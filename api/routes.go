@@ -16,6 +16,14 @@ func Register(mux *http.ServeMux, pa *pulseaudio.PulseAudioBackend, sd *systemd.
 		}),
 	)
 	mux.HandleFunc(
+		"POST /audio/server/mute",
+		MuteMasterHandler(pa),
+	)
+	mux.HandleFunc(
+		"POST /audio/server/volume",
+		SetVolumeMasterHandler(pa),
+	)
+	mux.HandleFunc(
 		"/audio/clients",
 		JSONHandler(func(w http.ResponseWriter, r *http.Request) (any, error) {
 			return pa.ListClients()
@@ -33,7 +41,7 @@ func Register(mux *http.ServeMux, pa *pulseaudio.PulseAudioBackend, sd *systemd.
 	// systemd routes
 	mux.HandleFunc(
 		"/services", 
-		 JSONHandler(func(w http.ResponseWriter, r *http.Request) (any, error) {
+		JSONHandler(func(w http.ResponseWriter, r *http.Request) (any, error) {
 			return sd.ListServices()
 		}),
 	)

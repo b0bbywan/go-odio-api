@@ -62,7 +62,18 @@ func (pa *PulseAudioBackend) ListClients() ([]AudioClient, error) {
 	return clients, nil
 }
 
-func (pa *PulseAudioBackend) SetMute(name string) error {
+func (pa *PulseAudioBackend) ToggleMuteMaster() error {
+	if _, err := pa.client.ToggleMute(); err != nil {
+		return fmt.Errorf("Failed to get default sink: %w", err)
+	}
+	return nil
+}
+
+func (pa *PulseAudioBackend) SetVolumeMaster(volume float32) error {
+	return pa.client.SetVolume(volume)
+}
+
+func (pa *PulseAudioBackend) ToggleMute(name string) error {
 	sink, err := pa.client.GetSinkInputByName(name)
 	if err != nil {
 		return fmt.Errorf("Failed to get Sink Input: %w", err)

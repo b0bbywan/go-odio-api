@@ -6,7 +6,7 @@ import (
 )
 
 type setVolumeRequest struct {
-	Volume float64 `json:"volume"`
+	Volume float32 `json:"volume"`
 }
 
 func JSONHandler(h func(http.ResponseWriter, *http.Request) (any, error)) http.HandlerFunc {
