@@ -22,8 +22,12 @@ func Register(mux *http.ServeMux, pa *pulseaudio.PulseAudioBackend, sd *systemd.
 		}),
 	)
 	mux.HandleFunc(
-		"POST /audio/clients/{sink}/mute", 
+		"POST /audio/clients/{sink}/mute",
 		MuteClientHandler(pa),
+	)
+	mux.HandleFunc(
+		"POST /audio/clients/{sink}/volume",
+		SetVolumeClientHandler(pa),
 	)
 
 	// systemd routes
