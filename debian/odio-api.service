@@ -1,0 +1,16 @@
+[Unit]
+Description=Dbus api for Odio
+Documentation=https://github.com/b0bbywan/go-odio-api
+Wants=sound.target
+After=sound.target
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+ExecStart=/usr/bin/odio-api
+Restart=always
+RestartSec=12
+TimeoutSec=30
+
+[Install]
+WantedBy=default.target

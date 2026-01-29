@@ -1,0 +1,8 @@
+#!/bin/bash
+set -e
+
+# Stop user service if running (best effort)
+systemctl --user stop odio-api.service 2>/dev/null || true
+systemctl --user disable odio-api.service 2>/dev/null || true
+
+exit 0

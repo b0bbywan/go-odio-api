@@ -1,0 +1,28 @@
+#!/usr/bin/make -f
+
+export DH_VERBOSE = 1
+export DH_BUILD_DDEBS = 0
+
+%:
+	dh $@ --buildsystem=golang
+
+override_dh_auto_test:
+	:
+
+override_dh_auto_build:
+	go build -v -o odio-api .
+
+override_dh_auto_install:
+	install -D -m 0755 odio-api debian/odio-api/usr/bin/odio-api
+
+override_dh_installsystemd:
+	dh_installsystemduser
+
+override_dh_dwz:
+	:
+
+override_dh_strip:
+	:
+
+override_dh_installinit:
+	:

@@ -1,0 +1,15 @@
+Source: odio-api
+Section: sound
+Priority: optional
+Maintainer: Mathieu Réquillart <mathieu.requillart@gmail.com>
+Build-Depends: debhelper-compat (= 13),
+               dh-golang,
+               golang-go,
+Standards-Version: 4.6.0
+Homepage: https://github.com/b0bbywan/go-odio-api
+
+Package: odio-api
+Architecture: any
+Depends: ${shlibs:Depends},
+         ${misc:Depends},
+Description: API for audio through dbus
