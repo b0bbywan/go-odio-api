@@ -1,7 +1,12 @@
 package pulseaudio
 
 import (
+	"context"
+
 	"github.com/the-jonsey/pulseaudio"
+
+	"github.com/b0bbywan/go-odio-api/cache"
+
 )
 
 type AudioServerKind string
@@ -15,6 +20,13 @@ type PulseAudioBackend struct {
 	client *pulseaudio.Client
 	server *pulseaudio.Server
 	kind   AudioServerKind
+	ctx    context.Context
+
+	// cache permanent (pas d'expiration)
+	cache *cache.Cache[[]AudioClient]
+
+	// listener pour les changements pulseaudio
+	listener *Listener
 }
 
 type ServerInfo struct {
