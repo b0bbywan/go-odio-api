@@ -2,6 +2,7 @@ package systemd
 
 import (
 	"context"
+	"log"
 
 	"github.com/b0bbywan/go-odio-api/cache"
 	"github.com/coreos/go-systemd/v22/dbus"
@@ -80,8 +81,14 @@ func (s *SystemdBackend) ListServices() ([]Service, error) {
 	// Charger depuis systemd
 	out := make([]Service, 0, len(s.serviceNames)*2)
 
-	sysSvcs, _ := s.listServices(s.ctx, s.sysConn, ScopeSystem, s.serviceNames)
-	userSvcs, _ := s.listServices(s.ctx, s.userConn, ScopeUser, s.serviceNames)
+	sysSvcs, err := s.listServices(s.ctx, s.sysConn, ScopeSystem, s.serviceNames)
+	if err != nil {
+		log.Printf("Warning: failed to list system services: %v", err)
+	}
+	userSvcs, err := s.listServices(s.ctx, s.userConn, ScopeUser, s.serviceNames)
+	if err != nil {
+		log.Printf("Warning: failed to list user services: %v", err)
+	}
 
 	out = append(out, sysSvcs...)
 	out = append(out, userSvcs...)
@@ -222,7 +229,9 @@ func (s *SystemdBackend) EnableService(name string, scope UnitScope) error {
 	}
 
 	// Rafraîchir uniquement ce service dans le cache
-	_, _ = s.RefreshService(name, scope)
+	if _, err := s.RefreshService(name, scope); err != nil {
+		log.Printf("Warning: failed to refresh service %q in cache: %v", name, err)
+	}
 	return nil
 }
 
@@ -246,7 +255,9 @@ func (s *SystemdBackend) DisableService(name string, scope UnitScope) error {
 	}
 
 	// Rafraîchir uniquement ce service dans le cache
-	_, _ = s.RefreshService(name, scope)
+	if _, err := s.RefreshService(name, scope); err != nil {
+		log.Printf("Warning: failed to refresh service %q in cache: %v", name, err)
+	}
 	return nil
 }
 
@@ -256,7 +267,9 @@ func (s *SystemdBackend) RestartService(name string, scope UnitScope) error {
 	}
 
 	// Rafraîchir uniquement ce service dans le cache
-	_, _ = s.RefreshService(name, scope)
+	if _, err := s.RefreshService(name, scope); err != nil {
+		log.Printf("Warning: failed to refresh service %q in cache: %v", name, err)
+	}
 	return nil
 }
 
