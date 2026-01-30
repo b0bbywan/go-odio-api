@@ -1,0 +1,9 @@
+services:
+  - bluetooth.service
+  - mpd.service
+  - pipewire-pulse.service
+  - pulseaudio.service
+  - shairport-sync.service
+  - snapclient.service
+  - spotifyd.service
+  - upmpdcli.service
