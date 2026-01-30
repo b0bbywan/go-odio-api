@@ -98,6 +98,10 @@ func (pa *PulseAudioBackend) SetVolume(name string, vol float32) error {
 	return sink.SetVolume(vol)
 }
 
+func (pa *PulseAudioBackend) Close () {
+	pa.client.Close()
+}
+
 func (pa *PulseAudioBackend) parseSinkInput(s pulseaudio.SinkInput) AudioClient {
 	switch pa.kind {
 	case ServerPipeWire:
