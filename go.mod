@@ -3,7 +3,7 @@ module github.com/b0bbywan/go-odio-api
 go 1.23.0
 
 require (
-	github.com/coreos/go-systemd/v22 v22.6.0
+	github.com/coreos/go-systemd/v22 v22.7.0
 	github.com/spf13/viper v1.21.0
 	github.com/the-jonsey/pulseaudio v0.0.1
 )
