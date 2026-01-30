@@ -1,0 +1,21 @@
+#!/bin/bash
+set -e
+
+echo "✓ odio-api installed"
+echo ""
+echo "Example configuration file available at:"
+echo "  /usr/share/odio-api/config.yaml"
+echo ""
+echo "To configure:"
+echo "  mkdir -p ~/.config/odio-api"
+echo "  cp /usr/share/odio-api/config.yaml ~/.config/odio-api/config.yaml"
+echo "  # Edit ~/.config/odio-api/config.yaml as needed"
+echo ""
+echo "To enable the user service:"
+echo "  systemctl --user enable odio-api.service"
+echo "  systemctl --user start odio-api.service"
+echo ""
+echo "To check status:"
+echo "  systemctl --user status odio-api.service"
+
+exit 0
