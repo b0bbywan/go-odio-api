@@ -44,7 +44,7 @@ func (l *Listener) Start() error {
 	// Subscribe system scope (sans filtre, on filtre nous-mêmes)
 	sysStatusCh, sysErrCh := l.backend.sysConn.SubscribeUnitsCustomContext(
 		l.ctx,
-		250*time.Millisecond, // interval de polling
+		500*time.Millisecond, // interval de polling
 		100,                  // buffer size
 		isChanged,
 		nil, // pas de filtre ici, on filtre dans listen()
@@ -53,7 +53,7 @@ func (l *Listener) Start() error {
 	// Subscribe user scope
 	userStatusCh, userErrCh := l.backend.userConn.SubscribeUnitsCustomContext(
 		l.ctx,
-		250*time.Millisecond,
+		500*time.Millisecond,
 		100,
 		isChanged,
 		nil, // pas de filtre ici, on filtre dans listen()
