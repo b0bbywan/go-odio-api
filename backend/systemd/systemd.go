@@ -14,9 +14,10 @@ const (
 )
 
 type SystemdBackend struct {
-	sysConn  *dbus.Conn
-	userConn *dbus.Conn
-	ctx      context.Context
+	sysConn      *dbus.Conn
+	userConn     *dbus.Conn
+	ctx          context.Context
+	serviceNames []string // Vient de la config
 }
 
 type Service struct {
@@ -29,7 +30,8 @@ type Service struct {
 	Description string 		`json:"description,omitempty"`
 }
 
-func New(ctx context.Context) (*SystemdBackend, error) {
+// New prend maintenant la liste des services depuis la config
+func New(ctx context.Context, serviceNames []string) (*SystemdBackend, error) {
 	sysC, err := dbus.NewSystemConnectionContext(ctx)
 	if err != nil {
 		return nil, err
@@ -39,24 +41,19 @@ func New(ctx context.Context) (*SystemdBackend, error) {
 		return nil, err
 	}
 
-	return &SystemdBackend{sysConn: sysC, userConn: userC, ctx: ctx}, nil
+	return &SystemdBackend{
+		sysConn:      sysC,
+		userConn:     userC,
+		ctx:          ctx,
+		serviceNames: serviceNames,
+	}, nil
 }
 
 func (s *SystemdBackend) ListServices() ([]Service, error) {
-	services := []string{
-		"mpd.service",
-		"mpd-discplayer.service",
-		"pipewire-pulse.service",
-		"pulseaudio.service",
-		"shairport-sync.service",
-		"snapclient.service",
-		"spotifyd.service",
-		"upmpdcli.service",
-	}
-	out := make([]Service, 0, len(services)*2)
+	out := make([]Service, 0, len(s.serviceNames)*2)
 
-	sysSvcs, _ := s.listServices(s.ctx, s.sysConn, ScopeSystem, services)
-	userSvcs, _ := s.listServices(s.ctx, s.userConn, ScopeUser, services)
+	sysSvcs, _ := s.listServices(s.ctx, s.sysConn, ScopeSystem, s.serviceNames)
+	userSvcs, _ := s.listServices(s.ctx, s.userConn, ScopeUser, s.serviceNames)
 
 	out = append(out, sysSvcs...)
 	out = append(out, userSvcs...)
@@ -81,8 +78,7 @@ func (s *SystemdBackend) listServices(ctx context.Context, conn *dbus.Conn, scop
 			services = append(services, svc)
 			continue
 		}
-		
-		// unit existante
+
 		svc.Exists = true
 		svc.Enabled = props["UnitFileState"] == "enabled"
 		svc.ActiveState, _ = props["ActiveState"].(string)
@@ -157,7 +153,6 @@ func restartUnit(ctx context.Context, conn *dbus.Conn, name string) error {
 		return conn.RestartUnitContext(ctx, name, "replace", ch)
 	})
 }
-
 
 func doUnitJob(
 	ctx context.Context,

@@ -6,11 +6,17 @@ import (
 	"net/http"
 
 	"github.com/b0bbywan/go-odio-api/api"
+	"github.com/b0bbywan/go-odio-api/config"
 	"github.com/b0bbywan/go-odio-api/backend/pulseaudio"
 	"github.com/b0bbywan/go-odio-api/backend/systemd"
 )
 
 func main() {
+	cfg, err := config.New()
+	if err != nil {
+		log.Fatalf("Failed to load config: %v", err)
+	}
+
 	// PulseAudio backend
 	pa, err := pulseaudio.New()
 	if err != nil {
@@ -18,7 +24,7 @@ func main() {
 	}
 
 	// systemd backend
-	sd, err := systemd.New(context.Background())
+	sd, err := systemd.New(context.Background(), cfg.Services)
 	if err != nil {
 		log.Fatal(err)
 	}
