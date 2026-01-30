@@ -208,7 +208,9 @@ func (pa *PulseAudioBackend) ToggleMute(name string) error {
 	}
 
 	// Rafraîchir le client dans le cache
-	_, _ = pa.RefreshClient(name)
+	if _, err := pa.RefreshClient(name); err != nil {
+		log.Printf("Warning: failed to refresh client %q in cache: %v", name, err)
+	}
 	return nil
 }
 
@@ -223,7 +225,9 @@ func (pa *PulseAudioBackend) SetVolume(name string, vol float32) error {
 	}
 
 	// Rafraîchir le client dans le cache
-	_, _ = pa.RefreshClient(name)
+	if _, err := pa.RefreshClient(name); err != nil {
+		log.Printf("Warning: failed to refresh client %q in cache: %v", name, err)
+	}
 	return nil
 }
 
