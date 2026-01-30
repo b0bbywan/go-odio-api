@@ -2,11 +2,9 @@ package systemd
 
 import (
 	"context"
-	"log"
-
-	"github.com/coreos/go-systemd/v22/dbus"
 
 	"github.com/b0bbywan/go-odio-api/cache"
+	"github.com/coreos/go-systemd/v22/dbus"
 )
 
 type UnitScope string
@@ -24,6 +22,9 @@ type SystemdBackend struct {
 
 	// cache permanent (pas d'expiration)
 	cache *cache.Cache[[]Service]
+
+	// listener pour les changements systemd
+	listener *Listener
 }
 
 type Service struct {
@@ -56,6 +57,12 @@ func New(ctx context.Context, serviceNames []string) (*SystemdBackend, error) {
 
 	// Charger le cache au démarrage
 	if _, err := backend.ListServices(); err != nil {
+		return nil, err
+	}
+
+	// Démarrer le listener pour les changements systemd
+	backend.listener = NewListener(backend)
+	if err := backend.listener.Start(); err != nil {
 		return nil, err
 	}
 
@@ -309,4 +316,17 @@ func (s *SystemdBackend) invalidateCache() {
 // InvalidateCache est l'API publique pour invalider le cache si nécessaire
 func (s *SystemdBackend) InvalidateCache() {
 	s.invalidateCache()
+}
+
+// Close ferme proprement les connexions et arrête le listener
+func (s *SystemdBackend) Close() {
+	if s.listener != nil {
+		s.listener.Stop()
+	}
+	if s.sysConn != nil {
+		s.sysConn.Close()
+	}
+	if s.userConn != nil {
+		s.userConn.Close()
+	}
 }
