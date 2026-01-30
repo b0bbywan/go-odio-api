@@ -42,15 +42,17 @@ func (l *Listener) listen(updates <-chan struct{}) {
 	for {
 		select {
 		case <-l.ctx.Done():
+			log.Println("PulseAudio listener context done")
 			return
 
-		case _, ok := <-updates:
+		case data, ok := <-updates:
 			if !ok {
+				log.Println("PulseAudio updates channel closed")
 				return
 			}
 
 			// Un sink input a changé, recharger le cache
-			log.Println("Sink inputs changed, refreshing cache")
+			log.Printf("⚠️ Sink inputs changed event received, refreshing cache: %v", data)
 			if _, err := l.backend.refreshCache(); err != nil {
 				log.Printf("Failed to refresh clients: %v", err)
 			}
