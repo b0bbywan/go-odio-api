@@ -11,10 +11,11 @@ import (
 
 // Listener écoute les changements systemd via signaux D-Bus natifs (godbus)
 type Listener struct {
-	backend *SystemdBackend
-	ctx     context.Context
-	cancel  context.CancelFunc
-	watched map[string]bool
+	backend  *SystemdBackend
+	ctx      context.Context
+	cancel   context.CancelFunc
+	watched  map[string]bool
+	headless bool
 
 	// Déduplication : dernier état connu par service/scope
 	lastState   map[string]string
@@ -35,6 +36,7 @@ func NewListener(backend *SystemdBackend) *Listener {
 		ctx:       ctx,
 		cancel:    cancel,
 		watched:   watched,
+		headless:  backend.Headless,
 		lastState: make(map[string]string),
 	}
 }
@@ -42,44 +44,47 @@ func NewListener(backend *SystemdBackend) *Listener {
 // Start démarre l'écoute des signaux D-Bus directement via godbus
 func (l *Listener) Start() error {
 	// Connexions D-Bus brutes pour les signaux
-	sysConn, err := dbus.ConnectSystemBus()
-	if err != nil {
+	if err := l.startScope(ScopeSystem); err != nil {
 		return err
 	}
 
-	userConn, err := dbus.ConnectSessionBus()
-	if err != nil {
-		sysConn.Close()
+	if err := l.startScope(ScopeUser); err != nil {
+		l.Stop()
 		return err
+	}
+
+	return nil
+}
+
+func (l *Listener) startScope(scope UnitScope) error {
+	var conn *dbus.Conn
+	var err error
+	if scope == ScopeSystem {
+		if conn, err = dbus.ConnectSystemBus(); err != nil {
+			return err
+		}
+	} else if scope == ScopeUser {
+		if !l.headless {
+			return nil
+		}
+		if conn, err = dbus.ConnectSessionBus(); err != nil {
+			return err
+		}
 	}
 
 	// S'abonner aux signaux de systemd (path filtre sur systemd1)
 	matchRule := "type='signal',sender='org.freedesktop.systemd1'"
 
-	if err := sysConn.BusObject().Call("org.freedesktop.DBus.AddMatch", 0, matchRule).Err; err != nil {
-		sysConn.Close()
-		userConn.Close()
+	if err := conn.BusObject().Call("org.freedesktop.DBus.AddMatch", 0, matchRule).Err; err != nil {
+		conn.Close()
 		return err
 	}
+	ch := make(chan *dbus.Signal, 10)
+	conn.Signal(ch)
 
-	if err := userConn.BusObject().Call("org.freedesktop.DBus.AddMatch", 0, matchRule).Err; err != nil {
-		sysConn.Close()
-		userConn.Close()
-		return err
-	}
+	go l.listen(ch, conn, scope)
 
-	// Channels pour les signaux
-	sysCh := make(chan *dbus.Signal, 10)
-	userCh := make(chan *dbus.Signal, 10)
-
-	sysConn.Signal(sysCh)
-	userConn.Signal(userCh)
-
-	// Goroutines d'écoute
-	go l.listen(sysCh, sysConn, ScopeSystem)
-	go l.listen(userCh, userConn, ScopeUser)
-
-	log.Println("Systemd listener started (signal-based)")
+	log.Printf("%s Systemd listener started (signal-based)", scope)
 	return nil
 }
 
