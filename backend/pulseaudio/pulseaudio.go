@@ -11,6 +11,8 @@ import (
 	"github.com/the-jonsey/pulseaudio"
 )
 
+const cacheKey = "clients"
+
 func New(ctx context.Context) (*PulseAudioBackend, error) {
 	xdgRuntimeDir, ok := os.LookupEnv("XDG_RUNTIME_DIR")
 	if !ok {
@@ -36,18 +38,23 @@ func New(ctx context.Context) (*PulseAudioBackend, error) {
 		cache:  cache.New[[]AudioClient](0), // TTL=0 = pas d'expiration
 	}
 
+	return backend, nil
+}
+
+// Start charge le cache initial et démarre le listener
+func (pa *PulseAudioBackend) Start() error {
 	// Charger le cache au démarrage
-	if _, err := backend.ListClients(); err != nil {
-		return nil, err
+	if _, err := pa.ListClients(); err != nil {
+		return err
 	}
 
 	// Démarrer le listener pour les changements pulseaudio
-	backend.listener = NewListener(backend)
-	if err := backend.listener.Start(); err != nil {
-		return nil, err
+	pa.listener = NewListener(pa)
+	if err := pa.listener.Start(); err != nil {
+		return err
 	}
 
-	return backend, nil
+	return nil
 }
 
 func (pa *PulseAudioBackend) ServerInfo() (*ServerInfo, error) {
@@ -71,8 +78,6 @@ func (pa *PulseAudioBackend) ServerInfo() (*ServerInfo, error) {
 
 	return nil, fmt.Errorf("server info unavailable")
 }
-
-const cacheKey = "clients"
 
 func (pa *PulseAudioBackend) ListClients() ([]AudioClient, error) {
 	// Vérifier le cache

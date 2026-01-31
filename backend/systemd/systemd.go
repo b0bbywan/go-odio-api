@@ -13,6 +13,7 @@ type UnitScope string
 const (
 	ScopeSystem UnitScope = "system"
 	ScopeUser   UnitScope = "user"
+	cacheKey    string    = "services"
 )
 
 type SystemdBackend struct {
@@ -56,21 +57,24 @@ func New(ctx context.Context, serviceNames []string) (*SystemdBackend, error) {
 		cache:        cache.New[[]Service](0), // TTL=0 = pas d'expiration
 	}
 
-	// Charger le cache au démarrage
-	if _, err := backend.ListServices(); err != nil {
-		return nil, err
-	}
-
-	// Démarrer le listener pour les changements systemd
-	backend.listener = NewListener(backend)
-	if err := backend.listener.Start(); err != nil {
-		return nil, err
-	}
-
 	return backend, nil
 }
 
-const cacheKey = "services"
+// Start charge le cache initial et démarre le listener
+func (s *SystemdBackend) Start() error {
+	// Charger le cache au démarrage
+	if _, err := s.ListServices(); err != nil {
+		return err
+	}
+
+	// Démarrer le listener pour les changements systemd
+	s.listener = NewListener(s)
+	if err := s.listener.Start(); err != nil {
+		return err
+	}
+
+	return nil
+}
 
 func (s *SystemdBackend) ListServices() ([]Service, error) {
 	// Vérifier le cache
