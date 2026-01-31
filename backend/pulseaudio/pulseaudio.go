@@ -2,6 +2,7 @@ package pulseaudio
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"strings"
 
@@ -33,6 +34,12 @@ func New() (*PulseAudioBackend, error) {
 }
 
 func (pa *PulseAudioBackend) ServerInfo() (*ServerInfo, error) {
+	var volume float32
+	var err error
+
+	if volume, err = pa.client.Volume(); err != nil {
+		log.Printf("failed to get client volume: %v", err)
+	}
 	if pa.server != nil {
 		return &ServerInfo{
 			Kind: 			pa.kind,
@@ -41,6 +48,7 @@ func (pa *PulseAudioBackend) ServerInfo() (*ServerInfo, error) {
 			User:			pa.server.User,
 			Hostname:		pa.server.Hostname,
 			DefaultSink:	pa.server.DefaultSink,
+			Volume:			volume,
 		}, nil
 	}
 

@@ -24,6 +24,7 @@ type ServerInfo struct {
 	User 		string 			`json:"user"`
 	Hostname 	string 			`json:"hostname"`
 	DefaultSink string			`json:"default_sink"`
+	Volume		float32			`json:"volume"`
 }
 
 type AudioClient struct {
