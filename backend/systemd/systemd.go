@@ -21,6 +21,7 @@ type SystemdBackend struct {
 	userConn     *dbus.Conn
 	ctx          context.Context
 	serviceNames []string
+	Headless     bool
 
 	// cache permanent (pas d'expiration)
 	cache *cache.Cache[[]Service]
@@ -39,7 +40,7 @@ type Service struct {
 	Description string 		`json:"description,omitempty"`
 }
 
-func New(ctx context.Context, serviceNames []string) (*SystemdBackend, error) {
+func New(ctx context.Context, serviceNames []string, headless bool) (*SystemdBackend, error) {
 	sysC, err := dbus.NewSystemConnectionContext(ctx)
 	if err != nil {
 		return nil, err
@@ -54,6 +55,7 @@ func New(ctx context.Context, serviceNames []string) (*SystemdBackend, error) {
 		userConn:     userC,
 		ctx:          ctx,
 		serviceNames: serviceNames,
+		Headless:     headless,
 		cache:        cache.New[[]Service](0), // TTL=0 = pas d'expiration
 	}
 

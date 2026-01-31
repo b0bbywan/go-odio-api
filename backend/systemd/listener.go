@@ -3,98 +3,210 @@ package systemd
 import (
 	"context"
 	"log"
-	"time"
+	"strings"
+	"sync"
 
-	"github.com/coreos/go-systemd/v22/dbus"
+	"github.com/godbus/dbus/v5"
 )
 
-// Listener écoute les changements systemd via D-Bus
+// Listener écoute les changements systemd via signaux D-Bus natifs (godbus)
 type Listener struct {
-	backend *SystemdBackend
-	ctx     context.Context
-	cancel  context.CancelFunc
+	backend  *SystemdBackend
+	ctx      context.Context
+	cancel   context.CancelFunc
+	watched  map[string]bool
+	headless bool
+
+	// Déduplication : dernier état connu par service/scope
+	lastState   map[string]string
+	lastStateMu sync.RWMutex
 }
 
 func NewListener(backend *SystemdBackend) *Listener {
 	ctx, cancel := context.WithCancel(backend.ctx)
-	return &Listener{
-		backend: backend,
-		ctx:     ctx,
-		cancel:  cancel,
-	}
-}
 
-// Start démarre l'écoute des événements D-Bus
-func (l *Listener) Start() error {
 	// Map pour filtrage rapide
-	watched := make(map[string]bool, len(l.backend.serviceNames))
-	for _, name := range l.backend.serviceNames {
+	watched := make(map[string]bool, len(backend.serviceNames))
+	for _, name := range backend.serviceNames {
 		watched[name] = true
 	}
 
-	// Fonction de comparaison : détecter les changements réels
-	isChanged := func(u1, u2 *dbus.UnitStatus) bool {
-		if u1 == nil || u2 == nil {
-			return true
-		}
-		// Changement si ActiveState ou LoadState différent
-		return u1.ActiveState != u2.ActiveState || u1.LoadState != u2.LoadState
+	return &Listener{
+		backend:   backend,
+		ctx:       ctx,
+		cancel:    cancel,
+		watched:   watched,
+		headless:  backend.Headless,
+		lastState: make(map[string]string),
+	}
+}
+
+// Start démarre l'écoute des signaux D-Bus directement via godbus
+func (l *Listener) Start() error {
+	// Connexions D-Bus brutes pour les signaux
+	if err := l.startScope(ScopeSystem); err != nil {
+		return err
 	}
 
-	// Subscribe system scope (sans filtre, on filtre nous-mêmes)
-	sysStatusCh, sysErrCh := l.backend.sysConn.SubscribeUnitsCustomContext(
-		l.ctx,
-		500*time.Millisecond, // interval de polling
-		100,                  // buffer size
-		isChanged,
-		nil, // pas de filtre ici, on filtre dans listen()
-	)
+	if err := l.startScope(ScopeUser); err != nil {
+		l.Stop()
+		return err
+	}
 
-	// Subscribe user scope
-	userStatusCh, userErrCh := l.backend.userConn.SubscribeUnitsCustomContext(
-		l.ctx,
-		500*time.Millisecond,
-		100,
-		isChanged,
-		nil, // pas de filtre ici, on filtre dans listen()
-	)
-
-	// Goroutines d'écoute
-	go l.listen(sysStatusCh, sysErrCh, ScopeSystem, watched)
-	go l.listen(userStatusCh, userErrCh, ScopeUser, watched)
-
-	log.Println("Systemd listener started")
 	return nil
 }
 
-func (l *Listener) listen(statusCh <-chan map[string]*dbus.UnitStatus, errCh <-chan error, scope UnitScope, watched map[string]bool) {
+func (l *Listener) startScope(scope UnitScope) error {
+	var conn *dbus.Conn
+	var err error
+	if scope == ScopeSystem {
+		if conn, err = dbus.ConnectSystemBus(); err != nil {
+			return err
+		}
+	} else if scope == ScopeUser {
+		if !l.headless {
+			return nil
+		}
+		if conn, err = dbus.ConnectSessionBus(); err != nil {
+			return err
+		}
+	}
+
+	// S'abonner aux signaux de systemd (path filtre sur systemd1)
+	matchRule := "type='signal',sender='org.freedesktop.systemd1'"
+
+	if err := conn.BusObject().Call("org.freedesktop.DBus.AddMatch", 0, matchRule).Err; err != nil {
+		conn.Close()
+		return err
+	}
+	ch := make(chan *dbus.Signal, 10)
+	conn.Signal(ch)
+
+	go l.listen(ch, conn, scope)
+
+	log.Printf("%s Systemd listener started (signal-based)", scope)
+	return nil
+}
+
+// unitNameFromPath extrait le nom de l'unité depuis le path D-Bus
+// Ex: /org/freedesktop/systemd1/unit/spotifyd_2eservice -> spotifyd.service
+func unitNameFromPath(path dbus.ObjectPath) string {
+	s := string(path)
+	const prefix = "/org/freedesktop/systemd1/unit/"
+	if !strings.HasPrefix(s, prefix) {
+		return ""
+	}
+	encoded := s[len(prefix):]
+	// Décoder les caractères échappés (ex: _2e -> .)
+	return decodeUnitName(encoded)
+}
+
+// decodeUnitName décode le nom d'unité échappé par systemd
+func decodeUnitName(encoded string) string {
+	var result strings.Builder
+	for i := 0; i < len(encoded); i++ {
+		if encoded[i] == '_' && i+2 < len(encoded) {
+			// Séquence d'échappement _XX (hex)
+			hex := encoded[i+1 : i+3]
+			var b byte
+			if _, err := parseHexByte(hex, &b); err == nil {
+				result.WriteByte(b)
+				i += 2
+				continue
+			}
+		}
+		result.WriteByte(encoded[i])
+	}
+	return result.String()
+}
+
+func parseHexByte(s string, b *byte) (bool, error) {
+	if len(s) != 2 {
+		return false, nil
+	}
+	val := 0
+	for _, c := range s {
+		val <<= 4
+		switch {
+		case c >= '0' && c <= '9':
+			val |= int(c - '0')
+		case c >= 'a' && c <= 'f':
+			val |= int(c - 'a' + 10)
+		case c >= 'A' && c <= 'F':
+			val |= int(c - 'A' + 10)
+		default:
+			return false, nil
+		}
+	}
+	*b = byte(val)
+	return true, nil
+}
+
+// stateKey génère une clé unique pour le couple service/scope
+func stateKey(name string, scope UnitScope) string {
+	return string(scope) + "/" + name
+}
+
+func (l *Listener) listen(ch <-chan *dbus.Signal, conn *dbus.Conn, scope UnitScope) {
+	defer conn.Close()
+
 	for {
 		select {
 		case <-l.ctx.Done():
 			return
 
-		case err, ok := <-errCh:
-			if !ok {
-				return
-			}
-			log.Printf("Systemd listener error (%s): %v", scope, err)
-
-		case statuses, ok := <-statusCh:
+		case sig, ok := <-ch:
 			if !ok {
 				return
 			}
 
-			// Filtrer et rafraîchir uniquement les services surveillés
-			for name := range statuses {
-				// IMPORTANT: filtrer ici
-				if !watched[name] {
-					continue
-				}
+			// Extraire le nom de l'unité depuis le path
+			unitName := unitNameFromPath(sig.Path)
+			if unitName == "" {
+				continue
+			}
 
-				log.Printf("Unit changed: %s/%s", scope, name)
-				if _, err := l.backend.RefreshService(name, scope); err != nil {
-					log.Printf("Failed to refresh service %s/%s: %v", scope, name, err)
-				}
+			// Filtrer : uniquement les services surveillés
+			if !l.watched[unitName] {
+				continue
+			}
+
+			// Extraire SubState depuis les propriétés changées (signaux PropertiesChanged)
+			if len(sig.Body) < 2 {
+				continue
+			}
+			changed, ok := sig.Body[1].(map[string]dbus.Variant)
+			if !ok {
+				continue
+			}
+
+			subStateVar, hasSubState := changed["SubState"]
+			if !hasSubState {
+				continue
+			}
+			subState, ok := subStateVar.Value().(string)
+			if !ok {
+				continue
+			}
+
+			// Déduplication : ignorer si même état que précédemment
+			key := stateKey(unitName, scope)
+			l.lastStateMu.RLock()
+			lastState := l.lastState[key]
+			l.lastStateMu.RUnlock()
+
+			if lastState == subState {
+				continue
+			}
+
+			// Mettre à jour le dernier état connu
+			l.lastStateMu.Lock()
+			l.lastState[key] = subState
+			l.lastStateMu.Unlock()
+
+			log.Printf("Unit changed: %s/%s -> %s", scope, unitName, subState)
+			if _, err := l.backend.RefreshService(unitName, scope); err != nil {
+				log.Printf("Failed to refresh service %s/%s: %v", scope, unitName, err)
 			}
 		}
 	}
@@ -103,9 +215,6 @@ func (l *Listener) listen(statusCh <-chan map[string]*dbus.UnitStatus, errCh <-c
 // Stop arrête le listener
 func (l *Listener) Stop() {
 	log.Println("Stopping systemd listener")
-	// Unsubscribe pour fermer les channels
-	l.backend.sysConn.Unsubscribe()
-	l.backend.userConn.Unsubscribe()
 	l.cancel()
-	log.Println("Stoppped")
+	log.Println("Stopped")
 }
