@@ -3,6 +3,7 @@ package systemd
 import (
 	"context"
 	"log"
+	"time"
 
 	"github.com/b0bbywan/go-odio-api/cache"
 	"github.com/coreos/go-systemd/v22/dbus"
@@ -56,7 +57,7 @@ func New(ctx context.Context, serviceNames []string, headless bool) (*SystemdBac
 		ctx:          ctx,
 		serviceNames: serviceNames,
 		Headless:     headless,
-		cache:        cache.New[[]Service](0), // TTL=0 = pas d'expiration
+		cache:        cache.New[[]Service](2), // TTL=0 = pas d'expiration
 	}
 
 	return backend, nil
@@ -87,6 +88,7 @@ func (s *SystemdBackend) ListServices() ([]Service, error) {
 	// Charger depuis systemd
 	out := make([]Service, 0, len(s.serviceNames)*2)
 
+	start := time.Now()
 	sysSvcs, err := s.listServices(s.ctx, s.sysConn, ScopeSystem, s.serviceNames)
 	if err != nil {
 		log.Printf("Warning: failed to list system services: %v", err)
@@ -95,6 +97,9 @@ func (s *SystemdBackend) ListServices() ([]Service, error) {
 	if err != nil {
 		log.Printf("Warning: failed to list user services: %v", err)
 	}
+	elapsed := time.Since(start)
+	log.Printf("units listed in %s", elapsed)
+
 
 	out = append(out, sysSvcs...)
 	out = append(out, userSvcs...)
