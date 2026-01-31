@@ -168,13 +168,9 @@ func (l *Listener) listen(
 				return
 			}
 
-			// DEBUG: afficher tous les signaux reçus
-			log.Printf("DEBUG [%s] Signal: name=%s path=%s body=%v", scope, sig.Name, sig.Path, sig.Body)
-
 			// Extraire le nom de l'unité depuis le path
 			unitName := unitNameFromPath(sig.Path)
 			if unitName == "" {
-				log.Printf("DEBUG [%s] no unit name from path", scope)
 				continue
 			}
 
@@ -183,24 +179,17 @@ func (l *Listener) listen(
 				continue
 			}
 
-			log.Printf("DEBUG [%s] watched unit: %s", scope, unitName)
-
-			// Extraire SubState depuis les propriétés changées
+			// Extraire SubState depuis les propriétés changées (signaux PropertiesChanged)
 			if len(sig.Body) < 2 {
-				log.Printf("DEBUG [%s] body too short", scope)
 				continue
 			}
 			changed, ok := sig.Body[1].(map[string]dbus.Variant)
 			if !ok {
-				log.Printf("DEBUG [%s] body[1] not map: %T", scope, sig.Body[1])
 				continue
 			}
 
-			log.Printf("DEBUG [%s] changed props: %v", scope, changed)
-
 			subStateVar, hasSubState := changed["SubState"]
 			if !hasSubState {
-				log.Printf("DEBUG [%s] no SubState in changed", scope)
 				continue
 			}
 			subState, ok := subStateVar.Value().(string)
