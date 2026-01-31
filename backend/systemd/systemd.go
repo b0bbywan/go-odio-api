@@ -3,6 +3,7 @@ package systemd
 import (
 	"context"
 	"log"
+	"time"
 
 	"github.com/coreos/go-systemd/v22/dbus"
 
@@ -80,6 +81,7 @@ func (s *SystemdBackend) Start() error {
 
 func (s *SystemdBackend) ListServices() ([]Service, error) {
 	out := make([]Service, 0, len(s.config.SystemServices)+len(s.config.UserServices))
+	start := time.Now()
 
 	sysSvcs, err := s.listServices(s.ctx, s.sysConn, ScopeSystem, s.config.SystemServices)
 	if err != nil {
@@ -89,6 +91,9 @@ func (s *SystemdBackend) ListServices() ([]Service, error) {
 	if err != nil {
 		logger.Warn("failed to list user services: %v", err)
 	}
+	elapsed := time.Since(start)
+	log.Printf("units listed in %s", elapsed)
+
 
 	out = append(out, sysSvcs...)
 	out = append(out, userSvcs...)

@@ -74,7 +74,7 @@ func (l *Listener) startScope(scope UnitScope, watched map[string]bool) error {
 		}
 	} else if scope == ScopeUser {
 		if l.headless {
-			return l.StartHeadless()
+			return nil
 		}
 		if conn, err = dbus.ConnectSessionBus(); err != nil {
 			return err
