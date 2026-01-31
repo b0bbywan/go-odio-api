@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -14,10 +15,14 @@ const (
 
 type Config struct {
 	Services []string
+	Port     int
+	Headless bool
 }
 
 func New() (*Config, error) {
 	viper.SetDefault("Services", []string{})
+	viper.SetDefault("Port", 8080)
+
 	// Load from configuration file, environment variables, and CLI flags
 	viper.SetConfigName("config")                       // name of config file (without extension)
 	viper.SetConfigType("yaml")                         // config file format
@@ -33,8 +38,21 @@ func New() (*Config, error) {
 		}
 	}
 
+	var headless bool
+	if desktop := os.Getenv("XDG_SESSION_DESKTOP"); desktop == "" {
+		log.Println("running in headless mode")
+		headless = true
+	}
+
+	port := viper.GetInt("Port")
+	if port <= 0 || port > 65535 {
+		return nil, fmt.Errorf("invalid port: %d", port)
+	}
+
 	cfg := Config{
 		Services: viper.GetStringSlice("services"),
+		Port:     port,
+		Headless: headless,
 	}
 
 	return &cfg, nil
