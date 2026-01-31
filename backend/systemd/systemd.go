@@ -162,6 +162,8 @@ func (s *SystemdBackend) RefreshService(name string, scope UnitScope) (*Service,
 		}
 	}
 
+	log.Printf("RefreshService: %s/%s -> running=%v, activeState=%s", scope, name, svc.Running, svc.ActiveState)
+
 	// Mettre à jour dans le cache
 	if err := s.UpdateService(svc); err != nil {
 		return nil, err
