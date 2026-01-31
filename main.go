@@ -10,8 +10,7 @@ import (
 	"time"
 
 	"github.com/b0bbywan/go-odio-api/api"
-	"github.com/b0bbywan/go-odio-api/backend/pulseaudio"
-	"github.com/b0bbywan/go-odio-api/backend/systemd"
+	"github.com/b0bbywan/go-odio-api/backend"
 	"github.com/b0bbywan/go-odio-api/config"
 )
 
@@ -26,19 +25,18 @@ func main() {
 	defer cancel()
 
 	// PulseAudio backend
-	pa, err := pulseaudio.New(ctx)
+	b, err := backend.New(ctx, cfg.Services)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	// systemd backend
-	sd, err := systemd.New(ctx, cfg.Services)
-	if err != nil {
+	if err := b.Start(); err != nil {
 		log.Fatal(err)
 	}
 
 	mux := http.NewServeMux()
-	api.Register(mux, pa, sd)
+	api.Register(mux, b)
 
 	// HTTP server
 	srv := &http.Server{
@@ -58,8 +56,7 @@ func main() {
 		cancel()
 
 		// Cleanup des backends
-		sd.Close()
-		pa.Close()
+		b.Close()
 
 		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer shutdownCancel()
