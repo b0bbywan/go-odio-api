@@ -178,30 +178,20 @@ func (s *SystemdBackend) RefreshService(name string, scope UnitScope) (*Service,
 
 func (s *SystemdBackend) listServices(ctx context.Context, conn *dbus.Conn, scope UnitScope, names []string) ([]Service, error) {
 	services := make([]Service, 0, len(names))
+	units, err := conn.ListUnitsByNamesContext(ctx, names)
+	if err != nil {
+		return nil, err
+	}
 
-	for _, name := range names {
+	for _, unit := range units {
+		log.Printf("%s: %s %s %s %s", unit.Name, unit.ActiveState, unit.SubState, unit.LoadState, unit.Description)
 		svc := Service{
-			Name:  name,
+			Name:  unit.Name,
 			Scope: scope,
-		}
-
-		props, err := conn.GetUnitPropertiesContext(ctx, name)
-		if err != nil || props["UnitFileState"] == nil || props["UnitFileState"] == "" {
-			// unit inexistante
-			svc.Exists = false
-			svc.Enabled = false
-			services = append(services, svc)
-			continue
-		}
-
-		svc.Exists = true
-		svc.Enabled = props["UnitFileState"] == "enabled"
-		svc.ActiveState, _ = props["ActiveState"].(string)
-		subState, _ := props["SubState"].(string)
-		svc.Running = svc.ActiveState == "active" && subState == "running"
-
-		if desc, ok := props["Description"].(string); ok {
-			svc.Description = desc
+			ActiveState: unit.ActiveState,
+			Running: unit.SubState == "running",
+			Exists: unit.LoadState == "loaded",
+			Description: unit.Description,
 		}
 
 		services = append(services, svc)
