@@ -26,7 +26,7 @@ func main() {
 	defer cancel()
 
 	// PulseAudio backend
-	b, err := backend.New(ctx, cfg.Services)
+	b, err := backend.New(ctx, cfg.Services, cfg.Headless)
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -12,7 +12,7 @@ type Backend struct {
 	Systemd	*systemd.SystemdBackend
 }
 
-func New(ctx context.Context, services []string) (*Backend, error) {
+func New(ctx context.Context, services []string, headless bool) (*Backend, error) {
 	var backend Backend
 	if p, err := pulseaudio.New(ctx); err != nil {
 		return nil, err
@@ -20,7 +20,7 @@ func New(ctx context.Context, services []string) (*Backend, error) {
 		backend.Pulse = p
 	}
 
-	if s, err := systemd.New(ctx, services); err != nil {
+	if s, err := systemd.New(ctx, services, headless); err != nil {
 		return nil, err
 	} else {
 		backend.Systemd = s
