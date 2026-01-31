@@ -17,13 +17,13 @@ const (
 type Config struct {
 	Services *SystemdConfig
 	Port     int
-	Headless bool
 	LogLevel logger.Level
 }
 
 type SystemdConfig struct {
 	SystemServices []string
 	UserServices   []string
+	Headless       bool
 }
 
 // parseLogLevel converts a string to a logger.Level
@@ -79,12 +79,12 @@ func New() (*Config, error) {
 	syscfg := SystemdConfig{
 		SystemServices: viper.GetStringSlice("services.system"),
 		UserServices:   viper.GetStringSlice("services.user"),
+		Headless: headless,
 	}
 
 	cfg := Config{
 		Services: &syscfg,
 		Port:     port,
-		Headless: headless,
 		LogLevel: parseLogLevel(viper.GetString("LogLevel")),
 	}
 
