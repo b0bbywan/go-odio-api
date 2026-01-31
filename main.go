@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -38,9 +39,10 @@ func main() {
 	mux := http.NewServeMux()
 	api.Register(mux, b)
 
+	port := fmt.Sprintf(":%d",cfg.Port)
 	// HTTP server
 	srv := &http.Server{
-		Addr:    ":8080",
+		Addr:    port,
 		Handler: mux,
 	}
 
@@ -66,7 +68,7 @@ func main() {
 		}
 	}()
 
-	log.Println("Odio Audio API running on :8080")
+	log.Printf("Odio Audio API running on %s", port)
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Printf("Server error: %v", err)
 	}
