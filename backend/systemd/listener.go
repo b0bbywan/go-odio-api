@@ -61,9 +61,8 @@ func (l *Listener) Start() error {
 		return err
 	}
 
-	// S'abonner aux signaux PropertiesChanged de systemd
-	// On filtre par interface pour ne recevoir que les changements d'unités
-	matchRule := "type='signal',interface='org.freedesktop.DBus.Properties',member='PropertiesChanged',arg0='org.freedesktop.systemd1.Unit'"
+	// S'abonner aux signaux de systemd (path filtre sur systemd1)
+	matchRule := "type='signal',sender='org.freedesktop.systemd1'"
 
 	if err := sysConn.BusObject().Call("org.freedesktop.DBus.AddMatch", 0, matchRule).Err; err != nil {
 		sysConn.Close()
