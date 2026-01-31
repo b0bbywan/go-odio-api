@@ -3,6 +3,7 @@ package systemd
 import (
 	"context"
 	"log"
+	"sync"
 
 	"github.com/coreos/go-systemd/v22/dbus"
 )
@@ -13,6 +14,10 @@ type Listener struct {
 	ctx     context.Context
 	cancel  context.CancelFunc
 	watched map[string]bool
+
+	// Déduplication : dernier état connu par service/scope
+	lastState   map[string]string
+	lastStateMu sync.RWMutex
 }
 
 func NewListener(backend *SystemdBackend) *Listener {
@@ -25,10 +30,11 @@ func NewListener(backend *SystemdBackend) *Listener {
 	}
 
 	return &Listener{
-		backend: backend,
-		ctx:     ctx,
-		cancel:  cancel,
-		watched: watched,
+		backend:   backend,
+		ctx:       ctx,
+		cancel:    cancel,
+		watched:   watched,
+		lastState: make(map[string]string),
 	}
 }
 
@@ -44,9 +50,9 @@ func (l *Listener) Start() error {
 
 	// Channels pour recevoir les mises à jour (signaux D-Bus natifs, pas de polling)
 	sysUpdateCh := make(chan *dbus.SubStateUpdate, 10)
-	sysErrCh := make(chan error, 1)
+	sysErrCh := make(chan error, 10)
 	userUpdateCh := make(chan *dbus.SubStateUpdate, 10)
-	userErrCh := make(chan error, 1)
+	userErrCh := make(chan error, 10)
 
 	// Enregistrer les subscribers
 	l.backend.sysConn.SetSubStateSubscriber(sysUpdateCh, sysErrCh)
@@ -60,17 +66,22 @@ func (l *Listener) Start() error {
 	return nil
 }
 
+// stateKey génère une clé unique pour le couple service/scope
+func stateKey(name string, scope UnitScope) string {
+	return string(scope) + "/" + name
+}
+
 func (l *Listener) listen(updateCh <-chan *dbus.SubStateUpdate, errCh <-chan error, scope UnitScope) {
 	for {
 		select {
 		case <-l.ctx.Done():
 			return
 
-		case err, ok := <-errCh:
+		case _, ok := <-errCh:
 			if !ok {
 				return
 			}
-			log.Printf("Systemd listener error (%s): %v", scope, err)
+			// Ignorer les erreurs (souvent spam au shutdown)
 
 		case update, ok := <-updateCh:
 			if !ok {
@@ -81,6 +92,21 @@ func (l *Listener) listen(updateCh <-chan *dbus.SubStateUpdate, errCh <-chan err
 			if !l.watched[update.UnitName] {
 				continue
 			}
+
+			// Déduplication : ignorer si même état que précédemment
+			key := stateKey(update.UnitName, scope)
+			l.lastStateMu.RLock()
+			lastState := l.lastState[key]
+			l.lastStateMu.RUnlock()
+
+			if lastState == update.SubState {
+				continue
+			}
+
+			// Mettre à jour le dernier état connu
+			l.lastStateMu.Lock()
+			l.lastState[key] = update.SubState
+			l.lastStateMu.Unlock()
 
 			log.Printf("Unit changed: %s/%s -> %s", scope, update.UnitName, update.SubState)
 			if _, err := l.backend.RefreshService(update.UnitName, scope); err != nil {
@@ -93,8 +119,8 @@ func (l *Listener) listen(updateCh <-chan *dbus.SubStateUpdate, errCh <-chan err
 // Stop arrête le listener
 func (l *Listener) Stop() {
 	log.Println("Stopping systemd listener")
+	l.cancel()
 	l.backend.sysConn.Unsubscribe()
 	l.backend.userConn.Unsubscribe()
-	l.cancel()
 	log.Println("Stopped")
 }
