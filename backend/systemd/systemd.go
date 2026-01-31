@@ -58,6 +58,7 @@ func New(ctx context.Context, config *config.SystemdConfig) (*SystemdBackend, er
 		userConn:     userC,
 		ctx:          ctx,
 		config:       config,
+		cache:        cache.New[[]Service](0), // TTL=0 = pas d'expiration
 	}, nil
 }
 
@@ -169,7 +170,6 @@ func (s *SystemdBackend) RefreshService(name string, scope UnitScope) (*Service,
 
 	return &svc, nil
 }
-
 
 func (s *SystemdBackend) listServices(ctx context.Context, conn *dbus.Conn, scope UnitScope, names []string) ([]Service, error) {
 	services := make([]Service, 0, len(names))
