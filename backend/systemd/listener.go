@@ -46,22 +46,28 @@ func (l *Listener) Start() error {
 		return u1.ActiveState != u2.ActiveState || u1.LoadState != u2.LoadState
 	}
 
-	// Subscribe system scope (sans filtre, on filtre nous-mêmes)
+	// Fonction de filtrage : ne surveiller que les services configurés
+	// Cela évite de poll TOUS les units systemd à chaque intervalle
+	filterUnit := func(name string) bool {
+		return watched[name]
+	}
+
+	// Subscribe system scope
 	sysStatusCh, sysErrCh := l.backend.sysConn.SubscribeUnitsCustomContext(
 		l.ctx,
-		500*time.Millisecond, // interval de polling
-		100,                  // buffer size
+		time.Second, // interval de polling (1s suffit pour les changements d'état)
+		10,          // buffer size réduit (moins d'events attendus)
 		isChanged,
-		nil, // pas de filtre ici, on filtre dans listen()
+		filterUnit,
 	)
 
 	// Subscribe user scope
 	userStatusCh, userErrCh := l.backend.userConn.SubscribeUnitsCustomContext(
 		l.ctx,
-		500*time.Millisecond,
-		100,
+		time.Second,
+		10,
 		isChanged,
-		nil, // pas de filtre ici, on filtre dans listen()
+		filterUnit,
 	)
 
 	// Goroutines d'écoute
