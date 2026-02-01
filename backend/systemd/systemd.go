@@ -148,27 +148,13 @@ func (s *SystemdBackend) UpdateService(updated Service) error {
 func (s *SystemdBackend) RefreshService(name string, scope UnitScope) (*Service, error) {
 	conn := s.connForScope(scope)
 
-	svc := Service{
-		Name:  name,
-		Scope: scope,
-	}
-
 	props, err := conn.GetUnitPropertiesContext(s.ctx, name)
-	if err != nil || props["UnitFileState"] == nil || props["UnitFileState"] == "" {
-		svc.Exists = false
-		svc.Enabled = false
-	} else {
-		svc.Exists = true
-		svc.Enabled = props["UnitFileState"] == "enabled"
-		svc.ActiveState, _ = props["ActiveState"].(string)
-		subState, _ := props["SubState"].(string)
-		svc.Running = svc.ActiveState == "active" && subState == "running"
-		if desc, ok := props["Description"].(string); ok {
-			svc.Description = desc
-		}
+	if err != nil {
+		props = nil
 	}
 
-	// Mettre à jour dans le cache
+	svc := serviceFromProps(name, scope, props)
+
 	if err := s.UpdateService(svc); err != nil {
 		return nil, err
 	}
@@ -176,7 +162,12 @@ func (s *SystemdBackend) RefreshService(name string, scope UnitScope) (*Service,
 	return &svc, nil
 }
 
-func (s *SystemdBackend) listServices(ctx context.Context, conn *dbus.Conn, scope UnitScope, names []string) ([]Service, error) {
+func (s *SystemdBackend) listServices(
+	ctx context.Context,
+	conn *dbus.Conn,
+	scope UnitScope,
+	names []string,
+) ([]Service, error) {
 	services := make([]Service, 0, len(names))
 	units, err := conn.ListUnitsByNamesContext(ctx, names)
 	if err != nil {
@@ -184,20 +175,58 @@ func (s *SystemdBackend) listServices(ctx context.Context, conn *dbus.Conn, scop
 	}
 
 	for _, unit := range units {
-		log.Printf("%s: %s %s %s %s", unit.Name, unit.ActiveState, unit.SubState, unit.LoadState, unit.Description)
-		svc := Service{
-			Name:  unit.Name,
-			Scope: scope,
-			ActiveState: unit.ActiveState,
-			Running: unit.SubState == "running",
-			Exists: unit.LoadState == "loaded",
-			Description: unit.Description,
-		}
+		if loaded := unit.LoadState == "loaded"; loaded {
+			svc := Service{
+				Name:  unit.Name,
+				Scope: scope,
+				ActiveState: unit.ActiveState,
+				Running: unit.SubState == "running",
+				Exists: loaded,
+			}
+			enabled, err := conn.GetUnitPropertyContext(ctx, unit.Name, "UnitFileState")
+			if err != nil {
+				log.Printf("failed to get %s state: %v", err)
+			} else {
+				svc.Enabled = enabled.Value.Value().(string) == "enabled"
+			}
+			description, err := conn.GetUnitPropertyContext(ctx, unit.Name, "UnitFileState")
+			if err != nil {
+				log.Printf("failed to get %s description: %v", err)
+			} else {
+				svc.Description = description.Value.Value().(string)
+			}
 
-		services = append(services, svc)
+			services = append(services, svc)
+		}
 	}
 
 	return services, nil
+}
+
+func serviceFromProps(name string, scope UnitScope, props map[string]interface{}) Service {
+	svc := Service{
+		Name:  name,
+		Scope: scope,
+	}
+
+	if props == nil || props["UnitFileState"] == nil || props["UnitFileState"] == "" {
+		svc.Exists = false
+		svc.Enabled = false
+		return svc
+	}
+
+	svc.Exists = true
+	svc.Enabled = props["UnitFileState"] == "enabled"
+	svc.ActiveState, _ = props["ActiveState"].(string)
+
+	subState, _ := props["SubState"].(string)
+	svc.Running = svc.ActiveState == "active" && subState == "running"
+
+	if desc, ok := props["Description"].(string); ok {
+		svc.Description = desc
+	}
+
+	return svc
 }
 
 func (s *SystemdBackend) EnableService(name string, scope UnitScope) error {
