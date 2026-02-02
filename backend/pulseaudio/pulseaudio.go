@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/b0bbywan/go-odio-api/cache"
 	"github.com/the-jonsey/pulseaudio"
@@ -18,22 +19,10 @@ func New(ctx context.Context) (*PulseAudioBackend, error) {
 	if !ok {
 		xdgRuntimeDir = fmt.Sprintf("/run/user/%d", os.Getuid())
 	}
-	addressArr := fmt.Sprintf("%s/pulse/native", xdgRuntimeDir)
-
-	c, err := pulseaudio.NewClient(addressArr)
-	if err != nil {
-		return nil, err
-	}
-	server, err := c.ServerInfo()
-	if err != nil {
-		return nil, err
-	}
-	kind := detectServerKind(server)
+	address := fmt.Sprintf("%s/pulse/native", xdgRuntimeDir)
 
 	backend := &PulseAudioBackend{
-		client: c,
-		server: server,
-		kind:   kind,
+		address: address,
 		ctx:    ctx,
 		cache:  cache.New[[]AudioClient](0), // TTL=0 = pas d'expiration
 	}
@@ -43,6 +32,18 @@ func New(ctx context.Context) (*PulseAudioBackend, error) {
 
 // Start charge le cache initial et démarre le listener
 func (pa *PulseAudioBackend) Start() error {
+	pa.mu.Lock()
+	defer pa.mu.Unlock()
+	var err error
+	if pa.client, err = pulseaudio.NewClient(pa.address); err != nil {
+		return err
+	}
+
+	if pa.server, err = pa.client.ServerInfo(); err != nil {
+		return err
+	}
+	pa.kind = detectServerKind(pa.server)
+
 	// Charger le cache au démarrage
 	if _, err := pa.ListClients(); err != nil {
 		return err
@@ -54,7 +55,58 @@ func (pa *PulseAudioBackend) Start() error {
 		return err
 	}
 
+	go pa.heartbeat()
+
 	return nil
+}
+
+func (pa *PulseAudioBackend) Reconnect() error {
+	pa.Close()
+
+	return pa.Start()
+}
+
+func (pa *PulseAudioBackend) heartbeat() {
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-pa.ctx.Done():
+			return
+		case <-ticker.C:
+			if pa.client == nil || !pa.client.Connected() {
+				pa.reconnectWithBackoff()
+				return
+			}
+		}
+	}
+}
+
+func (pa *PulseAudioBackend) reconnectWithBackoff() {
+	backoff := time.Second
+	maxBackoff := 30 * time.Second
+
+	for {
+		select {
+		case <-pa.ctx.Done():
+			return
+		default:
+		}
+
+		if err := pa.Reconnect(); err != nil {
+			log.Printf("PulseAudio reconnect failed, retry in %s\n", backoff)
+			time.Sleep(backoff)
+
+			backoff *= 2
+			if backoff > maxBackoff {
+				backoff = maxBackoff
+			}
+			continue
+		}
+
+		log.Println("PulseAudio reconnected")
+		return
+	}
 }
 
 func (pa *PulseAudioBackend) ServerInfo() (*ServerInfo, error) {
@@ -231,9 +283,12 @@ func (pa *PulseAudioBackend) InvalidateCache() {
 func (pa *PulseAudioBackend) Close() {
 	if pa.listener != nil {
 		pa.listener.Stop()
+		pa.listener = nil
+
 	}
 	if pa.client != nil {
 		pa.client.Close()
+		pa.client = nil
 	}
 }
 
