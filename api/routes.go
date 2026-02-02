@@ -3,58 +3,57 @@ package api
 import (
 	"net/http"
 
-	"github.com/b0bbywan/go-odio-api/backend/pulseaudio"
-	"github.com/b0bbywan/go-odio-api/backend/systemd"
+	"github.com/b0bbywan/go-odio-api/backend"
 )
 
-func Register(mux *http.ServeMux, pa *pulseaudio.PulseAudioBackend, sd *systemd.SystemdBackend) {
+func Register(mux *http.ServeMux, b *backend.Backend) {
 	// pulse routes
 	mux.HandleFunc(
 		"/audio/server",
 		JSONHandler(func(w http.ResponseWriter, r *http.Request) (any, error) {
-			return pa.ServerInfo()
+			return b.Pulse.ServerInfo()
 		}),
 	)
 	mux.HandleFunc(
 		"POST /audio/server/mute",
-		MuteMasterHandler(pa),
+		MuteMasterHandler(b.Pulse),
 	)
 	mux.HandleFunc(
 		"POST /audio/server/volume",
-		SetVolumeMasterHandler(pa),
+		SetVolumeMasterHandler(b.Pulse),
 	)
 	mux.HandleFunc(
 		"/audio/clients",
 		JSONHandler(func(w http.ResponseWriter, r *http.Request) (any, error) {
-			return pa.ListClients()
+			return b.Pulse.ListClients()
 		}),
 	)
 	mux.HandleFunc(
 		"POST /audio/clients/{sink}/mute",
-		MuteClientHandler(pa),
+		MuteClientHandler(b.Pulse),
 	)
 	mux.HandleFunc(
 		"POST /audio/clients/{sink}/volume",
-		SetVolumeClientHandler(pa),
+		SetVolumeClientHandler(b.Pulse),
 	)
 
 	// systemd routes
 	mux.HandleFunc(
 		"/services", 
 		JSONHandler(func(w http.ResponseWriter, r *http.Request) (any, error) {
-			return sd.ListServices()
+			return b.Systemd.ListServices()
 		}),
 	)
 	mux.HandleFunc(
 		"POST /services/{scope}/{unit}/enable",
-		withService(sd, sd.EnableService),
+		withService(b.Systemd, b.Systemd.EnableService),
 	)
 	mux.HandleFunc(
 		"POST /services/{scope}/{unit}/disable",
-		withService(sd, sd.DisableService),
+		withService(b.Systemd, b.Systemd.DisableService),
 	)
 	mux.HandleFunc(
 		"POST /services/{scope}/{unit}/restart",
-		withService(sd, sd.RestartService),
+		withService(b.Systemd, b.Systemd.RestartService),
 	)
 }
