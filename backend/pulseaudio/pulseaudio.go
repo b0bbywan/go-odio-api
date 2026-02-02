@@ -3,12 +3,12 @@ package pulseaudio
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/b0bbywan/go-odio-api/cache"
+	"github.com/b0bbywan/go-odio-api/logger"
 	"github.com/the-jonsey/pulseaudio"
 )
 
@@ -94,7 +94,7 @@ func (pa *PulseAudioBackend) reconnectWithBackoff() {
 		}
 
 		if err := pa.Reconnect(); err != nil {
-			log.Printf("PulseAudio reconnect failed, retry in %s\n", backoff)
+			logger.Warn("PulseAudio reconnect failed, retry in %s", backoff)
 			time.Sleep(backoff)
 
 			backoff *= 2
@@ -104,7 +104,7 @@ func (pa *PulseAudioBackend) reconnectWithBackoff() {
 			continue
 		}
 
-		log.Println("PulseAudio reconnected")
+		logger.Info("PulseAudio reconnected")
 		return
 	}
 }
@@ -114,7 +114,7 @@ func (pa *PulseAudioBackend) ServerInfo() (*ServerInfo, error) {
 	var err error
 
 	if volume, err = pa.client.Volume(); err != nil {
-		log.Printf("failed to get client volume: %v", err)
+		logger.Warn("failed to get client volume: %v", err)
 	}
 	if pa.server != nil {
 		return &ServerInfo{
@@ -134,11 +134,11 @@ func (pa *PulseAudioBackend) ServerInfo() (*ServerInfo, error) {
 func (pa *PulseAudioBackend) ListClients() ([]AudioClient, error) {
 	// Vérifier le cache
 	if cached, ok := pa.cache.Get(cacheKey); ok {
-		log.Printf("Returning %d clients from cache", len(cached))
+		logger.Debug("Returning %d clients from cache", len(cached))
 		return cached, nil
 	}
 
-	log.Println("Cache miss, loading clients from pulseaudio")
+	logger.Debug("Cache miss, loading clients from pulseaudio")
 	return pa.refreshCache()
 }
 
@@ -149,7 +149,7 @@ func (pa *PulseAudioBackend) refreshCache() ([]AudioClient, error) {
 		return nil, err
 	}
 
-	log.Printf("Loaded %d sink inputs from pulseaudio", len(sinks))
+	logger.Debug("Loaded %d sink inputs from pulseaudio", len(sinks))
 
 	// récupérer l'ancien cache
 	oldClients, _ := pa.cache.Get(cacheKey)
@@ -315,7 +315,7 @@ func (pa *PulseAudioBackend) ToggleMute(name string) error {
 
 	// Rafraîchir le client dans le cache
 	if _, err := pa.RefreshClient(name); err != nil {
-		log.Printf("Warning: failed to refresh client %q in cache: %v", name, err)
+		logger.Warn("failed to refresh client %q in cache: %v", name, err)
 	}
 	return nil
 }
@@ -332,7 +332,7 @@ func (pa *PulseAudioBackend) SetVolume(name string, vol float32) error {
 
 	// Rafraîchir le client dans le cache
 	if _, err := pa.RefreshClient(name); err != nil {
-		log.Printf("Warning: failed to refresh client %q in cache: %v", name, err)
+		logger.Warn("failed to refresh client %q in cache: %v", name, err)
 	}
 	return nil
 }
@@ -353,7 +353,7 @@ func (pa *PulseAudioBackend) parsePulseSinkInput(s pulseaudio.SinkInput) AudioCl
 		if client, ok := pa.parsePulseBluetoothSink(s, props); ok {
 			return client
 		}
-		log.Printf("failed to resolve bluetooth sink %s", s.Name)
+		logger.Warn("failed to resolve bluetooth sink %s", s.Name)
 	}
 
 	return AudioClient{
