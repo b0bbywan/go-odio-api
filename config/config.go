@@ -14,13 +14,19 @@ const (
 )
 
 type Config struct {
-	Services []string
+	Services *SystemdConfig
 	Port     int
 	Headless bool
 }
 
+type SystemdConfig struct {
+	SystemServices []string
+	UserServices   []string
+}
+
 func New() (*Config, error) {
-	viper.SetDefault("Services", []string{})
+	viper.SetDefault("services.system", []string{})
+	viper.SetDefault("services.user", []string{})
 	viper.SetDefault("Port", 8080)
 
 	// Load from configuration file, environment variables, and CLI flags
@@ -49,8 +55,13 @@ func New() (*Config, error) {
 		return nil, fmt.Errorf("invalid port: %d", port)
 	}
 
+	syscfg := SystemdConfig{
+		SystemServices: viper.GetStringSlice("services.system"),
+		UserServices:   viper.GetStringSlice("services.user"),
+	}
+
 	cfg := Config{
-		Services: viper.GetStringSlice("services"),
+		Services: &syscfg,
 		Port:     port,
 		Headless: headless,
 	}
