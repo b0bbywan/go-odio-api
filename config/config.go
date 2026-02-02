@@ -2,10 +2,10 @@ package config
 
 import (
 	"os"
-	"log"
 	"path/filepath"
 
 	"github.com/spf13/viper"
+	"github.com/b0bbywan/go-odio-api/logger"
 )
 
 const (
@@ -39,13 +39,13 @@ func New() (*Config, error) {
 	if err := viper.ReadInConfig(); err != nil {
 		// Config file is optional, continue with defaults if not found
 		if _, isNotFound := err.(viper.ConfigFileNotFoundError); !isNotFound {
-			log.Printf("warning: failed to read config: %v", err)
+			logger.Warn("failed to read config: %v", err)
 		}
 	}
 
 	var headless bool
 	if desktop := os.Getenv("XDG_SESSION_DESKTOP"); desktop == "" {
-		log.Println("running in headless mode")
+		logger.Info("running in headless mode")
 		headless = true
 	}
 

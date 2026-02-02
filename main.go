@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -13,12 +12,13 @@ import (
 	"github.com/b0bbywan/go-odio-api/api"
 	"github.com/b0bbywan/go-odio-api/backend"
 	"github.com/b0bbywan/go-odio-api/config"
+	"github.com/b0bbywan/go-odio-api/logger"
 )
 
 func main() {
 	cfg, err := config.New()
 	if err != nil {
-		log.Fatalf("Failed to load config: %v", err)
+		logger.Fatal("Failed to load config: %v", err)
 	}
 
 	// Context global pour toute l'application
@@ -28,12 +28,12 @@ func main() {
 	// PulseAudio backend
 	b, err := backend.New(ctx, cfg.Services)
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal("Backend initialization failed: %v", err)
 	}
 
 	// systemd backend
 	if err := b.Start(); err != nil {
-		log.Fatal(err)
+		logger.Fatal("Backend start failed: %v", err)
 	}
 
 	mux := http.NewServeMux()
@@ -52,7 +52,7 @@ func main() {
 		signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 		<-sigChan
 
-		log.Println("Shutdown signal received, stopping server...")
+		logger.Info("Shutdown signal received, stopping server...")
 
 		// Cancel le context global - arrête tous les listeners
 		cancel()
@@ -64,13 +64,13 @@ func main() {
 		defer shutdownCancel()
 
 		if err := srv.Shutdown(shutdownCtx); err != nil {
-			log.Printf("Server shutdown error: %v", err)
+			logger.Error("Server shutdown error: %v", err)
 		}
 	}()
 
-	log.Printf("Odio Audio API running on %s", port)
+	logger.Info("Odio Audio API running on %s", port)
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		log.Printf("Server error: %v", err)
+		logger.Error("Server error: %v", err)
 	}
-	log.Println("Server stopped")
+	logger.Info("Server stopped")
 }
