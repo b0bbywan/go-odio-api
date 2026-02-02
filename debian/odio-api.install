@@ -1,2 +1,1 @@
-share/config.yaml usr/share/odio-api/config.yaml
 debian/odio-api.service usr/lib/systemd/user/
