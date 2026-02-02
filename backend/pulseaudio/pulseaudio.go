@@ -2,6 +2,7 @@ package pulseaudio
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"strings"
 
@@ -102,6 +103,13 @@ func (pa *PulseAudioBackend) parseSinkInput(s pulseaudio.SinkInput) AudioClient 
 func (pa *PulseAudioBackend) parsePulseSinkInput(s pulseaudio.SinkInput) AudioClient {
 	props := cloneProps(s.PropList)
 
+	if props["media.icon_name"] == "audio-card-bluetooth" && strings.HasPrefix(props["media.name"], "Loopback from") {
+		if client, ok := pa.parsePulseBluetoothSink(s, props); ok {
+			return client
+		}
+		log.Printf("failed to resolve blueooth sink %s", s.Name)
+	}
+
 	return AudioClient{
 		ID:      s.Index,
 		Name:    props["media.name"],
@@ -133,4 +141,88 @@ func cloneProps(in map[string]string) map[string]string {
 		out[k] = v
 	}
 	return out
+}
+
+func (pa *PulseAudioBackend) parsePulseBluetoothSink(s pulseaudio.SinkInput, props map[string]string) (AudioClient, bool) {
+	// récupérer le module-loopback
+	mod, err := pa.findModule(s.OwnerModule, "module-loopback")
+	if err != nil {
+		return AudioClient{}, false
+	}
+
+	// extraire la source bluez
+	sourceName := extractModuleSource(mod.Argument)
+	if sourceName == "" {
+		return AudioClient{}, false
+	}
+
+	// lookup de la source
+	src, err := pa.findSourceByName(sourceName)
+	if err != nil {
+		return AudioClient{}, false
+	}
+
+	//
+	btProps := cloneProps(props)
+	for k, v := range src.PropList {
+		btProps[k] = v
+	}
+
+	// enrichissement props
+	name := src.PropList["device.description"]
+	if name == "" {
+		name = strings.TrimPrefix(props["media.name"], "Loopback from ")
+	}
+
+	return AudioClient{
+		ID:      s.Index,
+		Name:    name,
+		App:     "bluetooth",
+		Muted:   s.IsMute(),
+		Volume:  s.GetVolume(),
+		Corked:  s.Corked,
+		Backend: ServerPulse,
+		Binary:  "bluez",
+		User:    "",
+		Host:    name,
+		Props:   btProps,
+	}, true
+
+}
+
+func (pa *PulseAudioBackend) findModule(index uint32, name string) (*pulseaudio.Module, error) {
+	mods, err := pa.client.ModuleList()
+	if err != nil {
+		return nil, err
+	}
+	for _, m := range mods {
+		if m.Index == index && m.Name == name {
+			return &m, nil
+		}
+	}
+	return nil, fmt.Errorf("module %s %d  not found", name, index)
+}
+
+
+func (pa *PulseAudioBackend) findSourceByName(name string) (*pulseaudio.Source, error) {
+	sources, err := pa.client.Sources()
+	if err != nil {
+		return nil, err
+	}
+	for _, s := range sources {
+		if s.Name == name {
+			return &s, nil
+		}
+	}
+	return nil, fmt.Errorf("source %s not found", name)
+}
+
+func extractModuleSource(arg string) string {
+	// source="bluez_source.C8_2A_DD_A7_D5_0D.a2dp_source"
+	for _, part := range strings.Fields(arg) {
+		if strings.HasPrefix(part, "source=") {
+			return strings.Trim(part[len("source="):], `"`)
+		}
+	}
+	return ""
 }
