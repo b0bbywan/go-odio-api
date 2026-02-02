@@ -4,6 +4,8 @@ import (
 	"context"
 
 	"github.com/coreos/go-systemd/v22/dbus"
+
+	"github.com/b0bbywan/go-odio-api/config"
 )
 
 type UnitScope string
@@ -17,7 +19,7 @@ type SystemdBackend struct {
 	sysConn      *dbus.Conn
 	userConn     *dbus.Conn
 	ctx          context.Context
-	serviceNames []string // Vient de la config
+	config       *config.SystemdConfig // Vient de la config
 }
 
 type Service struct {
@@ -31,7 +33,7 @@ type Service struct {
 }
 
 // New prend maintenant la liste des services depuis la config
-func New(ctx context.Context, serviceNames []string) (*SystemdBackend, error) {
+func New(ctx context.Context, config *config.SystemdConfig) (*SystemdBackend, error) {
 	sysC, err := dbus.NewSystemConnectionContext(ctx)
 	if err != nil {
 		return nil, err
@@ -45,7 +47,7 @@ func New(ctx context.Context, serviceNames []string) (*SystemdBackend, error) {
 		sysConn:      sysC,
 		userConn:     userC,
 		ctx:          ctx,
-		serviceNames: serviceNames,
+		config:       config,
 	}, nil
 }
 
@@ -61,10 +63,16 @@ func (s *SystemdBackend) Close() {
 }
 
 func (s *SystemdBackend) ListServices() ([]Service, error) {
-	out := make([]Service, 0, len(s.serviceNames)*2)
+	out := make([]Service, 0, len(s.config.SystemServices)+len(s.config.UserServices))
 
-	sysSvcs, _ := s.listServices(s.ctx, s.sysConn, ScopeSystem, s.serviceNames)
-	userSvcs, _ := s.listServices(s.ctx, s.userConn, ScopeUser, s.serviceNames)
+	sysSvcs, err := s.listServices(s.ctx, s.sysConn, ScopeSystem, s.config.SystemServices)
+	if err != nil {
+		log.Printf("warning: failed to list system services: %v", err)
+	}
+	userSvcs, err := s.listServices(s.ctx, s.userConn, ScopeUser, s.config.UserServices)
+	if err != nil {
+		log.Printf("warning: failed to list user services: %v", err)
+	}
 
 	out = append(out, sysSvcs...)
 	out = append(out, userSvcs...)
