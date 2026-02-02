@@ -5,7 +5,7 @@ import (
 
 )
 
-func parsePipeWireSinkInput(s pulseaudio.SinkInput) AudioClient {
+func (pa *PulseAudioBackend) parsePipeWireSinkInput(s pulseaudio.SinkInput) AudioClient {
 	props := cloneProps(s.PropList)
 
 	return AudioClient{
