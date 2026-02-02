@@ -93,13 +93,13 @@ func (pa *PulseAudioBackend) SetVolume(name string, vol float32) error {
 func (pa *PulseAudioBackend) parseSinkInput(s pulseaudio.SinkInput) AudioClient {
 	switch pa.kind {
 	case ServerPipeWire:
-		return parsePipeWireSinkInput(s)
+		return pa.parsePipeWireSinkInput(s)
 	default:
-		return parsePulseSinkInput(s)
+		return pa.parsePulseSinkInput(s)
 	}
 }
 
-func parsePulseSinkInput(s pulseaudio.SinkInput) AudioClient {
+func (pa *PulseAudioBackend) parsePulseSinkInput(s pulseaudio.SinkInput) AudioClient {
 	props := cloneProps(s.PropList)
 
 	return AudioClient{
