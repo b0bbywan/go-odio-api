@@ -37,7 +37,10 @@ func New() (*Config, error) {
 	}
 
 	if err := viper.ReadInConfig(); err != nil {
-		return nil, err
+		// Config file is optional, continue with defaults if not found
+		if _, isNotFound := err.(viper.ConfigFileNotFoundError); !isNotFound {
+			log.Printf("warning: failed to read config: %v", err)
+		}
 	}
 
 	var headless bool
