@@ -2,9 +2,10 @@ package pulseaudio
 
 import (
 	"context"
-	"log"
 
 	"github.com/the-jonsey/pulseaudio"
+
+	"github.com/b0bbywan/go-odio-api/logger"
 )
 
 // Listener écoute les changements pulseaudio
@@ -34,7 +35,7 @@ func (l *Listener) Start() error {
 	// Goroutine d'écoute
 	go l.listen(updates)
 
-	log.Println("PulseAudio listener started")
+	logger.Info("PulseAudio listener started")
 	return nil
 }
 
@@ -42,19 +43,19 @@ func (l *Listener) listen(updates <-chan struct{}) {
 	for {
 		select {
 		case <-l.ctx.Done():
-			log.Println("PulseAudio listener context done")
+			logger.Debug("PulseAudio listener context done")
 			return
 
 		case data, ok := <-updates:
 			if !ok {
-				log.Println("PulseAudio updates channel closed")
+				logger.Debug("PulseAudio updates channel closed")
 				return
 			}
 
 			// Un sink input a changé, recharger le cache
-			log.Printf("[SINK_INPUT_CHANGE] Sink inputs changed event received, refreshing cache: %v", data)
+			logger.Debug("Sink inputs changed event received, refreshing cache: %v", data)
 			if _, err := l.backend.refreshCache(); err != nil {
-				log.Printf("Failed to refresh clients: %v", err)
+				logger.Warn("Failed to refresh clients: %v", err)
 			}
 		}
 	}
@@ -62,7 +63,7 @@ func (l *Listener) listen(updates <-chan struct{}) {
 
 // Stop arrête le listener
 func (l *Listener) Stop() {
-	log.Println("Stopping pulseaudio listener")
+	logger.Info("Stopping pulseaudio listener")
 
 	// Cancel le context pour arrêter la goroutine
 	l.cancel()
