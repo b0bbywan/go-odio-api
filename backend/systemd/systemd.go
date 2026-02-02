@@ -54,8 +54,14 @@ func New(ctx context.Context, config *config.SystemdConfig) (*SystemdBackend, er
 func (s *SystemdBackend) ListServices() ([]Service, error) {
 	out := make([]Service, 0, len(s.config.SystemServices)+len(s.config.UserServices))
 
-	sysSvcs, _ := s.listServices(s.ctx, s.sysConn, ScopeSystem, s.config.SystemServices)
-	userSvcs, _ := s.listServices(s.ctx, s.userConn, ScopeUser, s.config.UserServices)
+	sysSvcs, err := s.listServices(s.ctx, s.sysConn, ScopeSystem, s.config.SystemServices)
+	if err != nil {
+		log.Printf("warning: failed to list system services: %v", err)
+	}
+	userSvcs, err := s.listServices(s.ctx, s.userConn, ScopeUser, s.config.UserServices)
+	if err != nil {
+		log.Printf("warning: failed to list user services: %v", err)
+	}
 
 	out = append(out, sysSvcs...)
 	out = append(out, userSvcs...)
