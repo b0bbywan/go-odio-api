@@ -196,9 +196,9 @@ func (pa *PulseAudioBackend) updateOrAddClient(oldMap map[string]AudioClient, cl
 }
 
 func clientChanged(a, b AudioClient) bool {
-	return a.Volume == b.Volume &&
-		a.Muted == b.Muted &&
-		a.Corked == b.Corked
+	return a.Volume != b.Volume ||
+		a.Muted != b.Muted ||
+		a.Corked != b.Corked
 }
 
 func (pa *PulseAudioBackend) removeMissingClients(oldMap map[string]AudioClient, newClients []AudioClient) []AudioClient {
@@ -353,7 +353,7 @@ func (pa *PulseAudioBackend) parsePulseSinkInput(s pulseaudio.SinkInput) AudioCl
 		if client, ok := pa.parsePulseBluetoothSink(s, props); ok {
 			return client
 		}
-		log.Printf("failed to resolve blueooth sink %s", s.Name)
+		log.Printf("failed to resolve bluetooth sink %s", s.Name)
 	}
 
 	return AudioClient{
@@ -446,7 +446,7 @@ func (pa *PulseAudioBackend) findModule(index uint32, name string) (*pulseaudio.
 			return &m, nil
 		}
 	}
-	return nil, fmt.Errorf("module %s %d  not found", name, index)
+	return nil, fmt.Errorf("module %s %d not found", name, index)
 }
 
 

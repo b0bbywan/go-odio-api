@@ -52,7 +52,7 @@ func (l *Listener) listen(updates <-chan struct{}) {
 			}
 
 			// Un sink input a changé, recharger le cache
-			log.Printf("⚠️ Sink inputs changed event received, refreshing cache: %v", data)
+			log.Printf("[SINK_INPUT_CHANGE] Sink inputs changed event received, refreshing cache: %v", data)
 			if _, err := l.backend.refreshCache(); err != nil {
 				log.Printf("Failed to refresh clients: %v", err)
 			}
