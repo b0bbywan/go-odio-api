@@ -2,6 +2,7 @@ package pulseaudio
 
 import (
 	"context"
+	"sync"
 
 	"github.com/the-jonsey/pulseaudio"
 
@@ -17,15 +18,15 @@ const (
 )
 
 type PulseAudioBackend struct {
-	client *pulseaudio.Client
-	server *pulseaudio.Server
-	kind   AudioServerKind
-	ctx    context.Context
+	ctx context.Context
+	mu  sync.Mutex
 
-	// cache permanent (pas d'expiration)
-	cache *cache.Cache[[]AudioClient]
+	address string
+	client  *pulseaudio.Client
+	server  *pulseaudio.Server
+	kind    AudioServerKind
 
-	// listener pour les changements pulseaudio
+	cache    *cache.Cache[[]AudioClient]
 	listener *Listener
 }
 
