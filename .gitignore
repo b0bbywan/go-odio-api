@@ -8,6 +8,13 @@
 *.so
 *.dylib
 
+# Compiled binaries
+odio-api
+go-odio-api
+/dist/
+/build/
+obj-arm-linux-gnueabihf/
+
 # Test binary, built with `go test -c`
 *.test
 
