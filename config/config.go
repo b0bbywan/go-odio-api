@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/viper"
 	"github.com/b0bbywan/go-odio-api/logger"
@@ -16,6 +17,7 @@ type Config struct {
 	Services *SystemdConfig
 	Port     int
 	Headless bool
+	LogLevel logger.Level
 }
 
 type SystemdConfig struct {
@@ -23,10 +25,29 @@ type SystemdConfig struct {
 	UserServices   []string
 }
 
+// parseLogLevel converts a string to a logger.Level
+func parseLogLevel(levelStr string) logger.Level {
+	switch strings.ToUpper(levelStr) {
+	case "DEBUG":
+		return logger.DEBUG
+	case "INFO":
+		return logger.INFO
+	case "WARN":
+		return logger.WARN
+	case "ERROR":
+		return logger.ERROR
+	case "FATAL":
+		return logger.FATAL
+	default:
+		return logger.WARN // default
+	}
+}
+
 func New() (*Config, error) {
 	viper.SetDefault("services.system", []string{})
 	viper.SetDefault("services.user", []string{})
 	viper.SetDefault("Port", 8080)
+	viper.SetDefault("LogLevel", "WARN")
 
 	// Load from configuration file, environment variables, and CLI flags
 	viper.SetConfigName("config")                       // name of config file (without extension)
@@ -58,6 +79,7 @@ func New() (*Config, error) {
 		Services: &syscfg,
 		Port:     viper.GetInt("Port"),
 		Headless: headless,
+		LogLevel: parseLogLevel(viper.GetString("LogLevel")),
 	}
 
 	return &cfg, nil

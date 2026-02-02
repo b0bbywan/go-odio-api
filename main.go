@@ -21,6 +21,9 @@ func main() {
 		logger.Fatal("Failed to load config: %v", err)
 	}
 
+	// Set log level from config
+	logger.SetLevel(cfg.LogLevel)
+
 	// Context global pour toute l'application
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
