@@ -1,3 +1,17 @@
+odio-api (0.2.0) trixie; urgency=medium
+
+  * feat: add configuration for services, port and headless mode
+  * feat: structured logging with configurable levels (DEBUG/INFO/WARN/ERROR/FATAL)
+  * feat: generic cache system with TTL
+  * feat: backend for service management
+  * feat: PulseAudio event listener and reconnection with backoff
+  * feat: comprehensive unit tests (cache 100%, logger 89.5%)
+  * fix: DBus resource cleanup
+  * improvement: better error handling and log messages
+
+ -- Mathieu Réquillart <mathieu.requillart@gmail.com>  Mon, 03 Feb 2026 01:30:00 +0000
+
+
 odio-api (0.1.2) trixie; urgency=low
 
   * add volume in server response
