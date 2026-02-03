@@ -37,6 +37,12 @@ func (b *Backend) Start() error {
 		}
 	}
 
+	if b.Systemd != nil {
+		if err := b.Systemd.Start(); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
