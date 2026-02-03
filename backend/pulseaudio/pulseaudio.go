@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	pkgbackend "github.com/b0bbywan/go-odio-api/backend"
 	"github.com/b0bbywan/go-odio-api/cache"
 	"github.com/b0bbywan/go-odio-api/logger"
 	"github.com/the-jonsey/pulseaudio"
@@ -15,10 +16,7 @@ import (
 const cacheKey = "clients"
 
 func New(ctx context.Context) (*PulseAudioBackend, error) {
-	xdgRuntimeDir, ok := os.LookupEnv("XDG_RUNTIME_DIR")
-	if !ok {
-		xdgRuntimeDir = fmt.Sprintf("/run/user/%d", os.Getuid())
-	}
+	xdgRuntimeDir := pkgbackend.GetXDGRuntimeDir()
 	address := fmt.Sprintf("%s/pulse/native", xdgRuntimeDir)
 
 	backend := &PulseAudioBackend{

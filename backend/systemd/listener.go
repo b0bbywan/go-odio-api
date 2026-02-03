@@ -9,6 +9,7 @@ import (
 	"github.com/fsnotify/fsnotify"
 	"github.com/godbus/dbus/v5"
 
+	"github.com/b0bbywan/go-odio-api/backend"
 	"github.com/b0bbywan/go-odio-api/logger"
 )
 
@@ -202,9 +203,9 @@ func (l *Listener) StartHeadless() error {
 		return err
 	}
 
-	// Obtenir le UID de l'utilisateur courant
-	uid := os.Getuid()
-	unitsDir := fmt.Sprintf("/run/user/%d/systemd/units", uid)
+	// Obtenir le répertoire XDG_RUNTIME_DIR
+	xdgRuntimeDir := backend.GetXDGRuntimeDir()
+	unitsDir := filepath.Join(xdgRuntimeDir, "systemd/units")
 
 	// Vérifier que le répertoire existe
 	if _, err := os.Stat(unitsDir); os.IsNotExist(err) {
