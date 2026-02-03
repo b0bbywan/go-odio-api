@@ -162,7 +162,7 @@ func (s *SystemdBackend) listServices(
 			} else {
 				svc.Enabled = enabled.Value.Value().(string) == "enabled"
 			}
-			description, err := conn.GetUnitPropertyContext(ctx, unit.Name, "UnitFileState")
+			description, err := conn.GetUnitPropertyContext(ctx, unit.Name, "Description")
 			if err != nil {
 				logger.Warn("[systemd] failed to get %s Description: %v", unit.Name, err)
 			} else {
