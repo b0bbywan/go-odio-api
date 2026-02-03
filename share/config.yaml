@@ -1,0 +1,14 @@
+services:
+  system:
+    - bluetooth.service
+    - upmpdcli.service
+  user:
+    - mpd.service
+    - pipewire-pulse.service
+    - pulseaudio.service
+    - shairport-sync.service
+    - snapclient.service
+    - spotifyd.service
+
+port: 8080
+logLevel: warn
