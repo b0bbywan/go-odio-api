@@ -13,15 +13,15 @@ type Backend struct {
 	Systemd *systemd.SystemdBackend
 }
 
-func New(ctx context.Context, config *config.SystemdConfig) (*Backend, error) {
+func New(ctx context.Context, syscfg *config.SystemdConfig, pulscfg *config.PulseAudioConfig) (*Backend, error) {
 	var backend Backend
-	p, err := pulseaudio.New(ctx)
+	p, err := pulseaudio.New(ctx, pulscfg)
 	if err != nil {
 		return nil, err
 	}
 	backend.Pulse = p
 
-	s, err := systemd.New(ctx, config)
+	s, err := systemd.New(ctx, syscfg)
 	if err != nil {
 		return nil, err
 	}
