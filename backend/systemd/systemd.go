@@ -33,6 +33,8 @@ func New(ctx context.Context, config *config.SystemdConfig) (*SystemdBackend, er
 
 // Start charge le cache initial et démarre le listener
 func (s *SystemdBackend) Start() error {
+	logger.Debug("[systemd] starting backend (headless=%v)", s.config.Headless)
+
 	// Charger le cache au démarrage
 	if _, err := s.ListServices(); err != nil {
 		return err
@@ -44,26 +46,35 @@ func (s *SystemdBackend) Start() error {
 		return err
 	}
 
+	logger.Info("[systemd] backend started successfully")
 	return nil
 }
 
 func (s *SystemdBackend) ListServices() ([]Service, error) {
+	// Vérifier le cache d'abord
+	if services, ok := s.cache.Get(cacheKey); ok {
+		logger.Debug("[systemd] returning %d units from cache", len(services))
+		return services, nil
+	}
+
+	// Cache miss, charger depuis D-Bus
+	logger.Debug("[systemd] cache miss, loading units")
 	out := make([]Service, 0, len(s.config.SystemServices)+len(s.config.UserServices))
 	start := time.Now()
 
 	sysSvcs, err := s.listServices(s.ctx, s.sysConn, ScopeSystem, s.config.SystemServices)
 	if err != nil {
-		logger.Warn("failed to list system services: %v", err)
+		logger.Warn("[systemd] failed to list system services: %v", err)
 	}
 	userSvcs, err := s.listServices(s.ctx, s.userConn, ScopeUser, s.config.UserServices)
 	if err != nil {
-		logger.Warn("failed to list user services: %v", err)
+		logger.Warn("[systemd] failed to list user services: %v", err)
 	}
 	elapsed := time.Since(start)
-	logger.Debug("units listed in %s", elapsed)
 
 	out = append(out, sysSvcs...)
 	out = append(out, userSvcs...)
+	logger.Debug("[systemd] loaded %d units in %s", len(out), elapsed)
 
 	// Mettre à jour le cache
 	s.cache.Set(cacheKey, out)
@@ -154,13 +165,13 @@ func (s *SystemdBackend) listServices(
 			}
 			enabled, err := conn.GetUnitPropertyContext(ctx, unit.Name, "UnitFileState")
 			if err != nil {
-				logger.Warn("failed to get %s state: %v", unit.Name, err)
+				logger.Warn("[systemd] failed to get %s UnitFileState: %v", unit.Name, err)
 			} else {
 				svc.Enabled = enabled.Value.Value().(string) == "enabled"
 			}
 			description, err := conn.GetUnitPropertyContext(ctx, unit.Name, "Description")
 			if err != nil {
-				logger.Warn("failed to get %s description: %v", unit.Name, err)
+				logger.Warn("[systemd] failed to get %s Description: %v", unit.Name, err)
 			} else {
 				svc.Description = description.Value.Value().(string)
 			}
@@ -173,6 +184,7 @@ func (s *SystemdBackend) listServices(
 }
 
 func (s *SystemdBackend) EnableService(name string, scope UnitScope) error {
+	logger.Debug("[systemd] enabling service %s/%s", scope, name)
 	conn := s.connForScope(scope)
 
 	_, _, err := conn.EnableUnitFilesContext(
@@ -195,12 +207,14 @@ func (s *SystemdBackend) EnableService(name string, scope UnitScope) error {
 
 	// Rafraîchir uniquement ce service dans le cache
 	if _, err := s.RefreshService(name, scope); err != nil {
-		logger.Warn("failed to refresh service %q in cache: %v", name, err)
+		logger.Warn("[systemd] failed to refresh service %q in cache: %v", name, err)
 	}
+	logger.Debug("[systemd] service %s/%s enabled successfully", scope, name)
 	return nil
 }
 
 func (s *SystemdBackend) DisableService(name string, scope UnitScope) error {
+	logger.Debug("[systemd] disabling service %s/%s", scope, name)
 	conn := s.connForScope(scope)
 
 	if err := stopUnit(s.ctx, conn, name); err != nil {
@@ -221,20 +235,23 @@ func (s *SystemdBackend) DisableService(name string, scope UnitScope) error {
 
 	// Rafraîchir uniquement ce service dans le cache
 	if _, err := s.RefreshService(name, scope); err != nil {
-		logger.Warn("failed to refresh service %q in cache: %v", name, err)
+		logger.Warn("[systemd] failed to refresh service %q in cache: %v", name, err)
 	}
+	logger.Debug("[systemd] service %s/%s disabled successfully", scope, name)
 	return nil
 }
 
 func (s *SystemdBackend) RestartService(name string, scope UnitScope) error {
+	logger.Debug("[systemd] restarting service %s/%s", scope, name)
 	if err := restartUnit(s.ctx, s.connForScope(scope), name); err != nil {
 		return err
 	}
 
 	// Rafraîchir uniquement ce service dans le cache
 	if _, err := s.RefreshService(name, scope); err != nil {
-		logger.Warn("failed to refresh service %q in cache: %v", name, err)
+		logger.Warn("[systemd] failed to refresh service %q in cache: %v", name, err)
 	}
+	logger.Debug("[systemd] service %s/%s restarted successfully", scope, name)
 	return nil
 }
 
