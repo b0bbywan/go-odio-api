@@ -101,7 +101,7 @@ func (l *Listener) startScope(scope UnitScope, watched map[string]bool) error {
 
 	go l.listen(ch, conn, scope, watched)
 
-	logger.Info("%s Systemd listener started (signal-based)", scope)
+	logger.Info("[systemd] %s listener started (D-Bus signal-based)", scope)
 	return nil
 }
 
@@ -212,7 +212,7 @@ func (l *Listener) checkUnit(sig *dbus.Signal, scope UnitScope) (string, bool) {
 	l.lastState[key] = subState
 	l.lastStateMu.Unlock()
 
-	logger.Debug("Unit changed: %s/%s -> %s", scope, unitName, subState)
+	logger.Debug("[systemd] unit changed: %s/%s -> %s", scope, unitName, subState)
 	return unitName, true
 }
 
@@ -251,7 +251,7 @@ func (l *Listener) listen(
 			}
 			if unitName, ok := l.checkUnit(sig, scope); ok {
 				if _, err := l.backend.RefreshService(unitName, scope); err != nil {
-					logger.Error("Failed to refresh service %s/%s: %v", scope, unitName, err)
+					logger.Error("[systemd] failed to refresh service %s/%s: %v", scope, unitName, err)
 				}
 			}
 		}
@@ -260,9 +260,9 @@ func (l *Listener) listen(
 
 // Stop arrête le listener
 func (l *Listener) Stop() {
-	logger.Info("Stopping systemd listener")
+	logger.Info("[systemd] stopping listener")
 	l.cancel()
-	logger.Info("Stopped")
+	logger.Debug("[systemd] listener stopped")
 }
 
 // StartHeadless démarre l'écoute des événements systemd via fsnotify
@@ -287,7 +287,7 @@ func (l *Listener) StartHeadless() error {
 		return err
 	}
 
-	logger.Info("Monitoring %s for systemd user events (fsnotify)", unitsDir)
+	logger.Info("[systemd] user listener started (fsnotify), monitoring %s", unitsDir)
 
 	go l.listenHeadless(watcher)
 
@@ -322,15 +322,15 @@ func (l *Listener) listenHeadless(watcher *fsnotify.Watcher) {
 
 			switch {
 			case event.Op&fsnotify.Create == fsnotify.Create:
-				logger.Info("Service STARTED: %s/%s", ScopeUser, serviceName)
+				logger.Debug("[systemd] service started: %s/%s", ScopeUser, serviceName)
 				if _, err := l.backend.RefreshService(serviceName, ScopeUser); err != nil {
-					logger.Error("Failed to refresh service %s/%s: %v", ScopeUser, serviceName, err)
+					logger.Error("[systemd] failed to refresh service %s/%s: %v", ScopeUser, serviceName, err)
 				}
 
 			case event.Op&fsnotify.Remove == fsnotify.Remove:
-				logger.Info("Service STOPPED: %s/%s", ScopeUser, serviceName)
+				logger.Debug("[systemd] service stopped: %s/%s", ScopeUser, serviceName)
 				if _, err := l.backend.RefreshService(serviceName, ScopeUser); err != nil {
-					logger.Error("Failed to refresh service %s/%s: %v", ScopeUser, serviceName, err)
+					logger.Error("[systemd] failed to refresh service %s/%s: %v", ScopeUser, serviceName, err)
 				}
 			}
 
@@ -338,7 +338,7 @@ func (l *Listener) listenHeadless(watcher *fsnotify.Watcher) {
 			if !ok {
 				return
 			}
-			logger.Error("Systemd fsnotify listener error: %v", err)
+			logger.Error("[systemd] fsnotify watcher error: %v", err)
 		}
 	}
 }
