@@ -11,37 +11,6 @@ import (
 	"github.com/b0bbywan/go-odio-api/logger"
 )
 
-type UnitScope string
-
-const (
-	ScopeSystem UnitScope = "system"
-	ScopeUser   UnitScope = "user"
-	cacheKey    string    = "services"
-)
-
-type SystemdBackend struct {
-	sysConn      *dbus.Conn
-	userConn     *dbus.Conn
-	ctx          context.Context
-	config       *config.SystemdConfig // Vient de la config
-
-	// cache permanent (pas d'expiration)
-	cache *cache.Cache[[]Service]
-
-	// listener pour les changements systemd
-	listener *Listener
-}
-
-type Service struct {
-	Name        string 		`json:"name"`
-	Scope       UnitScope 	`json:"scope"`
-	ActiveState string 		`json:"active_state,omitempty"`
-	Running     bool   		`json:"running"`
-	Enabled     bool 		`json:"enabled"`
-	Exists      bool      	`json:"exists"`
-	Description string 		`json:"description,omitempty"`
-}
-
 // New prend maintenant la liste des services depuis la config
 func New(ctx context.Context, config *config.SystemdConfig) (*SystemdBackend, error) {
 	sysC, err := dbus.NewSystemConnectionContext(ctx)
@@ -203,32 +172,6 @@ func (s *SystemdBackend) listServices(
 	return services, nil
 }
 
-func serviceFromProps(name string, scope UnitScope, props map[string]interface{}) Service {
-	svc := Service{
-		Name:  name,
-		Scope: scope,
-	}
-
-	if props == nil || props["UnitFileState"] == nil || props["UnitFileState"] == "" {
-		svc.Exists = false
-		svc.Enabled = false
-		return svc
-	}
-
-	svc.Exists = true
-	svc.Enabled = props["UnitFileState"] == "enabled"
-	svc.ActiveState, _ = props["ActiveState"].(string)
-
-	subState, _ := props["SubState"].(string)
-	svc.Running = svc.ActiveState == "active" && subState == "running"
-
-	if desc, ok := props["Description"].(string); ok {
-		svc.Description = desc
-	}
-
-	return svc
-}
-
 func (s *SystemdBackend) EnableService(name string, scope UnitScope) error {
 	conn := s.connForScope(scope)
 
@@ -293,47 +236,6 @@ func (s *SystemdBackend) RestartService(name string, scope UnitScope) error {
 		logger.Warn("failed to refresh service %q in cache: %v", name, err)
 	}
 	return nil
-}
-
-func startUnit(ctx context.Context, conn *dbus.Conn, name string) error {
-	return doUnitJob(ctx, func(ch chan<- string) (int, error) {
-		return conn.StartUnitContext(ctx, name, "replace", ch)
-	})
-}
-
-func stopUnit(ctx context.Context, conn *dbus.Conn, name string) error {
-	return doUnitJob(ctx, func(ch chan<- string) (int, error) {
-		return conn.StopUnitContext(ctx, name, "replace", ch)
-	})
-}
-
-func restartUnit(ctx context.Context, conn *dbus.Conn, name string) error {
-	return doUnitJob(ctx, func(ch chan<- string) (int, error) {
-		return conn.RestartUnitContext(ctx, name, "replace", ch)
-	})
-}
-
-func doUnitJob(
-	ctx context.Context,
-	f func(chan<- string) (int, error),
-) error {
-	ch := make(chan string, 1)
-
-	if _, err := f(ch); err != nil {
-		return err
-	}
-
-	<-ch
-	return nil
-}
-
-func ParseUnitScope(v string) (UnitScope, bool) {
-	switch UnitScope(v) {
-	case ScopeSystem, ScopeUser:
-		return UnitScope(v), true
-	default:
-		return "", false
-	}
 }
 
 func (s *SystemdBackend) connForScope(scope UnitScope) *dbus.Conn {

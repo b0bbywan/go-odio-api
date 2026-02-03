@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
-	"sync"
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/godbus/dbus/v5"
@@ -18,20 +16,6 @@ const (
 	actionStarted = "STARTED"
 	actionStopped = "STOPPED"
 )
-
-// Listener écoute les changements systemd via signaux D-Bus natifs (godbus)
-type Listener struct {
-	backend     *SystemdBackend
-	ctx         context.Context
-	cancel      context.CancelFunc
-	sysWatched  map[string]bool
-	userWatched map[string]bool
-	headless    bool
-
-	// Déduplication : dernier état connu par service/scope
-	lastState   map[string]string
-	lastStateMu sync.RWMutex
-}
 
 func NewListener(backend *SystemdBackend) *Listener {
 	ctx, cancel := context.WithCancel(backend.ctx)
@@ -108,65 +92,6 @@ func (l *Listener) startScope(scope UnitScope, watched map[string]bool) error {
 
 	logger.Info("%s Systemd listener started (signal-based)", scope)
 	return nil
-}
-
-// unitNameFromPath extrait le nom de l'unité depuis le path D-Bus
-// Ex: /org/freedesktop/systemd1/unit/spotifyd_2eservice -> spotifyd.service
-func unitNameFromPath(path dbus.ObjectPath) string {
-	s := string(path)
-	const prefix = "/org/freedesktop/systemd1/unit/"
-	if !strings.HasPrefix(s, prefix) {
-		return ""
-	}
-	encoded := s[len(prefix):]
-	// Décoder les caractères échappés (ex: _2e -> .)
-	return decodeUnitName(encoded)
-}
-
-// decodeUnitName décode le nom d'unité échappé par systemd
-func decodeUnitName(encoded string) string {
-	var result strings.Builder
-	for i := 0; i < len(encoded); i++ {
-		if encoded[i] == '_' && i+2 < len(encoded) {
-			// Séquence d'échappement _XX (hex)
-			hex := encoded[i+1 : i+3]
-			var b byte
-			if _, err := parseHexByte(hex, &b); err == nil {
-				result.WriteByte(b)
-				i += 2
-				continue
-			}
-		}
-		result.WriteByte(encoded[i])
-	}
-	return result.String()
-}
-
-func parseHexByte(s string, b *byte) (bool, error) {
-	if len(s) != 2 {
-		return false, nil
-	}
-	val := 0
-	for _, c := range s {
-		val <<= 4
-		switch {
-		case c >= '0' && c <= '9':
-			val |= int(c - '0')
-		case c >= 'a' && c <= 'f':
-			val |= int(c - 'a' + 10)
-		case c >= 'A' && c <= 'F':
-			val |= int(c - 'A' + 10)
-		default:
-			return false, nil
-		}
-	}
-	*b = byte(val)
-	return true, nil
-}
-
-// stateKey génère une clé unique pour le couple service/scope
-func stateKey(name string, scope UnitScope) string {
-	return string(scope) + "/" + name
 }
 
 func (l *Listener) checkUnit(sig *dbus.Signal, scope UnitScope) (string, bool) {
