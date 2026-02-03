@@ -9,7 +9,6 @@ import (
 	"github.com/fsnotify/fsnotify"
 	"github.com/godbus/dbus/v5"
 
-	"github.com/b0bbywan/go-odio-api/backend"
 	"github.com/b0bbywan/go-odio-api/logger"
 )
 
@@ -203,9 +202,8 @@ func (l *Listener) StartHeadless() error {
 		return err
 	}
 
-	// Obtenir le répertoire XDG_RUNTIME_DIR
-	xdgRuntimeDir := backend.GetXDGRuntimeDir()
-	unitsDir := filepath.Join(xdgRuntimeDir, "systemd/units")
+	// Utiliser le répertoire XDG_RUNTIME_DIR depuis la config
+	unitsDir := filepath.Join(l.backend.config.XDGRuntimeDir, "systemd/units")
 
 	// Vérifier que le répertoire existe
 	if _, err := os.Stat(unitsDir); os.IsNotExist(err) {

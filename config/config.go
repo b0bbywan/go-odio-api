@@ -24,6 +24,7 @@ type SystemdConfig struct {
 	SystemServices []string
 	UserServices   []string
 	Headless       bool
+	XDGRuntimeDir  string
 }
 
 // parseLogLevel converts a string to a logger.Level
@@ -76,10 +77,16 @@ func New() (*Config, error) {
 		return nil, fmt.Errorf("invalid port: %d", port)
 	}
 
+	xdgRuntimeDir := os.Getenv("XDG_RUNTIME_DIR")
+	if xdgRuntimeDir == "" {
+		xdgRuntimeDir = fmt.Sprintf("/run/user/%d", os.Getuid())
+	}
+
 	syscfg := SystemdConfig{
 		SystemServices: viper.GetStringSlice("services.system"),
 		UserServices:   viper.GetStringSlice("services.user"),
-		Headless: headless,
+		Headless:       headless,
+		XDGRuntimeDir:  xdgRuntimeDir,
 	}
 
 	cfg := Config{

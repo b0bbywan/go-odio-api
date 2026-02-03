@@ -15,7 +15,7 @@ type Backend struct {
 
 func New(ctx context.Context, config *config.SystemdConfig) (*Backend, error) {
 	var backend Backend
-	p, err := pulseaudio.New(ctx)
+	p, err := pulseaudio.New(ctx, config)
 	if err != nil {
 		return nil, err
 	}

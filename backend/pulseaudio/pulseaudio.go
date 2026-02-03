@@ -3,21 +3,19 @@ package pulseaudio
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
-	pkgbackend "github.com/b0bbywan/go-odio-api/backend"
 	"github.com/b0bbywan/go-odio-api/cache"
+	"github.com/b0bbywan/go-odio-api/config"
 	"github.com/b0bbywan/go-odio-api/logger"
 	"github.com/the-jonsey/pulseaudio"
 )
 
 const cacheKey = "clients"
 
-func New(ctx context.Context) (*PulseAudioBackend, error) {
-	xdgRuntimeDir := pkgbackend.GetXDGRuntimeDir()
-	address := fmt.Sprintf("%s/pulse/native", xdgRuntimeDir)
+func New(ctx context.Context, cfg *config.SystemdConfig) (*PulseAudioBackend, error) {
+	address := fmt.Sprintf("%s/pulse/native", cfg.XDGRuntimeDir)
 
 	backend := &PulseAudioBackend{
 		address: address,
