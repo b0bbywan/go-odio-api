@@ -2,7 +2,6 @@ package systemd
 
 import (
 	"context"
-	"log"
 	"time"
 
 	"github.com/coreos/go-systemd/v22/dbus"
@@ -92,7 +91,7 @@ func (s *SystemdBackend) ListServices() ([]Service, error) {
 		logger.Warn("failed to list user services: %v", err)
 	}
 	elapsed := time.Since(start)
-	log.Printf("units listed in %s", elapsed)
+	logger.Debug("units listed in %s", elapsed)
 
 
 	out = append(out, sysSvcs...)
@@ -185,13 +184,13 @@ func (s *SystemdBackend) listServices(
 			}
 			enabled, err := conn.GetUnitPropertyContext(ctx, unit.Name, "UnitFileState")
 			if err != nil {
-				log.Printf("failed to get %s state: %v", unit.Name, err)
+				logger.Warn("failed to get %s state: %v", unit.Name, err)
 			} else {
 				svc.Enabled = enabled.Value.Value().(string) == "enabled"
 			}
 			description, err := conn.GetUnitPropertyContext(ctx, unit.Name, "UnitFileState")
 			if err != nil {
-				log.Printf("failed to get %s description: %v", unit.Name, err)
+				logger.Warn("failed to get %s description: %v", unit.Name, err)
 			} else {
 				svc.Description = description.Value.Value().(string)
 			}
@@ -252,7 +251,7 @@ func (s *SystemdBackend) EnableService(name string, scope UnitScope) error {
 
 	// Rafraîchir uniquement ce service dans le cache
 	if _, err := s.RefreshService(name, scope); err != nil {
-		log.Printf("Warning: failed to refresh service %q in cache: %v", name, err)
+		logger.Warn("failed to refresh service %q in cache: %v", name, err)
 	}
 	return nil
 }
@@ -278,7 +277,7 @@ func (s *SystemdBackend) DisableService(name string, scope UnitScope) error {
 
 	// Rafraîchir uniquement ce service dans le cache
 	if _, err := s.RefreshService(name, scope); err != nil {
-		log.Printf("Warning: failed to refresh service %q in cache: %v", name, err)
+		logger.Warn("failed to refresh service %q in cache: %v", name, err)
 	}
 	return nil
 }
@@ -290,7 +289,7 @@ func (s *SystemdBackend) RestartService(name string, scope UnitScope) error {
 
 	// Rafraîchir uniquement ce service dans le cache
 	if _, err := s.RefreshService(name, scope); err != nil {
-		log.Printf("Warning: failed to refresh service %q in cache: %v", name, err)
+		logger.Warn("failed to refresh service %q in cache: %v", name, err)
 	}
 	return nil
 }
