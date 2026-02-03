@@ -13,7 +13,7 @@ type Backend struct {
 	Systemd *systemd.SystemdBackend
 }
 
-func New(ctx context.Context, syscfg *config.ConfigSystemd, pulscfg *config.ConfigPulseAudio) (*Backend, error) {
+func New(ctx context.Context, syscfg *config.SystemdConfig, pulscfg *config.PulseAudioConfig) (*Backend, error) {
 	var backend Backend
 	p, err := pulseaudio.New(ctx, pulscfg)
 	if err != nil {

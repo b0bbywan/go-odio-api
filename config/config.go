@@ -15,20 +15,20 @@ const (
 )
 
 type Config struct {
-	Systemd  *ConfigSystemd
-	Pulseaudio *ConfigPulseAudio
-	Port     int
-	LogLevel logger.Level
+	Systemd    *SystemdConfig
+	Pulseaudio *PulseAudioConfig
+	Port       int
+	LogLevel   logger.Level
 }
 
-type ConfigSystemd struct {
+type SystemdConfig struct {
 	SystemServices []string
 	UserServices   []string
 	Headless       bool
 	XDGRuntimeDir  string
 }
 
-type ConfigPulseAudio struct {
+type PulseAudioConfig struct {
 	XDGRuntimeDir string
 }
 
@@ -87,14 +87,14 @@ func New() (*Config, error) {
 		xdgRuntimeDir = fmt.Sprintf("/run/user/%d", os.Getuid())
 	}
 
-	syscfg := ConfigSystemd{
+	syscfg := SystemdConfig{
 		SystemServices: viper.GetStringSlice("services.system"),
 		UserServices:   viper.GetStringSlice("services.user"),
 		Headless:       headless,
 		XDGRuntimeDir:  xdgRuntimeDir,
 	}
 
-	pulsecfg := ConfigPulseAudio{
+	pulsecfg := PulseAudioConfig{
 		XDGRuntimeDir: xdgRuntimeDir,
 	}
 

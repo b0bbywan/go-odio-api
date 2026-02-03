@@ -12,7 +12,7 @@ import (
 )
 
 // New prend maintenant la liste des services depuis la config
-func New(ctx context.Context, cfg *config.ConfigSystemd) (*SystemdBackend, error) {
+func New(ctx context.Context, config *config.SystemdConfig) (*SystemdBackend, error) {
 	sysC, err := dbus.NewSystemConnectionContext(ctx)
 	if err != nil {
 		return nil, err
@@ -26,7 +26,7 @@ func New(ctx context.Context, cfg *config.ConfigSystemd) (*SystemdBackend, error
 		sysConn:      sysC,
 		userConn:     userC,
 		ctx:          ctx,
-		config:       cfg,
+		config:       config,
 		cache:        cache.New[[]Service](0), // TTL=0 = pas d'expiration
 	}, nil
 }
