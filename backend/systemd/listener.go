@@ -146,7 +146,7 @@ func (l *Listener) checkUnit(sig *dbus.Signal, scope UnitScope) (string, bool) {
 	return unitName, true
 }
 
-func (l *Listener) Watched(unitName string, scope UnitScope) bool{
+func (l *Listener) Watched(unitName string, scope UnitScope) bool {
 	switch scope {
 	case ScopeSystem:
 		if !l.sysWatched[unitName] {
