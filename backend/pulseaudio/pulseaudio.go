@@ -14,7 +14,7 @@ import (
 
 const cacheKey = "clients"
 
-func New(ctx context.Context, cfg *config.SystemdConfig) (*PulseAudioBackend, error) {
+func New(ctx context.Context, cfg *config.ConfigPulseAudio) (*PulseAudioBackend, error) {
 	address := fmt.Sprintf("%s/pulse/native", cfg.XDGRuntimeDir)
 
 	backend := &PulseAudioBackend{

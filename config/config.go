@@ -15,16 +15,21 @@ const (
 )
 
 type Config struct {
-	Services *SystemdConfig
+	Systemd  *ConfigSystemd
+	Pulseaudio *ConfigPulseAudio
 	Port     int
 	LogLevel logger.Level
 }
 
-type SystemdConfig struct {
+type ConfigSystemd struct {
 	SystemServices []string
 	UserServices   []string
 	Headless       bool
 	XDGRuntimeDir  string
+}
+
+type ConfigPulseAudio struct {
+	XDGRuntimeDir string
 }
 
 // parseLogLevel converts a string to a logger.Level
@@ -82,17 +87,22 @@ func New() (*Config, error) {
 		xdgRuntimeDir = fmt.Sprintf("/run/user/%d", os.Getuid())
 	}
 
-	syscfg := SystemdConfig{
+	syscfg := ConfigSystemd{
 		SystemServices: viper.GetStringSlice("services.system"),
 		UserServices:   viper.GetStringSlice("services.user"),
 		Headless:       headless,
 		XDGRuntimeDir:  xdgRuntimeDir,
 	}
 
+	pulsecfg := ConfigPulseAudio{
+		XDGRuntimeDir: xdgRuntimeDir,
+	}
+
 	cfg := Config{
-		Services: &syscfg,
-		Port:     port,
-		LogLevel: parseLogLevel(viper.GetString("LogLevel")),
+		Systemd:     &syscfg,
+		Pulseaudio:  &pulsecfg,
+		Port:        port,
+		LogLevel:    parseLogLevel(viper.GetString("LogLevel")),
 	}
 
 	return &cfg, nil
