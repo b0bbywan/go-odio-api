@@ -3,7 +3,6 @@ package systemd
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,6 +10,8 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/godbus/dbus/v5"
+
+	"github.com/b0bbywan/go-odio-api/logger"
 )
 
 const (
@@ -105,7 +106,7 @@ func (l *Listener) startScope(scope UnitScope, watched map[string]bool) error {
 
 	go l.listen(ch, conn, scope, watched)
 
-	log.Printf("%s Systemd listener started (signal-based)", scope)
+	logger.Info("%s Systemd listener started (signal-based)", scope)
 	return nil
 }
 
@@ -216,7 +217,7 @@ func (l *Listener) checkUnit(sig *dbus.Signal, scope UnitScope) (string, bool) {
 	l.lastState[key] = subState
 	l.lastStateMu.Unlock()
 
-	log.Printf("Unit changed: %s/%s -> %s", scope, unitName, subState)
+	logger.Debug("Unit changed: %s/%s -> %s", scope, unitName, subState)
 	return unitName, true
 }
 
@@ -255,7 +256,7 @@ func (l *Listener) listen(
 			}
 			if unitName, ok := l.checkUnit(sig, scope); ok {
 				if _, err := l.backend.RefreshService(unitName, scope); err != nil {
-					log.Printf("Failed to refresh service %s/%s: %v", scope, unitName, err)
+					logger.Error("Failed to refresh service %s/%s: %v", scope, unitName, err)
 				}
 			}
 		}
@@ -264,9 +265,9 @@ func (l *Listener) listen(
 
 // Stop arrête le listener
 func (l *Listener) Stop() {
-	log.Println("Stopping systemd listener")
+	logger.Info("Stopping systemd listener")
 	l.cancel()
-	log.Println("Stopped")
+	logger.Info("Stopped")
 }
 
 // StartHeadless démarre l'écoute des événements systemd via fsnotify
@@ -291,7 +292,7 @@ func (l *Listener) StartHeadless() error {
 		return err
 	}
 
-	log.Printf("Monitoring %s for systemd user events (fsnotify)", unitsDir)
+	logger.Info("Monitoring %s for systemd user events (fsnotify)", unitsDir)
 
 	go l.listenHeadless(watcher)
 
@@ -315,7 +316,7 @@ func (l *Listener) listenHeadless(watcher *fsnotify.Watcher) {
 			if !ok {
 				return
 			}
-			log.Printf("Systemd fsnotify listener error: %v", err)
+			logger.Error("Systemd fsnotify listener error: %v", err)
 		}
 	}
 }
@@ -345,9 +346,9 @@ func (l *Listener) dispatchHeadless(event fsnotify.Event) {
 
 	}
 
-	log.Printf("Service %s: %s/%s", action, ScopeUser, serviceName)
+	logger.Info("Service %s: %s/%s", action, ScopeUser, serviceName)
 	if _, err := l.backend.RefreshService(serviceName, ScopeUser); err != nil {
-		log.Printf("Failed to refresh service %s/%s: %v", ScopeUser, serviceName, err)
+		logger.Error("Failed to refresh service %s/%s: %v", ScopeUser, serviceName, err)
 	}
 	return
 }
