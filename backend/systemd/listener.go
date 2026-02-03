@@ -13,8 +13,8 @@ import (
 )
 
 const (
-    actionStarted = "STARTED"
-    actionStopped = "STOPPED"
+	actionStarted = "STARTED"
+	actionStopped = "STOPPED"
 )
 
 func NewListener(backend *SystemdBackend) *Listener {
