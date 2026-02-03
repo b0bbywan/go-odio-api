@@ -270,9 +270,9 @@ func (l *Listener) dispatchHeadless(event fsnotify.Event) {
 
 	}
 
-	logger.Info("Service %s: %s/%s", action, ScopeUser, serviceName)
+	logger.Info("[systemd] Service %s: %s/%s", action, ScopeUser, serviceName)
 	if _, err := l.backend.RefreshService(serviceName, ScopeUser); err != nil {
-		logger.Error("Failed to refresh service %s/%s: %v", ScopeUser, serviceName, err)
+		logger.Error("[systemd] Failed to refresh service %s/%s: %v", ScopeUser, serviceName, err)
 	}
 	return
 }
