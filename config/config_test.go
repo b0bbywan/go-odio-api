@@ -39,7 +39,7 @@ func TestParseLogLevel(t *testing.T) {
 func TestConfigStructFields(t *testing.T) {
 	// Just verify the Config struct has the expected fields
 	cfg := &Config{
-		Services: &SystemdConfig{
+		Systemd: &SystemdConfig{
 			Headless: false,
 		},
 		Port:     8080,
@@ -52,10 +52,10 @@ func TestConfigStructFields(t *testing.T) {
 	if cfg.LogLevel != logger.INFO {
 		t.Errorf("LogLevel = %d, want %d", cfg.LogLevel, logger.INFO)
 	}
-	if cfg.Services.Headless != false {
-		t.Errorf("Headless = %v, want false", cfg.Services.Headless)
+	if cfg.Systemd.Headless != false {
+		t.Errorf("Headless = %v, want false", cfg.Systemd.Headless)
 	}
-	if cfg.Services == nil {
+	if cfg.Systemd == nil {
 		t.Error("Services should not be nil")
 	}
 }
