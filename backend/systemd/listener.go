@@ -60,9 +60,17 @@ func (l *Listener) Start() error {
 		return err
 	}
 
-	if err := l.startScope(ScopeUser, l.userWatched); err != nil {
-		l.Stop()
-		return err
+	// En mode headless, utiliser fsnotify au lieu de D-Bus pour les services user
+	if l.headless {
+		if err := l.StartHeadless(); err != nil {
+			l.Stop()
+			return err
+		}
+	} else {
+		if err := l.startScope(ScopeUser, l.userWatched); err != nil {
+			l.Stop()
+			return err
+		}
 	}
 
 	return nil
@@ -76,9 +84,6 @@ func (l *Listener) startScope(scope UnitScope, watched map[string]bool) error {
 			return err
 		}
 	} else if scope == ScopeUser {
-		if l.headless {
-			return nil
-		}
 		if conn, err = dbus.ConnectSessionBus(); err != nil {
 			return err
 		}

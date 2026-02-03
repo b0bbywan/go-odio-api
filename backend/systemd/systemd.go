@@ -93,9 +93,11 @@ func (s *SystemdBackend) ListServices() ([]Service, error) {
 	elapsed := time.Since(start)
 	logger.Debug("units listed in %s", elapsed)
 
-
 	out = append(out, sysSvcs...)
 	out = append(out, userSvcs...)
+
+	// Mettre à jour le cache
+	s.cache.Set(cacheKey, out)
 
 	return out, nil
 }
