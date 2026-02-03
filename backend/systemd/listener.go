@@ -195,9 +195,8 @@ func (l *Listener) StartHeadless() error {
 		return err
 	}
 
-	// Obtenir le UID de l'utilisateur courant
-	uid := os.Getuid()
-	unitsDir := fmt.Sprintf("/run/user/%d/systemd/units", uid)
+	// Utiliser le répertoire XDG_RUNTIME_DIR depuis la config
+	unitsDir := filepath.Join(l.backend.config.XDGRuntimeDir, "systemd/units")
 
 	// Vérifier que le répertoire existe
 	if _, err := os.Stat(unitsDir); os.IsNotExist(err) {
