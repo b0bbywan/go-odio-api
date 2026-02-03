@@ -32,6 +32,7 @@ func New(ctx context.Context) (*PulseAudioBackend, error) {
 
 // Start charge le cache initial et démarre le listener
 func (pa *PulseAudioBackend) Start() error {
+	logger.Debug("[pulseaudio] starting backend")
 	pa.mu.Lock()
 	defer pa.mu.Unlock()
 	var err error
@@ -43,6 +44,7 @@ func (pa *PulseAudioBackend) Start() error {
 		return err
 	}
 	pa.kind = detectServerKind(pa.server)
+	logger.Debug("[pulseaudio] detected server: %s (type=%s)", pa.server.PackageName, pa.kind)
 
 	// Charger le cache au démarrage
 	if _, err := pa.ListClients(); err != nil {
@@ -57,6 +59,7 @@ func (pa *PulseAudioBackend) Start() error {
 
 	go pa.heartbeat()
 
+	logger.Info("[pulseaudio] backend started successfully")
 	return nil
 }
 
@@ -94,7 +97,7 @@ func (pa *PulseAudioBackend) reconnectWithBackoff() {
 		}
 
 		if err := pa.Reconnect(); err != nil {
-			logger.Warn("PulseAudio reconnect failed, retry in %s", backoff)
+			logger.Warn("[pulseaudio] reconnect failed, retry in %s", backoff)
 			time.Sleep(backoff)
 
 			backoff *= 2
@@ -104,7 +107,7 @@ func (pa *PulseAudioBackend) reconnectWithBackoff() {
 			continue
 		}
 
-		logger.Info("PulseAudio reconnected")
+		logger.Info("[pulseaudio] reconnected")
 		return
 	}
 }
@@ -114,7 +117,7 @@ func (pa *PulseAudioBackend) ServerInfo() (*ServerInfo, error) {
 	var err error
 
 	if volume, err = pa.client.Volume(); err != nil {
-		logger.Warn("failed to get client volume: %v", err)
+		logger.Warn("[pulseaudio] failed to get client volume: %v", err)
 	}
 	if pa.server != nil {
 		return &ServerInfo{
@@ -134,11 +137,11 @@ func (pa *PulseAudioBackend) ServerInfo() (*ServerInfo, error) {
 func (pa *PulseAudioBackend) ListClients() ([]AudioClient, error) {
 	// Vérifier le cache
 	if cached, ok := pa.cache.Get(cacheKey); ok {
-		logger.Debug("Returning %d clients from cache", len(cached))
+		logger.Debug("[pulseaudio] returning %d clients from cache", len(cached))
 		return cached, nil
 	}
 
-	logger.Debug("Cache miss, loading clients from pulseaudio")
+	logger.Debug("[pulseaudio] cache miss, loading clients")
 	return pa.refreshCache()
 }
 
@@ -149,7 +152,7 @@ func (pa *PulseAudioBackend) refreshCache() ([]AudioClient, error) {
 		return nil, err
 	}
 
-	logger.Debug("Loaded %d sink inputs from pulseaudio", len(sinks))
+	logger.Debug("[pulseaudio] loaded %d sink inputs", len(sinks))
 
 	// récupérer l'ancien cache
 	oldClients, _ := pa.cache.Get(cacheKey)
@@ -304,6 +307,7 @@ func (pa *PulseAudioBackend) SetVolumeMaster(volume float32) error {
 }
 
 func (pa *PulseAudioBackend) ToggleMute(name string) error {
+	logger.Debug("[pulseaudio] toggling mute for client %q", name)
 	sink, err := pa.client.GetSinkInputByName(name)
 	if err != nil {
 		return fmt.Errorf("Failed to get Sink Input: %w", err)
@@ -315,12 +319,13 @@ func (pa *PulseAudioBackend) ToggleMute(name string) error {
 
 	// Rafraîchir le client dans le cache
 	if _, err := pa.RefreshClient(name); err != nil {
-		logger.Warn("failed to refresh client %q in cache: %v", name, err)
+		logger.Warn("[pulseaudio] failed to refresh client %q in cache: %v", name, err)
 	}
 	return nil
 }
 
 func (pa *PulseAudioBackend) SetVolume(name string, vol float32) error {
+	logger.Debug("[pulseaudio] setting volume for client %q to %.2f", name, vol)
 	sink, err := pa.client.GetSinkInputByName(name)
 	if err != nil {
 		return fmt.Errorf("Failed to get Sink Input: %w", err)
@@ -332,7 +337,7 @@ func (pa *PulseAudioBackend) SetVolume(name string, vol float32) error {
 
 	// Rafraîchir le client dans le cache
 	if _, err := pa.RefreshClient(name); err != nil {
-		logger.Warn("failed to refresh client %q in cache: %v", name, err)
+		logger.Warn("[pulseaudio] failed to refresh client %q in cache: %v", name, err)
 	}
 	return nil
 }
@@ -353,7 +358,7 @@ func (pa *PulseAudioBackend) parsePulseSinkInput(s pulseaudio.SinkInput) AudioCl
 		if client, ok := pa.parsePulseBluetoothSink(s, props); ok {
 			return client
 		}
-		logger.Warn("failed to resolve bluetooth sink %s", s.Name)
+		logger.Warn("[pulseaudio] failed to resolve bluetooth sink %s", s.Name)
 	}
 
 	return AudioClient{

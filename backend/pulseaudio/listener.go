@@ -35,7 +35,7 @@ func (l *Listener) Start() error {
 	// Goroutine d'écoute
 	go l.listen(updates)
 
-	logger.Info("PulseAudio listener started")
+	logger.Info("[pulseaudio] listener started")
 	return nil
 }
 
@@ -43,19 +43,19 @@ func (l *Listener) listen(updates <-chan struct{}) {
 	for {
 		select {
 		case <-l.ctx.Done():
-			logger.Debug("PulseAudio listener context done")
+			logger.Debug("[pulseaudio] listener context done")
 			return
 
-		case data, ok := <-updates:
+		case _, ok := <-updates:
 			if !ok {
-				logger.Debug("PulseAudio updates channel closed")
+				logger.Debug("[pulseaudio] updates channel closed")
 				return
 			}
 
 			// Un sink input a changé, recharger le cache
-			logger.Debug("Sink inputs changed event received, refreshing cache: %v", data)
+			logger.Debug("[pulseaudio] sink inputs changed, refreshing cache")
 			if _, err := l.backend.refreshCache(); err != nil {
-				logger.Warn("Failed to refresh clients: %v", err)
+				logger.Warn("[pulseaudio] failed to refresh clients: %v", err)
 			}
 		}
 	}
@@ -63,7 +63,7 @@ func (l *Listener) listen(updates <-chan struct{}) {
 
 // Stop arrête le listener
 func (l *Listener) Stop() {
-	logger.Info("Stopping pulseaudio listener")
+	logger.Info("[pulseaudio] stopping listener")
 
 	// Cancel le context pour arrêter la goroutine
 	l.cancel()
