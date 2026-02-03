@@ -185,13 +185,13 @@ func (s *SystemdBackend) listServices(
 			}
 			enabled, err := conn.GetUnitPropertyContext(ctx, unit.Name, "UnitFileState")
 			if err != nil {
-				log.Printf("failed to get %s state: %v", err)
+				log.Printf("failed to get %s state: %v", unit.Name, err)
 			} else {
 				svc.Enabled = enabled.Value.Value().(string) == "enabled"
 			}
 			description, err := conn.GetUnitPropertyContext(ctx, unit.Name, "UnitFileState")
 			if err != nil {
-				log.Printf("failed to get %s description: %v", err)
+				log.Printf("failed to get %s description: %v", unit.Name, err)
 			} else {
 				svc.Description = description.Value.Value().(string)
 			}

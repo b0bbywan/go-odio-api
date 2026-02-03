@@ -2,12 +2,14 @@ package systemd
 
 import (
 	"context"
+	"fmt"
 	"log"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
-	"time"
 
-	sysdbus "github.com/coreos/go-systemd/v22/dbus"
+	"github.com/fsnotify/fsnotify"
 	"github.com/godbus/dbus/v5"
 )
 
@@ -257,68 +259,80 @@ func (l *Listener) Stop() {
 	log.Println("Stopped")
 }
 
-// Start démarre l'écoute des événements D-Bus
+// StartHeadless démarre l'écoute des événements systemd via fsnotify
 func (l *Listener) StartHeadless() error {
-	// Fonction de comparaison : détecter les changements réels
-	isChanged := func(u1, u2 *sysdbus.UnitStatus) bool {
-		if u1 == nil || u2 == nil {
-			return true
-		}
-		// Changement si ActiveState ou LoadState différent
-		return u1.ActiveState != u2.ActiveState || u1.LoadState != u2.LoadState
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		return err
 	}
 
-	// Subscribe system scope (sans filtre, on filtre nous-mêmes)
-	// Fonction de filtrage : ne surveiller que les services configurés
-	// Cela évite de poll TOUS les units systemd à chaque intervalle
-	filterUnit := func(name string) bool {
-		return l.userWatched[name]
+	// Obtenir le UID de l'utilisateur courant
+	uid := os.Getuid()
+	unitsDir := fmt.Sprintf("/run/user/%d/systemd/units", uid)
+
+	// Vérifier que le répertoire existe
+	if _, err := os.Stat(unitsDir); os.IsNotExist(err) {
+		watcher.Close()
+		return fmt.Errorf("units directory does not exist: %s", unitsDir)
 	}
 
-	// Subscribe user scope
-	userStatusCh, userErrCh := l.backend.userConn.SubscribeUnitsCustomContext(
-		l.ctx,
-		2*time.Second,
-		10,
-		isChanged,
-		filterUnit,
-	)
+	if err := watcher.Add(unitsDir); err != nil {
+		watcher.Close()
+		return err
+	}
 
-	// Goroutines d'écoute
-	go l.listenHeadless(userStatusCh, userErrCh, ScopeUser)
+	log.Printf("Monitoring %s for systemd user events (fsnotify)", unitsDir)
 
-	log.Printf("%s Systemd listener started", ScopeUser)
+	go l.listenHeadless(watcher)
+
 	return nil
 }
 
-func (l *Listener) listenHeadless(statusCh <-chan map[string]*sysdbus.UnitStatus, errCh <-chan error, scope UnitScope) {
+func (l *Listener) listenHeadless(watcher *fsnotify.Watcher) {
+	defer watcher.Close()
+
 	for {
 		select {
 		case <-l.ctx.Done():
 			return
 
-		case err, ok := <-errCh:
-			if !ok {
-				return
-			}
-			log.Printf("Systemd listener error (%s): %v", scope, err)
-
-		case statuses, ok := <-statusCh:
+		case event, ok := <-watcher.Events:
 			if !ok {
 				return
 			}
 
-			// Filtrer et rafraîchir uniquement les services surveillés
-			for name := range statuses {
-				if !l.userWatched[name] {
-					continue
+			// Filtre sur invocation:*.service
+			basename := filepath.Base(event.Name)
+			if len(basename) <= 11 || basename[:11] != "invocation:" {
+				continue
+			}
+
+			serviceName := basename[11:]
+
+			// Filtrer uniquement les services surveillés
+			if !l.userWatched[serviceName] {
+				continue
+			}
+
+			switch {
+			case event.Op&fsnotify.Create == fsnotify.Create:
+				log.Printf("Service STARTED: %s/%s", ScopeUser, serviceName)
+				if _, err := l.backend.RefreshService(serviceName, ScopeUser); err != nil {
+					log.Printf("Failed to refresh service %s/%s: %v", ScopeUser, serviceName, err)
 				}
 
-				log.Printf("Unit changed: %s/%s", scope, name)
-				if _, err := l.backend.RefreshService(name, scope); err != nil {
-					log.Printf("Failed to refresh service %s/%s: %v", scope, name, err)
+			case event.Op&fsnotify.Remove == fsnotify.Remove:
+				log.Printf("Service STOPPED: %s/%s", ScopeUser, serviceName)
+				if _, err := l.backend.RefreshService(serviceName, ScopeUser); err != nil {
+					log.Printf("Failed to refresh service %s/%s: %v", ScopeUser, serviceName, err)
 				}
 			}
+
+		case err, ok := <-watcher.Errors:
+			if !ok {
+				return
+			}
+			log.Printf("Systemd fsnotify listener error: %v", err)
 		}
 	}
 }
