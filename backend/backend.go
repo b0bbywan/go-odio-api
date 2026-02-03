@@ -3,9 +3,9 @@ package backend
 import (
 	"context"
 
-	"github.com/b0bbywan/go-odio-api/config"
 	"github.com/b0bbywan/go-odio-api/backend/pulseaudio"
 	"github.com/b0bbywan/go-odio-api/backend/systemd"
+	"github.com/b0bbywan/go-odio-api/config"
 )
 
 type Backend struct {

@@ -7,10 +7,10 @@ import (
 )
 
 func withService(
-		sd *systemd.SystemdBackend,
-		fn func(string, systemd.UnitScope) error,
-	) http.HandlerFunc {
-	
+	sd *systemd.SystemdBackend,
+	fn func(string, systemd.UnitScope) error,
+) http.HandlerFunc {
+
 	return func(w http.ResponseWriter, r *http.Request) {
 		scope, ok := systemd.ParseUnitScope(r.PathValue("scope"))
 		if !ok {

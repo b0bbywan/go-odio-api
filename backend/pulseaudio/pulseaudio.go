@@ -23,8 +23,8 @@ func New(ctx context.Context) (*PulseAudioBackend, error) {
 
 	backend := &PulseAudioBackend{
 		address: address,
-		ctx:    ctx,
-		cache:  cache.New[[]AudioClient](0), // TTL=0 = pas d'expiration
+		ctx:     ctx,
+		cache:   cache.New[[]AudioClient](0), // TTL=0 = pas d'expiration
 	}
 
 	return backend, nil
@@ -118,13 +118,13 @@ func (pa *PulseAudioBackend) ServerInfo() (*ServerInfo, error) {
 	}
 	if pa.server != nil {
 		return &ServerInfo{
-			Kind: 			pa.kind,
-			Name: 			pa.server.PackageName,
-			Version:		pa.server.PackageVersion,
-			User:			pa.server.User,
-			Hostname:		pa.server.Hostname,
-			DefaultSink:	pa.server.DefaultSink,
-			Volume:			volume,
+			Kind:        pa.kind,
+			Name:        pa.server.PackageName,
+			Version:     pa.server.PackageVersion,
+			User:        pa.server.User,
+			Hostname:    pa.server.Hostname,
+			DefaultSink: pa.server.DefaultSink,
+			Volume:      volume,
 		}, nil
 	}
 
@@ -448,7 +448,6 @@ func (pa *PulseAudioBackend) findModule(index uint32, name string) (*pulseaudio.
 	}
 	return nil, fmt.Errorf("module %s %d not found", name, index)
 }
-
 
 func (pa *PulseAudioBackend) findSourceByName(name string) (*pulseaudio.Source, error) {
 	sources, err := pa.client.Sources()

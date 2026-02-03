@@ -2,7 +2,6 @@ package pulseaudio
 
 import (
 	"github.com/the-jonsey/pulseaudio"
-
 )
 
 func (pa *PulseAudioBackend) parsePipeWireSinkInput(s pulseaudio.SinkInput) AudioClient {

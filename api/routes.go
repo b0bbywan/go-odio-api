@@ -39,7 +39,7 @@ func Register(mux *http.ServeMux, b *backend.Backend) {
 
 	// systemd routes
 	mux.HandleFunc(
-		"/services", 
+		"/services",
 		JSONHandler(func(w http.ResponseWriter, r *http.Request) (any, error) {
 			return b.Systemd.ListServices()
 		}),
