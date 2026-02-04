@@ -14,13 +14,13 @@ func withService(
 	return func(w http.ResponseWriter, r *http.Request) {
 		scope, ok := systemd.ParseUnitScope(r.PathValue("scope"))
 		if !ok {
-			http.Error(w, "invalid scope", http.StatusBadRequest)
+			http.Error(w, "invalid scope", http.StatusNotFound)
 			return
 		}
 
 		unit := r.PathValue("unit")
 		if unit == "" {
-			http.Error(w, "missing unit name", http.StatusBadRequest)
+			http.Error(w, "missing unit name", http.StatusNotFound)
 			return
 		}
 
@@ -29,6 +29,6 @@ func withService(
 			return
 		}
 
-		w.WriteHeader(http.StatusNoContent)
+		w.WriteHeader(http.StatusAccepted)
 	}
 }
