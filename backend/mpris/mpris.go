@@ -50,7 +50,7 @@ func (m *MPRISBackend) ListPlayers() ([]Player, error) {
 
 	// Lister tous les bus names
 	var names []string
-	err := m.conn.BusObject().Call(dbusInterface+".ListNames", 0).Store(&names)
+	err := m.conn.BusObject().Call(dbusListNamesMethod, 0).Store(&names)
 	if err != nil {
 		return nil, err
 	}
@@ -294,7 +294,7 @@ func (m *MPRISBackend) SetVolume(busName string, volume float64) error {
 
 	logger.Debug("[mpris] setting volume to %.2f for %s", volume, busName)
 	obj := m.conn.Object(busName, mprisPath)
-	return obj.Call(dbusPropIface+".Set", 0, mprisPlayerIface, "Volume", dbus.MakeVariant(volume)).Err
+	return obj.Call(dbusPropSet, 0, mprisPlayerIface, "Volume", dbus.MakeVariant(volume)).Err
 }
 
 // SetLoopStatus définit le statut de boucle
@@ -309,7 +309,7 @@ func (m *MPRISBackend) SetLoopStatus(busName string, status LoopStatus) error {
 
 	logger.Debug("[mpris] setting loop status to %s for %s", status, busName)
 	obj := m.conn.Object(busName, mprisPath)
-	return obj.Call(dbusPropIface+".Set", 0, mprisPlayerIface, "LoopStatus", dbus.MakeVariant(string(status))).Err
+	return obj.Call(dbusPropSet, 0, mprisPlayerIface, "LoopStatus", dbus.MakeVariant(string(status))).Err
 }
 
 // SetShuffle active/désactive le mode aléatoire
@@ -324,7 +324,7 @@ func (m *MPRISBackend) SetShuffle(busName string, shuffle bool) error {
 
 	logger.Debug("[mpris] setting shuffle to %v for %s", shuffle, busName)
 	obj := m.conn.Object(busName, mprisPath)
-	return obj.Call(dbusPropIface+".Set", 0, mprisPlayerIface, "Shuffle", dbus.MakeVariant(shuffle)).Err
+	return obj.Call(dbusPropSet, 0, mprisPlayerIface, "Shuffle", dbus.MakeVariant(shuffle)).Err
 }
 
 // InvalidateCache invalide tout le cache
