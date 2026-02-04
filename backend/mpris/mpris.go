@@ -168,7 +168,7 @@ func (m *MPRISBackend) Play(busName string) error {
 	if !found {
 		return &CapabilityError{Required: "player not found"}
 	}
-	if err := player.checkCapabilities(Caps.CanPlay); err != nil {
+	if err := player.checkCapabilities(CheckCanPlay); err != nil {
 		return err
 	}
 
@@ -183,7 +183,7 @@ func (m *MPRISBackend) Pause(busName string) error {
 	if !found {
 		return &CapabilityError{Required: "player not found"}
 	}
-	if err := player.checkCapabilities(Caps.CanPause); err != nil {
+	if err := player.checkCapabilities(CheckCanPause); err != nil {
 		return err
 	}
 
@@ -198,7 +198,7 @@ func (m *MPRISBackend) PlayPause(busName string) error {
 	if !found {
 		return &CapabilityError{Required: "player not found"}
 	}
-	if err := player.checkCapabilities(Caps.CanPlay, Caps.CanPause); err != nil {
+	if err := player.checkCapabilities(CheckCanPlay, CheckCanPause); err != nil {
 		return err
 	}
 
@@ -213,7 +213,7 @@ func (m *MPRISBackend) Stop(busName string) error {
 	if !found {
 		return &CapabilityError{Required: "player not found"}
 	}
-	if err := player.checkCapabilities(Caps.CanControl); err != nil {
+	if err := player.checkCapabilities(CheckCanControl); err != nil {
 		return err
 	}
 
@@ -228,7 +228,7 @@ func (m *MPRISBackend) Next(busName string) error {
 	if !found {
 		return &CapabilityError{Required: "player not found"}
 	}
-	if err := player.checkCapabilities(Caps.CanGoNext); err != nil {
+	if err := player.checkCapabilities(CheckCanGoNext); err != nil {
 		return err
 	}
 
@@ -243,7 +243,7 @@ func (m *MPRISBackend) Previous(busName string) error {
 	if !found {
 		return &CapabilityError{Required: "player not found"}
 	}
-	if err := player.checkCapabilities(Caps.CanGoPrevious); err != nil {
+	if err := player.checkCapabilities(CheckCanGoPrevious); err != nil {
 		return err
 	}
 
@@ -258,7 +258,7 @@ func (m *MPRISBackend) Seek(busName string, offset int64) error {
 	if !found {
 		return &CapabilityError{Required: "player not found"}
 	}
-	if err := player.checkCapabilities(Caps.CanSeek); err != nil {
+	if err := player.checkCapabilities(CheckCanSeek); err != nil {
 		return err
 	}
 
@@ -273,7 +273,7 @@ func (m *MPRISBackend) SetPosition(busName, trackID string, position int64) erro
 	if !found {
 		return &CapabilityError{Required: "player not found"}
 	}
-	if err := player.checkCapabilities(Caps.CanSeek); err != nil {
+	if err := player.checkCapabilities(CheckCanSeek); err != nil {
 		return err
 	}
 
@@ -288,7 +288,7 @@ func (m *MPRISBackend) SetVolume(busName string, volume float64) error {
 	if !found {
 		return &CapabilityError{Required: "player not found"}
 	}
-	if err := player.checkCapabilities(Caps.CanControl); err != nil {
+	if err := player.checkCapabilities(CheckCanControl); err != nil {
 		return err
 	}
 
@@ -303,7 +303,7 @@ func (m *MPRISBackend) SetLoopStatus(busName string, status LoopStatus) error {
 	if !found {
 		return &CapabilityError{Required: "player not found"}
 	}
-	if err := player.checkCapabilities(Caps.CanControl); err != nil {
+	if err := player.checkCapabilities(CheckCanControl); err != nil {
 		return err
 	}
 
@@ -318,7 +318,7 @@ func (m *MPRISBackend) SetShuffle(busName string, shuffle bool) error {
 	if !found {
 		return &CapabilityError{Required: "player not found"}
 	}
-	if err := player.checkCapabilities(Caps.CanControl); err != nil {
+	if err := player.checkCapabilities(CheckCanControl); err != nil {
 		return err
 	}
 

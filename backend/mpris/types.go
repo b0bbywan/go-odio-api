@@ -2,7 +2,6 @@ package mpris
 
 import (
 	"context"
-	"reflect"
 	"sync"
 
 	"github.com/godbus/dbus/v5"
@@ -39,19 +38,14 @@ const (
 	LoopPlaylist LoopStatus = "Playlist"
 )
 
-// Capabilities représente les actions supportées par un lecteur
-type Capabilities struct {
-	CanPlay       bool `json:"can_play" dbus:"CanPlay"`
-	CanPause      bool `json:"can_pause" dbus:"CanPause"`
-	CanGoNext     bool `json:"can_go_next" dbus:"CanGoNext"`
-	CanGoPrevious bool `json:"can_go_previous" dbus:"CanGoPrevious"`
-	CanSeek       bool `json:"can_seek" dbus:"CanSeek"`
-	CanControl    bool `json:"can_control" dbus:"CanControl"`
-}
-
-// CapabilityRef représente une référence à un champ de Capabilities
-type CapabilityRef struct {
-	FieldName string
+// capabilities représente les actions supportées par un lecteur (privé)
+type capabilities struct {
+	canPlay       bool `dbus:"CanPlay"`
+	canPause      bool `dbus:"CanPause"`
+	canGoNext     bool `dbus:"CanGoNext"`
+	canGoPrevious bool `dbus:"CanGoPrevious"`
+	canSeek       bool `dbus:"CanSeek"`
+	canControl    bool `dbus:"CanControl"`
 }
 
 // CapabilityError indique qu'une action n'est pas supportée par le player
@@ -63,27 +57,39 @@ func (e *CapabilityError) Error() string {
 	return "action not allowed (requires " + e.Required + ")"
 }
 
-// Caps contient les références à toutes les capabilities, auto-générées depuis Capabilities
-var Caps = struct {
-	CanPlay       CapabilityRef
-	CanPause      CapabilityRef
-	CanGoNext     CapabilityRef
-	CanGoPrevious CapabilityRef
-	CanSeek       CapabilityRef
-	CanControl    CapabilityRef
-}{}
-
-func init() {
-	// Auto-générer les CapabilityRef depuis la struct Capabilities
-	capsType := reflect.TypeOf(Capabilities{})
-	capsVal := reflect.ValueOf(&Caps).Elem()
-
-	for i := 0; i < capsType.NumField(); i++ {
-		field := capsType.Field(i)
-		capRef := CapabilityRef{FieldName: field.Name}
-		capsVal.Field(i).Set(reflect.ValueOf(capRef))
-	}
+// CapabilityChecker est une fonction qui vérifie une capability et retourne le nom D-Bus associé
+type CapabilityChecker struct {
+	Check    func(*Player) bool
+	DbusName string
 }
+
+// Capability checkers pré-définis
+var (
+	CheckCanPlay = CapabilityChecker{
+		Check:    func(p *Player) bool { return p.CanPlay() },
+		DbusName: "CanPlay",
+	}
+	CheckCanPause = CapabilityChecker{
+		Check:    func(p *Player) bool { return p.CanPause() },
+		DbusName: "CanPause",
+	}
+	CheckCanGoNext = CapabilityChecker{
+		Check:    func(p *Player) bool { return p.CanGoNext() },
+		DbusName: "CanGoNext",
+	}
+	CheckCanGoPrevious = CapabilityChecker{
+		Check:    func(p *Player) bool { return p.CanGoPrevious() },
+		DbusName: "CanGoPrevious",
+	}
+	CheckCanSeek = CapabilityChecker{
+		Check:    func(p *Player) bool { return p.CanSeek() },
+		DbusName: "CanSeek",
+	}
+	CheckCanControl = CapabilityChecker{
+		Check:    func(p *Player) bool { return p.CanControl() },
+		DbusName: "CanControl",
+	}
+)
 
 // Listener écoute les changements MPRIS via signaux D-Bus
 type Listener struct {
@@ -110,8 +116,10 @@ type MPRISBackend struct {
 
 // Player représente un lecteur multimédia MPRIS
 type Player struct {
-	conn    *dbus.Conn // Connexion D-Bus (non exporté)
-	BusName string     `json:"bus_name"`
+	conn         *dbus.Conn // Connexion D-Bus (non exporté)
+	capabilities capabilities
+
+	BusName string `json:"bus_name"`
 
 	Identity       string            `json:"identity" dbus:"Identity" iface:"org.mpris.MediaPlayer2"`
 	PlaybackStatus PlaybackStatus    `json:"playback_status" dbus:"PlaybackStatus" iface:"org.mpris.MediaPlayer2.Player"`
@@ -121,7 +129,6 @@ type Player struct {
 	Position       int64             `json:"position,omitempty" dbus:"Position" iface:"org.mpris.MediaPlayer2.Player"`
 	Rate           float64           `json:"rate,omitempty" dbus:"Rate" iface:"org.mpris.MediaPlayer2.Player"`
 	Metadata       map[string]string `json:"metadata,omitempty" dbus:"Metadata" iface:"org.mpris.MediaPlayer2.Player"`
-	Capabilities   Capabilities      `json:"capabilities"`
 }
 
 // Request types pour l'API

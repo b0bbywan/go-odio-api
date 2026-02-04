@@ -17,22 +17,22 @@ func TestGetPlayer(t *testing.T) {
 			BusName:        "org.mpris.MediaPlayer2.spotify",
 			Identity:       "Spotify",
 			PlaybackStatus: StatusPlaying,
-			Capabilities: Capabilities{
-				CanPlay:       true,
-				CanPause:      true,
-				CanGoNext:     true,
-				CanGoPrevious: true,
+			capabilities: capabilities{
+				canPlay:       true,
+				canPause:      true,
+				canGoNext:     true,
+				canGoPrevious: true,
 			},
 		},
 		{
 			BusName:        "org.mpris.MediaPlayer2.vlc",
 			Identity:       "VLC",
 			PlaybackStatus: StatusPaused,
-			Capabilities: Capabilities{
-				CanPlay:       true,
-				CanPause:      true,
-				CanGoNext:     false,
-				CanGoPrevious: false,
+			capabilities: capabilities{
+				canPlay:       true,
+				canPause:      true,
+				canGoNext:     false,
+				canGoPrevious: false,
 			},
 		},
 	}
@@ -52,11 +52,11 @@ func TestGetPlayer(t *testing.T) {
 				BusName:        "org.mpris.MediaPlayer2.spotify",
 				Identity:       "Spotify",
 				PlaybackStatus: StatusPlaying,
-				Capabilities: Capabilities{
-					CanPlay:       true,
-					CanPause:      true,
-					CanGoNext:     true,
-					CanGoPrevious: true,
+				capabilities: capabilities{
+					canPlay:       true,
+					canPause:      true,
+					canGoNext:     true,
+					canGoPrevious: true,
 				},
 			},
 		},
@@ -68,11 +68,11 @@ func TestGetPlayer(t *testing.T) {
 				BusName:        "org.mpris.MediaPlayer2.vlc",
 				Identity:       "VLC",
 				PlaybackStatus: StatusPaused,
-				Capabilities: Capabilities{
-					CanPlay:       true,
-					CanPause:      true,
-					CanGoNext:     false,
-					CanGoPrevious: false,
+				capabilities: capabilities{
+					canPlay:       true,
+					canPause:      true,
+					canGoNext:     false,
+					canGoPrevious: false,
 				},
 			},
 		},
@@ -100,11 +100,11 @@ func TestGetPlayer(t *testing.T) {
 				if player.PlaybackStatus != tt.wantPlayer.PlaybackStatus {
 					t.Errorf("PlaybackStatus = %q, want %q", player.PlaybackStatus, tt.wantPlayer.PlaybackStatus)
 				}
-				if player.Capabilities.CanPlay != tt.wantPlayer.Capabilities.CanPlay {
-					t.Errorf("CanPlay = %v, want %v", player.Capabilities.CanPlay, tt.wantPlayer.Capabilities.CanPlay)
+				if player.CanPlay() != tt.wantPlayer.CanPlay() {
+					t.Errorf("CanPlay() = %v, want %v", player.CanPlay(), tt.wantPlayer.CanPlay())
 				}
-				if player.Capabilities.CanGoNext != tt.wantPlayer.Capabilities.CanGoNext {
-					t.Errorf("CanGoNext = %v, want %v", player.Capabilities.CanGoNext, tt.wantPlayer.Capabilities.CanGoNext)
+				if player.CanGoNext() != tt.wantPlayer.CanGoNext() {
+					t.Errorf("CanGoNext() = %v, want %v", player.CanGoNext(), tt.wantPlayer.CanGoNext())
 				}
 			}
 		})
@@ -153,9 +153,9 @@ func TestUpdatePlayer(t *testing.T) {
 		Identity:       "Spotify",
 		PlaybackStatus: StatusPlaying,
 		Volume:         0.8,
-		Capabilities: Capabilities{
-			CanPlay:  true,
-			CanPause: true,
+		capabilities: capabilities{
+			canPlay:  true,
+			canPause: true,
 		},
 	}
 
@@ -205,8 +205,8 @@ func TestUpdatePlayerAddNew(t *testing.T) {
 		BusName:        "org.mpris.MediaPlayer2.vlc",
 		Identity:       "VLC",
 		PlaybackStatus: StatusPlaying,
-		Capabilities: Capabilities{
-			CanPlay: true,
+		capabilities: capabilities{
+			canPlay: true,
 		},
 	}
 
