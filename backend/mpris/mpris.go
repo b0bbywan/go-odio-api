@@ -73,7 +73,8 @@ func (m *MPRISBackend) Start() error {
 	logger.Debug("[mpris] starting backend")
 
 	// Charger le cache au démarrage
-	if _, err := m.ListPlayers(); err != nil {
+	players, err := m.ListPlayers()
+	if err != nil {
 		return err
 	}
 
@@ -83,15 +84,8 @@ func (m *MPRISBackend) Start() error {
 		return err
 	}
 
-	// Vérifier si des players sont déjà en Playing au démarrage
-	players, _ := m.cache.Get(cacheKey)
-	for _, player := range players {
-		if player.PlaybackStatus == StatusPlaying {
-			logger.Debug("[mpris] detected player %s already playing, starting heartbeat", player.BusName)
-			m.ensureHeartbeatRunning()
-			break
-		}
-	}
+	// Démarrer le heartbeat si un player est déjà en Playing
+	m.startHeartbeatIfPlaying(players)
 
 	logger.Info("[mpris] backend started successfully")
 	return nil
@@ -495,6 +489,17 @@ func (m *MPRISBackend) ensureHeartbeatRunning() {
 
 	m.heartbeatActive = true
 	go m.startPositionHeartbeat()
+}
+
+// startHeartbeatIfPlaying démarre le heartbeat si au moins un player est en Playing
+func (m *MPRISBackend) startHeartbeatIfPlaying(players []Player) {
+	for _, player := range players {
+		if player.PlaybackStatus == StatusPlaying {
+			logger.Debug("[mpris] detected player %s already playing, starting heartbeat", player.BusName)
+			m.ensureHeartbeatRunning()
+			return
+		}
+	}
 }
 
 // startPositionHeartbeat met à jour la position des players en lecture toutes les 2s
