@@ -57,6 +57,7 @@ func (l *Listener) listen(ch <-chan *dbus.Signal) {
 			if !ok {
 				return
 			}
+			logger.Debug("[mpris] received signal: %s from %s", sig.Name, sig.Sender)
 			l.handleSignal(sig)
 		}
 	}
@@ -69,6 +70,8 @@ func (l *Listener) handleSignal(sig *dbus.Signal) {
 		l.handlePropertiesChanged(sig)
 	case dbusNameOwnerChanged:
 		l.handleNameOwnerChanged(sig)
+	default:
+		logger.Debug("[mpris] unhandled signal: %s", sig.Name)
 	}
 }
 
