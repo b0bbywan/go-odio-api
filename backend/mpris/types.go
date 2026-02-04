@@ -38,11 +38,22 @@ const (
 	LoopPlaylist LoopStatus = "Playlist"
 )
 
+// Capabilities représente les actions supportées par un lecteur
+type Capabilities struct {
+	CanPlay       bool `json:"can_play"`
+	CanPause      bool `json:"can_pause"`
+	CanGoNext     bool `json:"can_go_next"`
+	CanGoPrevious bool `json:"can_go_previous"`
+	CanSeek       bool `json:"can_seek"`
+	CanControl    bool `json:"can_control"`
+}
+
 // Listener écoute les changements MPRIS via signaux D-Bus
 type Listener struct {
 	backend *MPRISBackend
 	ctx     context.Context
 	cancel  context.CancelFunc
+	conn    *dbus.Conn
 
 	// Déduplication : dernier état connu par player
 	lastState   map[string]PlaybackStatus
@@ -72,10 +83,28 @@ type Player struct {
 	Position       int64             `json:"position,omitempty"`
 	Rate           float64           `json:"rate,omitempty"`
 	Metadata       map[string]string `json:"metadata,omitempty"`
-	CanPlay        bool              `json:"can_play"`
-	CanPause       bool              `json:"can_pause"`
-	CanGoNext      bool              `json:"can_go_next"`
-	CanGoPrevious  bool              `json:"can_go_previous"`
-	CanSeek        bool              `json:"can_seek"`
-	CanControl     bool              `json:"can_control"`
+	Capabilities   Capabilities      `json:"capabilities"`
+}
+
+// Request types pour l'API
+
+type SeekRequest struct {
+	Offset int64 `json:"offset"`
+}
+
+type PositionRequest struct {
+	TrackID  string `json:"track_id"`
+	Position int64  `json:"position"`
+}
+
+type VolumeRequest struct {
+	Volume float64 `json:"volume"`
+}
+
+type LoopRequest struct {
+	Loop string `json:"loop"`
+}
+
+type ShuffleRequest struct {
+	Shuffle bool `json:"shuffle"`
 }

@@ -2,7 +2,6 @@ package mpris
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"time"
 
@@ -155,147 +154,73 @@ func (m *MPRISBackend) RemovePlayer(busName string) error {
 
 // getPlayerInfo récupère toutes les informations d'un lecteur MPRIS
 func (m *MPRISBackend) getPlayerInfo(busName string) (Player, error) {
-	obj := m.conn.Object(busName, mprisPath)
-
 	player := Player{
 		BusName: busName,
 	}
 
 	// Récupérer Identity
-	if val, ok := m.getStringProperty(obj, mprisInterface, "Identity"); ok {
+	if val, ok := getStringProperty(m.conn, busName, mprisInterface, "Identity"); ok {
 		player.Identity = val
 	}
 
 	// Récupérer PlaybackStatus
-	if val, ok := m.getStringProperty(obj, mprisPlayerIface, "PlaybackStatus"); ok {
+	if val, ok := getStringProperty(m.conn, busName, mprisPlayerIface, "PlaybackStatus"); ok {
 		player.PlaybackStatus = PlaybackStatus(val)
 	}
 
 	// Récupérer LoopStatus
-	if val, ok := m.getStringProperty(obj, mprisPlayerIface, "LoopStatus"); ok {
+	if val, ok := getStringProperty(m.conn, busName, mprisPlayerIface, "LoopStatus"); ok {
 		player.LoopStatus = LoopStatus(val)
 	}
 
 	// Récupérer Shuffle
-	if val, ok := m.getBoolProperty(obj, mprisPlayerIface, "Shuffle"); ok {
+	if val, ok := getBoolProperty(m.conn, busName, mprisPlayerIface, "Shuffle"); ok {
 		player.Shuffle = val
 	}
 
 	// Récupérer Volume
-	if val, ok := m.getFloat64Property(obj, mprisPlayerIface, "Volume"); ok {
+	if val, ok := getFloat64Property(m.conn, busName, mprisPlayerIface, "Volume"); ok {
 		player.Volume = val
 	}
 
 	// Récupérer Position
-	if val, ok := m.getInt64Property(obj, mprisPlayerIface, "Position"); ok {
+	if val, ok := getInt64Property(m.conn, busName, mprisPlayerIface, "Position"); ok {
 		player.Position = val
 	}
 
 	// Récupérer Rate
-	if val, ok := m.getFloat64Property(obj, mprisPlayerIface, "Rate"); ok {
+	if val, ok := getFloat64Property(m.conn, busName, mprisPlayerIface, "Rate"); ok {
 		player.Rate = val
 	}
 
 	// Récupérer Metadata
-	if metadata, err := m.getProperty(obj, mprisPlayerIface, "Metadata"); err == nil {
+	if metadata, err := getProperty(m.conn, busName, mprisPlayerIface, "Metadata"); err == nil {
 		player.Metadata = extractMetadata(metadata.Value())
 	}
 
 	// Récupérer les capabilities
-	if val, ok := m.getBoolProperty(obj, mprisPlayerIface, "CanPlay"); ok {
-		player.CanPlay = val
+	var caps Capabilities
+	if val, ok := getBoolProperty(m.conn, busName, mprisPlayerIface, "CanPlay"); ok {
+		caps.CanPlay = val
 	}
-	if val, ok := m.getBoolProperty(obj, mprisPlayerIface, "CanPause"); ok {
-		player.CanPause = val
+	if val, ok := getBoolProperty(m.conn, busName, mprisPlayerIface, "CanPause"); ok {
+		caps.CanPause = val
 	}
-	if val, ok := m.getBoolProperty(obj, mprisPlayerIface, "CanGoNext"); ok {
-		player.CanGoNext = val
+	if val, ok := getBoolProperty(m.conn, busName, mprisPlayerIface, "CanGoNext"); ok {
+		caps.CanGoNext = val
 	}
-	if val, ok := m.getBoolProperty(obj, mprisPlayerIface, "CanGoPrevious"); ok {
-		player.CanGoPrevious = val
+	if val, ok := getBoolProperty(m.conn, busName, mprisPlayerIface, "CanGoPrevious"); ok {
+		caps.CanGoPrevious = val
 	}
-	if val, ok := m.getBoolProperty(obj, mprisPlayerIface, "CanSeek"); ok {
-		player.CanSeek = val
+	if val, ok := getBoolProperty(m.conn, busName, mprisPlayerIface, "CanSeek"); ok {
+		caps.CanSeek = val
 	}
-	if val, ok := m.getBoolProperty(obj, mprisPlayerIface, "CanControl"); ok {
-		player.CanControl = val
+	if val, ok := getBoolProperty(m.conn, busName, mprisPlayerIface, "CanControl"); ok {
+		caps.CanControl = val
 	}
+	player.Capabilities = caps
 
 	return player, nil
-}
-
-// getProperty récupère une propriété D-Bus
-func (m *MPRISBackend) getProperty(obj dbus.BusObject, iface, prop string) (dbus.Variant, error) {
-	var v dbus.Variant
-	err := obj.Call(dbusPropIface+".Get", 0, iface, prop).Store(&v)
-	return v, err
-}
-
-// Helper functions pour récupérer des propriétés typées
-func (m *MPRISBackend) getStringProperty(obj dbus.BusObject, iface, prop string) (string, bool) {
-	v, err := m.getProperty(obj, iface, prop)
-	if err != nil {
-		return "", false
-	}
-	val, ok := v.Value().(string)
-	return val, ok
-}
-
-func (m *MPRISBackend) getBoolProperty(obj dbus.BusObject, iface, prop string) (bool, bool) {
-	v, err := m.getProperty(obj, iface, prop)
-	if err != nil {
-		return false, false
-	}
-	val, ok := v.Value().(bool)
-	return val, ok
-}
-
-func (m *MPRISBackend) getFloat64Property(obj dbus.BusObject, iface, prop string) (float64, bool) {
-	v, err := m.getProperty(obj, iface, prop)
-	if err != nil {
-		return 0, false
-	}
-	val, ok := v.Value().(float64)
-	return val, ok
-}
-
-func (m *MPRISBackend) getInt64Property(obj dbus.BusObject, iface, prop string) (int64, bool) {
-	v, err := m.getProperty(obj, iface, prop)
-	if err != nil {
-		return 0, false
-	}
-	val, ok := v.Value().(int64)
-	return val, ok
-}
-
-// extractMetadata extrait les métadonnées pertinentes
-func extractMetadata(raw interface{}) map[string]string {
-	metadata := make(map[string]string)
-
-	m, ok := raw.(map[string]dbus.Variant)
-	if !ok {
-		return metadata
-	}
-
-	// Extraire les métadonnées courantes
-	metadataKeys := []string{
-		"xesam:title",
-		"xesam:artist",
-		"xesam:album",
-		"xesam:albumArtist",
-		"xesam:genre",
-		"mpris:trackid",
-		"mpris:artUrl",
-		"mpris:length",
-	}
-
-	for _, key := range metadataKeys {
-		if v, ok := m[key]; ok {
-			metadata[key] = fmt.Sprintf("%v", v.Value())
-		}
-	}
-
-	return metadata
 }
 
 // Play démarre la lecture
