@@ -74,14 +74,14 @@ type MPRISBackend struct {
 // Player représente un lecteur multimédia MPRIS
 type Player struct {
 	BusName        string            `json:"bus_name"`
-	Identity       string            `json:"identity"`
-	PlaybackStatus PlaybackStatus    `json:"playback_status"`
-	LoopStatus     LoopStatus        `json:"loop_status,omitempty"`
-	Shuffle        bool              `json:"shuffle,omitempty"`
-	Volume         float64           `json:"volume,omitempty"`
-	Position       int64             `json:"position,omitempty"`
-	Rate           float64           `json:"rate,omitempty"`
-	Metadata       map[string]string `json:"metadata,omitempty"`
+	Identity       string            `json:"identity" dbus:"Identity" iface:"org.mpris.MediaPlayer2"`
+	PlaybackStatus PlaybackStatus    `json:"playback_status" dbus:"PlaybackStatus" iface:"org.mpris.MediaPlayer2.Player"`
+	LoopStatus     LoopStatus        `json:"loop_status,omitempty" dbus:"LoopStatus" iface:"org.mpris.MediaPlayer2.Player"`
+	Shuffle        bool              `json:"shuffle,omitempty" dbus:"Shuffle" iface:"org.mpris.MediaPlayer2.Player"`
+	Volume         float64           `json:"volume,omitempty" dbus:"Volume" iface:"org.mpris.MediaPlayer2.Player"`
+	Position       int64             `json:"position,omitempty" dbus:"Position" iface:"org.mpris.MediaPlayer2.Player"`
+	Rate           float64           `json:"rate,omitempty" dbus:"Rate" iface:"org.mpris.MediaPlayer2.Player"`
+	Metadata       map[string]string `json:"metadata,omitempty" dbus:"Metadata" iface:"org.mpris.MediaPlayer2.Player"`
 	Capabilities   Capabilities      `json:"capabilities"`
 }
 

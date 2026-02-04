@@ -107,3 +107,63 @@ func loadCapabilities(conn *dbus.Conn, busName string) Capabilities {
 
 	return caps
 }
+
+// loadPlayer charge un Player depuis D-Bus en utilisant reflection et les tags `dbus` et `iface`
+func loadPlayer(conn *dbus.Conn, busName string) Player {
+	player := Player{
+		BusName: busName,
+	}
+
+	val := reflect.ValueOf(&player).Elem()
+	typ := val.Type()
+
+	for i := 0; i < val.NumField(); i++ {
+		field := val.Field(i)
+		fieldType := typ.Field(i)
+
+		// Récupérer les tags
+		dbusTag := fieldType.Tag.Get("dbus")
+		ifaceTag := fieldType.Tag.Get("iface")
+
+		// Ignorer les champs sans tag dbus (BusName, Capabilities)
+		if dbusTag == "" {
+			continue
+		}
+
+		// Gérer selon le type de champ
+		switch field.Kind() {
+		case reflect.String:
+			if propVal, ok := getStringProperty(conn, busName, ifaceTag, dbusTag); ok {
+				field.SetString(propVal)
+			}
+
+		case reflect.Bool:
+			if propVal, ok := getBoolProperty(conn, busName, ifaceTag, dbusTag); ok {
+				field.SetBool(propVal)
+			}
+
+		case reflect.Float64:
+			if propVal, ok := getFloat64Property(conn, busName, ifaceTag, dbusTag); ok {
+				field.SetFloat(propVal)
+			}
+
+		case reflect.Int64:
+			if propVal, ok := getInt64Property(conn, busName, ifaceTag, dbusTag); ok {
+				field.SetInt(propVal)
+			}
+
+		case reflect.Map:
+			// Cas spécial pour Metadata
+			if dbusTag == "Metadata" {
+				if metadata, err := getProperty(conn, busName, ifaceTag, dbusTag); err == nil {
+					field.Set(reflect.ValueOf(extractMetadata(metadata.Value())))
+				}
+			}
+		}
+	}
+
+	// Charger les capabilities séparément (déjà géré par loadCapabilities)
+	player.Capabilities = loadCapabilities(conn, busName)
+
+	return player
+}
