@@ -2,6 +2,7 @@ package mpris
 
 import (
 	"context"
+	"reflect"
 	"sync"
 
 	"github.com/godbus/dbus/v5"
@@ -53,15 +54,27 @@ type CapabilityRef struct {
 	FieldName string
 }
 
-// Constantes pour référencer les capabilities de manière type-safe
-var (
-	CapCanPlay       = CapabilityRef{"CanPlay"}
-	CapCanPause      = CapabilityRef{"CanPause"}
-	CapCanGoNext     = CapabilityRef{"CanGoNext"}
-	CapCanGoPrevious = CapabilityRef{"CanGoPrevious"}
-	CapCanSeek       = CapabilityRef{"CanSeek"}
-	CapCanControl    = CapabilityRef{"CanControl"}
-)
+// Caps contient les références à toutes les capabilities, auto-générées depuis Capabilities
+var Caps = struct {
+	CanPlay       CapabilityRef
+	CanPause      CapabilityRef
+	CanGoNext     CapabilityRef
+	CanGoPrevious CapabilityRef
+	CanSeek       CapabilityRef
+	CanControl    CapabilityRef
+}{}
+
+func init() {
+	// Auto-générer les CapabilityRef depuis la struct Capabilities
+	capsType := reflect.TypeOf(Capabilities{})
+	capsVal := reflect.ValueOf(&Caps).Elem()
+
+	for i := 0; i < capsType.NumField(); i++ {
+		field := capsType.Field(i)
+		capRef := CapabilityRef{FieldName: field.Name}
+		capsVal.Field(i).Set(reflect.ValueOf(capRef))
+	}
+}
 
 // Listener écoute les changements MPRIS via signaux D-Bus
 type Listener struct {
