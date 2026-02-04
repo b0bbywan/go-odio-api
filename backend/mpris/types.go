@@ -3,6 +3,7 @@ package mpris
 import (
 	"context"
 	"sync"
+	"time"
 
 	"github.com/godbus/dbus/v5"
 
@@ -29,6 +30,9 @@ const (
 	dbusPropSet           = dbusPropIface + ".Set"
 	dbusPropChangedSignal = dbusPropIface + ".PropertiesChanged"
 	dbusNameOwnerChanged  = dbusInterface + ".NameOwnerChanged"
+
+	// Timeout pour les appels D-Bus (5 secondes)
+	dbusCallTimeout = 5 * time.Second
 )
 
 // PlaybackStatus represents the current playback state
