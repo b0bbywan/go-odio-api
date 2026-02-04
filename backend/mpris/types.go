@@ -48,6 +48,21 @@ type Capabilities struct {
 	CanControl    bool `json:"can_control" dbus:"CanControl"`
 }
 
+// CapabilityRef représente une référence à un champ de Capabilities
+type CapabilityRef struct {
+	FieldName string
+}
+
+// Constantes pour référencer les capabilities de manière type-safe
+var (
+	CapCanPlay       = CapabilityRef{"CanPlay"}
+	CapCanPause      = CapabilityRef{"CanPause"}
+	CapCanGoNext     = CapabilityRef{"CanGoNext"}
+	CapCanGoPrevious = CapabilityRef{"CanGoPrevious"}
+	CapCanSeek       = CapabilityRef{"CanSeek"}
+	CapCanControl    = CapabilityRef{"CanControl"}
+)
+
 // Listener écoute les changements MPRIS via signaux D-Bus
 type Listener struct {
 	backend *MPRISBackend

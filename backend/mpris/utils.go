@@ -169,10 +169,10 @@ func loadPlayer(conn *dbus.Conn, busName string) Player {
 }
 
 // CheckCapabilities vérifie si un player a les capabilities requises
-// Supporte la logique OR : si plusieurs noms sont donnés, au moins un doit être true
+// Supporte la logique OR : si plusieurs capabilities sont données, au moins une doit être true
 // Retourne (hasCapability, errorMessage)
-func CheckCapabilities(player *Player, capFieldNames ...string) (bool, string) {
-	if len(capFieldNames) == 0 {
+func CheckCapabilities(player *Player, caps ...CapabilityRef) (bool, string) {
+	if len(caps) == 0 {
 		return true, ""
 	}
 
@@ -182,14 +182,14 @@ func CheckCapabilities(player *Player, capFieldNames ...string) (bool, string) {
 	var dbusNames []string
 	hasAny := false
 
-	for _, fieldName := range capFieldNames {
-		field := capsVal.FieldByName(fieldName)
+	for _, cap := range caps {
+		field := capsVal.FieldByName(cap.FieldName)
 		if !field.IsValid() {
 			continue
 		}
 
 		// Récupérer le tag dbus pour le message d'erreur
-		if structField, ok := capsType.FieldByName(fieldName); ok {
+		if structField, ok := capsType.FieldByName(cap.FieldName); ok {
 			dbusTag := structField.Tag.Get("dbus")
 			if dbusTag != "" {
 				dbusNames = append(dbusNames, dbusTag)
