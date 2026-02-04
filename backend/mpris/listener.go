@@ -31,6 +31,7 @@ func (l *Listener) Start() error {
 	if err != nil {
 		return err
 	}
+	l.conn = conn
 
 	// S'abonner aux signaux PropertiesChanged pour tous les lecteurs MPRIS
 	matchRule := "type='signal',interface='org.freedesktop.DBus.Properties',member='PropertiesChanged',arg0namespace='org.mpris.MediaPlayer2'"
@@ -49,16 +50,14 @@ func (l *Listener) Start() error {
 	ch := make(chan *dbus.Signal, 10)
 	conn.Signal(ch)
 
-	go l.listen(ch, conn)
+	go l.listen(ch)
 
 	logger.Info("[mpris] listener started (D-Bus signal-based)")
 	return nil
 }
 
 // listen écoute les signaux D-Bus en continu
-func (l *Listener) listen(ch <-chan *dbus.Signal, conn *dbus.Conn) {
-	defer conn.Close()
-
+func (l *Listener) listen(ch <-chan *dbus.Signal) {
 	for {
 		select {
 		case <-l.ctx.Done():
@@ -175,5 +174,9 @@ func (l *Listener) handleNameOwnerChanged(sig *dbus.Signal) {
 func (l *Listener) Stop() {
 	logger.Info("[mpris] stopping listener")
 	l.cancel()
+	if l.conn != nil {
+		l.conn.Close()
+		l.conn = nil
+	}
 	logger.Debug("[mpris] listener stopped")
 }
