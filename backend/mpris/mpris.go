@@ -84,8 +84,9 @@ func (m *MPRISBackend) Start() error {
 		return err
 	}
 
-	// Démarrer le heartbeat si un player est déjà en Playing
-	m.startHeartbeatIfPlaying(players)
+	// Créer et démarrer le heartbeat si un player est déjà en Playing
+	m.heartbeat = NewHeartbeat(m)
+	m.heartbeat.StartIfAnyPlaying(players)
 
 	logger.Info("[mpris] backend started successfully")
 	return nil
@@ -509,101 +510,12 @@ func (m *MPRISBackend) InvalidateCache() {
 	m.cache.Delete(cacheKey)
 }
 
-// ensureHeartbeatRunning démarre le heartbeat s'il n'est pas déjà actif.
-// Le heartbeat met à jour la position des players en Playing toutes les 2 secondes.
-// Cette fonction est idempotente : appeler plusieurs fois ne démarre qu'un seul heartbeat.
-// Appelé automatiquement par le listener quand un player passe en Playing.
-func (m *MPRISBackend) ensureHeartbeatRunning() {
-	m.heartbeatMu.Lock()
-	defer m.heartbeatMu.Unlock()
-
-	if m.heartbeatActive {
-		return // Déjà actif
-	}
-
-	m.heartbeatActive = true
-	go m.startPositionHeartbeat()
-}
-
-// startHeartbeatIfPlaying démarre le heartbeat si au moins un player est en Playing.
-// Appelé au démarrage du backend (Start) pour détecter si un player joue déjà de la musique
-// et démarrer le heartbeat immédiatement au lieu d'attendre le premier signal.
-func (m *MPRISBackend) startHeartbeatIfPlaying(players []Player) {
-	for _, player := range players {
-		if player.PlaybackStatus == StatusPlaying {
-			logger.Debug("[mpris] detected player %s already playing, starting heartbeat", player.BusName)
-			m.ensureHeartbeatRunning()
-			return
-		}
-	}
-}
-
-// startPositionHeartbeat met à jour la position des players en lecture toutes les 2s
-func (m *MPRISBackend) startPositionHeartbeat() {
-	defer func() {
-		m.heartbeatMu.Lock()
-		m.heartbeatActive = false
-		m.heartbeatMu.Unlock()
-		logger.Debug("[mpris] position heartbeat stopped")
-	}()
-
-	ticker := time.NewTicker(2 * time.Second)
-	defer ticker.Stop()
-
-	logger.Debug("[mpris] position heartbeat started")
-
-	for {
-		select {
-		case <-m.ctx.Done():
-			return
-		case <-ticker.C:
-			hasPlaying := m.updatePlayingPositions()
-			if !hasPlaying {
-				return // Auto-stop: plus aucun player en Playing
-			}
-		}
-	}
-}
-
-// updatePlayingPositions met à jour la position de tous les players en lecture
-// Retourne true si au moins un player est en Playing
-func (m *MPRISBackend) updatePlayingPositions() bool {
-	players, ok := m.cache.Get(cacheKey)
-	if !ok {
-		return false
-	}
-
-	hasPlaying := false
-	for _, player := range players {
-		// Mettre à jour uniquement les players en Playing
-		if player.PlaybackStatus != StatusPlaying {
-			continue
-		}
-
-		hasPlaying = true
-
-		// Récupérer la position actuelle
-		obj := m.conn.Object(player.BusName, mprisPath)
-		call := obj.Call(dbusPropGet, 0, mprisPlayerIface, "Position")
-		if err := m.callWithTimeout(call); err != nil {
-			continue
-		}
-		var variant dbus.Variant
-		if err := call.Store(&variant); err != nil {
-			continue
-		}
-
-		// Mettre à jour via UpdateProperty (gère le cache proprement)
-		if err := m.UpdateProperty(player.BusName, "Position", variant); err != nil {
-			logger.Warn("[mpris] failed to update position for %s: %v", player.BusName, err)
-		}
-	}
-
-	return hasPlaying
-}
-
 // Close ferme proprement les connexions et arrête le listener
 func (m *MPRISBackend) Close() {
+	if m.heartbeat != nil {
+		m.heartbeat.Stop()
+		m.heartbeat = nil
+	}
 	if m.listener != nil {
 		m.listener.Stop()
 		m.listener = nil

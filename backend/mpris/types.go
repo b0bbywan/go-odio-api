@@ -126,8 +126,7 @@ type MPRISBackend struct {
 	listener *Listener
 
 	// heartbeat pour mettre à jour Position des players en lecture
-	heartbeatMu     sync.Mutex
-	heartbeatActive bool
+	heartbeat *Heartbeat
 }
 
 // Player représente un lecteur multimédia MPRIS

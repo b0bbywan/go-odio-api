@@ -123,7 +123,7 @@ func (l *Listener) handlePropertiesChanged(sig *dbus.Signal) {
 
 				// Si le player passe en Playing, s'assurer que le heartbeat tourne
 				if newStatus == StatusPlaying {
-					l.backend.ensureHeartbeatRunning()
+					l.backend.heartbeat.Start()
 				}
 			}
 		}
