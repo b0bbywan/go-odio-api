@@ -97,25 +97,8 @@ func (l *Listener) handlePropertiesChanged(sig *dbus.Signal) {
 	}
 
 	// Le signal contient le unique name (:1.107), pas le well-known name
-	// Trouver le player MPRIS correspondant via GetNameOwner
-	players, ok := l.backend.cache.Get(cacheKey)
-	if !ok {
-		return
-	}
-
-	uniqueName := sig.Sender
-	var busName string
-
-	// Pour chaque player connu, vérifier si son owner unique name correspond
-	for _, player := range players {
-		var owner string
-		err := l.backend.conn.BusObject().Call("org.freedesktop.DBus.GetNameOwner", 0, player.BusName).Store(&owner)
-		if err == nil && owner == uniqueName {
-			busName = player.BusName
-			break
-		}
-	}
-
+	// Trouver le player MPRIS correspondant
+	busName := l.backend.findPlayerByUniqueName(sig.Sender)
 	if busName == "" {
 		// Signal d'un player non connu, ignorer
 		return

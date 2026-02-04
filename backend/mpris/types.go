@@ -132,8 +132,9 @@ type MPRISBackend struct {
 
 // Player représente un lecteur multimédia MPRIS
 type Player struct {
-	conn    *dbus.Conn    // Connexion D-Bus (non exporté)
-	timeout time.Duration // Timeout pour les appels D-Bus (non exporté)
+	conn       *dbus.Conn    // Connexion D-Bus (non exporté)
+	timeout    time.Duration // Timeout pour les appels D-Bus (non exporté)
+	uniqueName string        // Unique connection name D-Bus (ex: :1.107)
 
 	BusName string `json:"bus_name"`
 

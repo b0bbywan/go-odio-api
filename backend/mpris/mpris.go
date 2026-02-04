@@ -283,6 +283,21 @@ func (m *MPRISBackend) RemovePlayer(busName string) error {
 	return nil
 }
 
+// findPlayerByUniqueName trouve le busName d'un player à partir de son unique name
+func (m *MPRISBackend) findPlayerByUniqueName(uniqueName string) string {
+	players, ok := m.cache.Get(cacheKey)
+	if !ok {
+		return ""
+	}
+
+	for _, player := range players {
+		if player.uniqueName == uniqueName {
+			return player.BusName
+		}
+	}
+	return ""
+}
+
 // getPlayerInfo récupère toutes les informations d'un lecteur MPRIS
 func (m *MPRISBackend) getPlayerInfo(busName string) (Player, error) {
 	// Créer un player et charger ses propriétés

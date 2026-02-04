@@ -115,6 +115,13 @@ func (p *Player) CanControl() bool {
 
 // Load charge toutes les propriétés du player depuis D-Bus
 func (p *Player) Load() error {
+	// Récupérer le unique name via GetNameOwner
+	var owner string
+	if err := p.conn.BusObject().Call("org.freedesktop.DBus.GetNameOwner", 0, p.BusName).Store(&owner); err != nil {
+		return err
+	}
+	p.uniqueName = owner
+
 	// Récupérer toutes les propriétés des deux interfaces en 2 appels au lieu de ~15
 	propsMediaPlayer2, err := p.getAllProperties("org.mpris.MediaPlayer2")
 	if err != nil {
