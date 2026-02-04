@@ -162,108 +162,63 @@ func (m *MPRISBackend) getPlayerInfo(busName string) (Player, error) {
 	}
 
 	// Récupérer Identity
-	identity, err := m.getProperty(obj, mprisInterface, "Identity")
-	if err == nil {
-		if val, ok := identity.Value().(string); ok {
-			player.Identity = val
-		}
+	if val, ok := m.getStringProperty(obj, mprisInterface, "Identity"); ok {
+		player.Identity = val
 	}
 
 	// Récupérer PlaybackStatus
-	playbackStatus, err := m.getProperty(obj, mprisPlayerIface, "PlaybackStatus")
-	if err == nil {
-		if val, ok := playbackStatus.Value().(string); ok {
-			player.PlaybackStatus = PlaybackStatus(val)
-		}
+	if val, ok := m.getStringProperty(obj, mprisPlayerIface, "PlaybackStatus"); ok {
+		player.PlaybackStatus = PlaybackStatus(val)
 	}
 
 	// Récupérer LoopStatus
-	loopStatus, err := m.getProperty(obj, mprisPlayerIface, "LoopStatus")
-	if err == nil {
-		if val, ok := loopStatus.Value().(string); ok {
-			player.LoopStatus = LoopStatus(val)
-		}
+	if val, ok := m.getStringProperty(obj, mprisPlayerIface, "LoopStatus"); ok {
+		player.LoopStatus = LoopStatus(val)
 	}
 
 	// Récupérer Shuffle
-	shuffle, err := m.getProperty(obj, mprisPlayerIface, "Shuffle")
-	if err == nil {
-		if val, ok := shuffle.Value().(bool); ok {
-			player.Shuffle = val
-		}
+	if val, ok := m.getBoolProperty(obj, mprisPlayerIface, "Shuffle"); ok {
+		player.Shuffle = val
 	}
 
 	// Récupérer Volume
-	volume, err := m.getProperty(obj, mprisPlayerIface, "Volume")
-	if err == nil {
-		if val, ok := volume.Value().(float64); ok {
-			player.Volume = val
-		}
+	if val, ok := m.getFloat64Property(obj, mprisPlayerIface, "Volume"); ok {
+		player.Volume = val
 	}
 
 	// Récupérer Position
-	position, err := m.getProperty(obj, mprisPlayerIface, "Position")
-	if err == nil {
-		if val, ok := position.Value().(int64); ok {
-			player.Position = val
-		}
+	if val, ok := m.getInt64Property(obj, mprisPlayerIface, "Position"); ok {
+		player.Position = val
 	}
 
 	// Récupérer Rate
-	rate, err := m.getProperty(obj, mprisPlayerIface, "Rate")
-	if err == nil {
-		if val, ok := rate.Value().(float64); ok {
-			player.Rate = val
-		}
+	if val, ok := m.getFloat64Property(obj, mprisPlayerIface, "Rate"); ok {
+		player.Rate = val
 	}
 
 	// Récupérer Metadata
-	metadata, err := m.getProperty(obj, mprisPlayerIface, "Metadata")
-	if err == nil {
+	if metadata, err := m.getProperty(obj, mprisPlayerIface, "Metadata"); err == nil {
 		player.Metadata = extractMetadata(metadata.Value())
 	}
 
 	// Récupérer les capabilities
-	canPlay, err := m.getProperty(obj, mprisPlayerIface, "CanPlay")
-	if err == nil {
-		if val, ok := canPlay.Value().(bool); ok {
-			player.CanPlay = val
-		}
+	if val, ok := m.getBoolProperty(obj, mprisPlayerIface, "CanPlay"); ok {
+		player.CanPlay = val
 	}
-
-	canPause, err := m.getProperty(obj, mprisPlayerIface, "CanPause")
-	if err == nil {
-		if val, ok := canPause.Value().(bool); ok {
-			player.CanPause = val
-		}
+	if val, ok := m.getBoolProperty(obj, mprisPlayerIface, "CanPause"); ok {
+		player.CanPause = val
 	}
-
-	canGoNext, err := m.getProperty(obj, mprisPlayerIface, "CanGoNext")
-	if err == nil {
-		if val, ok := canGoNext.Value().(bool); ok {
-			player.CanGoNext = val
-		}
+	if val, ok := m.getBoolProperty(obj, mprisPlayerIface, "CanGoNext"); ok {
+		player.CanGoNext = val
 	}
-
-	canGoPrevious, err := m.getProperty(obj, mprisPlayerIface, "CanGoPrevious")
-	if err == nil {
-		if val, ok := canGoPrevious.Value().(bool); ok {
-			player.CanGoPrevious = val
-		}
+	if val, ok := m.getBoolProperty(obj, mprisPlayerIface, "CanGoPrevious"); ok {
+		player.CanGoPrevious = val
 	}
-
-	canSeek, err := m.getProperty(obj, mprisPlayerIface, "CanSeek")
-	if err == nil {
-		if val, ok := canSeek.Value().(bool); ok {
-			player.CanSeek = val
-		}
+	if val, ok := m.getBoolProperty(obj, mprisPlayerIface, "CanSeek"); ok {
+		player.CanSeek = val
 	}
-
-	canControl, err := m.getProperty(obj, mprisPlayerIface, "CanControl")
-	if err == nil {
-		if val, ok := canControl.Value().(bool); ok {
-			player.CanControl = val
-		}
+	if val, ok := m.getBoolProperty(obj, mprisPlayerIface, "CanControl"); ok {
+		player.CanControl = val
 	}
 
 	return player, nil
@@ -274,6 +229,43 @@ func (m *MPRISBackend) getProperty(obj dbus.BusObject, iface, prop string) (dbus
 	var v dbus.Variant
 	err := obj.Call(dbusPropIface+".Get", 0, iface, prop).Store(&v)
 	return v, err
+}
+
+// Helper functions pour récupérer des propriétés typées
+func (m *MPRISBackend) getStringProperty(obj dbus.BusObject, iface, prop string) (string, bool) {
+	v, err := m.getProperty(obj, iface, prop)
+	if err != nil {
+		return "", false
+	}
+	val, ok := v.Value().(string)
+	return val, ok
+}
+
+func (m *MPRISBackend) getBoolProperty(obj dbus.BusObject, iface, prop string) (bool, bool) {
+	v, err := m.getProperty(obj, iface, prop)
+	if err != nil {
+		return false, false
+	}
+	val, ok := v.Value().(bool)
+	return val, ok
+}
+
+func (m *MPRISBackend) getFloat64Property(obj dbus.BusObject, iface, prop string) (float64, bool) {
+	v, err := m.getProperty(obj, iface, prop)
+	if err != nil {
+		return 0, false
+	}
+	val, ok := v.Value().(float64)
+	return val, ok
+}
+
+func (m *MPRISBackend) getInt64Property(obj dbus.BusObject, iface, prop string) (int64, bool) {
+	v, err := m.getProperty(obj, iface, prop)
+	if err != nil {
+		return 0, false
+	}
+	val, ok := v.Value().(int64)
+	return val, ok
 }
 
 // extractMetadata extrait les métadonnées pertinentes
