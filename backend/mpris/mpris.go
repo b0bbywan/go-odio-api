@@ -154,53 +154,8 @@ func (m *MPRISBackend) RemovePlayer(busName string) error {
 
 // getPlayerInfo récupère toutes les informations d'un lecteur MPRIS
 func (m *MPRISBackend) getPlayerInfo(busName string) (Player, error) {
-	player := Player{
-		BusName: busName,
-	}
-
-	// Récupérer Identity
-	if val, ok := getStringProperty(m.conn, busName, mprisInterface, "Identity"); ok {
-		player.Identity = val
-	}
-
-	// Récupérer PlaybackStatus
-	if val, ok := getStringProperty(m.conn, busName, mprisPlayerIface, "PlaybackStatus"); ok {
-		player.PlaybackStatus = PlaybackStatus(val)
-	}
-
-	// Récupérer LoopStatus
-	if val, ok := getStringProperty(m.conn, busName, mprisPlayerIface, "LoopStatus"); ok {
-		player.LoopStatus = LoopStatus(val)
-	}
-
-	// Récupérer Shuffle
-	if val, ok := getBoolProperty(m.conn, busName, mprisPlayerIface, "Shuffle"); ok {
-		player.Shuffle = val
-	}
-
-	// Récupérer Volume
-	if val, ok := getFloat64Property(m.conn, busName, mprisPlayerIface, "Volume"); ok {
-		player.Volume = val
-	}
-
-	// Récupérer Position
-	if val, ok := getInt64Property(m.conn, busName, mprisPlayerIface, "Position"); ok {
-		player.Position = val
-	}
-
-	// Récupérer Rate
-	if val, ok := getFloat64Property(m.conn, busName, mprisPlayerIface, "Rate"); ok {
-		player.Rate = val
-	}
-
-	// Récupérer Metadata
-	if metadata, err := getProperty(m.conn, busName, mprisPlayerIface, "Metadata"); err == nil {
-		player.Metadata = extractMetadata(metadata.Value())
-	}
-
-	// Récupérer les capabilities via reflection
-	player.Capabilities = loadCapabilities(m.conn, busName)
-
+	// Charger toutes les propriétés via reflection
+	player := loadPlayer(m.conn, busName)
 	return player, nil
 }
 
