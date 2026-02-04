@@ -8,20 +8,9 @@ import (
 	"github.com/godbus/dbus/v5"
 )
 
-// callWithTimeout exécute un appel D-Bus avec timeout
+// callWithTimeout méthode receiver pour Player
 func (p *Player) callWithTimeout(call *dbus.Call) error {
-	done := make(chan error, 1)
-
-	go func() {
-		done <- call.Err
-	}()
-
-	select {
-	case err := <-done:
-		return err
-	case <-time.After(p.timeout):
-		return &dbusTimeoutError{}
-	}
+	return callWithTimeout(call, p.timeout)
 }
 
 // getProperty récupère une propriété D-Bus

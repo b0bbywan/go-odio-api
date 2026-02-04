@@ -27,7 +27,7 @@ func validateBusName(busName string) error {
 }
 
 // callWithTimeout exécute un appel D-Bus avec timeout
-func (m *MPRISBackend) callWithTimeout(call *dbus.Call) error {
+func callWithTimeout(call *dbus.Call, timeout time.Duration) error {
 	done := make(chan error, 1)
 
 	go func() {
@@ -37,7 +37,7 @@ func (m *MPRISBackend) callWithTimeout(call *dbus.Call) error {
 	select {
 	case err := <-done:
 		return err
-	case <-time.After(m.timeout):
+	case <-time.After(timeout):
 		return &dbusTimeoutError{}
 	}
 }
@@ -46,6 +46,11 @@ type dbusTimeoutError struct{}
 
 func (e *dbusTimeoutError) Error() string {
 	return "D-Bus call timeout"
+}
+
+// callWithTimeout méthode receiver pour MPRISBackend
+func (m *MPRISBackend) callWithTimeout(call *dbus.Call) error {
+	return callWithTimeout(call, m.timeout)
 }
 
 // New crée un nouveau backend MPRIS
