@@ -148,23 +148,23 @@ func (p *Player) Load() error {
 func (p *Player) loadCapabilities() capabilities {
 	var caps capabilities
 
-	val := reflect.ValueOf(&caps).Elem()
-	typ := val.Type()
-
-	for i := 0; i < val.NumField(); i++ {
-		field := val.Field(i)
-		fieldType := typ.Field(i)
-
-		// Récupérer le tag dbus
-		dbusTag := fieldType.Tag.Get("dbus")
-		if dbusTag == "" {
-			continue
-		}
-
-		// Récupérer la propriété D-Bus
-		if propVal, ok := p.getBoolProperty(mprisPlayerIface, dbusTag); ok {
-			field.SetBool(propVal)
-		}
+	if val, ok := p.getBoolProperty(mprisPlayerIface, "CanPlay"); ok {
+		caps.canPlay = val
+	}
+	if val, ok := p.getBoolProperty(mprisPlayerIface, "CanPause"); ok {
+		caps.canPause = val
+	}
+	if val, ok := p.getBoolProperty(mprisPlayerIface, "CanGoNext"); ok {
+		caps.canGoNext = val
+	}
+	if val, ok := p.getBoolProperty(mprisPlayerIface, "CanGoPrevious"); ok {
+		caps.canGoPrevious = val
+	}
+	if val, ok := p.getBoolProperty(mprisPlayerIface, "CanSeek"); ok {
+		caps.canSeek = val
+	}
+	if val, ok := p.getBoolProperty(mprisPlayerIface, "CanControl"); ok {
+		caps.canControl = val
 	}
 
 	return caps
