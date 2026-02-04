@@ -216,6 +216,10 @@ func (m *MPRISBackend) UpdatePlayerProperties(busName string, changed map[string
 				if val, ok := variant.Value().(float64); ok {
 					players[i].Rate = val
 				}
+			case "Position":
+				if val, ok := variant.Value().(int64); ok {
+					players[i].Position = val
+				}
 			}
 		}
 
@@ -512,8 +516,7 @@ func (m *MPRISBackend) updatePlayingPositions() bool {
 	}
 
 	hasPlaying := false
-	updated := false
-	for i, player := range players {
+	for _, player := range players {
 		// Mettre à jour uniquement les players en Playing
 		if player.PlaybackStatus != StatusPlaying {
 			continue
@@ -523,7 +526,6 @@ func (m *MPRISBackend) updatePlayingPositions() bool {
 
 		// Récupérer la position actuelle
 		obj := m.conn.Object(player.BusName, mprisPath)
-		var position int64
 		call := obj.Call(dbusPropGet, 0, mprisPlayerIface, "Position")
 		if err := m.callWithTimeout(call); err != nil {
 			continue
@@ -532,16 +534,14 @@ func (m *MPRISBackend) updatePlayingPositions() bool {
 		if err := call.Store(&variant); err != nil {
 			continue
 		}
-		if pos, ok := variant.Value().(int64); ok {
-			position = pos
-			players[i].Position = position
-			updated = true
-		}
-	}
 
-	if updated {
-		m.cache.Set(cacheKey, players)
-		logger.Debug("[mpris] updated positions for playing players")
+		// Mettre à jour via UpdatePlayerProperties (gère le cache proprement)
+		positionMap := map[string]dbus.Variant{
+			"Position": variant,
+		}
+		if err := m.UpdatePlayerProperties(player.BusName, positionMap); err != nil {
+			logger.Warn("[mpris] failed to update position for %s: %v", player.BusName, err)
+		}
 	}
 
 	return hasPlaying
