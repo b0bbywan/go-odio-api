@@ -3,6 +3,7 @@ package backend
 import (
 	"context"
 
+	"github.com/b0bbywan/go-odio-api/backend/mpris"
 	"github.com/b0bbywan/go-odio-api/backend/pulseaudio"
 	"github.com/b0bbywan/go-odio-api/backend/systemd"
 	"github.com/b0bbywan/go-odio-api/config"
@@ -11,9 +12,10 @@ import (
 type Backend struct {
 	Pulse   *pulseaudio.PulseAudioBackend
 	Systemd *systemd.SystemdBackend
+	MPRIS   *mpris.MPRISBackend
 }
 
-func New(ctx context.Context, syscfg *config.SystemdConfig, pulscfg *config.PulseAudioConfig) (*Backend, error) {
+func New(ctx context.Context, syscfg *config.SystemdConfig, pulscfg *config.PulseAudioConfig, mpriscfg *config.MPRISConfig) (*Backend, error) {
 	var backend Backend
 	p, err := pulseaudio.New(ctx, pulscfg)
 	if err != nil {
@@ -26,6 +28,14 @@ func New(ctx context.Context, syscfg *config.SystemdConfig, pulscfg *config.Puls
 		return nil, err
 	}
 	backend.Systemd = s
+
+	if mpriscfg.Enabled {
+		m, err := mpris.New(ctx)
+		if err != nil {
+			return nil, err
+		}
+		backend.MPRIS = m
+	}
 
 	return &backend, nil
 }
@@ -43,6 +53,12 @@ func (b *Backend) Start() error {
 		}
 	}
 
+	if b.MPRIS != nil {
+		if err := b.MPRIS.Start(); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -52,5 +68,8 @@ func (b *Backend) Close() {
 	}
 	if b.Systemd != nil {
 		b.Systemd.Close()
+	}
+	if b.MPRIS != nil {
+		b.MPRIS.Close()
 	}
 }

@@ -18,6 +18,7 @@ const (
 type Config struct {
 	Systemd    *SystemdConfig
 	Pulseaudio *PulseAudioConfig
+	MPRIS      *MPRISConfig
 	Port       int
 	LogLevel   logger.Level
 }
@@ -31,6 +32,10 @@ type SystemdConfig struct {
 
 type PulseAudioConfig struct {
 	XDGRuntimeDir string
+}
+
+type MPRISConfig struct {
+	Enabled bool
 }
 
 // parseLogLevel converts a string to a logger.Level
@@ -54,6 +59,7 @@ func parseLogLevel(levelStr string) logger.Level {
 func New() (*Config, error) {
 	viper.SetDefault("services.system", []string{})
 	viper.SetDefault("services.user", []string{})
+	viper.SetDefault("mpris.enabled", true)
 	viper.SetDefault("Port", 8080)
 	viper.SetDefault("LogLevel", "WARN")
 
@@ -99,9 +105,14 @@ func New() (*Config, error) {
 		XDGRuntimeDir: xdgRuntimeDir,
 	}
 
+	mpriscfg := MPRISConfig{
+		Enabled: viper.GetBool("mpris.enabled"),
+	}
+
 	cfg := Config{
 		Systemd:    &syscfg,
 		Pulseaudio: &pulsecfg,
+		MPRIS:      &mpriscfg,
 		Port:       port,
 		LogLevel:   parseLogLevel(viper.GetString("LogLevel")),
 	}
