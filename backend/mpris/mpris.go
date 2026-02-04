@@ -231,6 +231,13 @@ func (m *MPRISBackend) UpdatePlayerProperties(busName string, changed map[string
 	return &PlayerNotFoundError{BusName: busName}
 }
 
+// UpdateProperty met à jour une seule propriété d'un player dans le cache
+func (m *MPRISBackend) UpdateProperty(busName, property string, value dbus.Variant) error {
+	return m.UpdatePlayerProperties(busName, map[string]dbus.Variant{
+		property: value,
+	})
+}
+
 // RefreshPlayer recharge un lecteur spécifique depuis D-Bus et met à jour le cache
 func (m *MPRISBackend) RefreshPlayer(busName string) (*Player, error) {
 	if err := validateBusName(busName); err != nil {
@@ -535,11 +542,8 @@ func (m *MPRISBackend) updatePlayingPositions() bool {
 			continue
 		}
 
-		// Mettre à jour via UpdatePlayerProperties (gère le cache proprement)
-		positionMap := map[string]dbus.Variant{
-			"Position": variant,
-		}
-		if err := m.UpdatePlayerProperties(player.BusName, positionMap); err != nil {
+		// Mettre à jour via UpdateProperty (gère le cache proprement)
+		if err := m.UpdateProperty(player.BusName, "Position", variant); err != nil {
 			logger.Warn("[mpris] failed to update position for %s: %v", player.BusName, err)
 		}
 	}
