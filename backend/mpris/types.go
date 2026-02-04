@@ -27,6 +27,7 @@ const (
 	dbusListNamesMethod   = dbusInterface + ".ListNames"
 	dbusAddMatchMethod    = dbusInterface + ".AddMatch"
 	dbusPropGet           = dbusPropIface + ".Get"
+	dbusPropGetAll        = dbusPropIface + ".GetAll"
 	dbusPropSet           = dbusPropIface + ".Set"
 	dbusPropChangedSignal = dbusPropIface + ".PropertiesChanged"
 	dbusNameOwnerChanged  = dbusInterface + ".NameOwnerChanged"

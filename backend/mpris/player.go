@@ -13,6 +13,20 @@ func (p *Player) callWithTimeout(call *dbus.Call) error {
 	return callWithTimeout(call, p.timeout)
 }
 
+// getAllProperties récupère toutes les propriétés d'une interface D-Bus en un seul appel
+func (p *Player) getAllProperties(iface string) (map[string]dbus.Variant, error) {
+	obj := p.conn.Object(p.BusName, mprisPath)
+	var props map[string]dbus.Variant
+
+	call := obj.Call(dbusPropGetAll, 0, iface)
+	if err := p.callWithTimeout(call); err != nil {
+		return nil, err
+	}
+
+	err := call.Store(&props)
+	return props, err
+}
+
 // getProperty récupère une propriété D-Bus
 func (p *Player) getProperty(iface, prop string) (dbus.Variant, error) {
 	obj := p.conn.Object(p.BusName, mprisPath)
@@ -101,6 +115,23 @@ func (p *Player) CanControl() bool {
 
 // Load charge toutes les propriétés du player depuis D-Bus
 func (p *Player) Load() error {
+	// Récupérer toutes les propriétés des deux interfaces en 2 appels au lieu de ~15
+	propsMediaPlayer2, err := p.getAllProperties("org.mpris.MediaPlayer2")
+	if err != nil {
+		return err
+	}
+
+	propsPlayer, err := p.getAllProperties(mprisPlayerIface)
+	if err != nil {
+		return err
+	}
+
+	// Combiner les deux maps
+	allProps := make(map[string]map[string]dbus.Variant)
+	allProps["org.mpris.MediaPlayer2"] = propsMediaPlayer2
+	allProps[mprisPlayerIface] = propsPlayer
+
+	// Mapper les propriétés aux champs du struct
 	val := reflect.ValueOf(p).Elem()
 	typ := val.Type()
 
@@ -117,45 +148,82 @@ func (p *Player) Load() error {
 			continue
 		}
 
+		// Récupérer la propriété depuis le cache
+		props, ok := allProps[ifaceTag]
+		if !ok {
+			continue
+		}
+
+		variant, ok := props[dbusTag]
+		if !ok {
+			continue
+		}
+
 		// Gérer selon le type de champ
 		switch field.Kind() {
 		case reflect.String:
-			if propVal, ok := p.getStringProperty(ifaceTag, dbusTag); ok {
-				field.SetString(propVal)
+			if val, ok := variant.Value().(string); ok {
+				field.SetString(val)
 			}
 
 		case reflect.Bool:
-			if propVal, ok := p.getBoolProperty(ifaceTag, dbusTag); ok {
-				field.SetBool(propVal)
+			if val, ok := variant.Value().(bool); ok {
+				field.SetBool(val)
 			}
 
 		case reflect.Float64:
-			if propVal, ok := p.getFloat64Property(ifaceTag, dbusTag); ok {
-				field.SetFloat(propVal)
+			if val, ok := variant.Value().(float64); ok {
+				field.SetFloat(val)
 			}
 
 		case reflect.Int64:
-			if propVal, ok := p.getInt64Property(ifaceTag, dbusTag); ok {
-				field.SetInt(propVal)
+			if val, ok := variant.Value().(int64); ok {
+				field.SetInt(val)
 			}
 
 		case reflect.Map:
 			// Cas spécial pour Metadata
 			if dbusTag == "Metadata" {
-				if metadata, err := p.getProperty(ifaceTag, dbusTag); err == nil {
-					field.Set(reflect.ValueOf(extractMetadata(metadata.Value())))
-				}
+				field.Set(reflect.ValueOf(extractMetadata(variant.Value())))
 			}
 		}
 	}
 
-	// Charger les capabilities
-	p.Capabilities = p.loadCapabilities()
+	// Charger les capabilities depuis les propriétés déjà récupérées
+	p.Capabilities = p.loadCapabilitiesFromProps(propsPlayer)
 
 	return nil
 }
 
-// loadCapabilities charge les capabilities depuis D-Bus
+// loadCapabilitiesFromProps charge les capabilities depuis les propriétés déjà récupérées
+func (p *Player) loadCapabilitiesFromProps(props map[string]dbus.Variant) Capabilities {
+	var caps Capabilities
+
+	val := reflect.ValueOf(&caps).Elem()
+	typ := val.Type()
+
+	for i := 0; i < val.NumField(); i++ {
+		field := val.Field(i)
+		fieldType := typ.Field(i)
+
+		// Récupérer le tag dbus
+		dbusTag := fieldType.Tag.Get("dbus")
+		if dbusTag == "" {
+			continue
+		}
+
+		// Récupérer la propriété depuis les props
+		if variant, ok := props[dbusTag]; ok {
+			if boolVal, ok := variant.Value().(bool); ok {
+				field.SetBool(boolVal)
+			}
+		}
+	}
+
+	return caps
+}
+
+// loadCapabilities charge les capabilities depuis D-Bus (legacy, pour compatibilité)
 func (p *Player) loadCapabilities() Capabilities {
 	var caps Capabilities
 
