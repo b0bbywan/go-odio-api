@@ -89,6 +89,14 @@ func (m *MPRISBackend) Start() error {
 
 // ListPlayers liste tous les lecteurs MPRIS disponibles
 func (m *MPRISBackend) ListPlayers() ([]Player, error) {
+	// Vérifier le cache d'abord
+	if players, ok := m.cache.Get(cacheKey); ok {
+		logger.Debug("[mpris] returning %d players from cache", len(players))
+		return players, nil
+	}
+
+	// Cache miss, charger depuis D-Bus
+	logger.Debug("[mpris] cache miss, loading players")
 	start := time.Now()
 
 	// Lister tous les bus names
@@ -112,7 +120,7 @@ func (m *MPRISBackend) ListPlayers() ([]Player, error) {
 	}
 
 	elapsed := time.Since(start)
-	logger.Debug("[mpris] listed %d players in %s", len(players), elapsed)
+	logger.Debug("[mpris] loaded %d players in %s", len(players), elapsed)
 
 	// Mettre à jour le cache
 	m.cache.Set(cacheKey, players)
