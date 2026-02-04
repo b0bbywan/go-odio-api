@@ -35,7 +35,7 @@ func ListPlayersHandler(m *mpris.MPRISBackend) http.HandlerFunc {
 	})
 }
 
-// withPlayer wrapper pour extraire le player et vérifier une capability
+// withPlayer wrapper pour actions simples sans body
 func withPlayer(
 	m *mpris.MPRISBackend,
 	checkCapability func(*mpris.Player) bool,
@@ -69,231 +69,162 @@ func withPlayer(
 	}
 }
 
-// PlayHandler lance la lecture
+// withPlayerAndBody wrapper générique pour actions avec body et validation
+func withPlayerAndBody[T any](
+	m *mpris.MPRISBackend,
+	checkCapability func(*mpris.Player) bool,
+	capabilityName string,
+	validate func(*T) error,
+	action func(string, *T) error,
+) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		busName := r.PathValue("player")
+		if busName == "" {
+			http.Error(w, "missing player name", http.StatusNotFound)
+			return
+		}
+
+		player, found := m.GetPlayer(busName)
+		if !found {
+			http.Error(w, "player not found", http.StatusNotFound)
+			return
+		}
+
+		if checkCapability != nil && !checkCapability(player) {
+			http.Error(w, "action not allowed (requires "+capabilityName+")", http.StatusBadRequest)
+			return
+		}
+
+		defer r.Body.Close()
+		var req T
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "invalid JSON payload", http.StatusBadRequest)
+			return
+		}
+
+		if validate != nil {
+			if err := validate(&req); err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+		}
+
+		if err := action(busName, &req); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusAccepted)
+	}
+}
+
+// Handlers pour actions simples
 func PlayHandler(m *mpris.MPRISBackend) http.HandlerFunc {
 	return withPlayer(m, func(p *mpris.Player) bool { return p.CanPlay }, "CanPlay", m.Play)
 }
 
-// PauseHandler met en pause
 func PauseHandler(m *mpris.MPRISBackend) http.HandlerFunc {
 	return withPlayer(m, func(p *mpris.Player) bool { return p.CanPause }, "CanPause", m.Pause)
 }
 
-// PlayPauseHandler bascule play/pause
 func PlayPauseHandler(m *mpris.MPRISBackend) http.HandlerFunc {
 	return withPlayer(m, func(p *mpris.Player) bool { return p.CanPlay || p.CanPause }, "CanPlay or CanPause", m.PlayPause)
 }
 
-// StopHandler arrête la lecture
 func StopHandler(m *mpris.MPRISBackend) http.HandlerFunc {
 	return withPlayer(m, func(p *mpris.Player) bool { return p.CanControl }, "CanControl", m.Stop)
 }
 
-// NextHandler passe à la piste suivante
 func NextHandler(m *mpris.MPRISBackend) http.HandlerFunc {
 	return withPlayer(m, func(p *mpris.Player) bool { return p.CanGoNext }, "CanGoNext", m.Next)
 }
 
-// PreviousHandler revient à la piste précédente
 func PreviousHandler(m *mpris.MPRISBackend) http.HandlerFunc {
 	return withPlayer(m, func(p *mpris.Player) bool { return p.CanGoPrevious }, "CanGoPrevious", m.Previous)
 }
 
-// SeekHandler déplace la position de lecture
+// Handlers pour actions avec body
 func SeekHandler(m *mpris.MPRISBackend) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		busName := r.PathValue("player")
-		if busName == "" {
-			http.Error(w, "missing player name", http.StatusNotFound)
-			return
-		}
-
-		player, found := m.GetPlayer(busName)
-		if !found {
-			http.Error(w, "player not found", http.StatusNotFound)
-			return
-		}
-
-		if !player.CanSeek {
-			http.Error(w, "action not allowed (requires CanSeek)", http.StatusBadRequest)
-			return
-		}
-
-		defer r.Body.Close()
-		var req seekRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "invalid JSON payload", http.StatusBadRequest)
-			return
-		}
-
-		if err := m.Seek(busName, req.Offset); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		w.WriteHeader(http.StatusAccepted)
-	}
+	return withPlayerAndBody(
+		m,
+		func(p *mpris.Player) bool { return p.CanSeek },
+		"CanSeek",
+		nil,
+		func(busName string, req *seekRequest) error {
+			return m.Seek(busName, req.Offset)
+		},
+	)
 }
 
-// SetPositionHandler définit la position de lecture
 func SetPositionHandler(m *mpris.MPRISBackend) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		busName := r.PathValue("player")
-		if busName == "" {
-			http.Error(w, "missing player name", http.StatusNotFound)
-			return
-		}
-
-		player, found := m.GetPlayer(busName)
-		if !found {
-			http.Error(w, "player not found", http.StatusNotFound)
-			return
-		}
-
-		if !player.CanSeek {
-			http.Error(w, "action not allowed (requires CanSeek)", http.StatusBadRequest)
-			return
-		}
-
-		defer r.Body.Close()
-		var req positionRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "invalid JSON payload", http.StatusBadRequest)
-			return
-		}
-
-		if req.TrackID == "" {
-			http.Error(w, "missing track_id", http.StatusBadRequest)
-			return
-		}
-
-		if err := m.SetPosition(busName, req.TrackID, req.Position); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		w.WriteHeader(http.StatusAccepted)
-	}
+	return withPlayerAndBody(
+		m,
+		func(p *mpris.Player) bool { return p.CanSeek },
+		"CanSeek",
+		func(req *positionRequest) error {
+			if req.TrackID == "" {
+				return &validationError{"missing track_id"}
+			}
+			return nil
+		},
+		func(busName string, req *positionRequest) error {
+			return m.SetPosition(busName, req.TrackID, req.Position)
+		},
+	)
 }
 
-// SetVolumeHandler définit le volume
 func SetVolumeHandler(m *mpris.MPRISBackend) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		busName := r.PathValue("player")
-		if busName == "" {
-			http.Error(w, "missing player name", http.StatusNotFound)
-			return
-		}
-
-		player, found := m.GetPlayer(busName)
-		if !found {
-			http.Error(w, "player not found", http.StatusNotFound)
-			return
-		}
-
-		if !player.CanControl {
-			http.Error(w, "action not allowed (requires CanControl)", http.StatusBadRequest)
-			return
-		}
-
-		defer r.Body.Close()
-		var req volumeRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "invalid JSON payload", http.StatusBadRequest)
-			return
-		}
-
-		if req.Volume < 0 || req.Volume > 1 {
-			http.Error(w, "volume must be between 0 and 1", http.StatusBadRequest)
-			return
-		}
-
-		if err := m.SetVolume(busName, req.Volume); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		w.WriteHeader(http.StatusAccepted)
-	}
+	return withPlayerAndBody(
+		m,
+		func(p *mpris.Player) bool { return p.CanControl },
+		"CanControl",
+		func(req *volumeRequest) error {
+			if req.Volume < 0 || req.Volume > 1 {
+				return &validationError{"volume must be between 0 and 1"}
+			}
+			return nil
+		},
+		func(busName string, req *volumeRequest) error {
+			return m.SetVolume(busName, req.Volume)
+		},
+	)
 }
 
-// SetLoopHandler définit le mode de répétition
 func SetLoopHandler(m *mpris.MPRISBackend) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		busName := r.PathValue("player")
-		if busName == "" {
-			http.Error(w, "missing player name", http.StatusNotFound)
-			return
-		}
-
-		player, found := m.GetPlayer(busName)
-		if !found {
-			http.Error(w, "player not found", http.StatusNotFound)
-			return
-		}
-
-		if !player.CanControl {
-			http.Error(w, "action not allowed (requires CanControl)", http.StatusBadRequest)
-			return
-		}
-
-		defer r.Body.Close()
-		var req loopRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "invalid JSON payload", http.StatusBadRequest)
-			return
-		}
-
-		// Valider le loop status
-		switch mpris.LoopStatus(req.Loop) {
-		case mpris.LoopNone, mpris.LoopTrack, mpris.LoopPlaylist:
-			// OK
-		default:
-			http.Error(w, "loop must be None, Track, or Playlist", http.StatusBadRequest)
-			return
-		}
-
-		if err := m.SetLoopStatus(busName, mpris.LoopStatus(req.Loop)); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		w.WriteHeader(http.StatusAccepted)
-	}
+	return withPlayerAndBody(
+		m,
+		func(p *mpris.Player) bool { return p.CanControl },
+		"CanControl",
+		func(req *loopRequest) error {
+			switch mpris.LoopStatus(req.Loop) {
+			case mpris.LoopNone, mpris.LoopTrack, mpris.LoopPlaylist:
+				return nil
+			default:
+				return &validationError{"loop must be None, Track, or Playlist"}
+			}
+		},
+		func(busName string, req *loopRequest) error {
+			return m.SetLoopStatus(busName, mpris.LoopStatus(req.Loop))
+		},
+	)
 }
 
-// SetShuffleHandler active/désactive le mode aléatoire
 func SetShuffleHandler(m *mpris.MPRISBackend) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		busName := r.PathValue("player")
-		if busName == "" {
-			http.Error(w, "missing player name", http.StatusNotFound)
-			return
-		}
+	return withPlayerAndBody(
+		m,
+		func(p *mpris.Player) bool { return p.CanControl },
+		"CanControl",
+		nil,
+		func(busName string, req *shuffleRequest) error {
+			return m.SetShuffle(busName, req.Shuffle)
+		},
+	)
+}
 
-		player, found := m.GetPlayer(busName)
-		if !found {
-			http.Error(w, "player not found", http.StatusNotFound)
-			return
-		}
+type validationError struct {
+	message string
+}
 
-		if !player.CanControl {
-			http.Error(w, "action not allowed (requires CanControl)", http.StatusBadRequest)
-			return
-		}
-
-		defer r.Body.Close()
-		var req shuffleRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "invalid JSON payload", http.StatusBadRequest)
-			return
-		}
-
-		if err := m.SetShuffle(busName, req.Shuffle); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		w.WriteHeader(http.StatusAccepted)
-	}
+func (e *validationError) Error() string {
+	return e.message
 }
