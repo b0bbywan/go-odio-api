@@ -38,14 +38,14 @@ const (
 	LoopPlaylist LoopStatus = "Playlist"
 )
 
-// capabilities représente les actions supportées par un lecteur (privé)
-type capabilities struct {
-	canPlay       bool `dbus:"CanPlay"`
-	canPause      bool `dbus:"CanPause"`
-	canGoNext     bool `dbus:"CanGoNext"`
-	canGoPrevious bool `dbus:"CanGoPrevious"`
-	canSeek       bool `dbus:"CanSeek"`
-	canControl    bool `dbus:"CanControl"`
+// Capabilities représente les actions supportées par un lecteur
+type Capabilities struct {
+	CanPlay       bool `json:"can_play"`
+	CanPause      bool `json:"can_pause"`
+	CanGoNext     bool `json:"can_go_next"`
+	CanGoPrevious bool `json:"can_go_previous"`
+	CanSeek       bool `json:"can_seek"`
+	CanControl    bool `json:"can_control"`
 }
 
 // CapabilityError indique qu'une action n'est pas supportée par le player
@@ -82,8 +82,7 @@ type MPRISBackend struct {
 
 // Player représente un lecteur multimédia MPRIS
 type Player struct {
-	conn         *dbus.Conn // Connexion D-Bus (non exporté)
-	capabilities capabilities
+	conn *dbus.Conn // Connexion D-Bus (non exporté)
 
 	BusName string `json:"bus_name"`
 
@@ -95,6 +94,7 @@ type Player struct {
 	Position       int64             `json:"position,omitempty" dbus:"Position" iface:"org.mpris.MediaPlayer2.Player"`
 	Rate           float64           `json:"rate,omitempty" dbus:"Rate" iface:"org.mpris.MediaPlayer2.Player"`
 	Metadata       map[string]string `json:"metadata,omitempty" dbus:"Metadata" iface:"org.mpris.MediaPlayer2.Player"`
+	Capabilities   Capabilities      `json:"capabilities"`
 }
 
 // Request types pour l'API

@@ -17,22 +17,22 @@ func TestGetPlayer(t *testing.T) {
 			BusName:        "org.mpris.MediaPlayer2.spotify",
 			Identity:       "Spotify",
 			PlaybackStatus: StatusPlaying,
-			capabilities: capabilities{
-				canPlay:       true,
-				canPause:      true,
-				canGoNext:     true,
-				canGoPrevious: true,
+			Capabilities: Capabilities{
+				CanPlay:       true,
+				CanPause:      true,
+				CanGoNext:     true,
+				CanGoPrevious: true,
 			},
 		},
 		{
 			BusName:        "org.mpris.MediaPlayer2.vlc",
 			Identity:       "VLC",
 			PlaybackStatus: StatusPaused,
-			capabilities: capabilities{
-				canPlay:       true,
-				canPause:      true,
-				canGoNext:     false,
-				canGoPrevious: false,
+			Capabilities: Capabilities{
+				CanPlay:       true,
+				CanPause:      true,
+				CanGoNext:     false,
+				CanGoPrevious: false,
 			},
 		},
 	}
@@ -52,11 +52,11 @@ func TestGetPlayer(t *testing.T) {
 				BusName:        "org.mpris.MediaPlayer2.spotify",
 				Identity:       "Spotify",
 				PlaybackStatus: StatusPlaying,
-				capabilities: capabilities{
-					canPlay:       true,
-					canPause:      true,
-					canGoNext:     true,
-					canGoPrevious: true,
+				Capabilities: Capabilities{
+					CanPlay:       true,
+					CanPause:      true,
+					CanGoNext:     true,
+					CanGoPrevious: true,
 				},
 			},
 		},
@@ -68,11 +68,11 @@ func TestGetPlayer(t *testing.T) {
 				BusName:        "org.mpris.MediaPlayer2.vlc",
 				Identity:       "VLC",
 				PlaybackStatus: StatusPaused,
-				capabilities: capabilities{
-					canPlay:       true,
-					canPause:      true,
-					canGoNext:     false,
-					canGoPrevious: false,
+				Capabilities: Capabilities{
+					CanPlay:       true,
+					CanPause:      true,
+					CanGoNext:     false,
+					CanGoPrevious: false,
 				},
 			},
 		},
@@ -153,9 +153,9 @@ func TestUpdatePlayer(t *testing.T) {
 		Identity:       "Spotify",
 		PlaybackStatus: StatusPlaying,
 		Volume:         0.8,
-		capabilities: capabilities{
-			canPlay:  true,
-			canPause: true,
+		Capabilities: Capabilities{
+			CanPlay:  true,
+			CanPause: true,
 		},
 	}
 
@@ -205,8 +205,8 @@ func TestUpdatePlayerAddNew(t *testing.T) {
 		BusName:        "org.mpris.MediaPlayer2.vlc",
 		Identity:       "VLC",
 		PlaybackStatus: StatusPlaying,
-		capabilities: capabilities{
-			canPlay: true,
+		Capabilities: Capabilities{
+			CanPlay: true,
 		},
 	}
 
