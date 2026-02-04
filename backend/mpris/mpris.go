@@ -61,11 +61,10 @@ func New(ctx context.Context, timeout time.Duration) (*MPRISBackend, error) {
 	}
 
 	return &MPRISBackend{
-		conn:          conn,
-		ctx:           ctx,
-		timeout:       timeout,
-		cache:         cache.New[[]Player](0), // TTL=0 = pas d'expiration
-		heartbeatDone: make(chan struct{}),
+		conn:    conn,
+		ctx:     ctx,
+		timeout: timeout,
+		cache:   cache.New[[]Player](0), // TTL=0 = pas d'expiration
 	}, nil
 }
 
@@ -464,8 +463,28 @@ func (m *MPRISBackend) InvalidateCache() {
 	m.cache.Delete(cacheKey)
 }
 
+// ensureHeartbeatRunning démarre le heartbeat s'il n'est pas déjà actif
+func (m *MPRISBackend) ensureHeartbeatRunning() {
+	m.heartbeatMu.Lock()
+	defer m.heartbeatMu.Unlock()
+
+	if m.heartbeatActive {
+		return // Déjà actif
+	}
+
+	m.heartbeatActive = true
+	go m.startPositionHeartbeat()
+}
+
 // startPositionHeartbeat met à jour la position des players en lecture toutes les 2s
 func (m *MPRISBackend) startPositionHeartbeat() {
+	defer func() {
+		m.heartbeatMu.Lock()
+		m.heartbeatActive = false
+		m.heartbeatMu.Unlock()
+		logger.Debug("[mpris] position heartbeat stopped")
+	}()
+
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 
@@ -475,28 +494,32 @@ func (m *MPRISBackend) startPositionHeartbeat() {
 		select {
 		case <-m.ctx.Done():
 			return
-		case <-m.heartbeatDone:
-			logger.Debug("[mpris] position heartbeat stopped")
-			return
 		case <-ticker.C:
-			m.updatePlayingPositions()
+			hasPlaying := m.updatePlayingPositions()
+			if !hasPlaying {
+				return // Auto-stop: plus aucun player en Playing
+			}
 		}
 	}
 }
 
 // updatePlayingPositions met à jour la position de tous les players en lecture
-func (m *MPRISBackend) updatePlayingPositions() {
+// Retourne true si au moins un player est en Playing
+func (m *MPRISBackend) updatePlayingPositions() bool {
 	players, ok := m.cache.Get(cacheKey)
 	if !ok {
-		return
+		return false
 	}
 
+	hasPlaying := false
 	updated := false
 	for i, player := range players {
 		// Mettre à jour uniquement les players en Playing
 		if player.PlaybackStatus != StatusPlaying {
 			continue
 		}
+
+		hasPlaying = true
 
 		// Récupérer la position actuelle
 		obj := m.conn.Object(player.BusName, mprisPath)
@@ -520,13 +543,12 @@ func (m *MPRISBackend) updatePlayingPositions() {
 		m.cache.Set(cacheKey, players)
 		logger.Debug("[mpris] updated positions for playing players")
 	}
+
+	return hasPlaying
 }
 
 // Close ferme proprement les connexions et arrête le listener
 func (m *MPRISBackend) Close() {
-	// Arrêter le heartbeat
-	close(m.heartbeatDone)
-
 	if m.listener != nil {
 		m.listener.Stop()
 		m.listener = nil

@@ -116,6 +116,11 @@ func (l *Listener) handlePropertiesChanged(sig *dbus.Signal) {
 				l.lastStateMu.Unlock()
 
 				logger.Debug("[mpris] player %s changed status: %s -> %s", busName, lastStatus, newStatus)
+
+				// Si le player passe en Playing, s'assurer que le heartbeat tourne
+				if newStatus == StatusPlaying {
+					l.backend.ensureHeartbeatRunning()
+				}
 			}
 		}
 	}

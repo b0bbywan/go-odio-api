@@ -128,7 +128,6 @@ type MPRISBackend struct {
 	// heartbeat pour mettre à jour Position des players en lecture
 	heartbeatMu     sync.Mutex
 	heartbeatActive bool
-	heartbeatDone   chan struct{}
 }
 
 // Player représente un lecteur multimédia MPRIS
