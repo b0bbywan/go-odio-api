@@ -64,8 +64,48 @@ func Register(mux *http.ServeMux, b *backend.Backend) {
 			ListPlayersHandler(b.MPRIS),
 		)
 		mux.HandleFunc(
-			"POST /players/{player}",
-			PlayerActionHandler(b.MPRIS),
+			"POST /players/{player}/play",
+			PlayHandler(b.MPRIS),
+		)
+		mux.HandleFunc(
+			"POST /players/{player}/pause",
+			PauseHandler(b.MPRIS),
+		)
+		mux.HandleFunc(
+			"POST /players/{player}/play_pause",
+			PlayPauseHandler(b.MPRIS),
+		)
+		mux.HandleFunc(
+			"POST /players/{player}/stop",
+			StopHandler(b.MPRIS),
+		)
+		mux.HandleFunc(
+			"POST /players/{player}/next",
+			NextHandler(b.MPRIS),
+		)
+		mux.HandleFunc(
+			"POST /players/{player}/previous",
+			PreviousHandler(b.MPRIS),
+		)
+		mux.HandleFunc(
+			"POST /players/{player}/seek",
+			SeekHandler(b.MPRIS),
+		)
+		mux.HandleFunc(
+			"POST /players/{player}/position",
+			SetPositionHandler(b.MPRIS),
+		)
+		mux.HandleFunc(
+			"POST /players/{player}/volume",
+			SetVolumeHandler(b.MPRIS),
+		)
+		mux.HandleFunc(
+			"POST /players/{player}/loop",
+			SetLoopHandler(b.MPRIS),
+		)
+		mux.HandleFunc(
+			"POST /players/{player}/shuffle",
+			SetShuffleHandler(b.MPRIS),
 		)
 	}
 }
