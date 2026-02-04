@@ -36,7 +36,7 @@ func TestGetPlayerFromCache(t *testing.T) {
 			},
 		},
 	}
-	backend.cache.Set(cacheKey, players)
+	backend.cache.Set(CACHE_KEY, players)
 
 	tests := []struct {
 		name       string
@@ -145,7 +145,7 @@ func TestUpdatePlayer(t *testing.T) {
 			Volume:         1.0,
 		},
 	}
-	backend.cache.Set(cacheKey, initialPlayers)
+	backend.cache.Set(CACHE_KEY, initialPlayers)
 
 	// Update an existing player
 	updatedPlayer := Player{
@@ -198,7 +198,7 @@ func TestUpdatePlayerAddNew(t *testing.T) {
 			Identity: "Spotify",
 		},
 	}
-	backend.cache.Set(cacheKey, initialPlayers)
+	backend.cache.Set(CACHE_KEY, initialPlayers)
 
 	// Add a new player
 	newPlayer := Player{
@@ -225,7 +225,7 @@ func TestUpdatePlayerAddNew(t *testing.T) {
 	}
 
 	// Verify we now have 2 players in cache
-	players, _ := backend.cache.Get(cacheKey)
+	players, _ := backend.cache.Get(CACHE_KEY)
 	if len(players) != 2 {
 		t.Errorf("Cache should contain 2 players, got %d", len(players))
 	}
@@ -247,7 +247,7 @@ func TestRemovePlayer(t *testing.T) {
 			Identity: "VLC",
 		},
 	}
-	backend.cache.Set(cacheKey, players)
+	backend.cache.Set(CACHE_KEY, players)
 
 	// Remove one player
 	err := backend.RemovePlayer("org.mpris.MediaPlayer2.spotify")
@@ -271,7 +271,7 @@ func TestRemovePlayer(t *testing.T) {
 	}
 
 	// Verify cache size
-	cachedPlayers, _ := backend.cache.Get(cacheKey)
+	cachedPlayers, _ := backend.cache.Get(CACHE_KEY)
 	if len(cachedPlayers) != 1 {
 		t.Errorf("Cache should contain 1 player, got %d", len(cachedPlayers))
 	}
@@ -286,7 +286,7 @@ func TestInvalidateCache(t *testing.T) {
 	players := []Player{
 		{BusName: "org.mpris.MediaPlayer2.test", Identity: "Test"},
 	}
-	backend.cache.Set(cacheKey, players)
+	backend.cache.Set(CACHE_KEY, players)
 
 	// Verify cache is populated
 	_, err := backend.GetPlayerFromCache("org.mpris.MediaPlayer2.test")

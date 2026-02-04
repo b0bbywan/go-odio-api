@@ -11,26 +11,27 @@ import (
 )
 
 const (
-	cacheKey = "players"
+	CACHE_KEY = "players"
 
 	// MPRIS D-Bus constants
-	mprisPrefix      = "org.mpris.MediaPlayer2"
-	mprisPath        = "/org/mpris/MediaPlayer2"
-	mprisInterface   = "org.mpris.MediaPlayer2"
-	mprisPlayerIface = "org.mpris.MediaPlayer2.Player"
+	MPRIS_PREFIX        = "org.mpris.MediaPlayer2"
+	MPRIS_PATH          = "/org/mpris/MediaPlayer2"
+	MPRIS_INTERFACE     = "org.mpris.MediaPlayer2"
+	MPRIS_PLAYER_IFACE  = "org.mpris.MediaPlayer2.Player"
 
 	// D-Bus system constants
-	dbusInterface = "org.freedesktop.DBus"
-	dbusPropIface = "org.freedesktop.DBus.Properties"
+	DBUS_INTERFACE  = "org.freedesktop.DBus"
+	DBUS_PROP_IFACE = "org.freedesktop.DBus.Properties"
 
 	// D-Bus method names
-	dbusListNamesMethod   = dbusInterface + ".ListNames"
-	dbusAddMatchMethod    = dbusInterface + ".AddMatch"
-	dbusPropGet           = dbusPropIface + ".Get"
-	dbusPropGetAll        = dbusPropIface + ".GetAll"
-	dbusPropSet           = dbusPropIface + ".Set"
-	dbusPropChangedSignal = dbusPropIface + ".PropertiesChanged"
-	dbusNameOwnerChanged  = dbusInterface + ".NameOwnerChanged"
+	DBUS_LIST_NAMES_METHOD   = DBUS_INTERFACE + ".ListNames"
+	DBUS_ADD_MATCH_METHOD    = DBUS_INTERFACE + ".AddMatch"
+	DBUS_PROP_GET            = DBUS_PROP_IFACE + ".Get"
+	DBUS_PROP_GET_ALL        = DBUS_PROP_IFACE + ".GetAll"
+	DBUS_PROP_SET            = DBUS_PROP_IFACE + ".Set"
+	DBUS_PROP_CHANGED_SIGNAL = DBUS_PROP_IFACE + ".PropertiesChanged"
+	DBUS_NAME_OWNER_CHANGED  = DBUS_INTERFACE + ".NameOwnerChanged"
+	DBUS_GET_NAME_OWNER      = DBUS_INTERFACE + ".GetNameOwner"
 )
 
 // PlaybackStatus represents the current playback state

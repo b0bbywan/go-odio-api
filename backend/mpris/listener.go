@@ -27,14 +27,14 @@ func (l *Listener) Start() error {
 	conn := l.backend.conn
 
 	// S'abonner aux signaux PropertiesChanged pour tous les lecteurs MPRIS
-	matchRule := "type='signal',interface='" + dbusPropIface + "',member='PropertiesChanged',arg0namespace='" + mprisPrefix + "'"
-	if err := conn.BusObject().Call(dbusAddMatchMethod, 0, matchRule).Err; err != nil {
+	matchRule := "type='signal',interface='" + DBUS_PROP_IFACE + "',member='PropertiesChanged',arg0namespace='" + MPRIS_PREFIX + "'"
+	if err := conn.BusObject().Call(DBUS_ADD_MATCH_METHOD, 0, matchRule).Err; err != nil {
 		return err
 	}
 
 	// S'abonner aux signaux NameOwnerChanged pour détecter les nouveaux/anciens lecteurs
-	ownerMatchRule := "type='signal',interface='" + dbusInterface + "',member='NameOwnerChanged',arg0namespace='" + mprisPrefix + "'"
-	if err := conn.BusObject().Call(dbusAddMatchMethod, 0, ownerMatchRule).Err; err != nil {
+	ownerMatchRule := "type='signal',interface='" + DBUS_INTERFACE + "',member='NameOwnerChanged',arg0namespace='" + MPRIS_PREFIX + "'"
+	if err := conn.BusObject().Call(DBUS_ADD_MATCH_METHOD, 0, ownerMatchRule).Err; err != nil {
 		return err
 	}
 
@@ -66,9 +66,9 @@ func (l *Listener) listen(ch <-chan *dbus.Signal) {
 // handleSignal traite un signal D-Bus
 func (l *Listener) handleSignal(sig *dbus.Signal) {
 	switch sig.Name {
-	case dbusPropChangedSignal:
+	case DBUS_PROP_CHANGED_SIGNAL:
 		l.handlePropertiesChanged(sig)
-	case dbusNameOwnerChanged:
+	case DBUS_NAME_OWNER_CHANGED:
 		l.handleNameOwnerChanged(sig)
 	default:
 		logger.Debug("[mpris] unhandled signal: %s", sig.Name)
@@ -86,7 +86,7 @@ func (l *Listener) handlePropertiesChanged(sig *dbus.Signal) {
 	}
 
 	iface, ok := sig.Body[0].(string)
-	if !ok || iface != mprisPlayerIface {
+	if !ok || iface != MPRIS_PLAYER_IFACE {
 		// On ne s'intéresse qu'aux changements du Player
 		return
 	}
@@ -153,7 +153,7 @@ func (l *Listener) handleNameOwnerChanged(sig *dbus.Signal) {
 	}
 
 	busName, ok := sig.Body[0].(string)
-	if !ok || !strings.HasPrefix(busName, mprisPrefix+".") {
+	if !ok || !strings.HasPrefix(busName, MPRIS_PREFIX+".") {
 		return
 	}
 

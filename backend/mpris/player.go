@@ -15,10 +15,10 @@ func (p *Player) callWithTimeout(call *dbus.Call) error {
 
 // getAllProperties récupère toutes les propriétés d'une interface D-Bus en un seul appel
 func (p *Player) getAllProperties(iface string) (map[string]dbus.Variant, error) {
-	obj := p.conn.Object(p.BusName, mprisPath)
+	obj := p.conn.Object(p.BusName, MPRIS_PATH)
 	var props map[string]dbus.Variant
 
-	call := obj.Call(dbusPropGetAll, 0, iface)
+	call := obj.Call(DBUS_PROP_GET_ALL, 0, iface)
 	if err := p.callWithTimeout(call); err != nil {
 		return nil, err
 	}
@@ -29,10 +29,10 @@ func (p *Player) getAllProperties(iface string) (map[string]dbus.Variant, error)
 
 // getProperty récupère une propriété D-Bus
 func (p *Player) getProperty(iface, prop string) (dbus.Variant, error) {
-	obj := p.conn.Object(p.BusName, mprisPath)
+	obj := p.conn.Object(p.BusName, MPRIS_PATH)
 	var v dbus.Variant
 
-	call := obj.Call(dbusPropGet, 0, iface, prop)
+	call := obj.Call(DBUS_PROP_GET, 0, iface, prop)
 	if err := p.callWithTimeout(call); err != nil {
 		return dbus.Variant{}, err
 	}
@@ -121,26 +121,26 @@ func (p *Player) CanControl() bool {
 func (p *Player) loadFromDBus() error {
 	// Récupérer le unique name via GetNameOwner
 	var owner string
-	if err := p.conn.BusObject().Call("org.freedesktop.DBus.GetNameOwner", 0, p.BusName).Store(&owner); err != nil {
+	if err := p.conn.BusObject().Call(DBUS_GET_NAME_OWNER, 0, p.BusName).Store(&owner); err != nil {
 		return err
 	}
 	p.uniqueName = owner
 
 	// Récupérer toutes les propriétés des deux interfaces en 2 appels au lieu de ~15
-	propsMediaPlayer2, err := p.getAllProperties("org.mpris.MediaPlayer2")
+	propsMediaPlayer2, err := p.getAllProperties(MPRIS_INTERFACE)
 	if err != nil {
 		return err
 	}
 
-	propsPlayer, err := p.getAllProperties(mprisPlayerIface)
+	propsPlayer, err := p.getAllProperties(MPRIS_PLAYER_IFACE)
 	if err != nil {
 		return err
 	}
 
 	// Combiner les deux maps
 	allProps := make(map[string]map[string]dbus.Variant)
-	allProps["org.mpris.MediaPlayer2"] = propsMediaPlayer2
-	allProps[mprisPlayerIface] = propsPlayer
+	allProps[MPRIS_INTERFACE] = propsMediaPlayer2
+	allProps[MPRIS_PLAYER_IFACE] = propsPlayer
 
 	// Mapper les propriétés aux champs du struct
 	val := reflect.ValueOf(p).Elem()

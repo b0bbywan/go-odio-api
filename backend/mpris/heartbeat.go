@@ -101,7 +101,7 @@ func (h *Heartbeat) run() {
 // updatePlayingPositions met à jour la position de tous les players en lecture.
 // Retourne true si au moins un player est en Playing.
 func (h *Heartbeat) updatePlayingPositions() bool {
-	players, ok := h.backend.cache.Get(cacheKey)
+	players, ok := h.backend.cache.Get(CACHE_KEY)
 	if !ok {
 		return false
 	}
@@ -116,8 +116,8 @@ func (h *Heartbeat) updatePlayingPositions() bool {
 		hasPlaying = true
 
 		// Récupérer la position actuelle
-		obj := h.backend.conn.Object(player.BusName, mprisPath)
-		call := obj.Call(dbusPropGet, 0, mprisPlayerIface, "Position")
+		obj := h.backend.conn.Object(player.BusName, MPRIS_PATH)
+		call := obj.Call(DBUS_PROP_GET, 0, MPRIS_PLAYER_IFACE, "Position")
 		if err := h.backend.callWithTimeout(call); err != nil {
 			continue
 		}
