@@ -54,6 +54,15 @@ type CapabilityRef struct {
 	FieldName string
 }
 
+// CapabilityError indique qu'une action n'est pas supportée par le player
+type CapabilityError struct {
+	Required string
+}
+
+func (e *CapabilityError) Error() string {
+	return "action not allowed (requires " + e.Required + ")"
+}
+
 // Caps contient les références à toutes les capabilities, auto-générées depuis Capabilities
 var Caps = struct {
 	CanPlay       CapabilityRef
