@@ -77,13 +77,6 @@ func (l *Listener) handleSignal(sig *dbus.Signal) {
 
 // handlePropertiesChanged traite les changements de propriétés MPRIS
 func (l *Listener) handlePropertiesChanged(sig *dbus.Signal) {
-	// Le sender est le bus name du lecteur
-	busName := sig.Sender
-
-	if !strings.HasPrefix(busName, mprisPrefix+".") {
-		return
-	}
-
 	// Body[0] = interface name
 	// Body[1] = changed properties (map[string]Variant)
 	// Body[2] = invalidated properties ([]string)
@@ -100,6 +93,31 @@ func (l *Listener) handlePropertiesChanged(sig *dbus.Signal) {
 
 	changed, ok := sig.Body[1].(map[string]dbus.Variant)
 	if !ok {
+		return
+	}
+
+	// Le signal contient le unique name (:1.107), pas le well-known name
+	// Trouver le player MPRIS correspondant via GetNameOwner
+	players, ok := l.backend.cache.Get(cacheKey)
+	if !ok {
+		return
+	}
+
+	uniqueName := sig.Sender
+	var busName string
+
+	// Pour chaque player connu, vérifier si son owner unique name correspond
+	for _, player := range players {
+		var owner string
+		err := l.backend.conn.BusObject().Call("org.freedesktop.DBus.GetNameOwner", 0, player.BusName).Store(&owner)
+		if err == nil && owner == uniqueName {
+			busName = player.BusName
+			break
+		}
+	}
+
+	if busName == "" {
+		// Signal d'un player non connu, ignorer
 		return
 	}
 
