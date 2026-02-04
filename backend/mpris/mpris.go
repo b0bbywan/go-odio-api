@@ -166,6 +166,59 @@ func (m *MPRISBackend) UpdatePlayer(updated Player) error {
 	return nil
 }
 
+// UpdatePlayerProperties met à jour sélectivement les propriétés d'un player dans le cache
+func (m *MPRISBackend) UpdatePlayerProperties(busName string, changed map[string]dbus.Variant) error {
+	players, ok := m.cache.Get(cacheKey)
+	if !ok {
+		return &PlayerNotFoundError{BusName: busName}
+	}
+
+	for i, player := range players {
+		if player.BusName != busName {
+			continue
+		}
+
+		// Mettre à jour seulement les propriétés qui ont changé
+		for key, variant := range changed {
+			switch key {
+			case "PlaybackStatus":
+				if val, ok := variant.Value().(string); ok {
+					players[i].PlaybackStatus = PlaybackStatus(val)
+				}
+			case "LoopStatus":
+				if val, ok := variant.Value().(string); ok {
+					players[i].LoopStatus = LoopStatus(val)
+				}
+			case "Shuffle":
+				if val, ok := variant.Value().(bool); ok {
+					players[i].Shuffle = val
+				}
+			case "Volume":
+				if val, ok := variant.Value().(float64); ok {
+					players[i].Volume = val
+				}
+			case "Metadata":
+				if metaMap, ok := variant.Value().(map[string]dbus.Variant); ok {
+					players[i].Metadata = make(map[string]string)
+					for k, v := range metaMap {
+						players[i].Metadata[k] = formatMetadataValue(v)
+					}
+				}
+			case "Rate":
+				if val, ok := variant.Value().(float64); ok {
+					players[i].Rate = val
+				}
+			}
+		}
+
+		m.cache.Set(cacheKey, players)
+		logger.Debug("[mpris] updated %d properties for player %s", len(changed), busName)
+		return nil
+	}
+
+	return &PlayerNotFoundError{BusName: busName}
+}
+
 // RefreshPlayer recharge un lecteur spécifique depuis D-Bus et met à jour le cache
 func (m *MPRISBackend) RefreshPlayer(busName string) (*Player, error) {
 	if err := validateBusName(busName); err != nil {

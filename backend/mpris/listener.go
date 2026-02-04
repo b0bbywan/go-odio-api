@@ -100,7 +100,23 @@ func (l *Listener) handlePropertiesChanged(sig *dbus.Signal) {
 		return
 	}
 
-	// Vérifier si PlaybackStatus a changé
+	// Ignorer les changements qui ne contiennent QUE Position
+	// (Position change plusieurs fois par seconde pendant la lecture)
+	if len(changed) == 1 {
+		if _, hasPosition := changed["Position"]; hasPosition {
+			return
+		}
+	}
+
+	// Filtrer Position des changements (on ne veut pas la mettre à jour)
+	delete(changed, "Position")
+
+	// Si plus aucune propriété intéressante, ignorer
+	if len(changed) == 0 {
+		return
+	}
+
+	// Vérifier si PlaybackStatus a changé pour la déduplication
 	if statusVar, hasStatus := changed["PlaybackStatus"]; hasStatus {
 		if status, ok := statusVar.Value().(string); ok {
 			newStatus := PlaybackStatus(status)
@@ -110,7 +126,8 @@ func (l *Listener) handlePropertiesChanged(sig *dbus.Signal) {
 			lastStatus := l.lastState[busName]
 			l.lastStateMu.RUnlock()
 
-			if lastStatus == newStatus {
+			if lastStatus == newStatus && len(changed) == 1 {
+				// Si seul PlaybackStatus a changé et qu'il est identique, ignorer
 				return
 			}
 
@@ -122,9 +139,9 @@ func (l *Listener) handlePropertiesChanged(sig *dbus.Signal) {
 		}
 	}
 
-	// Rafraîchir le lecteur dans le cache
-	if _, err := l.backend.RefreshPlayer(busName); err != nil {
-		logger.Error("[mpris] failed to refresh player %s: %v", busName, err)
+	// Mettre à jour les propriétés directement depuis le signal (pas d'appels D-Bus!)
+	if err := l.backend.UpdatePlayerProperties(busName, changed); err != nil {
+		logger.Error("[mpris] failed to update player %s properties: %v", busName, err)
 	}
 }
 
