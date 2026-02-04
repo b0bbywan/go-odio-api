@@ -84,9 +84,6 @@ func (m *MPRISBackend) Start() error {
 		return err
 	}
 
-	// Démarrer le heartbeat pour Position
-	go m.startPositionHeartbeat()
-
 	logger.Info("[mpris] backend started successfully")
 	return nil
 }
