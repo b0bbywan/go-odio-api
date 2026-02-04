@@ -11,7 +11,7 @@ import (
 func (p *Player) getProperty(iface, prop string) (dbus.Variant, error) {
 	obj := p.conn.Object(p.BusName, mprisPath)
 	var v dbus.Variant
-	err := obj.Call(dbusPropIface+".Get", 0, iface, prop).Store(&v)
+	err := obj.Call(dbusPropGet, 0, iface, prop).Store(&v)
 	return v, err
 }
 
@@ -197,4 +197,12 @@ func extractMetadata(raw interface{}) map[string]string {
 	}
 
 	return metadata
+}
+
+// newPlayer crée un nouveau Player avec connexion D-Bus
+func newPlayer(conn *dbus.Conn, busName string) *Player {
+	return &Player{
+		conn:    conn,
+		BusName: busName,
+	}
 }

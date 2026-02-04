@@ -28,13 +28,13 @@ func (l *Listener) Start() error {
 
 	// S'abonner aux signaux PropertiesChanged pour tous les lecteurs MPRIS
 	matchRule := "type='signal',interface='" + dbusPropIface + "',member='PropertiesChanged',arg0namespace='" + mprisPrefix + "'"
-	if err := conn.BusObject().Call(dbusInterface+".AddMatch", 0, matchRule).Err; err != nil {
+	if err := conn.BusObject().Call(dbusAddMatchMethod, 0, matchRule).Err; err != nil {
 		return err
 	}
 
 	// S'abonner aux signaux NameOwnerChanged pour détecter les nouveaux/anciens lecteurs
 	ownerMatchRule := "type='signal',interface='" + dbusInterface + "',member='NameOwnerChanged',arg0namespace='" + mprisPrefix + "'"
-	if err := conn.BusObject().Call(dbusInterface+".AddMatch", 0, ownerMatchRule).Err; err != nil {
+	if err := conn.BusObject().Call(dbusAddMatchMethod, 0, ownerMatchRule).Err; err != nil {
 		return err
 	}
 
@@ -65,9 +65,9 @@ func (l *Listener) listen(ch <-chan *dbus.Signal) {
 // handleSignal traite un signal D-Bus
 func (l *Listener) handleSignal(sig *dbus.Signal) {
 	switch sig.Name {
-	case dbusPropIface + ".PropertiesChanged":
+	case dbusPropChangedSignal:
 		l.handlePropertiesChanged(sig)
-	case dbusInterface + ".NameOwnerChanged":
+	case dbusNameOwnerChanged:
 		l.handleNameOwnerChanged(sig)
 	}
 }

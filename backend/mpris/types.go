@@ -21,6 +21,14 @@ const (
 	// D-Bus system constants
 	dbusInterface = "org.freedesktop.DBus"
 	dbusPropIface = "org.freedesktop.DBus.Properties"
+
+	// D-Bus method names
+	dbusListNamesMethod    = "org.freedesktop.DBus.ListNames"
+	dbusAddMatchMethod     = "org.freedesktop.DBus.AddMatch"
+	dbusPropGet            = "org.freedesktop.DBus.Properties.Get"
+	dbusPropSet            = "org.freedesktop.DBus.Properties.Set"
+	dbusPropChangedSignal  = "org.freedesktop.DBus.Properties.PropertiesChanged"
+	dbusNameOwnerChanged   = "org.freedesktop.DBus.NameOwnerChanged"
 )
 
 // PlaybackStatus represents the current playback state
