@@ -167,3 +167,51 @@ func loadPlayer(conn *dbus.Conn, busName string) Player {
 
 	return player
 }
+
+// CheckCapabilities vérifie si un player a les capabilities requises
+// Supporte la logique OR : si plusieurs noms sont donnés, au moins un doit être true
+// Retourne (hasCapability, errorMessage)
+func CheckCapabilities(player *Player, capFieldNames ...string) (bool, string) {
+	if len(capFieldNames) == 0 {
+		return true, ""
+	}
+
+	capsVal := reflect.ValueOf(player.Capabilities)
+	capsType := capsVal.Type()
+
+	var dbusNames []string
+	hasAny := false
+
+	for _, fieldName := range capFieldNames {
+		field := capsVal.FieldByName(fieldName)
+		if !field.IsValid() {
+			continue
+		}
+
+		// Récupérer le tag dbus pour le message d'erreur
+		if structField, ok := capsType.FieldByName(fieldName); ok {
+			dbusTag := structField.Tag.Get("dbus")
+			if dbusTag != "" {
+				dbusNames = append(dbusNames, dbusTag)
+			}
+		}
+
+		// Vérifier si la capability est true
+		if field.Kind() == reflect.Bool && field.Bool() {
+			hasAny = true
+		}
+	}
+
+	// Construire le message d'erreur
+	var errorMsg string
+	if len(dbusNames) == 1 {
+		errorMsg = dbusNames[0]
+	} else if len(dbusNames) > 1 {
+		errorMsg = dbusNames[0]
+		for i := 1; i < len(dbusNames); i++ {
+			errorMsg += " or " + dbusNames[i]
+		}
+	}
+
+	return hasAny, errorMsg
+}

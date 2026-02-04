@@ -17,8 +17,7 @@ func ListPlayersHandler(m *mpris.MPRISBackend) http.HandlerFunc {
 // withPlayer wrapper pour actions simples sans body
 func withPlayer(
 	m *mpris.MPRISBackend,
-	checkCapability func(*mpris.Player) bool,
-	capabilityName string,
+	capFieldNames []string,
 	fn func(string) error,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -34,9 +33,12 @@ func withPlayer(
 			return
 		}
 
-		if checkCapability != nil && !checkCapability(player) {
-			http.Error(w, "action not allowed (requires "+capabilityName+")", http.StatusBadRequest)
-			return
+		if len(capFieldNames) > 0 {
+			hasCapability, capabilityName := mpris.CheckCapabilities(player, capFieldNames...)
+			if !hasCapability {
+				http.Error(w, "action not allowed (requires "+capabilityName+")", http.StatusBadRequest)
+				return
+			}
 		}
 
 		if err := fn(busName); err != nil {
@@ -51,8 +53,7 @@ func withPlayer(
 // withPlayerAndBody wrapper générique pour actions avec body et validation
 func withPlayerAndBody[T any](
 	m *mpris.MPRISBackend,
-	checkCapability func(*mpris.Player) bool,
-	capabilityName string,
+	capFieldNames []string,
 	validate func(*T) error,
 	action func(string, *T) error,
 ) http.HandlerFunc {
@@ -69,9 +70,12 @@ func withPlayerAndBody[T any](
 			return
 		}
 
-		if checkCapability != nil && !checkCapability(player) {
-			http.Error(w, "action not allowed (requires "+capabilityName+")", http.StatusBadRequest)
-			return
+		if len(capFieldNames) > 0 {
+			hasCapability, capabilityName := mpris.CheckCapabilities(player, capFieldNames...)
+			if !hasCapability {
+				http.Error(w, "action not allowed (requires "+capabilityName+")", http.StatusBadRequest)
+				return
+			}
 		}
 
 		defer r.Body.Close()
@@ -99,35 +103,34 @@ func withPlayerAndBody[T any](
 
 // Handlers pour actions simples
 func PlayHandler(m *mpris.MPRISBackend) http.HandlerFunc {
-	return withPlayer(m, func(p *mpris.Player) bool { return p.Capabilities.CanPlay }, "CanPlay", m.Play)
+	return withPlayer(m, []string{"CanPlay"}, m.Play)
 }
 
 func PauseHandler(m *mpris.MPRISBackend) http.HandlerFunc {
-	return withPlayer(m, func(p *mpris.Player) bool { return p.Capabilities.CanPause }, "CanPause", m.Pause)
+	return withPlayer(m, []string{"CanPause"}, m.Pause)
 }
 
 func PlayPauseHandler(m *mpris.MPRISBackend) http.HandlerFunc {
-	return withPlayer(m, func(p *mpris.Player) bool { return p.Capabilities.CanPlay || p.Capabilities.CanPause }, "CanPlay or CanPause", m.PlayPause)
+	return withPlayer(m, []string{"CanPlay", "CanPause"}, m.PlayPause)
 }
 
 func StopHandler(m *mpris.MPRISBackend) http.HandlerFunc {
-	return withPlayer(m, func(p *mpris.Player) bool { return p.Capabilities.CanControl }, "CanControl", m.Stop)
+	return withPlayer(m, []string{"CanControl"}, m.Stop)
 }
 
 func NextHandler(m *mpris.MPRISBackend) http.HandlerFunc {
-	return withPlayer(m, func(p *mpris.Player) bool { return p.Capabilities.CanGoNext }, "CanGoNext", m.Next)
+	return withPlayer(m, []string{"CanGoNext"}, m.Next)
 }
 
 func PreviousHandler(m *mpris.MPRISBackend) http.HandlerFunc {
-	return withPlayer(m, func(p *mpris.Player) bool { return p.Capabilities.CanGoPrevious }, "CanGoPrevious", m.Previous)
+	return withPlayer(m, []string{"CanGoPrevious"}, m.Previous)
 }
 
 // Handlers pour actions avec body
 func SeekHandler(m *mpris.MPRISBackend) http.HandlerFunc {
 	return withPlayerAndBody(
 		m,
-		func(p *mpris.Player) bool { return p.Capabilities.CanSeek },
-		"CanSeek",
+		[]string{"CanSeek"},
 		nil,
 		func(busName string, req *mpris.SeekRequest) error {
 			return m.Seek(busName, req.Offset)
@@ -138,8 +141,7 @@ func SeekHandler(m *mpris.MPRISBackend) http.HandlerFunc {
 func SetPositionHandler(m *mpris.MPRISBackend) http.HandlerFunc {
 	return withPlayerAndBody(
 		m,
-		func(p *mpris.Player) bool { return p.Capabilities.CanSeek },
-		"CanSeek",
+		[]string{"CanSeek"},
 		func(req *mpris.PositionRequest) error {
 			if req.TrackID == "" {
 				return &validationError{"missing track_id"}
@@ -155,8 +157,7 @@ func SetPositionHandler(m *mpris.MPRISBackend) http.HandlerFunc {
 func SetVolumeHandler(m *mpris.MPRISBackend) http.HandlerFunc {
 	return withPlayerAndBody(
 		m,
-		func(p *mpris.Player) bool { return p.Capabilities.CanControl },
-		"CanControl",
+		[]string{"CanControl"},
 		func(req *mpris.VolumeRequest) error {
 			if req.Volume < 0 || req.Volume > 1 {
 				return &validationError{"volume must be between 0 and 1"}
@@ -172,8 +173,7 @@ func SetVolumeHandler(m *mpris.MPRISBackend) http.HandlerFunc {
 func SetLoopHandler(m *mpris.MPRISBackend) http.HandlerFunc {
 	return withPlayerAndBody(
 		m,
-		func(p *mpris.Player) bool { return p.Capabilities.CanControl },
-		"CanControl",
+		[]string{"CanControl"},
 		func(req *mpris.LoopRequest) error {
 			switch mpris.LoopStatus(req.Loop) {
 			case mpris.LoopNone, mpris.LoopTrack, mpris.LoopPlaylist:
@@ -191,8 +191,7 @@ func SetLoopHandler(m *mpris.MPRISBackend) http.HandlerFunc {
 func SetShuffleHandler(m *mpris.MPRISBackend) http.HandlerFunc {
 	return withPlayerAndBody(
 		m,
-		func(p *mpris.Player) bool { return p.Capabilities.CanControl },
-		"CanControl",
+		[]string{"CanControl"},
 		nil,
 		func(busName string, req *mpris.ShuffleRequest) error {
 			return m.SetShuffle(busName, req.Shuffle)
