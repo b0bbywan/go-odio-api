@@ -68,6 +68,15 @@ func (e *CapabilityError) Error() string {
 	return "action not allowed (requires " + e.Required + ")"
 }
 
+// PlayerNotFoundError indique qu'un player n'existe pas
+type PlayerNotFoundError struct {
+	BusName string
+}
+
+func (e *PlayerNotFoundError) Error() string {
+	return "player not found: " + e.BusName
+}
+
 // Listener écoute les changements MPRIS via signaux D-Bus
 type Listener struct {
 	backend *MPRISBackend

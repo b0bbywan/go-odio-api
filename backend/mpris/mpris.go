@@ -166,7 +166,7 @@ func (m *MPRISBackend) getPlayerInfo(busName string) (Player, error) {
 func (m *MPRISBackend) Play(busName string) error {
 	player, found := m.GetPlayer(busName)
 	if !found {
-		return &CapabilityError{Required: "player not found"}
+		return &PlayerNotFoundError{BusName: busName}
 	}
 	if !player.CanPlay() {
 		return &CapabilityError{Required: "CanPlay"}
@@ -181,7 +181,7 @@ func (m *MPRISBackend) Play(busName string) error {
 func (m *MPRISBackend) Pause(busName string) error {
 	player, found := m.GetPlayer(busName)
 	if !found {
-		return &CapabilityError{Required: "player not found"}
+		return &PlayerNotFoundError{BusName: busName}
 	}
 	if !player.CanPause() {
 		return &CapabilityError{Required: "CanPause"}
@@ -196,7 +196,7 @@ func (m *MPRISBackend) Pause(busName string) error {
 func (m *MPRISBackend) PlayPause(busName string) error {
 	player, found := m.GetPlayer(busName)
 	if !found {
-		return &CapabilityError{Required: "player not found"}
+		return &PlayerNotFoundError{BusName: busName}
 	}
 	if !player.CanPlay() && !player.CanPause() {
 		return &CapabilityError{Required: "CanPlay or CanPause"}
@@ -211,7 +211,7 @@ func (m *MPRISBackend) PlayPause(busName string) error {
 func (m *MPRISBackend) Stop(busName string) error {
 	player, found := m.GetPlayer(busName)
 	if !found {
-		return &CapabilityError{Required: "player not found"}
+		return &PlayerNotFoundError{BusName: busName}
 	}
 	if !player.CanControl() {
 		return &CapabilityError{Required: "CanControl"}
@@ -226,7 +226,7 @@ func (m *MPRISBackend) Stop(busName string) error {
 func (m *MPRISBackend) Next(busName string) error {
 	player, found := m.GetPlayer(busName)
 	if !found {
-		return &CapabilityError{Required: "player not found"}
+		return &PlayerNotFoundError{BusName: busName}
 	}
 	if !player.CanGoNext() {
 		return &CapabilityError{Required: "CanGoNext"}
@@ -241,7 +241,7 @@ func (m *MPRISBackend) Next(busName string) error {
 func (m *MPRISBackend) Previous(busName string) error {
 	player, found := m.GetPlayer(busName)
 	if !found {
-		return &CapabilityError{Required: "player not found"}
+		return &PlayerNotFoundError{BusName: busName}
 	}
 	if !player.CanGoPrevious() {
 		return &CapabilityError{Required: "CanGoPrevious"}
@@ -256,7 +256,7 @@ func (m *MPRISBackend) Previous(busName string) error {
 func (m *MPRISBackend) Seek(busName string, offset int64) error {
 	player, found := m.GetPlayer(busName)
 	if !found {
-		return &CapabilityError{Required: "player not found"}
+		return &PlayerNotFoundError{BusName: busName}
 	}
 	if !player.CanSeek() {
 		return &CapabilityError{Required: "CanSeek"}
@@ -271,7 +271,7 @@ func (m *MPRISBackend) Seek(busName string, offset int64) error {
 func (m *MPRISBackend) SetPosition(busName, trackID string, position int64) error {
 	player, found := m.GetPlayer(busName)
 	if !found {
-		return &CapabilityError{Required: "player not found"}
+		return &PlayerNotFoundError{BusName: busName}
 	}
 	if !player.CanSeek() {
 		return &CapabilityError{Required: "CanSeek"}
@@ -286,7 +286,7 @@ func (m *MPRISBackend) SetPosition(busName, trackID string, position int64) erro
 func (m *MPRISBackend) SetVolume(busName string, volume float64) error {
 	player, found := m.GetPlayer(busName)
 	if !found {
-		return &CapabilityError{Required: "player not found"}
+		return &PlayerNotFoundError{BusName: busName}
 	}
 	if !player.CanControl() {
 		return &CapabilityError{Required: "CanControl"}
@@ -301,7 +301,7 @@ func (m *MPRISBackend) SetVolume(busName string, volume float64) error {
 func (m *MPRISBackend) SetLoopStatus(busName string, status LoopStatus) error {
 	player, found := m.GetPlayer(busName)
 	if !found {
-		return &CapabilityError{Required: "player not found"}
+		return &PlayerNotFoundError{BusName: busName}
 	}
 	if !player.CanControl() {
 		return &CapabilityError{Required: "CanControl"}
@@ -316,7 +316,7 @@ func (m *MPRISBackend) SetLoopStatus(busName string, status LoopStatus) error {
 func (m *MPRISBackend) SetShuffle(busName string, shuffle bool) error {
 	player, found := m.GetPlayer(busName)
 	if !found {
-		return &CapabilityError{Required: "player not found"}
+		return &PlayerNotFoundError{BusName: busName}
 	}
 	if !player.CanControl() {
 		return &CapabilityError{Required: "CanControl"}
