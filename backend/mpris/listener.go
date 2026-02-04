@@ -100,22 +100,6 @@ func (l *Listener) handlePropertiesChanged(sig *dbus.Signal) {
 		return
 	}
 
-	// Ignorer les changements qui ne contiennent QUE Position
-	// (Position change plusieurs fois par seconde pendant la lecture)
-	if len(changed) == 1 {
-		if _, hasPosition := changed["Position"]; hasPosition {
-			return
-		}
-	}
-
-	// Filtrer Position des changements (on ne veut pas la mettre à jour)
-	delete(changed, "Position")
-
-	// Si plus aucune propriété intéressante, ignorer
-	if len(changed) == 0 {
-		return
-	}
-
 	// Vérifier si PlaybackStatus a changé pour la déduplication
 	if statusVar, hasStatus := changed["PlaybackStatus"]; hasStatus {
 		if status, ok := statusVar.Value().(string); ok {
@@ -126,16 +110,13 @@ func (l *Listener) handlePropertiesChanged(sig *dbus.Signal) {
 			lastStatus := l.lastState[busName]
 			l.lastStateMu.RUnlock()
 
-			if lastStatus == newStatus && len(changed) == 1 {
-				// Si seul PlaybackStatus a changé et qu'il est identique, ignorer
-				return
+			if lastStatus != newStatus {
+				l.lastStateMu.Lock()
+				l.lastState[busName] = newStatus
+				l.lastStateMu.Unlock()
+
+				logger.Debug("[mpris] player %s changed status: %s -> %s", busName, lastStatus, newStatus)
 			}
-
-			l.lastStateMu.Lock()
-			l.lastState[busName] = newStatus
-			l.lastStateMu.Unlock()
-
-			logger.Debug("[mpris] player %s changed status: %s -> %s", busName, lastStatus, newStatus)
 		}
 	}
 

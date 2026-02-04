@@ -124,6 +124,9 @@ type MPRISBackend struct {
 
 	// listener pour les changements MPRIS
 	listener *Listener
+
+	// heartbeat pour mettre à jour Position des players en lecture
+	heartbeatDone chan struct{}
 }
 
 // Player représente un lecteur multimédia MPRIS
