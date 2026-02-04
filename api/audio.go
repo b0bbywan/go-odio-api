@@ -13,7 +13,7 @@ func MuteClientHandler(pa *pulseaudio.PulseAudioBackend) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		w.WriteHeader(http.StatusNoContent)
+		w.WriteHeader(http.StatusAccepted)
 	})
 }
 
@@ -23,7 +23,7 @@ func MuteMasterHandler(pa *pulseaudio.PulseAudioBackend) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		w.WriteHeader(http.StatusNoContent)
+		w.WriteHeader(http.StatusAccepted)
 	}
 }
 
@@ -34,7 +34,7 @@ func SetVolumeClientHandler(pa *pulseaudio.PulseAudioBackend) http.HandlerFunc {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
-			w.WriteHeader(http.StatusNoContent)
+			w.WriteHeader(http.StatusAccepted)
 		})(w, r)
 	})
 }
@@ -45,7 +45,7 @@ func SetVolumeMasterHandler(pa *pulseaudio.PulseAudioBackend) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		w.WriteHeader(http.StatusNoContent)
+		w.WriteHeader(http.StatusAccepted)
 	})
 }
 
@@ -56,7 +56,7 @@ func withSink(
 	return func(w http.ResponseWriter, r *http.Request) {
 		sink := r.PathValue("sink")
 		if sink == "" {
-			http.Error(w, "missing sink", http.StatusBadRequest)
+			http.Error(w, "missing sink", http.StatusNotFound)
 			return
 		}
 
