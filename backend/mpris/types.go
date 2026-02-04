@@ -91,6 +91,19 @@ func (e *InvalidBusNameError) Error() string {
 	return "invalid player name: " + e.Reason
 }
 
+// ValidationError indique qu'un paramètre est invalide
+type ValidationError struct {
+	Field   string
+	Message string
+}
+
+func (e *ValidationError) Error() string {
+	if e.Field != "" {
+		return e.Field + ": " + e.Message
+	}
+	return e.Message
+}
+
 // Listener écoute les changements MPRIS via signaux D-Bus
 type Listener struct {
 	backend *MPRISBackend

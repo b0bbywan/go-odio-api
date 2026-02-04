@@ -318,6 +318,10 @@ func (m *MPRISBackend) Seek(busName string, offset int64) error {
 
 // SetPosition définit la position de lecture
 func (m *MPRISBackend) SetPosition(busName, trackID string, position int64) error {
+	if trackID == "" {
+		return &ValidationError{Field: "track_id", Message: "cannot be empty"}
+	}
+
 	player, err := m.GetPlayer(busName)
 	if err != nil {
 		return err
@@ -333,6 +337,10 @@ func (m *MPRISBackend) SetPosition(busName, trackID string, position int64) erro
 
 // SetVolume définit le volume
 func (m *MPRISBackend) SetVolume(busName string, volume float64) error {
+	if volume < 0 || volume > 1 {
+		return &ValidationError{Field: "volume", Message: "must be between 0 and 1"}
+	}
+
 	player, err := m.GetPlayer(busName)
 	if err != nil {
 		return err
@@ -348,6 +356,13 @@ func (m *MPRISBackend) SetVolume(busName string, volume float64) error {
 
 // SetLoopStatus définit le statut de boucle
 func (m *MPRISBackend) SetLoopStatus(busName string, status LoopStatus) error {
+	switch status {
+	case LoopNone, LoopTrack, LoopPlaylist:
+		// Valid
+	default:
+		return &ValidationError{Field: "loop", Message: "must be None, Track, or Playlist"}
+	}
+
 	player, err := m.GetPlayer(busName)
 	if err != nil {
 		return err

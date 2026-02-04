@@ -64,6 +64,13 @@ func handleMPRISError(w http.ResponseWriter, err error) {
 		return
 	}
 
+	// Gérer les erreurs de validation
+	var validErr *mpris.ValidationError
+	if errors.As(err, &validErr) {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	// Gérer les erreurs de player not found
 	var notFoundErr *mpris.PlayerNotFoundError
 	if errors.As(err, &notFoundErr) {
@@ -129,51 +136,25 @@ func SeekHandler(m *mpris.MPRISBackend) http.HandlerFunc {
 
 func SetPositionHandler(m *mpris.MPRISBackend) http.HandlerFunc {
 	return withPlayer(func(w http.ResponseWriter, r *http.Request, busName string) {
-		withBody(
-			func(req *mpris.PositionRequest) error {
-				if req.TrackID == "" {
-					return &validationError{"missing track_id"}
-				}
-				return nil
-			},
-			func(w http.ResponseWriter, r *http.Request, req *mpris.PositionRequest) {
-				handleMPRISError(w, m.SetPosition(busName, req.TrackID, req.Position))
-			},
-		)(w, r)
+		withBody(nil, func(w http.ResponseWriter, r *http.Request, req *mpris.PositionRequest) {
+			handleMPRISError(w, m.SetPosition(busName, req.TrackID, req.Position))
+		})(w, r)
 	})
 }
 
 func SetVolumeHandler(m *mpris.MPRISBackend) http.HandlerFunc {
 	return withPlayer(func(w http.ResponseWriter, r *http.Request, busName string) {
-		withBody(
-			func(req *mpris.VolumeRequest) error {
-				if req.Volume < 0 || req.Volume > 1 {
-					return &validationError{"volume must be between 0 and 1"}
-				}
-				return nil
-			},
-			func(w http.ResponseWriter, r *http.Request, req *mpris.VolumeRequest) {
-				handleMPRISError(w, m.SetVolume(busName, req.Volume))
-			},
-		)(w, r)
+		withBody(nil, func(w http.ResponseWriter, r *http.Request, req *mpris.VolumeRequest) {
+			handleMPRISError(w, m.SetVolume(busName, req.Volume))
+		})(w, r)
 	})
 }
 
 func SetLoopHandler(m *mpris.MPRISBackend) http.HandlerFunc {
 	return withPlayer(func(w http.ResponseWriter, r *http.Request, busName string) {
-		withBody(
-			func(req *mpris.LoopRequest) error {
-				switch mpris.LoopStatus(req.Loop) {
-				case mpris.LoopNone, mpris.LoopTrack, mpris.LoopPlaylist:
-					return nil
-				default:
-					return &validationError{"loop must be None, Track, or Playlist"}
-				}
-			},
-			func(w http.ResponseWriter, r *http.Request, req *mpris.LoopRequest) {
-				handleMPRISError(w, m.SetLoopStatus(busName, mpris.LoopStatus(req.Loop)))
-			},
-		)(w, r)
+		withBody(nil, func(w http.ResponseWriter, r *http.Request, req *mpris.LoopRequest) {
+			handleMPRISError(w, m.SetLoopStatus(busName, mpris.LoopStatus(req.Loop)))
+		})(w, r)
 	})
 }
 
@@ -183,12 +164,4 @@ func SetShuffleHandler(m *mpris.MPRISBackend) http.HandlerFunc {
 			handleMPRISError(w, m.SetShuffle(busName, req.Shuffle))
 		})(w, r)
 	})
-}
-
-type validationError struct {
-	message string
-}
-
-func (e *validationError) Error() string {
-	return e.message
 }
