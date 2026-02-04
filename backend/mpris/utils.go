@@ -2,6 +2,7 @@ package mpris
 
 import (
 	"fmt"
+	"reflect"
 
 	"github.com/godbus/dbus/v5"
 )
@@ -79,4 +80,30 @@ func extractMetadata(raw interface{}) map[string]string {
 	}
 
 	return metadata
+}
+
+// loadCapabilities charge les capabilities depuis D-Bus en utilisant reflection et les tags `dbus`
+func loadCapabilities(conn *dbus.Conn, busName string) Capabilities {
+	var caps Capabilities
+
+	val := reflect.ValueOf(&caps).Elem()
+	typ := val.Type()
+
+	for i := 0; i < val.NumField(); i++ {
+		field := val.Field(i)
+		fieldType := typ.Field(i)
+
+		// Récupérer le tag dbus
+		dbusTag := fieldType.Tag.Get("dbus")
+		if dbusTag == "" {
+			continue
+		}
+
+		// Récupérer la propriété D-Bus
+		if propVal, ok := getBoolProperty(conn, busName, mprisPlayerIface, dbusTag); ok {
+			field.SetBool(propVal)
+		}
+	}
+
+	return caps
 }
