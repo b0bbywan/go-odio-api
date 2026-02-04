@@ -1,7 +1,6 @@
 package mpris
 
 import (
-	"encoding/json"
 	"fmt"
 	"reflect"
 
@@ -56,36 +55,36 @@ func (p *Player) getInt64Property(iface, prop string) (int64, bool) {
 	return val, ok
 }
 
-// Capability getter methods
+// Capability getter methods (raccourcis pour un accès plus court)
 
 // CanPlay retourne si le lecteur peut jouer
 func (p *Player) CanPlay() bool {
-	return p.capabilities.canPlay
+	return p.Capabilities.CanPlay
 }
 
 // CanPause retourne si le lecteur peut mettre en pause
 func (p *Player) CanPause() bool {
-	return p.capabilities.canPause
+	return p.Capabilities.CanPause
 }
 
 // CanGoNext retourne si le lecteur peut passer à la piste suivante
 func (p *Player) CanGoNext() bool {
-	return p.capabilities.canGoNext
+	return p.Capabilities.CanGoNext
 }
 
 // CanGoPrevious retourne si le lecteur peut revenir à la piste précédente
 func (p *Player) CanGoPrevious() bool {
-	return p.capabilities.canGoPrevious
+	return p.Capabilities.CanGoPrevious
 }
 
 // CanSeek retourne si le lecteur peut chercher dans la piste
 func (p *Player) CanSeek() bool {
-	return p.capabilities.canSeek
+	return p.Capabilities.CanSeek
 }
 
 // CanControl retourne si le lecteur peut être contrôlé
 func (p *Player) CanControl() bool {
-	return p.capabilities.canControl
+	return p.Capabilities.CanControl
 }
 
 // Load charge toutes les propriétés du player depuis D-Bus
@@ -139,32 +138,32 @@ func (p *Player) Load() error {
 	}
 
 	// Charger les capabilities
-	p.capabilities = p.loadCapabilities()
+	p.Capabilities = p.loadCapabilities()
 
 	return nil
 }
 
 // loadCapabilities charge les capabilities depuis D-Bus
-func (p *Player) loadCapabilities() capabilities {
-	var caps capabilities
+func (p *Player) loadCapabilities() Capabilities {
+	var caps Capabilities
 
 	if val, ok := p.getBoolProperty(mprisPlayerIface, "CanPlay"); ok {
-		caps.canPlay = val
+		caps.CanPlay = val
 	}
 	if val, ok := p.getBoolProperty(mprisPlayerIface, "CanPause"); ok {
-		caps.canPause = val
+		caps.CanPause = val
 	}
 	if val, ok := p.getBoolProperty(mprisPlayerIface, "CanGoNext"); ok {
-		caps.canGoNext = val
+		caps.CanGoNext = val
 	}
 	if val, ok := p.getBoolProperty(mprisPlayerIface, "CanGoPrevious"); ok {
-		caps.canGoPrevious = val
+		caps.CanGoPrevious = val
 	}
 	if val, ok := p.getBoolProperty(mprisPlayerIface, "CanSeek"); ok {
-		caps.canSeek = val
+		caps.CanSeek = val
 	}
 	if val, ok := p.getBoolProperty(mprisPlayerIface, "CanControl"); ok {
-		caps.canControl = val
+		caps.CanControl = val
 	}
 
 	return caps
@@ -198,37 +197,4 @@ func extractMetadata(raw interface{}) map[string]string {
 	}
 
 	return metadata
-}
-
-// MarshalJSON implémente json.Marshaler pour Player
-func (p *Player) MarshalJSON() ([]byte, error) {
-	type Alias Player
-	return json.Marshal(&struct {
-		*Alias
-		Capabilities struct {
-			CanPlay       bool `json:"can_play"`
-			CanPause      bool `json:"can_pause"`
-			CanGoNext     bool `json:"can_go_next"`
-			CanGoPrevious bool `json:"can_go_previous"`
-			CanSeek       bool `json:"can_seek"`
-			CanControl    bool `json:"can_control"`
-		} `json:"capabilities"`
-	}{
-		Alias: (*Alias)(p),
-		Capabilities: struct {
-			CanPlay       bool `json:"can_play"`
-			CanPause      bool `json:"can_pause"`
-			CanGoNext     bool `json:"can_go_next"`
-			CanGoPrevious bool `json:"can_go_previous"`
-			CanSeek       bool `json:"can_seek"`
-			CanControl    bool `json:"can_control"`
-		}{
-			CanPlay:       p.CanPlay(),
-			CanPause:      p.CanPause(),
-			CanGoNext:     p.CanGoNext(),
-			CanGoPrevious: p.CanGoPrevious(),
-			CanSeek:       p.CanSeek(),
-			CanControl:    p.CanControl(),
-		},
-	})
 }
