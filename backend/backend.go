@@ -30,7 +30,7 @@ func New(ctx context.Context, syscfg *config.SystemdConfig, pulscfg *config.Puls
 	backend.Systemd = s
 
 	if mpriscfg.Enabled {
-		m, err := mpris.New(ctx)
+		m, err := mpris.New(ctx, mpriscfg.Timeout)
 		if err != nil {
 			return nil, err
 		}

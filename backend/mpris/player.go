@@ -3,9 +3,26 @@ package mpris
 import (
 	"fmt"
 	"reflect"
+	"time"
 
 	"github.com/godbus/dbus/v5"
 )
+
+// callWithTimeout exécute un appel D-Bus avec timeout
+func (p *Player) callWithTimeout(call *dbus.Call) error {
+	done := make(chan error, 1)
+
+	go func() {
+		done <- call.Err
+	}()
+
+	select {
+	case err := <-done:
+		return err
+	case <-time.After(p.timeout):
+		return &dbusTimeoutError{}
+	}
+}
 
 // getProperty récupère une propriété D-Bus
 func (p *Player) getProperty(iface, prop string) (dbus.Variant, error) {
@@ -13,7 +30,7 @@ func (p *Player) getProperty(iface, prop string) (dbus.Variant, error) {
 	var v dbus.Variant
 
 	call := obj.Call(dbusPropGet, 0, iface, prop)
-	if err := callWithTimeout(call); err != nil {
+	if err := p.callWithTimeout(call); err != nil {
 		return dbus.Variant{}, err
 	}
 
@@ -234,9 +251,10 @@ func formatMetadataValue(value interface{}) string {
 }
 
 // newPlayer crée un nouveau Player avec connexion D-Bus
-func newPlayer(conn *dbus.Conn, busName string) *Player {
+func newPlayer(conn *dbus.Conn, busName string, timeout time.Duration) *Player {
 	return &Player{
 		conn:    conn,
+		timeout: timeout,
 		BusName: busName,
 	}
 }

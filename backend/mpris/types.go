@@ -30,9 +30,6 @@ const (
 	dbusPropSet           = dbusPropIface + ".Set"
 	dbusPropChangedSignal = dbusPropIface + ".PropertiesChanged"
 	dbusNameOwnerChanged  = dbusInterface + ".NameOwnerChanged"
-
-	// Timeout pour les appels D-Bus (5 secondes)
-	dbusCallTimeout = 5 * time.Second
 )
 
 // PlaybackStatus represents the current playback state
@@ -117,8 +114,9 @@ type Listener struct {
 
 // MPRISBackend gère les connexions aux lecteurs multimédias via MPRIS
 type MPRISBackend struct {
-	conn *dbus.Conn
-	ctx  context.Context
+	conn    *dbus.Conn
+	ctx     context.Context
+	timeout time.Duration
 
 	// cache permanent (pas d'expiration)
 	cache *cache.Cache[[]Player]
@@ -129,7 +127,8 @@ type MPRISBackend struct {
 
 // Player représente un lecteur multimédia MPRIS
 type Player struct {
-	conn *dbus.Conn // Connexion D-Bus (non exporté)
+	conn    *dbus.Conn    // Connexion D-Bus (non exporté)
+	timeout time.Duration // Timeout pour les appels D-Bus (non exporté)
 
 	BusName string `json:"bus_name"`
 

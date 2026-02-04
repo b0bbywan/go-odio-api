@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/spf13/viper"
 
@@ -36,6 +37,7 @@ type PulseAudioConfig struct {
 
 type MPRISConfig struct {
 	Enabled bool
+	Timeout time.Duration
 }
 
 // parseLogLevel converts a string to a logger.Level
@@ -60,6 +62,7 @@ func New() (*Config, error) {
 	viper.SetDefault("services.system", []string{})
 	viper.SetDefault("services.user", []string{})
 	viper.SetDefault("mpris.enabled", true)
+	viper.SetDefault("mpris.timeout", "5s")
 	viper.SetDefault("Port", 8080)
 	viper.SetDefault("LogLevel", "WARN")
 
@@ -105,8 +108,14 @@ func New() (*Config, error) {
 		XDGRuntimeDir: xdgRuntimeDir,
 	}
 
+	mprisTimeout := viper.GetDuration("mpris.timeout")
+	if mprisTimeout <= 0 {
+		mprisTimeout = 5 * time.Second
+	}
+
 	mpriscfg := MPRISConfig{
 		Enabled: viper.GetBool("mpris.enabled"),
+		Timeout: mprisTimeout,
 	}
 
 	cfg := Config{

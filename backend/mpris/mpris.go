@@ -27,7 +27,7 @@ func validateBusName(busName string) error {
 }
 
 // callWithTimeout exécute un appel D-Bus avec timeout
-func callWithTimeout(call *dbus.Call) error {
+func (m *MPRISBackend) callWithTimeout(call *dbus.Call) error {
 	done := make(chan error, 1)
 
 	go func() {
@@ -37,7 +37,7 @@ func callWithTimeout(call *dbus.Call) error {
 	select {
 	case err := <-done:
 		return err
-	case <-time.After(dbusCallTimeout):
+	case <-time.After(m.timeout):
 		return &dbusTimeoutError{}
 	}
 }
@@ -49,16 +49,17 @@ func (e *dbusTimeoutError) Error() string {
 }
 
 // New crée un nouveau backend MPRIS
-func New(ctx context.Context) (*MPRISBackend, error) {
+func New(ctx context.Context, timeout time.Duration) (*MPRISBackend, error) {
 	conn, err := dbus.ConnectSessionBus()
 	if err != nil {
 		return nil, err
 	}
 
 	return &MPRISBackend{
-		conn:  conn,
-		ctx:   ctx,
-		cache: cache.New[[]Player](0), // TTL=0 = pas d'expiration
+		conn:    conn,
+		ctx:     ctx,
+		timeout: timeout,
+		cache:   cache.New[[]Player](0), // TTL=0 = pas d'expiration
 	}, nil
 }
 
@@ -204,7 +205,7 @@ func (m *MPRISBackend) RemovePlayer(busName string) error {
 // getPlayerInfo récupère toutes les informations d'un lecteur MPRIS
 func (m *MPRISBackend) getPlayerInfo(busName string) (Player, error) {
 	// Créer un player et charger ses propriétés
-	player := newPlayer(m.conn, busName)
+	player := newPlayer(m.conn, busName, m.timeout)
 	if err := player.Load(); err != nil {
 		return Player{}, err
 	}
@@ -223,7 +224,7 @@ func (m *MPRISBackend) Play(busName string) error {
 
 	logger.Debug("[mpris] playing %s", busName)
 	obj := m.conn.Object(busName, mprisPath)
-	return callWithTimeout(obj.Call(mprisPlayerIface+".Play", 0))
+	return m.callWithTimeout(obj.Call(mprisPlayerIface+".Play", 0))
 }
 
 // Pause met en pause la lecture
@@ -238,7 +239,7 @@ func (m *MPRISBackend) Pause(busName string) error {
 
 	logger.Debug("[mpris] pausing %s", busName)
 	obj := m.conn.Object(busName, mprisPath)
-	return callWithTimeout(obj.Call(mprisPlayerIface+".Pause", 0))
+	return m.callWithTimeout(obj.Call(mprisPlayerIface+".Pause", 0))
 }
 
 // PlayPause bascule entre lecture et pause
@@ -253,7 +254,7 @@ func (m *MPRISBackend) PlayPause(busName string) error {
 
 	logger.Debug("[mpris] toggling play/pause for %s", busName)
 	obj := m.conn.Object(busName, mprisPath)
-	return callWithTimeout(obj.Call(mprisPlayerIface+".PlayPause", 0))
+	return m.callWithTimeout(obj.Call(mprisPlayerIface+".PlayPause", 0))
 }
 
 // Stop arrête la lecture
@@ -268,7 +269,7 @@ func (m *MPRISBackend) Stop(busName string) error {
 
 	logger.Debug("[mpris] stopping %s", busName)
 	obj := m.conn.Object(busName, mprisPath)
-	return callWithTimeout(obj.Call(mprisPlayerIface+".Stop", 0))
+	return m.callWithTimeout(obj.Call(mprisPlayerIface+".Stop", 0))
 }
 
 // Next passe à la piste suivante
@@ -283,7 +284,7 @@ func (m *MPRISBackend) Next(busName string) error {
 
 	logger.Debug("[mpris] next track for %s", busName)
 	obj := m.conn.Object(busName, mprisPath)
-	return callWithTimeout(obj.Call(mprisPlayerIface+".Next", 0))
+	return m.callWithTimeout(obj.Call(mprisPlayerIface+".Next", 0))
 }
 
 // Previous revient à la piste précédente
@@ -298,7 +299,7 @@ func (m *MPRISBackend) Previous(busName string) error {
 
 	logger.Debug("[mpris] previous track for %s", busName)
 	obj := m.conn.Object(busName, mprisPath)
-	return callWithTimeout(obj.Call(mprisPlayerIface+".Previous", 0))
+	return m.callWithTimeout(obj.Call(mprisPlayerIface+".Previous", 0))
 }
 
 // Seek déplace la position de lecture
@@ -313,7 +314,7 @@ func (m *MPRISBackend) Seek(busName string, offset int64) error {
 
 	logger.Debug("[mpris] seeking %d for %s", offset, busName)
 	obj := m.conn.Object(busName, mprisPath)
-	return callWithTimeout(obj.Call(mprisPlayerIface+".Seek", 0, offset))
+	return m.callWithTimeout(obj.Call(mprisPlayerIface+".Seek", 0, offset))
 }
 
 // SetPosition définit la position de lecture
@@ -332,7 +333,7 @@ func (m *MPRISBackend) SetPosition(busName, trackID string, position int64) erro
 
 	logger.Debug("[mpris] setting position to %d for %s", position, busName)
 	obj := m.conn.Object(busName, mprisPath)
-	return callWithTimeout(obj.Call(mprisPlayerIface+".SetPosition", 0, dbus.ObjectPath(trackID), position))
+	return m.callWithTimeout(obj.Call(mprisPlayerIface+".SetPosition", 0, dbus.ObjectPath(trackID), position))
 }
 
 // SetVolume définit le volume
@@ -351,7 +352,7 @@ func (m *MPRISBackend) SetVolume(busName string, volume float64) error {
 
 	logger.Debug("[mpris] setting volume to %.2f for %s", volume, busName)
 	obj := m.conn.Object(busName, mprisPath)
-	return callWithTimeout(obj.Call(dbusPropSet, 0, mprisPlayerIface, "Volume", dbus.MakeVariant(volume)))
+	return m.callWithTimeout(obj.Call(dbusPropSet, 0, mprisPlayerIface, "Volume", dbus.MakeVariant(volume)))
 }
 
 // SetLoopStatus définit le statut de boucle
@@ -373,7 +374,7 @@ func (m *MPRISBackend) SetLoopStatus(busName string, status LoopStatus) error {
 
 	logger.Debug("[mpris] setting loop status to %s for %s", status, busName)
 	obj := m.conn.Object(busName, mprisPath)
-	return callWithTimeout(obj.Call(dbusPropSet, 0, mprisPlayerIface, "LoopStatus", dbus.MakeVariant(string(status))))
+	return m.callWithTimeout(obj.Call(dbusPropSet, 0, mprisPlayerIface, "LoopStatus", dbus.MakeVariant(string(status))))
 }
 
 // SetShuffle active/désactive le mode aléatoire
@@ -388,7 +389,7 @@ func (m *MPRISBackend) SetShuffle(busName string, shuffle bool) error {
 
 	logger.Debug("[mpris] setting shuffle to %v for %s", shuffle, busName)
 	obj := m.conn.Object(busName, mprisPath)
-	return callWithTimeout(obj.Call(dbusPropSet, 0, mprisPlayerIface, "Shuffle", dbus.MakeVariant(shuffle)))
+	return m.callWithTimeout(obj.Call(dbusPropSet, 0, mprisPlayerIface, "Shuffle", dbus.MakeVariant(shuffle)))
 }
 
 // InvalidateCache invalide tout le cache
