@@ -154,9 +154,12 @@ func (m *MPRISBackend) RemovePlayer(busName string) error {
 
 // getPlayerInfo récupère toutes les informations d'un lecteur MPRIS
 func (m *MPRISBackend) getPlayerInfo(busName string) (Player, error) {
-	// Charger toutes les propriétés via reflection
-	player := loadPlayer(m.conn, busName)
-	return player, nil
+	// Créer un player et charger ses propriétés
+	player := newPlayer(m.conn, busName)
+	if err := player.Load(); err != nil {
+		return Player{}, err
+	}
+	return *player, nil
 }
 
 // Play démarre la lecture
@@ -165,7 +168,7 @@ func (m *MPRISBackend) Play(busName string) error {
 	if !found {
 		return &CapabilityError{Required: "player not found"}
 	}
-	if err := checkCapabilities(player, Caps.CanPlay); err != nil {
+	if err := player.checkCapabilities(Caps.CanPlay); err != nil {
 		return err
 	}
 
@@ -180,7 +183,7 @@ func (m *MPRISBackend) Pause(busName string) error {
 	if !found {
 		return &CapabilityError{Required: "player not found"}
 	}
-	if err := checkCapabilities(player, Caps.CanPause); err != nil {
+	if err := player.checkCapabilities(Caps.CanPause); err != nil {
 		return err
 	}
 
@@ -195,7 +198,7 @@ func (m *MPRISBackend) PlayPause(busName string) error {
 	if !found {
 		return &CapabilityError{Required: "player not found"}
 	}
-	if err := checkCapabilities(player, Caps.CanPlay, Caps.CanPause); err != nil {
+	if err := player.checkCapabilities(Caps.CanPlay, Caps.CanPause); err != nil {
 		return err
 	}
 
@@ -210,7 +213,7 @@ func (m *MPRISBackend) Stop(busName string) error {
 	if !found {
 		return &CapabilityError{Required: "player not found"}
 	}
-	if err := checkCapabilities(player, Caps.CanControl); err != nil {
+	if err := player.checkCapabilities(Caps.CanControl); err != nil {
 		return err
 	}
 
@@ -225,7 +228,7 @@ func (m *MPRISBackend) Next(busName string) error {
 	if !found {
 		return &CapabilityError{Required: "player not found"}
 	}
-	if err := checkCapabilities(player, Caps.CanGoNext); err != nil {
+	if err := player.checkCapabilities(Caps.CanGoNext); err != nil {
 		return err
 	}
 
@@ -240,7 +243,7 @@ func (m *MPRISBackend) Previous(busName string) error {
 	if !found {
 		return &CapabilityError{Required: "player not found"}
 	}
-	if err := checkCapabilities(player, Caps.CanGoPrevious); err != nil {
+	if err := player.checkCapabilities(Caps.CanGoPrevious); err != nil {
 		return err
 	}
 
@@ -255,7 +258,7 @@ func (m *MPRISBackend) Seek(busName string, offset int64) error {
 	if !found {
 		return &CapabilityError{Required: "player not found"}
 	}
-	if err := checkCapabilities(player, Caps.CanSeek); err != nil {
+	if err := player.checkCapabilities(Caps.CanSeek); err != nil {
 		return err
 	}
 
@@ -270,7 +273,7 @@ func (m *MPRISBackend) SetPosition(busName, trackID string, position int64) erro
 	if !found {
 		return &CapabilityError{Required: "player not found"}
 	}
-	if err := checkCapabilities(player, Caps.CanSeek); err != nil {
+	if err := player.checkCapabilities(Caps.CanSeek); err != nil {
 		return err
 	}
 
@@ -285,7 +288,7 @@ func (m *MPRISBackend) SetVolume(busName string, volume float64) error {
 	if !found {
 		return &CapabilityError{Required: "player not found"}
 	}
-	if err := checkCapabilities(player, Caps.CanControl); err != nil {
+	if err := player.checkCapabilities(Caps.CanControl); err != nil {
 		return err
 	}
 
@@ -300,7 +303,7 @@ func (m *MPRISBackend) SetLoopStatus(busName string, status LoopStatus) error {
 	if !found {
 		return &CapabilityError{Required: "player not found"}
 	}
-	if err := checkCapabilities(player, Caps.CanControl); err != nil {
+	if err := player.checkCapabilities(Caps.CanControl); err != nil {
 		return err
 	}
 
@@ -315,7 +318,7 @@ func (m *MPRISBackend) SetShuffle(busName string, shuffle bool) error {
 	if !found {
 		return &CapabilityError{Required: "player not found"}
 	}
-	if err := checkCapabilities(player, Caps.CanControl); err != nil {
+	if err := player.checkCapabilities(Caps.CanControl); err != nil {
 		return err
 	}
 

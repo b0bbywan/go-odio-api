@@ -110,7 +110,9 @@ type MPRISBackend struct {
 
 // Player représente un lecteur multimédia MPRIS
 type Player struct {
-	BusName        string            `json:"bus_name"`
+	conn    *dbus.Conn // Connexion D-Bus (non exporté)
+	BusName string     `json:"bus_name"`
+
 	Identity       string            `json:"identity" dbus:"Identity" iface:"org.mpris.MediaPlayer2"`
 	PlaybackStatus PlaybackStatus    `json:"playback_status" dbus:"PlaybackStatus" iface:"org.mpris.MediaPlayer2.Player"`
 	LoopStatus     LoopStatus        `json:"loop_status,omitempty" dbus:"LoopStatus" iface:"org.mpris.MediaPlayer2.Player"`
