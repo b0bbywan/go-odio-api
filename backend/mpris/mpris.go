@@ -50,7 +50,7 @@ func (m *MPRISBackend) ListPlayers() ([]Player, error) {
 
 	// Lister tous les bus names
 	var names []string
-	err := m.conn.BusObject().Call("org.freedesktop.DBus.ListNames", 0).Store(&names)
+	err := m.conn.BusObject().Call(dbusInterface+".ListNames", 0).Store(&names)
 	if err != nil {
 		return nil, err
 	}

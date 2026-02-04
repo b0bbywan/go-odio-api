@@ -9,10 +9,6 @@ import (
 	"github.com/b0bbywan/go-odio-api/logger"
 )
 
-const (
-	dbusInterface = "org.freedesktop.DBus"
-)
-
 // NewListener crée un nouveau listener MPRIS
 func NewListener(backend *MPRISBackend) *Listener {
 	ctx, cancel := context.WithCancel(backend.ctx)
@@ -31,14 +27,14 @@ func (l *Listener) Start() error {
 	conn := l.backend.conn
 
 	// S'abonner aux signaux PropertiesChanged pour tous les lecteurs MPRIS
-	matchRule := "type='signal',interface='org.freedesktop.DBus.Properties',member='PropertiesChanged',arg0namespace='org.mpris.MediaPlayer2'"
-	if err := conn.BusObject().Call("org.freedesktop.DBus.AddMatch", 0, matchRule).Err; err != nil {
+	matchRule := "type='signal',interface='" + dbusPropIface + "',member='PropertiesChanged',arg0namespace='" + mprisPrefix + "'"
+	if err := conn.BusObject().Call(dbusInterface+".AddMatch", 0, matchRule).Err; err != nil {
 		return err
 	}
 
 	// S'abonner aux signaux NameOwnerChanged pour détecter les nouveaux/anciens lecteurs
-	ownerMatchRule := "type='signal',interface='org.freedesktop.DBus',member='NameOwnerChanged',arg0namespace='org.mpris.MediaPlayer2'"
-	if err := conn.BusObject().Call("org.freedesktop.DBus.AddMatch", 0, ownerMatchRule).Err; err != nil {
+	ownerMatchRule := "type='signal',interface='" + dbusInterface + "',member='NameOwnerChanged',arg0namespace='" + mprisPrefix + "'"
+	if err := conn.BusObject().Call(dbusInterface+".AddMatch", 0, ownerMatchRule).Err; err != nil {
 		return err
 	}
 
@@ -69,9 +65,9 @@ func (l *Listener) listen(ch <-chan *dbus.Signal) {
 // handleSignal traite un signal D-Bus
 func (l *Listener) handleSignal(sig *dbus.Signal) {
 	switch sig.Name {
-	case "org.freedesktop.DBus.Properties.PropertiesChanged":
+	case dbusPropIface + ".PropertiesChanged":
 		l.handlePropertiesChanged(sig)
-	case "org.freedesktop.DBus.NameOwnerChanged":
+	case dbusInterface + ".NameOwnerChanged":
 		l.handleNameOwnerChanged(sig)
 	}
 }
