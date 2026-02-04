@@ -4,25 +4,9 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"strings"
 
 	"github.com/b0bbywan/go-odio-api/backend/mpris"
 )
-
-// validateBusName vérifie que le busName est valide pour MPRIS
-func validateBusName(busName string) error {
-	if busName == "" {
-		return errors.New("missing player name")
-	}
-	if !strings.HasPrefix(busName, "org.mpris.MediaPlayer2.") {
-		return errors.New("invalid player name: must start with org.mpris.MediaPlayer2.")
-	}
-	// Vérifier qu'il ne contient pas de caractères dangereux
-	if strings.ContainsAny(busName, "/../\x00") {
-		return errors.New("invalid player name: contains illegal characters")
-	}
-	return nil
-}
 
 // ListPlayersHandler retourne la liste de tous les lecteurs MPRIS
 func ListPlayersHandler(m *mpris.MPRISBackend) http.HandlerFunc {
@@ -37,12 +21,15 @@ func withPlayer(
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		busName := r.PathValue("player")
-		if err := validateBusName(busName); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
 
 		if err := fn(busName); err != nil {
+			// Gérer les erreurs de busName invalide
+			var invalidBusNameErr *mpris.InvalidBusNameError
+			if errors.As(err, &invalidBusNameErr) {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+
 			// Gérer les erreurs de player not found
 			var notFoundErr *mpris.PlayerNotFoundError
 			if errors.As(err, &notFoundErr) {
@@ -72,10 +59,6 @@ func withPlayerAndBody[T any](
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		busName := r.PathValue("player")
-		if err := validateBusName(busName); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
 
 		defer r.Body.Close()
 		var req T
@@ -92,6 +75,13 @@ func withPlayerAndBody[T any](
 		}
 
 		if err := action(busName, &req); err != nil {
+			// Gérer les erreurs de busName invalide
+			var invalidBusNameErr *mpris.InvalidBusNameError
+			if errors.As(err, &invalidBusNameErr) {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+
 			// Gérer les erreurs de player not found
 			var notFoundErr *mpris.PlayerNotFoundError
 			if errors.As(err, &notFoundErr) {

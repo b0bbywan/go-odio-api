@@ -11,6 +11,21 @@ import (
 	"github.com/b0bbywan/go-odio-api/logger"
 )
 
+// validateBusName valide qu'un busName est conforme à MPRIS
+func validateBusName(busName string) error {
+	if busName == "" {
+		return &InvalidBusNameError{BusName: busName, Reason: "empty bus name"}
+	}
+	if !strings.HasPrefix(busName, mprisPrefix+".") {
+		return &InvalidBusNameError{BusName: busName, Reason: "must start with org.mpris.MediaPlayer2."}
+	}
+	// Vérifier qu'il ne contient pas de caractères dangereux
+	if strings.Contains(busName, "..") || strings.Contains(busName, "/") || strings.ContainsAny(busName, "\x00\r\n") {
+		return &InvalidBusNameError{BusName: busName, Reason: "contains illegal characters"}
+	}
+	return nil
+}
+
 // callWithTimeout exécute un appel D-Bus avec timeout
 func callWithTimeout(call *dbus.Call) error {
 	done := make(chan error, 1)
@@ -100,18 +115,22 @@ func (m *MPRISBackend) ListPlayers() ([]Player, error) {
 }
 
 // GetPlayer récupère un lecteur spécifique du cache
-func (m *MPRISBackend) GetPlayer(busName string) (*Player, bool) {
+func (m *MPRISBackend) GetPlayer(busName string) (*Player, error) {
+	if err := validateBusName(busName); err != nil {
+		return nil, err
+	}
+
 	players, ok := m.cache.Get(cacheKey)
 	if !ok {
-		return nil, false
+		return nil, &PlayerNotFoundError{BusName: busName}
 	}
 
 	for _, player := range players {
 		if player.BusName == busName {
-			return &player, true
+			return &player, nil
 		}
 	}
-	return nil, false
+	return nil, &PlayerNotFoundError{BusName: busName}
 }
 
 // UpdatePlayer met à jour un lecteur spécifique dans le cache
@@ -143,6 +162,10 @@ func (m *MPRISBackend) UpdatePlayer(updated Player) error {
 
 // RefreshPlayer recharge un lecteur spécifique depuis D-Bus et met à jour le cache
 func (m *MPRISBackend) RefreshPlayer(busName string) (*Player, error) {
+	if err := validateBusName(busName); err != nil {
+		return nil, err
+	}
+
 	player, err := m.getPlayerInfo(busName)
 	if err != nil {
 		return nil, err
@@ -157,6 +180,10 @@ func (m *MPRISBackend) RefreshPlayer(busName string) (*Player, error) {
 
 // RemovePlayer supprime un lecteur du cache (quand il se ferme)
 func (m *MPRISBackend) RemovePlayer(busName string) error {
+	if err := validateBusName(busName); err != nil {
+		return err
+	}
+
 	players, ok := m.cache.Get(cacheKey)
 	if !ok {
 		return nil
@@ -186,9 +213,9 @@ func (m *MPRISBackend) getPlayerInfo(busName string) (Player, error) {
 
 // Play démarre la lecture
 func (m *MPRISBackend) Play(busName string) error {
-	player, found := m.GetPlayer(busName)
-	if !found {
-		return &PlayerNotFoundError{BusName: busName}
+	player, err := m.GetPlayer(busName)
+	if err != nil {
+		return err
 	}
 	if !player.CanPlay() {
 		return &CapabilityError{Required: "CanPlay"}
@@ -201,9 +228,9 @@ func (m *MPRISBackend) Play(busName string) error {
 
 // Pause met en pause la lecture
 func (m *MPRISBackend) Pause(busName string) error {
-	player, found := m.GetPlayer(busName)
-	if !found {
-		return &PlayerNotFoundError{BusName: busName}
+	player, err := m.GetPlayer(busName)
+	if err != nil {
+		return err
 	}
 	if !player.CanPause() {
 		return &CapabilityError{Required: "CanPause"}
@@ -216,9 +243,9 @@ func (m *MPRISBackend) Pause(busName string) error {
 
 // PlayPause bascule entre lecture et pause
 func (m *MPRISBackend) PlayPause(busName string) error {
-	player, found := m.GetPlayer(busName)
-	if !found {
-		return &PlayerNotFoundError{BusName: busName}
+	player, err := m.GetPlayer(busName)
+	if err != nil {
+		return err
 	}
 	if !player.CanPlay() && !player.CanPause() {
 		return &CapabilityError{Required: "CanPlay or CanPause"}
@@ -231,9 +258,9 @@ func (m *MPRISBackend) PlayPause(busName string) error {
 
 // Stop arrête la lecture
 func (m *MPRISBackend) Stop(busName string) error {
-	player, found := m.GetPlayer(busName)
-	if !found {
-		return &PlayerNotFoundError{BusName: busName}
+	player, err := m.GetPlayer(busName)
+	if err != nil {
+		return err
 	}
 	if !player.CanControl() {
 		return &CapabilityError{Required: "CanControl"}
@@ -246,9 +273,9 @@ func (m *MPRISBackend) Stop(busName string) error {
 
 // Next passe à la piste suivante
 func (m *MPRISBackend) Next(busName string) error {
-	player, found := m.GetPlayer(busName)
-	if !found {
-		return &PlayerNotFoundError{BusName: busName}
+	player, err := m.GetPlayer(busName)
+	if err != nil {
+		return err
 	}
 	if !player.CanGoNext() {
 		return &CapabilityError{Required: "CanGoNext"}
@@ -261,9 +288,9 @@ func (m *MPRISBackend) Next(busName string) error {
 
 // Previous revient à la piste précédente
 func (m *MPRISBackend) Previous(busName string) error {
-	player, found := m.GetPlayer(busName)
-	if !found {
-		return &PlayerNotFoundError{BusName: busName}
+	player, err := m.GetPlayer(busName)
+	if err != nil {
+		return err
 	}
 	if !player.CanGoPrevious() {
 		return &CapabilityError{Required: "CanGoPrevious"}
@@ -276,9 +303,9 @@ func (m *MPRISBackend) Previous(busName string) error {
 
 // Seek déplace la position de lecture
 func (m *MPRISBackend) Seek(busName string, offset int64) error {
-	player, found := m.GetPlayer(busName)
-	if !found {
-		return &PlayerNotFoundError{BusName: busName}
+	player, err := m.GetPlayer(busName)
+	if err != nil {
+		return err
 	}
 	if !player.CanSeek() {
 		return &CapabilityError{Required: "CanSeek"}
@@ -291,9 +318,9 @@ func (m *MPRISBackend) Seek(busName string, offset int64) error {
 
 // SetPosition définit la position de lecture
 func (m *MPRISBackend) SetPosition(busName, trackID string, position int64) error {
-	player, found := m.GetPlayer(busName)
-	if !found {
-		return &PlayerNotFoundError{BusName: busName}
+	player, err := m.GetPlayer(busName)
+	if err != nil {
+		return err
 	}
 	if !player.CanSeek() {
 		return &CapabilityError{Required: "CanSeek"}
@@ -306,9 +333,9 @@ func (m *MPRISBackend) SetPosition(busName, trackID string, position int64) erro
 
 // SetVolume définit le volume
 func (m *MPRISBackend) SetVolume(busName string, volume float64) error {
-	player, found := m.GetPlayer(busName)
-	if !found {
-		return &PlayerNotFoundError{BusName: busName}
+	player, err := m.GetPlayer(busName)
+	if err != nil {
+		return err
 	}
 	if !player.CanControl() {
 		return &CapabilityError{Required: "CanControl"}
@@ -321,9 +348,9 @@ func (m *MPRISBackend) SetVolume(busName string, volume float64) error {
 
 // SetLoopStatus définit le statut de boucle
 func (m *MPRISBackend) SetLoopStatus(busName string, status LoopStatus) error {
-	player, found := m.GetPlayer(busName)
-	if !found {
-		return &PlayerNotFoundError{BusName: busName}
+	player, err := m.GetPlayer(busName)
+	if err != nil {
+		return err
 	}
 	if !player.CanControl() {
 		return &CapabilityError{Required: "CanControl"}
@@ -336,9 +363,9 @@ func (m *MPRISBackend) SetLoopStatus(busName string, status LoopStatus) error {
 
 // SetShuffle active/désactive le mode aléatoire
 func (m *MPRISBackend) SetShuffle(busName string, shuffle bool) error {
-	player, found := m.GetPlayer(busName)
-	if !found {
-		return &PlayerNotFoundError{BusName: busName}
+	player, err := m.GetPlayer(busName)
+	if err != nil {
+		return err
 	}
 	if !player.CanControl() {
 		return &CapabilityError{Required: "CanControl"}

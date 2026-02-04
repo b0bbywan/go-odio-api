@@ -81,6 +81,16 @@ func (e *PlayerNotFoundError) Error() string {
 	return "player not found: " + e.BusName
 }
 
+// InvalidBusNameError indique qu'un busName est invalide
+type InvalidBusNameError struct {
+	BusName string
+	Reason  string
+}
+
+func (e *InvalidBusNameError) Error() string {
+	return "invalid player name: " + e.Reason
+}
+
 // Listener écoute les changements MPRIS via signaux D-Bus
 type Listener struct {
 	backend *MPRISBackend
