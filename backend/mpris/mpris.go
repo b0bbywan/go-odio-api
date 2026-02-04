@@ -83,6 +83,16 @@ func (m *MPRISBackend) Start() error {
 		return err
 	}
 
+	// Vérifier si des players sont déjà en Playing au démarrage
+	players, _ := m.cache.Get(cacheKey)
+	for _, player := range players {
+		if player.PlaybackStatus == StatusPlaying {
+			logger.Debug("[mpris] detected player %s already playing, starting heartbeat", player.BusName)
+			m.ensureHeartbeatRunning()
+			break
+		}
+	}
+
 	logger.Info("[mpris] backend started successfully")
 	return nil
 }
