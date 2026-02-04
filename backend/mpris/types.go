@@ -17,7 +17,10 @@ const (
 	mprisPath        = "/org/mpris/MediaPlayer2"
 	mprisInterface   = "org.mpris.MediaPlayer2"
 	mprisPlayerIface = "org.mpris.MediaPlayer2.Player"
-	dbusPropIface    = "org.freedesktop.DBus.Properties"
+
+	// D-Bus system constants
+	dbusInterface = "org.freedesktop.DBus"
+	dbusPropIface = "org.freedesktop.DBus.Properties"
 )
 
 // PlaybackStatus represents the current playback state
