@@ -23,12 +23,12 @@ const (
 	dbusPropIface = "org.freedesktop.DBus.Properties"
 
 	// D-Bus method names
-	dbusListNamesMethod    = "org.freedesktop.DBus.ListNames"
-	dbusAddMatchMethod     = "org.freedesktop.DBus.AddMatch"
-	dbusPropGet            = "org.freedesktop.DBus.Properties.Get"
-	dbusPropSet            = "org.freedesktop.DBus.Properties.Set"
-	dbusPropChangedSignal  = "org.freedesktop.DBus.Properties.PropertiesChanged"
-	dbusNameOwnerChanged   = "org.freedesktop.DBus.NameOwnerChanged"
+	dbusListNamesMethod   = dbusInterface + ".ListNames"
+	dbusAddMatchMethod    = dbusInterface + ".AddMatch"
+	dbusPropGet           = dbusPropIface + ".Get"
+	dbusPropSet           = dbusPropIface + ".Set"
+	dbusPropChangedSignal = dbusPropIface + ".PropertiesChanged"
+	dbusNameOwnerChanged  = dbusInterface + ".NameOwnerChanged"
 )
 
 // PlaybackStatus represents the current playback state
