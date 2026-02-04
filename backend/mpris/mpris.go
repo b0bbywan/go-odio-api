@@ -161,6 +161,14 @@ func (m *MPRISBackend) getPlayerInfo(busName string) (Player, error) {
 
 // Play démarre la lecture
 func (m *MPRISBackend) Play(busName string) error {
+	player, found := m.GetPlayer(busName)
+	if !found {
+		return &CapabilityError{Required: "player not found"}
+	}
+	if err := checkCapabilities(player, Caps.CanPlay); err != nil {
+		return err
+	}
+
 	logger.Debug("[mpris] playing %s", busName)
 	obj := m.conn.Object(busName, mprisPath)
 	return obj.Call(mprisPlayerIface+".Play", 0).Err
@@ -168,6 +176,14 @@ func (m *MPRISBackend) Play(busName string) error {
 
 // Pause met en pause la lecture
 func (m *MPRISBackend) Pause(busName string) error {
+	player, found := m.GetPlayer(busName)
+	if !found {
+		return &CapabilityError{Required: "player not found"}
+	}
+	if err := checkCapabilities(player, Caps.CanPause); err != nil {
+		return err
+	}
+
 	logger.Debug("[mpris] pausing %s", busName)
 	obj := m.conn.Object(busName, mprisPath)
 	return obj.Call(mprisPlayerIface+".Pause", 0).Err
@@ -175,6 +191,14 @@ func (m *MPRISBackend) Pause(busName string) error {
 
 // PlayPause bascule entre lecture et pause
 func (m *MPRISBackend) PlayPause(busName string) error {
+	player, found := m.GetPlayer(busName)
+	if !found {
+		return &CapabilityError{Required: "player not found"}
+	}
+	if err := checkCapabilities(player, Caps.CanPlay, Caps.CanPause); err != nil {
+		return err
+	}
+
 	logger.Debug("[mpris] toggling play/pause for %s", busName)
 	obj := m.conn.Object(busName, mprisPath)
 	return obj.Call(mprisPlayerIface+".PlayPause", 0).Err
@@ -182,6 +206,14 @@ func (m *MPRISBackend) PlayPause(busName string) error {
 
 // Stop arrête la lecture
 func (m *MPRISBackend) Stop(busName string) error {
+	player, found := m.GetPlayer(busName)
+	if !found {
+		return &CapabilityError{Required: "player not found"}
+	}
+	if err := checkCapabilities(player, Caps.CanControl); err != nil {
+		return err
+	}
+
 	logger.Debug("[mpris] stopping %s", busName)
 	obj := m.conn.Object(busName, mprisPath)
 	return obj.Call(mprisPlayerIface+".Stop", 0).Err
@@ -189,6 +221,14 @@ func (m *MPRISBackend) Stop(busName string) error {
 
 // Next passe à la piste suivante
 func (m *MPRISBackend) Next(busName string) error {
+	player, found := m.GetPlayer(busName)
+	if !found {
+		return &CapabilityError{Required: "player not found"}
+	}
+	if err := checkCapabilities(player, Caps.CanGoNext); err != nil {
+		return err
+	}
+
 	logger.Debug("[mpris] next track for %s", busName)
 	obj := m.conn.Object(busName, mprisPath)
 	return obj.Call(mprisPlayerIface+".Next", 0).Err
@@ -196,6 +236,14 @@ func (m *MPRISBackend) Next(busName string) error {
 
 // Previous revient à la piste précédente
 func (m *MPRISBackend) Previous(busName string) error {
+	player, found := m.GetPlayer(busName)
+	if !found {
+		return &CapabilityError{Required: "player not found"}
+	}
+	if err := checkCapabilities(player, Caps.CanGoPrevious); err != nil {
+		return err
+	}
+
 	logger.Debug("[mpris] previous track for %s", busName)
 	obj := m.conn.Object(busName, mprisPath)
 	return obj.Call(mprisPlayerIface+".Previous", 0).Err
@@ -203,6 +251,14 @@ func (m *MPRISBackend) Previous(busName string) error {
 
 // Seek déplace la position de lecture
 func (m *MPRISBackend) Seek(busName string, offset int64) error {
+	player, found := m.GetPlayer(busName)
+	if !found {
+		return &CapabilityError{Required: "player not found"}
+	}
+	if err := checkCapabilities(player, Caps.CanSeek); err != nil {
+		return err
+	}
+
 	logger.Debug("[mpris] seeking %d for %s", offset, busName)
 	obj := m.conn.Object(busName, mprisPath)
 	return obj.Call(mprisPlayerIface+".Seek", 0, offset).Err
@@ -210,6 +266,14 @@ func (m *MPRISBackend) Seek(busName string, offset int64) error {
 
 // SetPosition définit la position de lecture
 func (m *MPRISBackend) SetPosition(busName, trackID string, position int64) error {
+	player, found := m.GetPlayer(busName)
+	if !found {
+		return &CapabilityError{Required: "player not found"}
+	}
+	if err := checkCapabilities(player, Caps.CanSeek); err != nil {
+		return err
+	}
+
 	logger.Debug("[mpris] setting position to %d for %s", position, busName)
 	obj := m.conn.Object(busName, mprisPath)
 	return obj.Call(mprisPlayerIface+".SetPosition", 0, dbus.ObjectPath(trackID), position).Err
@@ -217,6 +281,14 @@ func (m *MPRISBackend) SetPosition(busName, trackID string, position int64) erro
 
 // SetVolume définit le volume
 func (m *MPRISBackend) SetVolume(busName string, volume float64) error {
+	player, found := m.GetPlayer(busName)
+	if !found {
+		return &CapabilityError{Required: "player not found"}
+	}
+	if err := checkCapabilities(player, Caps.CanControl); err != nil {
+		return err
+	}
+
 	logger.Debug("[mpris] setting volume to %.2f for %s", volume, busName)
 	obj := m.conn.Object(busName, mprisPath)
 	return obj.Call(dbusPropIface+".Set", 0, mprisPlayerIface, "Volume", dbus.MakeVariant(volume)).Err
@@ -224,6 +296,14 @@ func (m *MPRISBackend) SetVolume(busName string, volume float64) error {
 
 // SetLoopStatus définit le statut de boucle
 func (m *MPRISBackend) SetLoopStatus(busName string, status LoopStatus) error {
+	player, found := m.GetPlayer(busName)
+	if !found {
+		return &CapabilityError{Required: "player not found"}
+	}
+	if err := checkCapabilities(player, Caps.CanControl); err != nil {
+		return err
+	}
+
 	logger.Debug("[mpris] setting loop status to %s for %s", status, busName)
 	obj := m.conn.Object(busName, mprisPath)
 	return obj.Call(dbusPropIface+".Set", 0, mprisPlayerIface, "LoopStatus", dbus.MakeVariant(string(status))).Err
@@ -231,6 +311,14 @@ func (m *MPRISBackend) SetLoopStatus(busName string, status LoopStatus) error {
 
 // SetShuffle active/désactive le mode aléatoire
 func (m *MPRISBackend) SetShuffle(busName string, shuffle bool) error {
+	player, found := m.GetPlayer(busName)
+	if !found {
+		return &CapabilityError{Required: "player not found"}
+	}
+	if err := checkCapabilities(player, Caps.CanControl); err != nil {
+		return err
+	}
+
 	logger.Debug("[mpris] setting shuffle to %v for %s", shuffle, busName)
 	obj := m.conn.Object(busName, mprisPath)
 	return obj.Call(dbusPropIface+".Set", 0, mprisPlayerIface, "Shuffle", dbus.MakeVariant(shuffle)).Err

@@ -168,12 +168,12 @@ func loadPlayer(conn *dbus.Conn, busName string) Player {
 	return player
 }
 
-// CheckCapabilities vérifie si un player a les capabilities requises
+// checkCapabilities vérifie si un player a les capabilities requises
 // Supporte la logique OR : si plusieurs capabilities sont données, au moins une doit être true
-// Retourne (hasCapability, errorMessage)
-func CheckCapabilities(player *Player, caps ...CapabilityRef) (bool, string) {
+// Retourne nil si OK, sinon une CapabilityError
+func checkCapabilities(player *Player, caps ...CapabilityRef) error {
 	if len(caps) == 0 {
-		return true, ""
+		return nil
 	}
 
 	capsVal := reflect.ValueOf(player.Capabilities)
@@ -202,6 +202,10 @@ func CheckCapabilities(player *Player, caps ...CapabilityRef) (bool, string) {
 		}
 	}
 
+	if hasAny {
+		return nil
+	}
+
 	// Construire le message d'erreur
 	var errorMsg string
 	if len(dbusNames) == 1 {
@@ -213,5 +217,5 @@ func CheckCapabilities(player *Player, caps ...CapabilityRef) (bool, string) {
 		}
 	}
 
-	return hasAny, errorMsg
+	return &CapabilityError{Required: errorMsg}
 }
