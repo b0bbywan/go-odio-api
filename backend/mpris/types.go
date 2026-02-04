@@ -3,6 +3,7 @@ package mpris
 import (
 	"context"
 	"sync"
+	"time"
 
 	"github.com/godbus/dbus/v5"
 
@@ -29,6 +30,9 @@ const (
 	dbusPropSet           = dbusPropIface + ".Set"
 	dbusPropChangedSignal = dbusPropIface + ".PropertiesChanged"
 	dbusNameOwnerChanged  = dbusInterface + ".NameOwnerChanged"
+
+	// Timeout pour les appels D-Bus (5 secondes)
+	dbusCallTimeout = 5 * time.Second
 )
 
 // PlaybackStatus represents the current playback state
@@ -75,6 +79,16 @@ type PlayerNotFoundError struct {
 
 func (e *PlayerNotFoundError) Error() string {
 	return "player not found: " + e.BusName
+}
+
+// InvalidBusNameError indique qu'un busName est invalide
+type InvalidBusNameError struct {
+	BusName string
+	Reason  string
+}
+
+func (e *InvalidBusNameError) Error() string {
+	return "invalid player name: " + e.Reason
 }
 
 // Listener écoute les changements MPRIS via signaux D-Bus

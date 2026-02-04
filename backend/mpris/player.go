@@ -11,7 +11,13 @@ import (
 func (p *Player) getProperty(iface, prop string) (dbus.Variant, error) {
 	obj := p.conn.Object(p.BusName, mprisPath)
 	var v dbus.Variant
-	err := obj.Call(dbusPropGet, 0, iface, prop).Store(&v)
+
+	call := obj.Call(dbusPropGet, 0, iface, prop)
+	if err := callWithTimeout(call); err != nil {
+		return dbus.Variant{}, err
+	}
+
+	err := call.Store(&v)
 	return v, err
 }
 
@@ -192,11 +198,39 @@ func extractMetadata(raw interface{}) map[string]string {
 
 	for _, key := range metadataKeys {
 		if v, ok := m[key]; ok {
-			metadata[key] = fmt.Sprintf("%v", v.Value())
+			metadata[key] = formatMetadataValue(v.Value())
 		}
 	}
 
 	return metadata
+}
+
+// formatMetadataValue formate une valeur de métadonnée en string
+func formatMetadataValue(value interface{}) string {
+	switch v := value.(type) {
+	case []string:
+		// Joindre les tableaux de strings avec des virgules
+		result := ""
+		for i, s := range v {
+			if i > 0 {
+				result += ", "
+			}
+			result += s
+		}
+		return result
+	case []interface{}:
+		// Gérer les slices génériques
+		result := ""
+		for i, item := range v {
+			if i > 0 {
+				result += ", "
+			}
+			result += fmt.Sprintf("%v", item)
+		}
+		return result
+	default:
+		return fmt.Sprintf("%v", v)
+	}
 }
 
 // newPlayer crée un nouveau Player avec connexion D-Bus

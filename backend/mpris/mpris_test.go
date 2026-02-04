@@ -41,13 +41,13 @@ func TestGetPlayer(t *testing.T) {
 	tests := []struct {
 		name       string
 		busName    string
-		wantFound  bool
+		wantErr    bool
 		wantPlayer *Player
 	}{
 		{
-			name:      "find spotify player",
-			busName:   "org.mpris.MediaPlayer2.spotify",
-			wantFound: true,
+			name:    "find spotify player",
+			busName: "org.mpris.MediaPlayer2.spotify",
+			wantErr: false,
 			wantPlayer: &Player{
 				BusName:        "org.mpris.MediaPlayer2.spotify",
 				Identity:       "Spotify",
@@ -61,9 +61,9 @@ func TestGetPlayer(t *testing.T) {
 			},
 		},
 		{
-			name:      "find vlc player",
-			busName:   "org.mpris.MediaPlayer2.vlc",
-			wantFound: true,
+			name:    "find vlc player",
+			busName: "org.mpris.MediaPlayer2.vlc",
+			wantErr: false,
 			wantPlayer: &Player{
 				BusName:        "org.mpris.MediaPlayer2.vlc",
 				Identity:       "VLC",
@@ -79,16 +79,16 @@ func TestGetPlayer(t *testing.T) {
 		{
 			name:       "player not found",
 			busName:    "org.mpris.MediaPlayer2.nonexistent",
-			wantFound:  false,
+			wantErr:    true,
 			wantPlayer: nil,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			player, found := backend.GetPlayer(tt.busName)
-			if found != tt.wantFound {
-				t.Errorf("GetPlayer(%q) found = %v, want %v", tt.busName, found, tt.wantFound)
+			player, err := backend.GetPlayer(tt.busName)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetPlayer(%q) error = %v, wantErr %v", tt.busName, err, tt.wantErr)
 			}
 			if tt.wantPlayer != nil && player != nil {
 				if player.BusName != tt.wantPlayer.BusName {
@@ -116,9 +116,9 @@ func TestGetPlayerEmptyCache(t *testing.T) {
 		cache: cache.New[[]Player](0),
 	}
 
-	player, found := backend.GetPlayer("org.mpris.MediaPlayer2.test")
-	if found {
-		t.Error("GetPlayer should return false when cache is empty")
+	player, err := backend.GetPlayer("org.mpris.MediaPlayer2.test")
+	if err == nil {
+		t.Error("GetPlayer should return error when cache is empty")
 	}
 	if player != nil {
 		t.Error("GetPlayer should return nil when cache is empty")
@@ -165,9 +165,9 @@ func TestUpdatePlayer(t *testing.T) {
 	}
 
 	// Verify the player was updated
-	player, found := backend.GetPlayer("org.mpris.MediaPlayer2.spotify")
-	if !found {
-		t.Fatal("Updated player should be found in cache")
+	player, err := backend.GetPlayer("org.mpris.MediaPlayer2.spotify")
+	if err != nil {
+		t.Fatalf("Updated player should be found in cache: %v", err)
 	}
 	if player.PlaybackStatus != StatusPlaying {
 		t.Errorf("PlaybackStatus = %q, want %q", player.PlaybackStatus, StatusPlaying)
@@ -177,9 +177,9 @@ func TestUpdatePlayer(t *testing.T) {
 	}
 
 	// Verify other player wasn't affected
-	player2, found := backend.GetPlayer("org.mpris.MediaPlayer2.vlc")
-	if !found {
-		t.Fatal("Other player should still be in cache")
+	player2, err := backend.GetPlayer("org.mpris.MediaPlayer2.vlc")
+	if err != nil {
+		t.Fatalf("Other player should still be in cache: %v", err)
 	}
 	if player2.PlaybackStatus != StatusStopped {
 		t.Error("Other player should not be affected by update")
@@ -216,9 +216,9 @@ func TestUpdatePlayerAddNew(t *testing.T) {
 	}
 
 	// Verify the new player was added
-	player, found := backend.GetPlayer("org.mpris.MediaPlayer2.vlc")
-	if !found {
-		t.Fatal("New player should be found in cache")
+	player, err := backend.GetPlayer("org.mpris.MediaPlayer2.vlc")
+	if err != nil {
+		t.Fatalf("New player should be found in cache: %v", err)
 	}
 	if player.PlaybackStatus != StatusPlaying {
 		t.Error("New player should be playing")
@@ -256,15 +256,15 @@ func TestRemovePlayer(t *testing.T) {
 	}
 
 	// Verify player was removed
-	_, found := backend.GetPlayer("org.mpris.MediaPlayer2.spotify")
-	if found {
+	_, err = backend.GetPlayer("org.mpris.MediaPlayer2.spotify")
+	if err == nil {
 		t.Error("Removed player should not be found in cache")
 	}
 
 	// Verify other player is still there
-	player, found := backend.GetPlayer("org.mpris.MediaPlayer2.vlc")
-	if !found {
-		t.Error("Other player should still be in cache")
+	player, err := backend.GetPlayer("org.mpris.MediaPlayer2.vlc")
+	if err != nil {
+		t.Errorf("Other player should still be in cache: %v", err)
 	}
 	if player.Identity != "VLC" {
 		t.Errorf("Identity = %q, want %q", player.Identity, "VLC")
@@ -289,17 +289,17 @@ func TestInvalidateCache(t *testing.T) {
 	backend.cache.Set(cacheKey, players)
 
 	// Verify cache is populated
-	_, found := backend.GetPlayer("org.mpris.MediaPlayer2.test")
-	if !found {
-		t.Fatal("Cache should be populated")
+	_, err := backend.GetPlayer("org.mpris.MediaPlayer2.test")
+	if err != nil {
+		t.Fatalf("Cache should be populated: %v", err)
 	}
 
 	// Invalidate cache
 	backend.InvalidateCache()
 
 	// Verify cache is empty
-	_, found = backend.GetPlayer("org.mpris.MediaPlayer2.test")
-	if found {
+	_, err = backend.GetPlayer("org.mpris.MediaPlayer2.test")
+	if err == nil {
 		t.Error("Cache should be empty after invalidation")
 	}
 }
