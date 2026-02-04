@@ -1,6 +1,7 @@
 package mpris
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 
@@ -55,6 +56,38 @@ func (p *Player) getInt64Property(iface, prop string) (int64, bool) {
 	return val, ok
 }
 
+// Capability getter methods
+
+// CanPlay retourne si le lecteur peut jouer
+func (p *Player) CanPlay() bool {
+	return p.capabilities.canPlay
+}
+
+// CanPause retourne si le lecteur peut mettre en pause
+func (p *Player) CanPause() bool {
+	return p.capabilities.canPause
+}
+
+// CanGoNext retourne si le lecteur peut passer à la piste suivante
+func (p *Player) CanGoNext() bool {
+	return p.capabilities.canGoNext
+}
+
+// CanGoPrevious retourne si le lecteur peut revenir à la piste précédente
+func (p *Player) CanGoPrevious() bool {
+	return p.capabilities.canGoPrevious
+}
+
+// CanSeek retourne si le lecteur peut chercher dans la piste
+func (p *Player) CanSeek() bool {
+	return p.capabilities.canSeek
+}
+
+// CanControl retourne si le lecteur peut être contrôlé
+func (p *Player) CanControl() bool {
+	return p.capabilities.canControl
+}
+
 // Load charge toutes les propriétés du player depuis D-Bus
 func (p *Player) Load() error {
 	val := reflect.ValueOf(p).Elem()
@@ -106,14 +139,14 @@ func (p *Player) Load() error {
 	}
 
 	// Charger les capabilities
-	p.Capabilities = p.loadCapabilities()
+	p.capabilities = p.loadCapabilities()
 
 	return nil
 }
 
 // loadCapabilities charge les capabilities depuis D-Bus
-func (p *Player) loadCapabilities() Capabilities {
-	var caps Capabilities
+func (p *Player) loadCapabilities() capabilities {
+	var caps capabilities
 
 	val := reflect.ValueOf(&caps).Elem()
 	typ := val.Type()
@@ -137,34 +170,18 @@ func (p *Player) loadCapabilities() Capabilities {
 	return caps
 }
 
-// checkCapabilities vérifie si le player a les capabilities requises
-func (p *Player) checkCapabilities(caps ...CapabilityRef) error {
-	if len(caps) == 0 {
+// checkCapabilities vérifie si le player a au moins une des capabilities requises
+func (p *Player) checkCapabilities(checkers ...CapabilityChecker) error {
+	if len(checkers) == 0 {
 		return nil
 	}
-
-	capsVal := reflect.ValueOf(p.Capabilities)
-	capsType := capsVal.Type()
 
 	var dbusNames []string
 	hasAny := false
 
-	for _, cap := range caps {
-		field := capsVal.FieldByName(cap.FieldName)
-		if !field.IsValid() {
-			continue
-		}
-
-		// Récupérer le tag dbus pour le message d'erreur
-		if structField, ok := capsType.FieldByName(cap.FieldName); ok {
-			dbusTag := structField.Tag.Get("dbus")
-			if dbusTag != "" {
-				dbusNames = append(dbusNames, dbusTag)
-			}
-		}
-
-		// Vérifier si la capability est true
-		if field.Kind() == reflect.Bool && field.Bool() {
+	for _, checker := range checkers {
+		dbusNames = append(dbusNames, checker.DbusName)
+		if checker.Check(p) {
 			hasAny = true
 		}
 	}
@@ -215,4 +232,37 @@ func extractMetadata(raw interface{}) map[string]string {
 	}
 
 	return metadata
+}
+
+// MarshalJSON implémente json.Marshaler pour Player
+func (p *Player) MarshalJSON() ([]byte, error) {
+	type Alias Player
+	return json.Marshal(&struct {
+		*Alias
+		Capabilities struct {
+			CanPlay       bool `json:"can_play"`
+			CanPause      bool `json:"can_pause"`
+			CanGoNext     bool `json:"can_go_next"`
+			CanGoPrevious bool `json:"can_go_previous"`
+			CanSeek       bool `json:"can_seek"`
+			CanControl    bool `json:"can_control"`
+		} `json:"capabilities"`
+	}{
+		Alias: (*Alias)(p),
+		Capabilities: struct {
+			CanPlay       bool `json:"can_play"`
+			CanPause      bool `json:"can_pause"`
+			CanGoNext     bool `json:"can_go_next"`
+			CanGoPrevious bool `json:"can_go_previous"`
+			CanSeek       bool `json:"can_seek"`
+			CanControl    bool `json:"can_control"`
+		}{
+			CanPlay:       p.CanPlay(),
+			CanPause:      p.CanPause(),
+			CanGoNext:     p.CanGoNext(),
+			CanGoPrevious: p.CanGoPrevious(),
+			CanSeek:       p.CanSeek(),
+			CanControl:    p.CanControl(),
+		},
+	})
 }
