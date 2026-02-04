@@ -198,27 +198,8 @@ func (m *MPRISBackend) getPlayerInfo(busName string) (Player, error) {
 		player.Metadata = extractMetadata(metadata.Value())
 	}
 
-	// Récupérer les capabilities
-	var caps Capabilities
-	if val, ok := getBoolProperty(m.conn, busName, mprisPlayerIface, "CanPlay"); ok {
-		caps.CanPlay = val
-	}
-	if val, ok := getBoolProperty(m.conn, busName, mprisPlayerIface, "CanPause"); ok {
-		caps.CanPause = val
-	}
-	if val, ok := getBoolProperty(m.conn, busName, mprisPlayerIface, "CanGoNext"); ok {
-		caps.CanGoNext = val
-	}
-	if val, ok := getBoolProperty(m.conn, busName, mprisPlayerIface, "CanGoPrevious"); ok {
-		caps.CanGoPrevious = val
-	}
-	if val, ok := getBoolProperty(m.conn, busName, mprisPlayerIface, "CanSeek"); ok {
-		caps.CanSeek = val
-	}
-	if val, ok := getBoolProperty(m.conn, busName, mprisPlayerIface, "CanControl"); ok {
-		caps.CanControl = val
-	}
-	player.Capabilities = caps
+	// Récupérer les capabilities via reflection
+	player.Capabilities = loadCapabilities(m.conn, busName)
 
 	return player, nil
 }

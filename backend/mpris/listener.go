@@ -27,23 +27,18 @@ func NewListener(backend *MPRISBackend) *Listener {
 
 // Start démarre l'écoute des signaux D-Bus MPRIS
 func (l *Listener) Start() error {
-	conn, err := dbus.ConnectSessionBus()
-	if err != nil {
-		return err
-	}
-	l.conn = conn
+	// Utiliser la connexion du backend
+	conn := l.backend.conn
 
 	// S'abonner aux signaux PropertiesChanged pour tous les lecteurs MPRIS
 	matchRule := "type='signal',interface='org.freedesktop.DBus.Properties',member='PropertiesChanged',arg0namespace='org.mpris.MediaPlayer2'"
 	if err := conn.BusObject().Call("org.freedesktop.DBus.AddMatch", 0, matchRule).Err; err != nil {
-		conn.Close()
 		return err
 	}
 
 	// S'abonner aux signaux NameOwnerChanged pour détecter les nouveaux/anciens lecteurs
 	ownerMatchRule := "type='signal',interface='org.freedesktop.DBus',member='NameOwnerChanged',arg0namespace='org.mpris.MediaPlayer2'"
 	if err := conn.BusObject().Call("org.freedesktop.DBus.AddMatch", 0, ownerMatchRule).Err; err != nil {
-		conn.Close()
 		return err
 	}
 
@@ -174,9 +169,5 @@ func (l *Listener) handleNameOwnerChanged(sig *dbus.Signal) {
 func (l *Listener) Stop() {
 	logger.Info("[mpris] stopping listener")
 	l.cancel()
-	if l.conn != nil {
-		l.conn.Close()
-		l.conn = nil
-	}
 	logger.Debug("[mpris] listener stopped")
 }

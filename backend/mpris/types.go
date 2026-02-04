@@ -40,12 +40,12 @@ const (
 
 // Capabilities représente les actions supportées par un lecteur
 type Capabilities struct {
-	CanPlay       bool `json:"can_play"`
-	CanPause      bool `json:"can_pause"`
-	CanGoNext     bool `json:"can_go_next"`
-	CanGoPrevious bool `json:"can_go_previous"`
-	CanSeek       bool `json:"can_seek"`
-	CanControl    bool `json:"can_control"`
+	CanPlay       bool `json:"can_play" dbus:"CanPlay"`
+	CanPause      bool `json:"can_pause" dbus:"CanPause"`
+	CanGoNext     bool `json:"can_go_next" dbus:"CanGoNext"`
+	CanGoPrevious bool `json:"can_go_previous" dbus:"CanGoPrevious"`
+	CanSeek       bool `json:"can_seek" dbus:"CanSeek"`
+	CanControl    bool `json:"can_control" dbus:"CanControl"`
 }
 
 // Listener écoute les changements MPRIS via signaux D-Bus
@@ -53,7 +53,6 @@ type Listener struct {
 	backend *MPRISBackend
 	ctx     context.Context
 	cancel  context.CancelFunc
-	conn    *dbus.Conn
 
 	// Déduplication : dernier état connu par player
 	lastState   map[string]PlaybackStatus
