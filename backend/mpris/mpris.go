@@ -168,8 +168,8 @@ func (m *MPRISBackend) Play(busName string) error {
 	if !found {
 		return &CapabilityError{Required: "player not found"}
 	}
-	if err := player.checkCapabilities(CheckCanPlay); err != nil {
-		return err
+	if !player.CanPlay() {
+		return &CapabilityError{Required: "CanPlay"}
 	}
 
 	logger.Debug("[mpris] playing %s", busName)
@@ -183,8 +183,8 @@ func (m *MPRISBackend) Pause(busName string) error {
 	if !found {
 		return &CapabilityError{Required: "player not found"}
 	}
-	if err := player.checkCapabilities(CheckCanPause); err != nil {
-		return err
+	if !player.CanPause() {
+		return &CapabilityError{Required: "CanPause"}
 	}
 
 	logger.Debug("[mpris] pausing %s", busName)
@@ -198,8 +198,8 @@ func (m *MPRISBackend) PlayPause(busName string) error {
 	if !found {
 		return &CapabilityError{Required: "player not found"}
 	}
-	if err := player.checkCapabilities(CheckCanPlay, CheckCanPause); err != nil {
-		return err
+	if !player.CanPlay() && !player.CanPause() {
+		return &CapabilityError{Required: "CanPlay or CanPause"}
 	}
 
 	logger.Debug("[mpris] toggling play/pause for %s", busName)
@@ -213,8 +213,8 @@ func (m *MPRISBackend) Stop(busName string) error {
 	if !found {
 		return &CapabilityError{Required: "player not found"}
 	}
-	if err := player.checkCapabilities(CheckCanControl); err != nil {
-		return err
+	if !player.CanControl() {
+		return &CapabilityError{Required: "CanControl"}
 	}
 
 	logger.Debug("[mpris] stopping %s", busName)
@@ -228,8 +228,8 @@ func (m *MPRISBackend) Next(busName string) error {
 	if !found {
 		return &CapabilityError{Required: "player not found"}
 	}
-	if err := player.checkCapabilities(CheckCanGoNext); err != nil {
-		return err
+	if !player.CanGoNext() {
+		return &CapabilityError{Required: "CanGoNext"}
 	}
 
 	logger.Debug("[mpris] next track for %s", busName)
@@ -243,8 +243,8 @@ func (m *MPRISBackend) Previous(busName string) error {
 	if !found {
 		return &CapabilityError{Required: "player not found"}
 	}
-	if err := player.checkCapabilities(CheckCanGoPrevious); err != nil {
-		return err
+	if !player.CanGoPrevious() {
+		return &CapabilityError{Required: "CanGoPrevious"}
 	}
 
 	logger.Debug("[mpris] previous track for %s", busName)
@@ -258,8 +258,8 @@ func (m *MPRISBackend) Seek(busName string, offset int64) error {
 	if !found {
 		return &CapabilityError{Required: "player not found"}
 	}
-	if err := player.checkCapabilities(CheckCanSeek); err != nil {
-		return err
+	if !player.CanSeek() {
+		return &CapabilityError{Required: "CanSeek"}
 	}
 
 	logger.Debug("[mpris] seeking %d for %s", offset, busName)
@@ -273,8 +273,8 @@ func (m *MPRISBackend) SetPosition(busName, trackID string, position int64) erro
 	if !found {
 		return &CapabilityError{Required: "player not found"}
 	}
-	if err := player.checkCapabilities(CheckCanSeek); err != nil {
-		return err
+	if !player.CanSeek() {
+		return &CapabilityError{Required: "CanSeek"}
 	}
 
 	logger.Debug("[mpris] setting position to %d for %s", position, busName)
@@ -288,8 +288,8 @@ func (m *MPRISBackend) SetVolume(busName string, volume float64) error {
 	if !found {
 		return &CapabilityError{Required: "player not found"}
 	}
-	if err := player.checkCapabilities(CheckCanControl); err != nil {
-		return err
+	if !player.CanControl() {
+		return &CapabilityError{Required: "CanControl"}
 	}
 
 	logger.Debug("[mpris] setting volume to %.2f for %s", volume, busName)
@@ -303,8 +303,8 @@ func (m *MPRISBackend) SetLoopStatus(busName string, status LoopStatus) error {
 	if !found {
 		return &CapabilityError{Required: "player not found"}
 	}
-	if err := player.checkCapabilities(CheckCanControl); err != nil {
-		return err
+	if !player.CanControl() {
+		return &CapabilityError{Required: "CanControl"}
 	}
 
 	logger.Debug("[mpris] setting loop status to %s for %s", status, busName)
@@ -318,8 +318,8 @@ func (m *MPRISBackend) SetShuffle(busName string, shuffle bool) error {
 	if !found {
 		return &CapabilityError{Required: "player not found"}
 	}
-	if err := player.checkCapabilities(CheckCanControl); err != nil {
-		return err
+	if !player.CanControl() {
+		return &CapabilityError{Required: "CanControl"}
 	}
 
 	logger.Debug("[mpris] setting shuffle to %v for %s", shuffle, busName)

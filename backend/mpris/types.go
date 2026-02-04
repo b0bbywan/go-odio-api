@@ -57,40 +57,6 @@ func (e *CapabilityError) Error() string {
 	return "action not allowed (requires " + e.Required + ")"
 }
 
-// CapabilityChecker est une fonction qui vérifie une capability et retourne le nom D-Bus associé
-type CapabilityChecker struct {
-	Check    func(*Player) bool
-	DbusName string
-}
-
-// Capability checkers pré-définis
-var (
-	CheckCanPlay = CapabilityChecker{
-		Check:    func(p *Player) bool { return p.CanPlay() },
-		DbusName: "CanPlay",
-	}
-	CheckCanPause = CapabilityChecker{
-		Check:    func(p *Player) bool { return p.CanPause() },
-		DbusName: "CanPause",
-	}
-	CheckCanGoNext = CapabilityChecker{
-		Check:    func(p *Player) bool { return p.CanGoNext() },
-		DbusName: "CanGoNext",
-	}
-	CheckCanGoPrevious = CapabilityChecker{
-		Check:    func(p *Player) bool { return p.CanGoPrevious() },
-		DbusName: "CanGoPrevious",
-	}
-	CheckCanSeek = CapabilityChecker{
-		Check:    func(p *Player) bool { return p.CanSeek() },
-		DbusName: "CanSeek",
-	}
-	CheckCanControl = CapabilityChecker{
-		Check:    func(p *Player) bool { return p.CanControl() },
-		DbusName: "CanControl",
-	}
-)
-
 // Listener écoute les changements MPRIS via signaux D-Bus
 type Listener struct {
 	backend *MPRISBackend
