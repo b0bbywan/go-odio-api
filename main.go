@@ -28,8 +28,8 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// PulseAudio backend
-	b, err := backend.New(ctx, cfg.Systemd, cfg.Pulseaudio)
+	// Initialize backends
+	b, err := backend.New(ctx, cfg.Systemd, cfg.Pulseaudio, cfg.MPRIS)
 	if err != nil {
 		logger.Fatal("Backend initialization failed: %v", err)
 	}
