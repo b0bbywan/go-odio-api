@@ -205,10 +205,6 @@ func (s *SystemdBackend) EnableService(name string, scope UnitScope) error {
 		return err
 	}
 
-	// Rafraîchir uniquement ce service dans le cache
-	if _, err := s.RefreshService(name, scope); err != nil {
-		logger.Warn("[systemd] failed to refresh service %q in cache: %v", name, err)
-	}
 	logger.Debug("[systemd] service %s/%s enabled successfully", scope, name)
 	return nil
 }
@@ -233,10 +229,6 @@ func (s *SystemdBackend) DisableService(name string, scope UnitScope) error {
 		return err
 	}
 
-	// Rafraîchir uniquement ce service dans le cache
-	if _, err := s.RefreshService(name, scope); err != nil {
-		logger.Warn("[systemd] failed to refresh service %q in cache: %v", name, err)
-	}
 	logger.Debug("[systemd] service %s/%s disabled successfully", scope, name)
 	return nil
 }
@@ -247,10 +239,6 @@ func (s *SystemdBackend) RestartService(name string, scope UnitScope) error {
 		return err
 	}
 
-	// Rafraîchir uniquement ce service dans le cache
-	if _, err := s.RefreshService(name, scope); err != nil {
-		logger.Warn("[systemd] failed to refresh service %q in cache: %v", name, err)
-	}
 	logger.Debug("[systemd] service %s/%s restarted successfully", scope, name)
 	return nil
 }
