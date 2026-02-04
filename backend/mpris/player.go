@@ -170,40 +170,6 @@ func (p *Player) loadCapabilities() capabilities {
 	return caps
 }
 
-// checkCapabilities vérifie si le player a au moins une des capabilities requises
-func (p *Player) checkCapabilities(checkers ...CapabilityChecker) error {
-	if len(checkers) == 0 {
-		return nil
-	}
-
-	var dbusNames []string
-	hasAny := false
-
-	for _, checker := range checkers {
-		dbusNames = append(dbusNames, checker.DbusName)
-		if checker.Check(p) {
-			hasAny = true
-		}
-	}
-
-	if hasAny {
-		return nil
-	}
-
-	// Construire le message d'erreur
-	var errorMsg string
-	if len(dbusNames) == 1 {
-		errorMsg = dbusNames[0]
-	} else if len(dbusNames) > 1 {
-		errorMsg = dbusNames[0]
-		for i := 1; i < len(dbusNames); i++ {
-			errorMsg += " or " + dbusNames[i]
-		}
-	}
-
-	return &CapabilityError{Required: errorMsg}
-}
-
 // extractMetadata extrait les métadonnées pertinentes
 func extractMetadata(raw interface{}) map[string]string {
 	metadata := make(map[string]string)
