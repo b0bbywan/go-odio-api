@@ -113,8 +113,12 @@ func (p *Player) CanControl() bool {
 	return p.Capabilities.CanControl
 }
 
-// Load charge toutes les propriétés du player depuis D-Bus
-func (p *Player) Load() error {
+// loadFromDBus charge toutes les propriétés du player depuis D-Bus.
+// Cette fonction privée effectue les appels D-Bus nécessaires pour remplir tous les champs
+// du Player en utilisant GetAll (2 appels) au lieu d'appels individuels Get (~15 appels).
+// Le mapping des propriétés vers les champs struct se fait via reflection en utilisant
+// les tags `dbus` et `iface`.
+func (p *Player) loadFromDBus() error {
 	// Récupérer le unique name via GetNameOwner
 	var owner string
 	if err := p.conn.BusObject().Call("org.freedesktop.DBus.GetNameOwner", 0, p.BusName).Store(&owner); err != nil {
@@ -202,7 +206,10 @@ func (p *Player) Load() error {
 	return nil
 }
 
-// loadCapabilitiesFromProps charge les capabilities depuis les propriétés déjà récupérées
+// loadCapabilitiesFromProps charge les capabilities depuis les propriétés déjà récupérées.
+// Utilisé par loadFromDBus() pour éviter des appels D-Bus supplémentaires.
+// Mappe les propriétés D-Bus (CanPlay, CanPause, etc.) vers le struct Capabilities
+// en utilisant reflection et les tags `dbus`.
 func (p *Player) loadCapabilitiesFromProps(props map[string]dbus.Variant) Capabilities {
 	var caps Capabilities
 

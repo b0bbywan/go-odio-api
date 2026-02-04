@@ -118,7 +118,7 @@ func (m *MPRISBackend) ListPlayers() ([]Player, error) {
 	players := make([]Player, 0)
 	for _, name := range names {
 		if strings.HasPrefix(name, mprisPrefix+".") {
-			player, err := m.getPlayerInfo(name)
+			player, err := m.getPlayerFromDBus(name)
 			if err != nil {
 				logger.Warn("[mpris] failed to get player info for %s: %v", name, err)
 				continue
@@ -260,7 +260,7 @@ func (m *MPRISBackend) ReloadPlayerFromDBus(busName string) (*Player, error) {
 		return nil, err
 	}
 
-	player, err := m.getPlayerInfo(busName)
+	player, err := m.getPlayerFromDBus(busName)
 	if err != nil {
 		return nil, err
 	}
@@ -313,13 +313,13 @@ func (m *MPRISBackend) findPlayerByUniqueName(uniqueName string) string {
 	return ""
 }
 
-// getPlayerInfo récupère toutes les informations d'un lecteur MPRIS depuis D-Bus.
+// getPlayerFromDBus charge un lecteur MPRIS depuis D-Bus avec toutes ses propriétés.
 // Cette fonction privée est le point d'entrée unique pour charger un player depuis D-Bus.
-// Elle crée un nouveau Player et appelle player.Load() pour récupérer toutes les propriétés.
-func (m *MPRISBackend) getPlayerInfo(busName string) (Player, error) {
-	// Créer un player et charger ses propriétés
+// Elle crée un nouveau Player et appelle loadFromDBus() pour récupérer toutes les propriétés
+// en utilisant GetAll (2 appels D-Bus au lieu de ~15 appels individuels).
+func (m *MPRISBackend) getPlayerFromDBus(busName string) (Player, error) {
 	player := newPlayer(m.conn, busName, m.timeout)
-	if err := player.Load(); err != nil {
+	if err := player.loadFromDBus(); err != nil {
 		return Player{}, err
 	}
 	return *player, nil
