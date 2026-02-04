@@ -22,17 +22,25 @@ func withPlayer(
 	return func(w http.ResponseWriter, r *http.Request) {
 		busName := r.PathValue("player")
 		if busName == "" {
-			http.Error(w, "missing player name", http.StatusNotFound)
+			http.Error(w, "missing player name", http.StatusBadRequest)
 			return
 		}
 
 		if err := fn(busName); err != nil {
+			// Gérer les erreurs de player not found
+			var notFoundErr *mpris.PlayerNotFoundError
+			if errors.As(err, &notFoundErr) {
+				http.Error(w, err.Error(), http.StatusNotFound)
+				return
+			}
+
 			// Gérer les erreurs de capability
 			var capErr *mpris.CapabilityError
 			if errors.As(err, &capErr) {
-				http.Error(w, err.Error(), http.StatusBadRequest)
+				http.Error(w, err.Error(), http.StatusForbidden)
 				return
 			}
+
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -49,7 +57,7 @@ func withPlayerAndBody[T any](
 	return func(w http.ResponseWriter, r *http.Request) {
 		busName := r.PathValue("player")
 		if busName == "" {
-			http.Error(w, "missing player name", http.StatusNotFound)
+			http.Error(w, "missing player name", http.StatusBadRequest)
 			return
 		}
 
@@ -68,12 +76,20 @@ func withPlayerAndBody[T any](
 		}
 
 		if err := action(busName, &req); err != nil {
+			// Gérer les erreurs de player not found
+			var notFoundErr *mpris.PlayerNotFoundError
+			if errors.As(err, &notFoundErr) {
+				http.Error(w, err.Error(), http.StatusNotFound)
+				return
+			}
+
 			// Gérer les erreurs de capability
 			var capErr *mpris.CapabilityError
 			if errors.As(err, &capErr) {
-				http.Error(w, err.Error(), http.StatusBadRequest)
+				http.Error(w, err.Error(), http.StatusForbidden)
 				return
 			}
+
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
