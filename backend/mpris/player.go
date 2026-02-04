@@ -230,32 +230,6 @@ func (p *Player) loadCapabilitiesFromProps(props map[string]dbus.Variant) Capabi
 	return caps
 }
 
-// loadCapabilities charge les capabilities depuis D-Bus (legacy, pour compatibilité)
-func (p *Player) loadCapabilities() Capabilities {
-	var caps Capabilities
-
-	val := reflect.ValueOf(&caps).Elem()
-	typ := val.Type()
-
-	for i := 0; i < val.NumField(); i++ {
-		field := val.Field(i)
-		fieldType := typ.Field(i)
-
-		// Récupérer le tag dbus
-		dbusTag := fieldType.Tag.Get("dbus")
-		if dbusTag == "" {
-			continue
-		}
-
-		// Récupérer la propriété D-Bus
-		if propVal, ok := p.getBoolProperty(mprisPlayerIface, dbusTag); ok {
-			field.SetBool(propVal)
-		}
-	}
-
-	return caps
-}
-
 // extractMetadata extrait les métadonnées pertinentes
 func extractMetadata(raw interface{}) map[string]string {
 	metadata := make(map[string]string)

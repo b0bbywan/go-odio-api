@@ -163,7 +163,7 @@ func (l *Listener) handleNameOwnerChanged(sig *dbus.Signal) {
 	if oldOwner == "" && newOwner != "" {
 		// Nouveau lecteur apparu
 		logger.Info("[mpris] new player detected: %s", busName)
-		if _, err := l.backend.RefreshPlayer(busName); err != nil {
+		if _, err := l.backend.ReloadPlayerFromDBus(busName); err != nil {
 			logger.Error("[mpris] failed to add new player %s: %v", busName, err)
 		}
 	} else if oldOwner != "" && newOwner == "" {

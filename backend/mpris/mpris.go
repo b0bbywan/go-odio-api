@@ -91,7 +91,10 @@ func (m *MPRISBackend) Start() error {
 	return nil
 }
 
-// ListPlayers liste tous les lecteurs MPRIS disponibles
+// ListPlayers liste tous les lecteurs MPRIS disponibles.
+// Cette fonction utilise le cache en priorité. Si le cache est vide,
+// elle effectue un appel D-Bus pour lister les players et met à jour le cache.
+// Pour forcer un rechargement d'un player spécifique, utilisez ReloadPlayerFromDBus.
 func (m *MPRISBackend) ListPlayers() ([]Player, error) {
 	// Vérifier le cache d'abord
 	if players, ok := m.cache.Get(cacheKey); ok {
@@ -132,8 +135,10 @@ func (m *MPRISBackend) ListPlayers() ([]Player, error) {
 	return players, nil
 }
 
-// GetPlayer récupère un lecteur spécifique du cache
-func (m *MPRISBackend) GetPlayer(busName string) (*Player, error) {
+// GetPlayerFromCache récupère un lecteur spécifique du cache uniquement.
+// Si le player n'est pas en cache, retourne PlayerNotFoundError.
+// Pour forcer un rechargement depuis D-Bus, utilisez ReloadPlayerFromDBus.
+func (m *MPRISBackend) GetPlayerFromCache(busName string) (*Player, error) {
 	if err := validateBusName(busName); err != nil {
 		return nil, err
 	}
@@ -151,7 +156,9 @@ func (m *MPRISBackend) GetPlayer(busName string) (*Player, error) {
 	return nil, &PlayerNotFoundError{BusName: busName}
 }
 
-// UpdatePlayer met à jour un lecteur spécifique dans le cache
+// UpdatePlayer met à jour un lecteur spécifique dans le cache.
+// Si le player existe, il est remplacé. Sinon, il est ajouté au cache.
+// ATTENTION: Si le cache est vide, cette fonction recharge TOUS les players via ListPlayers.
 func (m *MPRISBackend) UpdatePlayer(updated Player) error {
 	players, ok := m.cache.Get(cacheKey)
 	if !ok {
@@ -178,7 +185,9 @@ func (m *MPRISBackend) UpdatePlayer(updated Player) error {
 	return nil
 }
 
-// UpdatePlayerProperties met à jour sélectivement les propriétés d'un player dans le cache
+// UpdatePlayerProperties met à jour sélectivement les propriétés d'un player dans le cache.
+// Utilisé principalement par le listener pour mettre à jour le cache lors de la réception
+// de signaux D-Bus PropertiesChanged. Ne fait PAS d'appel D-Bus.
 func (m *MPRISBackend) UpdatePlayerProperties(busName string, changed map[string]dbus.Variant) error {
 	players, ok := m.cache.Get(cacheKey)
 	if !ok {
@@ -242,8 +251,10 @@ func (m *MPRISBackend) UpdateProperty(busName, property string, value dbus.Varia
 	})
 }
 
-// RefreshPlayer recharge un lecteur spécifique depuis D-Bus et met à jour le cache
-func (m *MPRISBackend) RefreshPlayer(busName string) (*Player, error) {
+// ReloadPlayerFromDBus recharge un lecteur spécifique depuis D-Bus et met à jour le cache.
+// Cette fonction force un appel D-Bus même si le player est déjà en cache.
+// Utilisez cette fonction quand vous avez besoin des données les plus récentes.
+func (m *MPRISBackend) ReloadPlayerFromDBus(busName string) (*Player, error) {
 	if err := validateBusName(busName); err != nil {
 		return nil, err
 	}
@@ -283,7 +294,10 @@ func (m *MPRISBackend) RemovePlayer(busName string) error {
 	return nil
 }
 
-// findPlayerByUniqueName trouve le busName d'un player à partir de son unique name
+// findPlayerByUniqueName trouve le busName d'un player à partir de son unique name D-Bus.
+// Les signaux D-Bus contiennent le unique name (ex: ":1.107") et non le well-known name
+// (ex: "org.mpris.MediaPlayer2.spotify"). Cette fonction fait le mapping entre les deux
+// en cherchant dans le cache. Retourne "" si le player n'est pas trouvé.
 func (m *MPRISBackend) findPlayerByUniqueName(uniqueName string) string {
 	players, ok := m.cache.Get(cacheKey)
 	if !ok {
@@ -298,7 +312,9 @@ func (m *MPRISBackend) findPlayerByUniqueName(uniqueName string) string {
 	return ""
 }
 
-// getPlayerInfo récupère toutes les informations d'un lecteur MPRIS
+// getPlayerInfo récupère toutes les informations d'un lecteur MPRIS depuis D-Bus.
+// Cette fonction privée est le point d'entrée unique pour charger un player depuis D-Bus.
+// Elle crée un nouveau Player et appelle player.Load() pour récupérer toutes les propriétés.
 func (m *MPRISBackend) getPlayerInfo(busName string) (Player, error) {
 	// Créer un player et charger ses propriétés
 	player := newPlayer(m.conn, busName, m.timeout)
@@ -310,7 +326,7 @@ func (m *MPRISBackend) getPlayerInfo(busName string) (Player, error) {
 
 // Play démarre la lecture
 func (m *MPRISBackend) Play(busName string) error {
-	player, err := m.GetPlayer(busName)
+	player, err := m.GetPlayerFromCache(busName)
 	if err != nil {
 		return err
 	}
@@ -325,7 +341,7 @@ func (m *MPRISBackend) Play(busName string) error {
 
 // Pause met en pause la lecture
 func (m *MPRISBackend) Pause(busName string) error {
-	player, err := m.GetPlayer(busName)
+	player, err := m.GetPlayerFromCache(busName)
 	if err != nil {
 		return err
 	}
@@ -340,7 +356,7 @@ func (m *MPRISBackend) Pause(busName string) error {
 
 // PlayPause bascule entre lecture et pause
 func (m *MPRISBackend) PlayPause(busName string) error {
-	player, err := m.GetPlayer(busName)
+	player, err := m.GetPlayerFromCache(busName)
 	if err != nil {
 		return err
 	}
@@ -355,7 +371,7 @@ func (m *MPRISBackend) PlayPause(busName string) error {
 
 // Stop arrête la lecture
 func (m *MPRISBackend) Stop(busName string) error {
-	player, err := m.GetPlayer(busName)
+	player, err := m.GetPlayerFromCache(busName)
 	if err != nil {
 		return err
 	}
@@ -370,7 +386,7 @@ func (m *MPRISBackend) Stop(busName string) error {
 
 // Next passe à la piste suivante
 func (m *MPRISBackend) Next(busName string) error {
-	player, err := m.GetPlayer(busName)
+	player, err := m.GetPlayerFromCache(busName)
 	if err != nil {
 		return err
 	}
@@ -385,7 +401,7 @@ func (m *MPRISBackend) Next(busName string) error {
 
 // Previous revient à la piste précédente
 func (m *MPRISBackend) Previous(busName string) error {
-	player, err := m.GetPlayer(busName)
+	player, err := m.GetPlayerFromCache(busName)
 	if err != nil {
 		return err
 	}
@@ -400,7 +416,7 @@ func (m *MPRISBackend) Previous(busName string) error {
 
 // Seek déplace la position de lecture
 func (m *MPRISBackend) Seek(busName string, offset int64) error {
-	player, err := m.GetPlayer(busName)
+	player, err := m.GetPlayerFromCache(busName)
 	if err != nil {
 		return err
 	}
@@ -419,7 +435,7 @@ func (m *MPRISBackend) SetPosition(busName, trackID string, position int64) erro
 		return &ValidationError{Field: "track_id", Message: "cannot be empty"}
 	}
 
-	player, err := m.GetPlayer(busName)
+	player, err := m.GetPlayerFromCache(busName)
 	if err != nil {
 		return err
 	}
@@ -438,7 +454,7 @@ func (m *MPRISBackend) SetVolume(busName string, volume float64) error {
 		return &ValidationError{Field: "volume", Message: "must be between 0 and 1"}
 	}
 
-	player, err := m.GetPlayer(busName)
+	player, err := m.GetPlayerFromCache(busName)
 	if err != nil {
 		return err
 	}
@@ -460,7 +476,7 @@ func (m *MPRISBackend) SetLoopStatus(busName string, status LoopStatus) error {
 		return &ValidationError{Field: "loop", Message: "must be None, Track, or Playlist"}
 	}
 
-	player, err := m.GetPlayer(busName)
+	player, err := m.GetPlayerFromCache(busName)
 	if err != nil {
 		return err
 	}
@@ -475,7 +491,7 @@ func (m *MPRISBackend) SetLoopStatus(busName string, status LoopStatus) error {
 
 // SetShuffle active/désactive le mode aléatoire
 func (m *MPRISBackend) SetShuffle(busName string, shuffle bool) error {
-	player, err := m.GetPlayer(busName)
+	player, err := m.GetPlayerFromCache(busName)
 	if err != nil {
 		return err
 	}
@@ -493,7 +509,10 @@ func (m *MPRISBackend) InvalidateCache() {
 	m.cache.Delete(cacheKey)
 }
 
-// ensureHeartbeatRunning démarre le heartbeat s'il n'est pas déjà actif
+// ensureHeartbeatRunning démarre le heartbeat s'il n'est pas déjà actif.
+// Le heartbeat met à jour la position des players en Playing toutes les 2 secondes.
+// Cette fonction est idempotente : appeler plusieurs fois ne démarre qu'un seul heartbeat.
+// Appelé automatiquement par le listener quand un player passe en Playing.
 func (m *MPRISBackend) ensureHeartbeatRunning() {
 	m.heartbeatMu.Lock()
 	defer m.heartbeatMu.Unlock()
@@ -506,7 +525,9 @@ func (m *MPRISBackend) ensureHeartbeatRunning() {
 	go m.startPositionHeartbeat()
 }
 
-// startHeartbeatIfPlaying démarre le heartbeat si au moins un player est en Playing
+// startHeartbeatIfPlaying démarre le heartbeat si au moins un player est en Playing.
+// Appelé au démarrage du backend (Start) pour détecter si un player joue déjà de la musique
+// et démarrer le heartbeat immédiatement au lieu d'attendre le premier signal.
 func (m *MPRISBackend) startHeartbeatIfPlaying(players []Player) {
 	for _, player := range players {
 		if player.PlaybackStatus == StatusPlaying {
