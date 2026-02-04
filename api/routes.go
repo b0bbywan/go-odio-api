@@ -56,4 +56,16 @@ func Register(mux *http.ServeMux, b *backend.Backend) {
 		"POST /services/{scope}/{unit}/restart",
 		withService(b.Systemd, b.Systemd.RestartService),
 	)
+
+	// mpris routes
+	if b.MPRIS != nil {
+		mux.HandleFunc(
+			"/players",
+			ListPlayersHandler(b.MPRIS),
+		)
+		mux.HandleFunc(
+			"POST /players/{player}",
+			PlayerActionHandler(b.MPRIS),
+		)
+	}
 }
