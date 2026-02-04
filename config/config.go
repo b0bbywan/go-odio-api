@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/spf13/viper"
+
 	"github.com/b0bbywan/go-odio-api/logger"
 )
 
@@ -15,15 +16,21 @@ const (
 )
 
 type Config struct {
-	Services *SystemdConfig
-	Port     int
-	Headless bool
-	LogLevel logger.Level
+	Systemd    *SystemdConfig
+	Pulseaudio *PulseAudioConfig
+	Port       int
+	LogLevel   logger.Level
 }
 
 type SystemdConfig struct {
 	SystemServices []string
 	UserServices   []string
+	Headless       bool
+	XDGRuntimeDir  string
+}
+
+type PulseAudioConfig struct {
+	XDGRuntimeDir string
 }
 
 // parseLogLevel converts a string to a logger.Level
@@ -76,16 +83,27 @@ func New() (*Config, error) {
 		return nil, fmt.Errorf("invalid port: %d", port)
 	}
 
+	xdgRuntimeDir := os.Getenv("XDG_RUNTIME_DIR")
+	if xdgRuntimeDir == "" {
+		xdgRuntimeDir = fmt.Sprintf("/run/user/%d", os.Getuid())
+	}
+
 	syscfg := SystemdConfig{
 		SystemServices: viper.GetStringSlice("services.system"),
 		UserServices:   viper.GetStringSlice("services.user"),
+		Headless:       headless,
+		XDGRuntimeDir:  xdgRuntimeDir,
+	}
+
+	pulsecfg := PulseAudioConfig{
+		XDGRuntimeDir: xdgRuntimeDir,
 	}
 
 	cfg := Config{
-		Services: &syscfg,
-		Port:     port,
-		Headless: headless,
-		LogLevel: parseLogLevel(viper.GetString("LogLevel")),
+		Systemd:    &syscfg,
+		Pulseaudio: &pulsecfg,
+		Port:       port,
+		LogLevel:   parseLogLevel(viper.GetString("LogLevel")),
 	}
 
 	return &cfg, nil

@@ -29,7 +29,7 @@ func main() {
 	defer cancel()
 
 	// PulseAudio backend
-	b, err := backend.New(ctx, cfg.Services)
+	b, err := backend.New(ctx, cfg.Systemd, cfg.Pulseaudio)
 	if err != nil {
 		logger.Fatal("Backend initialization failed: %v", err)
 	}
@@ -42,7 +42,7 @@ func main() {
 	mux := http.NewServeMux()
 	api.Register(mux, b)
 
-	port := fmt.Sprintf(":%d",cfg.Port)
+	port := fmt.Sprintf(":%d", cfg.Port)
 	// HTTP server
 	srv := &http.Server{
 		Addr:    port,
