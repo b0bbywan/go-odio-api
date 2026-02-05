@@ -5,6 +5,8 @@
 
 A lightweight REST API for controlling Linux audio and media players, built in Go. Provides unified interfaces for MPRIS media players, PulseAudio/PipeWire audio control, and systemd service management.
 
+**Target Environment:** Designed for multimedia systems running with a user session (XDG_RUNTIME_DIR). Ideal for headless music servers, home audio systems, and dedicated media players.
+
 ## Features
 
 ### Media Player Control (MPRIS)
@@ -43,6 +45,37 @@ go build -o odio-api
 
 # Run
 ./odio-api
+```
+
+### systemd User Service
+
+To run as a systemd user service, create `~/.config/systemd/user/odio-api.service`:
+
+```ini
+[Unit]
+Description=Dbus api for Odio
+Documentation=https://github.com/b0bbywan/go-odio-api
+Wants=sound.target
+After=sound.target
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+ExecStart=/usr/bin/odio-api
+Restart=always
+RestartSec=12
+TimeoutSec=30
+
+[Install]
+WantedBy=default.target
+```
+
+Then enable and start the service:
+
+```bash
+systemctl --user daemon-reload
+systemctl --user enable odio-api.service
+systemctl --user start odio-api.service
 ```
 
 ## Configuration
