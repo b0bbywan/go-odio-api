@@ -4,7 +4,7 @@ on:
   push:
     branches: [ main, master ]
   pull_request:
-    branches: [ main, master ]
+    # Run on all PRs regardless of target branch
 
 jobs:
   test:
