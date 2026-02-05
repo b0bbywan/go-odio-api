@@ -469,7 +469,7 @@ func (m *MPRISBackend) Close() {
 		m.listener = nil
 	}
 	if m.conn != nil {
-		m.conn.Close()
+		_ = m.conn.Close() // Ignore close error in cleanup
 		m.conn = nil
 	}
 }
