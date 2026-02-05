@@ -1,7 +1,6 @@
 package config
 
 import (
-	"os"
 	"testing"
 
 	"github.com/spf13/viper"
@@ -89,18 +88,11 @@ func TestNew_Defaults(t *testing.T) {
 	// Reset viper to ensure clean state
 	viper.Reset()
 
+	// Isolate from user's config files by using a temp directory
+	t.Setenv("HOME", t.TempDir())
+
 	// Set XDG_SESSION_DESKTOP to avoid headless mode detection
-	originalDesktop := os.Getenv("XDG_SESSION_DESKTOP")
-	if err := os.Setenv("XDG_SESSION_DESKTOP", "test-desktop"); err != nil {
-		t.Fatalf("Failed to set XDG_SESSION_DESKTOP: %v", err)
-	}
-	defer func() {
-		if originalDesktop != "" {
-			_ = os.Setenv("XDG_SESSION_DESKTOP", originalDesktop)
-		} else {
-			_ = os.Unsetenv("XDG_SESSION_DESKTOP")
-		}
-	}()
+	t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
 
 	cfg, err := New()
 	if err != nil {
@@ -139,18 +131,11 @@ func TestNew_CustomPort(t *testing.T) {
 	// Set custom port
 	viper.Set("api.port", 9090)
 
+	// Isolate from user's config files by using a temp directory
+	t.Setenv("HOME", t.TempDir())
+
 	// Set XDG_SESSION_DESKTOP to avoid headless mode detection
-	originalDesktop := os.Getenv("XDG_SESSION_DESKTOP")
-	if err := os.Setenv("XDG_SESSION_DESKTOP", "test-desktop"); err != nil {
-		t.Fatalf("Failed to set XDG_SESSION_DESKTOP: %v", err)
-	}
-	defer func() {
-		if originalDesktop != "" {
-			_ = os.Setenv("XDG_SESSION_DESKTOP", originalDesktop)
-		} else {
-			_ = os.Unsetenv("XDG_SESSION_DESKTOP")
-		}
-	}()
+	t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
 
 	cfg, err := New()
 	if err != nil {
@@ -181,18 +166,11 @@ func TestNew_InvalidPort(t *testing.T) {
 			// Set invalid port
 			viper.Set("api.port", tt.port)
 
+			// Isolate from user's config files by using a temp directory
+			t.Setenv("HOME", t.TempDir())
+
 			// Set XDG_SESSION_DESKTOP to avoid headless mode detection
-			originalDesktop := os.Getenv("XDG_SESSION_DESKTOP")
-			if err := os.Setenv("XDG_SESSION_DESKTOP", "test-desktop"); err != nil {
-				t.Fatalf("Failed to set XDG_SESSION_DESKTOP: %v", err)
-			}
-			defer func() {
-				if originalDesktop != "" {
-					_ = os.Setenv("XDG_SESSION_DESKTOP", originalDesktop)
-				} else {
-					_ = os.Unsetenv("XDG_SESSION_DESKTOP")
-				}
-			}()
+			t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
 
 			cfg, err := New()
 			if err == nil {
@@ -209,16 +187,11 @@ func TestNew_HeadlessMode(t *testing.T) {
 	// Reset viper to ensure clean state
 	viper.Reset()
 
+	// Isolate from user's config files by using a temp directory
+	t.Setenv("HOME", t.TempDir())
+
 	// Clear XDG_SESSION_DESKTOP to trigger headless mode
-	originalDesktop := os.Getenv("XDG_SESSION_DESKTOP")
-	if err := os.Unsetenv("XDG_SESSION_DESKTOP"); err != nil {
-		t.Fatalf("Failed to unset XDG_SESSION_DESKTOP: %v", err)
-	}
-	defer func() {
-		if originalDesktop != "" {
-			_ = os.Setenv("XDG_SESSION_DESKTOP", originalDesktop)
-		}
-	}()
+	t.Setenv("XDG_SESSION_DESKTOP", "")
 
 	cfg, err := New()
 	if err != nil {
@@ -249,18 +222,11 @@ func TestNew_CustomLogLevel(t *testing.T) {
 
 			viper.Set("LogLevel", tt.level)
 
+			// Isolate from user's config files by using a temp directory
+			t.Setenv("HOME", t.TempDir())
+
 			// Set XDG_SESSION_DESKTOP to avoid headless mode detection
-			originalDesktop := os.Getenv("XDG_SESSION_DESKTOP")
-			if err := os.Setenv("XDG_SESSION_DESKTOP", "test-desktop"); err != nil {
-				t.Fatalf("Failed to set XDG_SESSION_DESKTOP: %v", err)
-			}
-			defer func() {
-				if originalDesktop != "" {
-					_ = os.Setenv("XDG_SESSION_DESKTOP", originalDesktop)
-				} else {
-					_ = os.Unsetenv("XDG_SESSION_DESKTOP")
-				}
-			}()
+			t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
 
 			cfg, err := New()
 			if err != nil {
