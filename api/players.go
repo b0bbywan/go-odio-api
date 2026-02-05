@@ -1,19 +1,11 @@
 package api
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 
 	"github.com/b0bbywan/go-odio-api/backend/mpris"
 )
-
-// ListPlayersHandler retourne la liste de tous les lecteurs MPRIS
-func ListPlayersHandler(m *mpris.MPRISBackend) http.HandlerFunc {
-	return JSONHandler(func(w http.ResponseWriter, r *http.Request) (any, error) {
-		return m.ListPlayers()
-	})
-}
 
 // withPlayer extrait le busName et appelle next
 func withPlayer(
@@ -22,31 +14,6 @@ func withPlayer(
 	return func(w http.ResponseWriter, r *http.Request) {
 		busName := r.PathValue("player")
 		next(w, r, busName)
-	}
-}
-
-// withBody parse et valide le body JSON, puis appelle next
-func withBody[T any](
-	validate func(*T) error,
-	next func(w http.ResponseWriter, r *http.Request, req *T),
-) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		defer r.Body.Close()
-
-		var req T
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "invalid JSON payload", http.StatusBadRequest)
-			return
-		}
-
-		if validate != nil {
-			if err := validate(&req); err != nil {
-				http.Error(w, err.Error(), http.StatusBadRequest)
-				return
-			}
-		}
-
-		next(w, r, &req)
 	}
 }
 
@@ -86,6 +53,13 @@ func handleMPRISError(w http.ResponseWriter, err error) {
 	}
 
 	http.Error(w, err.Error(), http.StatusInternalServerError)
+}
+
+// ListPlayersHandler retourne la liste de tous les lecteurs MPRIS
+func ListPlayersHandler(m *mpris.MPRISBackend) http.HandlerFunc {
+	return JSONHandler(func(w http.ResponseWriter, r *http.Request) (any, error) {
+		return m.ListPlayers()
+	})
 }
 
 // Handlers pour actions simples
