@@ -47,9 +47,9 @@ func (m *MPRISBackend) Start() error {
 		return err
 	}
 
-	// Create and start the heartbeat if a player is already Playing
+	// Start the heartbeat (will auto-stop if no player is Playing)
 	m.heartbeat = NewHeartbeat(m)
-	m.heartbeat.StartIfAnyPlaying(players)
+	m.heartbeat.Start()
 
 	logger.Info("[mpris] backend started successfully")
 	return nil

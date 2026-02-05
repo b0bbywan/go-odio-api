@@ -19,9 +19,9 @@ A lightweight REST API for controlling Linux audio and media players, built in G
 
 ### Audio Management (PulseAudio/PipeWire)
 - List audio sinks and sources
-- Volume control per application or device
+- Volume control for sink-inputs only
 - Real-time audio events via native PulseAudio monitoring
-- Full PipeWire compatibility
+- Limited PipeWire support with pipewire-pulse
 
 ### Service Management (systemd)
 - List and monitor systemd services

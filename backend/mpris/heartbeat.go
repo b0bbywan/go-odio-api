@@ -45,18 +45,6 @@ func (h *Heartbeat) Start() {
 	go h.run()
 }
 
-// StartIfAnyPlaying starts the heartbeat if at least one player is Playing.
-// Useful at application startup to detect if a player is already playing.
-func (h *Heartbeat) StartIfAnyPlaying(players []Player) {
-	for _, player := range players {
-		if player.PlaybackStatus == StatusPlaying {
-			logger.Debug("[mpris] detected player %s already playing, starting heartbeat", player.BusName)
-			h.Start()
-			return
-		}
-	}
-}
-
 // Stop stops the heartbeat
 func (h *Heartbeat) Stop() {
 	h.cancel()
