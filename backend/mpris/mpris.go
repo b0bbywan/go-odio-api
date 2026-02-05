@@ -108,8 +108,8 @@ func (m *MPRISBackend) ListPlayers() ([]Player, error) {
 	start := time.Now()
 
 	// Lister tous les bus names
-	var names []string
-	if err := m.conn.BusObject().Call(DBUS_LIST_NAMES_METHOD, 0).Store(&names); err != nil {
+	names, err := m.listDBusNames()
+	if err != nil {
 		return nil, err
 	}
 
@@ -350,6 +350,15 @@ func (m *MPRISBackend) getProperty(busName, iface, prop string) (dbus.Variant, e
 		return dbus.Variant{}, err
 	}
 	return v, nil
+}
+
+// listDBusNames récupère la liste de tous les bus names sur D-Bus
+func (m *MPRISBackend) listDBusNames() ([]string, error) {
+	var names []string
+	if err := m.conn.BusObject().Call(DBUS_LIST_NAMES_METHOD, 0).Store(&names); err != nil {
+		return nil, err
+	}
+	return names, nil
 }
 
 // Play démarre la lecture
