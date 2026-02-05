@@ -71,8 +71,7 @@ func (p *Player) getStringProperty(iface, prop string) (string, bool) {
 	if err != nil {
 		return "", false
 	}
-	val, ok := v.Value().(string)
-	return val, ok
+	return extractString(v)
 }
 
 // getBoolProperty récupère une propriété bool
@@ -81,8 +80,7 @@ func (p *Player) getBoolProperty(iface, prop string) (bool, bool) {
 	if err != nil {
 		return false, false
 	}
-	val, ok := v.Value().(bool)
-	return val, ok
+	return extractBool(v)
 }
 
 // getFloat64Property récupère une propriété float64
@@ -91,8 +89,7 @@ func (p *Player) getFloat64Property(iface, prop string) (float64, bool) {
 	if err != nil {
 		return 0, false
 	}
-	val, ok := v.Value().(float64)
-	return val, ok
+	return extractFloat64(v)
 }
 
 // getInt64Property récupère une propriété int64
@@ -101,8 +98,7 @@ func (p *Player) getInt64Property(iface, prop string) (int64, bool) {
 	if err != nil {
 		return 0, false
 	}
-	val, ok := v.Value().(int64)
-	return val, ok
+	return extractInt64(v)
 }
 
 // Capability getter methods (raccourcis pour un accès plus court)
@@ -197,22 +193,22 @@ func (p *Player) loadFromDBus() error {
 		// Gérer selon le type de champ
 		switch field.Kind() {
 		case reflect.String:
-			if val, ok := variant.Value().(string); ok {
+			if val, ok := extractString(variant); ok {
 				field.SetString(val)
 			}
 
 		case reflect.Bool:
-			if val, ok := variant.Value().(bool); ok {
+			if val, ok := extractBool(variant); ok {
 				field.SetBool(val)
 			}
 
 		case reflect.Float64:
-			if val, ok := variant.Value().(float64); ok {
+			if val, ok := extractFloat64(variant); ok {
 				field.SetFloat(val)
 			}
 
 		case reflect.Int64:
-			if val, ok := variant.Value().(int64); ok {
+			if val, ok := extractInt64(variant); ok {
 				field.SetInt(val)
 			}
 
@@ -252,7 +248,7 @@ func (p *Player) loadCapabilitiesFromProps(props map[string]dbus.Variant) Capabi
 
 		// Récupérer la propriété depuis les props
 		if variant, ok := props[dbusTag]; ok {
-			if boolVal, ok := variant.Value().(bool); ok {
+			if boolVal, ok := extractBool(variant); ok {
 				field.SetBool(boolVal)
 			}
 		}
