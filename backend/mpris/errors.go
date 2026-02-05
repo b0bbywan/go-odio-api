@@ -1,6 +1,5 @@
 package mpris
 
-
 // CapabilityError indique qu'une action n'est pas supportée par le player
 type CapabilityError struct {
 	Required string
@@ -47,4 +46,3 @@ type dbusTimeoutError struct{}
 func (e *dbusTimeoutError) Error() string {
 	return "D-Bus call timeout"
 }
-

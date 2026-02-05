@@ -469,7 +469,9 @@ func (m *MPRISBackend) Close() {
 		m.listener = nil
 	}
 	if m.conn != nil {
-		m.conn.Close()
+		if err := m.conn.Close(); err != nil {
+			logger.Info("Failed to close D-Bus connection: %v", err)
+		}
 		m.conn = nil
 	}
 }

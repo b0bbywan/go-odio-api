@@ -43,7 +43,6 @@ func (m *MPRISBackend) callWithTimeout(call *dbus.Call) error {
 	return callWithTimeout(call, m.timeout)
 }
 
-
 // callMethod appelle une méthode MPRIS sur un player avec timeout
 func (m *MPRISBackend) callMethod(busName, method string, args ...interface{}) error {
 	obj := m.conn.Object(busName, MPRIS_PATH)
@@ -102,13 +101,12 @@ func (m *MPRISBackend) addListenMatchRules() error {
 }
 
 func (m *MPRISBackend) getNameOwner(busName string) (string, error) {
-    var owner string
-    if err := m.conn.BusObject().Call(DBUS_GET_NAME_OWNER, 0, busName).Store(&owner); err != nil {
-        return "", err
-    }
-    return owner, nil
+	var owner string
+	if err := m.conn.BusObject().Call(DBUS_GET_NAME_OWNER, 0, busName).Store(&owner); err != nil {
+		return "", err
+	}
+	return owner, nil
 }
-
 
 // Helpers d'extraction de valeurs depuis dbus.Variant
 // Ces helpers sont utilisés pour extraire les valeurs des variants reçus
@@ -161,45 +159,4 @@ func (p *Player) getAllProperties(iface string) (map[string]dbus.Variant, error)
 
 	err := call.Store(&props)
 	return props, err
-}
-
-// getProperty récupère une propriété D-Bus via le backend
-func (p *Player) getProperty(iface, prop string) (dbus.Variant, error) {
-	return p.backend.getProperty(p.BusName, iface, prop)
-}
-
-// getStringProperty récupère une propriété string
-func (p *Player) getStringProperty(iface, prop string) (string, bool) {
-	v, err := p.getProperty(iface, prop)
-	if err != nil {
-		return "", false
-	}
-	return extractString(v)
-}
-
-// getBoolProperty récupère une propriété bool
-func (p *Player) getBoolProperty(iface, prop string) (bool, bool) {
-	v, err := p.getProperty(iface, prop)
-	if err != nil {
-		return false, false
-	}
-	return extractBool(v)
-}
-
-// getFloat64Property récupère une propriété float64
-func (p *Player) getFloat64Property(iface, prop string) (float64, bool) {
-	v, err := p.getProperty(iface, prop)
-	if err != nil {
-		return 0, false
-	}
-	return extractFloat64(v)
-}
-
-// getInt64Property récupère une propriété int64
-func (p *Player) getInt64Property(iface, prop string) (int64, bool) {
-	v, err := p.getProperty(iface, prop)
-	if err != nil {
-		return 0, false
-	}
-	return extractInt64(v)
 }

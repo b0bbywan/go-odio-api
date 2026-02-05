@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+
+	"github.com/b0bbywan/go-odio-api/logger"
 )
 
 type setVolumeRequest struct {
@@ -30,7 +32,11 @@ func withBody[T any](
 	next func(w http.ResponseWriter, r *http.Request, req *T),
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		defer r.Body.Close()
+		defer func() {
+			if err := r.Body.Close(); err != nil {
+				logger.Info("Failed to close request body: %v", err)
+			}
+		}()
 
 		var req T
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
