@@ -100,7 +100,7 @@ func New() (*Config, error) {
 		headless = true
 	}
 
-	port := viper.GetInt("Port")
+	port := viper.GetInt("api.port")
 	if port <= 0 || port > 65535 {
 		return nil, fmt.Errorf("invalid port: %d", port)
 	}
