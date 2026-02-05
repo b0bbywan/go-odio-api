@@ -25,9 +25,10 @@ A lightweight REST API for controlling Linux audio and media players, built in G
 
 ### Service Management (systemd)
 - List and monitor systemd services
-- Start, stop, restart, and reload services
-- Real-time service state updates
-- D-Bus integration for efficient monitoring
+- Enable, disable, and restart services
+- Real-time service state updates via D-Bus signals
+- Headless tracking via filesystem monitoring (for systemd without utmp)
+- User session detection based on DESKTOP environment variable
 
 ## Installation
 
@@ -45,35 +46,41 @@ go build -o odio-api
 ./odio-api
 ```
 
-### From Package
-
-Debian/Ubuntu packages are available in releases:
-
-```bash
-# Download the .deb file from releases
-dpkg -i go-odio-api_*.deb
-```
-
 ## Configuration
 
-Configuration is done via `config.yaml`:
+Configuration file can be placed at:
+- `/etc/odio-api/config.yaml` (system-wide)
+- `~/.config/odio-api/config.yaml` (user-specific)
+- A default configuration is available in `share/config.yaml`
+
+Example configuration:
 
 ```yaml
-server:
-  host: "localhost"
-  port: 8080
+services:
+  enabled: true
+  system:
+    - bluetooth.service
+    - upmpdcli.service
+  user:
+    - mpd.service
+    - pipewire-pulse.service
+    - pulseaudio.service
+    - shairport-sync.service
+    - snapclient.service
+    - spotifyd.service
+
+pulseaudio:
+  enabled: true
 
 mpris:
   enabled: true
   timeout: 5s
 
-pulseaudio:
+api:
   enabled: true
-  timeout: 5s
+  port: 8080
 
-systemd:
-  enabled: true
-  timeout: 5s
+logLevel: warn
 ```
 
 ## API Endpoints
@@ -81,37 +88,38 @@ systemd:
 ### MPRIS Media Players
 
 ```
-GET    /api/players              # List all media players
-GET    /api/players/:busName     # Get player details
-POST   /api/players/:busName/play
-POST   /api/players/:busName/pause
-POST   /api/players/:busName/playpause
-POST   /api/players/:busName/stop
-POST   /api/players/:busName/next
-POST   /api/players/:busName/previous
-POST   /api/players/:busName/seek
-POST   /api/players/:busName/position
-PUT    /api/players/:busName/volume
-PUT    /api/players/:busName/loop
-PUT    /api/players/:busName/shuffle
+GET    /players                           # List all media players
+POST   /players/{player}/play             # Play
+POST   /players/{player}/pause            # Pause
+POST   /players/{player}/play_pause       # Toggle play/pause
+POST   /players/{player}/stop             # Stop
+POST   /players/{player}/next             # Next track
+POST   /players/{player}/previous         # Previous track
+POST   /players/{player}/seek             # Seek (body: {"offset": 1000000})
+POST   /players/{player}/position         # Set position (body: {"track_id": "...", "position": 0})
+POST   /players/{player}/volume           # Set volume (body: {"volume": 0.5})
+POST   /players/{player}/loop             # Set loop status (body: {"loop": "None|Track|Playlist"})
+POST   /players/{player}/shuffle          # Set shuffle (body: {"shuffle": true})
 ```
 
 ### PulseAudio
 
 ```
-GET    /api/pulseaudio/sinks     # List audio sinks
-GET    /api/pulseaudio/sources   # List audio sources
-PUT    /api/pulseaudio/volume    # Set volume
+GET    /audio/server                      # Get server info
+POST   /audio/server/mute                 # Mute/unmute server
+POST   /audio/server/volume               # Set server volume
+GET    /audio/clients                     # List audio clients (sink-inputs)
+POST   /audio/clients/{sink}/mute         # Mute/unmute client
+POST   /audio/clients/{sink}/volume       # Set client volume
 ```
 
 ### Systemd Services
 
 ```
-GET    /api/systemd/services     # List services
-POST   /api/systemd/start
-POST   /api/systemd/stop
-POST   /api/systemd/restart
-POST   /api/systemd/reload
+GET    /services                          # List all monitored services
+POST   /services/{scope}/{unit}/enable    # Enable service (scope: system|user)
+POST   /services/{scope}/{unit}/disable   # Disable service
+POST   /services/{scope}/{unit}/restart   # Restart service
 ```
 
 ## Architecture
