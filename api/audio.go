@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"github.com/b0bbywan/go-odio-api/backend/pulseaudio"
@@ -29,8 +28,8 @@ func MuteMasterHandler(pa *pulseaudio.PulseAudioBackend) http.HandlerFunc {
 
 func SetVolumeClientHandler(pa *pulseaudio.PulseAudioBackend) http.HandlerFunc {
 	return withSink(pa, func(w http.ResponseWriter, r *http.Request, sink string) {
-		withVolume(func(w http.ResponseWriter, r *http.Request, volume float32) {
-			if err := pa.SetVolume(sink, volume); err != nil {
+		withBody(validateVolume, func(w http.ResponseWriter, r *http.Request, req *setVolumeRequest) {
+			if err := pa.SetVolume(sink, req.Volume); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
@@ -40,8 +39,8 @@ func SetVolumeClientHandler(pa *pulseaudio.PulseAudioBackend) http.HandlerFunc {
 }
 
 func SetVolumeMasterHandler(pa *pulseaudio.PulseAudioBackend) http.HandlerFunc {
-	return withVolume(func(w http.ResponseWriter, r *http.Request, volume float32) {
-		if err := pa.SetVolumeMaster(volume); err != nil {
+	return withBody(validateVolume, func(w http.ResponseWriter, r *http.Request, req *setVolumeRequest) {
+		if err := pa.SetVolumeMaster(req.Volume); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -61,26 +60,5 @@ func withSink(
 		}
 
 		fn(w, r, sink)
-	}
-}
-
-func withVolume(
-	next func(w http.ResponseWriter, r *http.Request, volume float32),
-) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		defer r.Body.Close()
-
-		var req setVolumeRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "invalid JSON payload", http.StatusBadRequest)
-			return
-		}
-
-		if req.Volume < 0 || req.Volume > 1 {
-			http.Error(w, "volume must be between 0 and 1", http.StatusBadRequest)
-			return
-		}
-
-		next(w, r, req.Volume)
 	}
 }
