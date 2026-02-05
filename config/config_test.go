@@ -91,8 +91,16 @@ func TestNew_Defaults(t *testing.T) {
 
 	// Set XDG_SESSION_DESKTOP to avoid headless mode detection
 	originalDesktop := os.Getenv("XDG_SESSION_DESKTOP")
-	os.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
-	defer os.Setenv("XDG_SESSION_DESKTOP", originalDesktop)
+	if err := os.Setenv("XDG_SESSION_DESKTOP", "test-desktop"); err != nil {
+		t.Fatalf("Failed to set XDG_SESSION_DESKTOP: %v", err)
+	}
+	defer func() {
+		if originalDesktop != "" {
+			_ = os.Setenv("XDG_SESSION_DESKTOP", originalDesktop)
+		} else {
+			_ = os.Unsetenv("XDG_SESSION_DESKTOP")
+		}
+	}()
 
 	cfg, err := New()
 	if err != nil {
@@ -133,8 +141,16 @@ func TestNew_CustomPort(t *testing.T) {
 
 	// Set XDG_SESSION_DESKTOP to avoid headless mode detection
 	originalDesktop := os.Getenv("XDG_SESSION_DESKTOP")
-	os.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
-	defer os.Setenv("XDG_SESSION_DESKTOP", originalDesktop)
+	if err := os.Setenv("XDG_SESSION_DESKTOP", "test-desktop"); err != nil {
+		t.Fatalf("Failed to set XDG_SESSION_DESKTOP: %v", err)
+	}
+	defer func() {
+		if originalDesktop != "" {
+			_ = os.Setenv("XDG_SESSION_DESKTOP", originalDesktop)
+		} else {
+			_ = os.Unsetenv("XDG_SESSION_DESKTOP")
+		}
+	}()
 
 	cfg, err := New()
 	if err != nil {
@@ -167,8 +183,16 @@ func TestNew_InvalidPort(t *testing.T) {
 
 			// Set XDG_SESSION_DESKTOP to avoid headless mode detection
 			originalDesktop := os.Getenv("XDG_SESSION_DESKTOP")
-			os.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
-			defer os.Setenv("XDG_SESSION_DESKTOP", originalDesktop)
+			if err := os.Setenv("XDG_SESSION_DESKTOP", "test-desktop"); err != nil {
+				t.Fatalf("Failed to set XDG_SESSION_DESKTOP: %v", err)
+			}
+			defer func() {
+				if originalDesktop != "" {
+					_ = os.Setenv("XDG_SESSION_DESKTOP", originalDesktop)
+				} else {
+					_ = os.Unsetenv("XDG_SESSION_DESKTOP")
+				}
+			}()
 
 			cfg, err := New()
 			if err == nil {
@@ -187,8 +211,14 @@ func TestNew_HeadlessMode(t *testing.T) {
 
 	// Clear XDG_SESSION_DESKTOP to trigger headless mode
 	originalDesktop := os.Getenv("XDG_SESSION_DESKTOP")
-	os.Unsetenv("XDG_SESSION_DESKTOP")
-	defer os.Setenv("XDG_SESSION_DESKTOP", originalDesktop)
+	if err := os.Unsetenv("XDG_SESSION_DESKTOP"); err != nil {
+		t.Fatalf("Failed to unset XDG_SESSION_DESKTOP: %v", err)
+	}
+	defer func() {
+		if originalDesktop != "" {
+			_ = os.Setenv("XDG_SESSION_DESKTOP", originalDesktop)
+		}
+	}()
 
 	cfg, err := New()
 	if err != nil {
@@ -221,8 +251,16 @@ func TestNew_CustomLogLevel(t *testing.T) {
 
 			// Set XDG_SESSION_DESKTOP to avoid headless mode detection
 			originalDesktop := os.Getenv("XDG_SESSION_DESKTOP")
-			os.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
-			defer os.Setenv("XDG_SESSION_DESKTOP", originalDesktop)
+			if err := os.Setenv("XDG_SESSION_DESKTOP", "test-desktop"); err != nil {
+				t.Fatalf("Failed to set XDG_SESSION_DESKTOP: %v", err)
+			}
+			defer func() {
+				if originalDesktop != "" {
+					_ = os.Setenv("XDG_SESSION_DESKTOP", originalDesktop)
+				} else {
+					_ = os.Unsetenv("XDG_SESSION_DESKTOP")
+				}
+			}()
 
 			cfg, err := New()
 			if err != nil {
