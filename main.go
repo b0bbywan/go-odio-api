@@ -16,7 +16,7 @@ import (
 func main() {
 	cfg, err := config.New()
 	if err != nil {
-		logger.Fatal("[%s] Failed to load config: %v", err)
+		logger.Fatal("[%s] Failed to load config: %v", config.AppName, err)
 	}
 
 	// Set log level from config
@@ -29,15 +29,18 @@ func main() {
 	// Initialize backends
 	b, err := backend.New(ctx, cfg.Systemd, cfg.Pulseaudio, cfg.MPRIS)
 	if err != nil {
-		logger.Fatal("[%s] Backend initialization failed: %v", err)
+		logger.Fatal("[%s] Backend initialization failed: %v", config.AppName, err)
 	}
 
 	// systemd backend
 	if err := b.Start(); err != nil {
-		logger.Fatal("[%s] Backend start failed: %v", err)
+		logger.Fatal("[%s] Backend start failed: %v", config.AppName, err)
 	}
 
 	server := api.NewServer(http.NewServeMux(), cfg.Api, b)
+
+	// Channel pour synchroniser le shutdown
+	shutdownDone := make(chan struct{})
 
 	// Goroutine pour signal handling
 	go func() {
@@ -52,11 +55,20 @@ func main() {
 
 		// Cleanup des backends
 		b.Close()
+
+		// Signaler que le cleanup est terminé
+		close(shutdownDone)
 	}()
 
 	logger.Info("[%s] started", config.AppName)
-	if err := server.Run(ctx); err != nil && err != http.ErrServerClosed {
-		logger.Error("[%s] http server error: %v", err)
+	if server != nil {
+		if err := server.Run(ctx); err != nil && err != http.ErrServerClosed {
+			logger.Error("[%s] http server error: %v", config.AppName, err)
+		}
 	}
+
+	// Attendre que le cleanup des backends soit terminé
+	<-shutdownDone
+
 	logger.Info("[%s] stopped", config.AppName)
 }
