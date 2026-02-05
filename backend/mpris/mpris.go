@@ -340,8 +340,16 @@ func (m *MPRISBackend) setProperty(busName, property string, value interface{}) 
 
 // getProperty récupère une propriété depuis D-Bus pour un busName donné
 func (m *MPRISBackend) getProperty(busName, iface, prop string) (dbus.Variant, error) {
-	player := newPlayer(m, busName)
-	return player.getProperty(iface, prop)
+	obj := m.conn.Object(busName, MPRIS_PATH)
+	var v dbus.Variant
+	call := obj.Call(DBUS_PROP_GET, 0, iface, prop)
+	if err := m.callWithTimeout(call); err != nil {
+		return dbus.Variant{}, err
+	}
+	if err := call.Store(&v); err != nil {
+		return dbus.Variant{}, err
+	}
+	return v, nil
 }
 
 // Play démarre la lecture
