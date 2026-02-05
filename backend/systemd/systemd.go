@@ -13,6 +13,10 @@ import (
 
 // New prend maintenant la liste des services depuis la config
 func New(ctx context.Context, config *config.SystemdConfig) (*SystemdBackend, error) {
+	if config == nil || !config.Enabled {
+		return nil, nil
+	}
+
 	sysC, err := dbus.NewSystemConnectionContext(ctx)
 	if err != nil {
 		return nil, err
