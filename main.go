@@ -22,7 +22,7 @@ func main() {
 	// Set log level from config
 	logger.SetLevel(cfg.LogLevel)
 
-	// Context global pour toute l'application
+	// Global context for the entire application
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -39,9 +39,9 @@ func main() {
 
 	server := api.NewServer(http.NewServeMux(), cfg.Api, b)
 
-	// Channel pour synchroniser le shutdown
+	// Channel to synchronize shutdown
 	shutdownDone := make(chan struct{})
-	// Goroutine pour signal handling
+	// Goroutine for signal handling
 	go func() {
 		sigChan := make(chan os.Signal, 1)
 		signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
@@ -49,13 +49,13 @@ func main() {
 
 		logger.Info("[%s] Shutdown signal received, stopping server...", config.AppName)
 
-		// Cancel le context global - arrête tous les listeners
+		// Cancel the global context - stops all listeners
 		cancel()
 
-		// Cleanup des backends
+		// Cleanup backends
 		b.Close()
 
-		// Signaler que le cleanup est terminé
+		// Signal that cleanup is complete
 		close(shutdownDone)
 	}()
 

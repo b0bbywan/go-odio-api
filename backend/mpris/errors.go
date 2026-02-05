@@ -1,6 +1,6 @@
 package mpris
 
-// CapabilityError indique qu'une action n'est pas supportée par le player
+// CapabilityError indicates that an action is not supported by the player
 type CapabilityError struct {
 	Required string
 }
@@ -9,7 +9,7 @@ func (e *CapabilityError) Error() string {
 	return "action not allowed (requires " + e.Required + ")"
 }
 
-// PlayerNotFoundError indique qu'un player n'existe pas
+// PlayerNotFoundError indicates that a player doesn't exist
 type PlayerNotFoundError struct {
 	BusName string
 }
@@ -18,7 +18,7 @@ func (e *PlayerNotFoundError) Error() string {
 	return "player not found: " + e.BusName
 }
 
-// InvalidBusNameError indique qu'un busName est invalide
+// InvalidBusNameError indicates that a busName is invalid
 type InvalidBusNameError struct {
 	BusName string
 	Reason  string
@@ -28,7 +28,7 @@ func (e *InvalidBusNameError) Error() string {
 	return "invalid player name: " + e.Reason
 }
 
-// ValidationError indique qu'un paramètre est invalide
+// ValidationError indicates that a parameter is invalid
 type ValidationError struct {
 	Field   string
 	Message string

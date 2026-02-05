@@ -8,7 +8,7 @@ import (
 	"github.com/godbus/dbus/v5"
 )
 
-// unitNameFromPath extrait le nom de l'unité depuis le path D-Bus
+// unitNameFromPath extracts the unit name from the D-Bus path
 // Ex: /org/freedesktop/systemd1/unit/spotifyd_2eservice -> spotifyd.service
 func unitNameFromPath(path dbus.ObjectPath) string {
 	s := string(path)
@@ -17,16 +17,16 @@ func unitNameFromPath(path dbus.ObjectPath) string {
 		return ""
 	}
 	encoded := s[len(prefix):]
-	// Décoder les caractères échappés (ex: _2e -> .)
+	// Decode escaped characters (ex: _2e -> .)
 	return decodeUnitName(encoded)
 }
 
-// decodeUnitName décode le nom d'unité échappé par systemd
+// decodeUnitName decodes the unit name escaped by systemd
 func decodeUnitName(encoded string) string {
 	var result strings.Builder
 	for i := 0; i < len(encoded); i++ {
 		if encoded[i] == '_' && i+2 < len(encoded) {
-			// Séquence d'échappement _XX (hex)
+			// Escape sequence _XX (hex)
 			hex := encoded[i+1 : i+3]
 			var b byte
 			if _, err := parseHexByte(hex, &b); err == nil {
@@ -62,7 +62,7 @@ func parseHexByte(s string, b *byte) (bool, error) {
 	return true, nil
 }
 
-// stateKey génère une clé unique pour le couple service/scope
+// stateKey generates a unique key for the service/scope pair
 func stateKey(name string, scope UnitScope) string {
 	return string(scope) + "/" + name
 }

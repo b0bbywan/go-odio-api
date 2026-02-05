@@ -24,13 +24,13 @@ func New(ctx context.Context, cfg *config.PulseAudioConfig) (*PulseAudioBackend,
 	backend := &PulseAudioBackend{
 		address: address,
 		ctx:     ctx,
-		cache:   cache.New[[]AudioClient](0), // TTL=0 = pas d'expiration
+		cache:   cache.New[[]AudioClient](0), // TTL=0 = no expiration
 	}
 
 	return backend, nil
 }
 
-// Start charge le cache initial et démarre le listener
+// Start loads the initial cache and starts the listener
 func (pa *PulseAudioBackend) Start() error {
 	logger.Debug("[pulseaudio] starting backend")
 	pa.mu.Lock()
@@ -46,12 +46,12 @@ func (pa *PulseAudioBackend) Start() error {
 	pa.kind = detectServerKind(pa.server)
 	logger.Debug("[pulseaudio] detected server: %s (type=%s)", pa.server.PackageName, pa.kind)
 
-	// Charger le cache au démarrage
+	// Load the cache at startup
 	if _, err := pa.ListClients(); err != nil {
 		return err
 	}
 
-	// Démarrer le listener pour les changements pulseaudio
+	// Start the listener for pulseaudio changes
 	pa.listener = NewListener(pa)
 	if err := pa.listener.Start(); err != nil {
 		return err
@@ -135,7 +135,7 @@ func (pa *PulseAudioBackend) ServerInfo() (*ServerInfo, error) {
 }
 
 func (pa *PulseAudioBackend) ListClients() ([]AudioClient, error) {
-	// Vérifier le cache
+	// Check the cache
 	if cached, ok := pa.cache.Get(cacheKey); ok {
 		logger.Debug("[pulseaudio] returning %d clients from cache", len(cached))
 		return cached, nil
@@ -145,7 +145,7 @@ func (pa *PulseAudioBackend) ListClients() ([]AudioClient, error) {
 	return pa.refreshCache()
 }
 
-// refreshCache recharge depuis pulseaudio et met à jour le cache
+// refreshCache reloads from pulseaudio and updates the cache
 func (pa *PulseAudioBackend) refreshCache() ([]AudioClient, error) {
 	sinks, err := pa.client.SinkInputs()
 	if err != nil {
@@ -154,26 +154,26 @@ func (pa *PulseAudioBackend) refreshCache() ([]AudioClient, error) {
 
 	logger.Debug("[pulseaudio] loaded %d sink inputs", len(sinks))
 
-	// récupérer l'ancien cache
+	// retrieve the old cache
 	oldClients, _ := pa.cache.Get(cacheKey)
 
-	// générer le nouveau cache avec mises à jour/ajouts
+	// generate the new cache with updates/additions
 	updatedClients := pa.mergeClients(oldClients, sinks)
 
-	// Mettre en cache
+	// Cache it
 	pa.cache.Set(cacheKey, updatedClients)
 
 	return updatedClients, nil
 }
 
 func (pa *PulseAudioBackend) mergeClients(oldClients []AudioClient, sinks []pulseaudio.SinkInput) []AudioClient {
-	// map temporaire pour lookup par Name
+	// temporary map for lookup by Name
 	oldMap := make(map[string]AudioClient, len(oldClients))
 	for _, c := range oldClients {
 		oldMap[c.Name] = c
 	}
 
-	// créer le nouveau slice et mettre à jour / ajouter les clients
+	// create the new slice and update / add clients
 	newClients := make([]AudioClient, 0, len(sinks))
 	for _, s := range sinks {
 		client := pa.parseSinkInput(s)
@@ -181,7 +181,7 @@ func (pa *PulseAudioBackend) mergeClients(oldClients []AudioClient, sinks []puls
 		newClients = append(newClients, client)
 	}
 
-	// supprimer les clients disparus
+	// remove missing clients
 	return pa.removeMissingClients(oldMap, newClients)
 }
 
@@ -193,7 +193,7 @@ func (pa *PulseAudioBackend) updateOrAddClient(oldMap map[string]AudioClient, cl
 		return oldMap[client.Name]
 	}
 
-	// nouveau client
+	// new client
 	oldMap[client.Name] = client
 	return client
 }
@@ -214,7 +214,7 @@ func (pa *PulseAudioBackend) removeMissingClients(oldMap map[string]AudioClient,
 	return final
 }
 
-// GetClient récupère un client spécifique du cache
+// GetClient retrieves a specific client from the cache
 func (pa *PulseAudioBackend) GetClient(name string) (*AudioClient, bool) {
 	clients, ok := pa.cache.Get(cacheKey)
 	if !ok {
@@ -229,11 +229,11 @@ func (pa *PulseAudioBackend) GetClient(name string) (*AudioClient, bool) {
 	return nil, false
 }
 
-// UpdateClient met à jour un client spécifique dans le cache
+// UpdateClient updates a specific client in the cache
 func (pa *PulseAudioBackend) UpdateClient(updated AudioClient) error {
 	clients, ok := pa.cache.Get(cacheKey)
 	if !ok {
-		// Si pas de cache, on recharge tout
+		// If no cache, reload everything
 		_, err := pa.ListClients()
 		return err
 	}
@@ -248,7 +248,7 @@ func (pa *PulseAudioBackend) UpdateClient(updated AudioClient) error {
 	}
 
 	if !found {
-		// Client pas dans le cache, on l'ajoute
+		// Client not in cache, add it
 		clients = append(clients, updated)
 	}
 
@@ -256,11 +256,11 @@ func (pa *PulseAudioBackend) UpdateClient(updated AudioClient) error {
 	return nil
 }
 
-// RefreshClient recharge un client spécifique depuis pulseaudio et met à jour le cache
+// RefreshClient reloads a specific client from pulseaudio and updates the cache
 func (pa *PulseAudioBackend) RefreshClient(name string) (*AudioClient, error) {
 	sink, err := pa.client.GetSinkInputByName(name)
 	if err != nil {
-		// Client n'existe plus, on recharge tout
+		// Client no longer exists, reload everything
 		if _, err := pa.ListClients(); err != nil {
 			return nil, err
 		}
@@ -269,7 +269,7 @@ func (pa *PulseAudioBackend) RefreshClient(name string) (*AudioClient, error) {
 
 	client := pa.parseSinkInput(sink)
 
-	// Mettre à jour dans le cache
+	// Update in the cache
 	if err := pa.UpdateClient(client); err != nil {
 		return nil, err
 	}
@@ -277,12 +277,12 @@ func (pa *PulseAudioBackend) RefreshClient(name string) (*AudioClient, error) {
 	return &client, nil
 }
 
-// InvalidateCache invalide tout le cache
+// InvalidateCache invalidates the entire cache
 func (pa *PulseAudioBackend) InvalidateCache() {
 	pa.cache.Delete(cacheKey)
 }
 
-// Close ferme proprement les connexions et arrête le listener
+// Close cleanly closes the connections and stops the listener
 func (pa *PulseAudioBackend) Close() {
 	if pa.listener != nil {
 		pa.listener.Stop()
@@ -386,31 +386,30 @@ func cloneProps(in map[string]string) map[string]string {
 }
 
 func (pa *PulseAudioBackend) parsePulseBluetoothSink(s pulseaudio.SinkInput, props map[string]string) (AudioClient, bool) {
-	// récupérer le module-loopback
+	// retrieve the module-loopback
 	mod, err := pa.findModule(s.OwnerModule, "module-loopback")
 	if err != nil {
 		return AudioClient{}, false
 	}
 
-	// extraire la source bluez
+	// extract the bluez source
 	sourceName := extractModuleSource(mod.Argument)
 	if sourceName == "" {
 		return AudioClient{}, false
 	}
 
-	// lookup de la source
+	// source lookup
 	src, err := pa.findSourceByName(sourceName)
 	if err != nil {
 		return AudioClient{}, false
 	}
 
-	//
 	btProps := cloneProps(props)
 	for k, v := range src.PropList {
 		btProps[k] = v
 	}
 
-	// enrichissement props
+	// enrich props
 	name := src.PropList["device.description"]
 	if name == "" {
 		name = strings.TrimPrefix(props["media.name"], "Loopback from ")

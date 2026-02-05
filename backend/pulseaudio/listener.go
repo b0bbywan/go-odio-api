@@ -8,7 +8,7 @@ import (
 	"github.com/b0bbywan/go-odio-api/logger"
 )
 
-// Listener écoute les changements pulseaudio
+// Listener listens for pulseaudio changes
 type Listener struct {
 	backend *PulseAudioBackend
 	ctx     context.Context
@@ -24,15 +24,15 @@ func NewListener(backend *PulseAudioBackend) *Listener {
 	}
 }
 
-// Start démarre l'écoute des événements pulseaudio
+// Start starts listening for pulseaudio events
 func (l *Listener) Start() error {
-	// Subscribe aux changements de sink inputs
+	// Subscribe to sink input changes
 	updates, err := l.backend.client.UpdatesByType(pulseaudio.SUBSCRIPTION_MASK_SINK_INPUT)
 	if err != nil {
 		return err
 	}
 
-	// Goroutine d'écoute
+	// Listening goroutine
 	go l.listen(updates)
 
 	logger.Info("[pulseaudio] listener started")
@@ -52,7 +52,7 @@ func (l *Listener) listen(updates <-chan struct{}) {
 				return
 			}
 
-			// Un sink input a changé, recharger le cache
+			// A sink input changed, refresh the cache
 			logger.Debug("[pulseaudio] sink inputs changed, refreshing cache")
 			if _, err := l.backend.refreshCache(); err != nil {
 				logger.Warn("[pulseaudio] failed to refresh clients: %v", err)
@@ -61,10 +61,10 @@ func (l *Listener) listen(updates <-chan struct{}) {
 	}
 }
 
-// Stop arrête le listener
+// Stop stops the listener
 func (l *Listener) Stop() {
 	logger.Info("[pulseaudio] stopping listener")
 
-	// Cancel le context pour arrêter la goroutine
+	// Cancel the context to stop the goroutine
 	l.cancel()
 }

@@ -8,9 +8,9 @@ import (
 	"github.com/b0bbywan/go-odio-api/logger"
 )
 
-// Heartbeat gère la mise à jour périodique de la position des players en lecture.
-// Il démarre automatiquement quand au moins un player est en Playing et s'arrête
-// automatiquement quand plus aucun player n'est en Playing.
+// Heartbeat manages periodic position updates for playing players.
+// It starts automatically when at least one player is Playing and stops
+// automatically when no player is Playing anymore.
 type Heartbeat struct {
 	backend *MPRISBackend
 	ctx     context.Context
@@ -20,7 +20,7 @@ type Heartbeat struct {
 	active bool
 }
 
-// NewHeartbeat crée un nouveau gestionnaire de heartbeat
+// NewHeartbeat creates a new heartbeat manager
 func NewHeartbeat(backend *MPRISBackend) *Heartbeat {
 	ctx, cancel := context.WithCancel(backend.ctx)
 	return &Heartbeat{
@@ -31,22 +31,22 @@ func NewHeartbeat(backend *MPRISBackend) *Heartbeat {
 	}
 }
 
-// Start démarre le heartbeat s'il n'est pas déjà actif.
-// Cette fonction est idempotente : appeler plusieurs fois ne démarre qu'un seul heartbeat.
+// Start starts the heartbeat if it's not already active.
+// This function is idempotent: calling multiple times only starts one heartbeat.
 func (h *Heartbeat) Start() {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
 	if h.active {
-		return // Déjà actif
+		return // Already active
 	}
 
 	h.active = true
 	go h.run()
 }
 
-// StartIfAnyPlaying démarre le heartbeat si au moins un player est en Playing.
-// Utile au démarrage de l'application pour détecter si un player joue déjà.
+// StartIfAnyPlaying starts the heartbeat if at least one player is Playing.
+// Useful at application startup to detect if a player is already playing.
 func (h *Heartbeat) StartIfAnyPlaying(players []Player) {
 	for _, player := range players {
 		if player.PlaybackStatus == StatusPlaying {
@@ -57,19 +57,19 @@ func (h *Heartbeat) StartIfAnyPlaying(players []Player) {
 	}
 }
 
-// Stop arrête le heartbeat
+// Stop stops the heartbeat
 func (h *Heartbeat) Stop() {
 	h.cancel()
 }
 
-// IsRunning retourne true si le heartbeat est actif
+// IsRunning returns true if the heartbeat is active
 func (h *Heartbeat) IsRunning() bool {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	return h.active
 }
 
-// run est la boucle principale du heartbeat
+// run is the main heartbeat loop
 func (h *Heartbeat) run() {
 	defer func() {
 		h.mu.Lock()
@@ -90,14 +90,14 @@ func (h *Heartbeat) run() {
 		case <-ticker.C:
 			hasPlaying := h.updatePlayingPositions()
 			if !hasPlaying {
-				return // Auto-stop: plus aucun player en Playing
+				return // Auto-stop: no more players Playing
 			}
 		}
 	}
 }
 
-// updatePlayingPositions met à jour la position de tous les players en lecture.
-// Retourne true si au moins un player est en Playing.
+// updatePlayingPositions updates the position of all playing players.
+// Returns true if at least one player is Playing.
 func (h *Heartbeat) updatePlayingPositions() bool {
 	players, ok := h.backend.cache.Get(CACHE_KEY)
 	if !ok {
@@ -106,20 +106,20 @@ func (h *Heartbeat) updatePlayingPositions() bool {
 
 	hasPlaying := false
 	for _, player := range players {
-		// Mettre à jour uniquement les players en Playing
+		// Update only Playing players
 		if player.PlaybackStatus != StatusPlaying {
 			continue
 		}
 
 		hasPlaying = true
 
-		// Récupérer la position actuelle via l'helper
+		// Get current position via helper
 		variant, err := h.backend.getProperty(player.BusName, MPRIS_PLAYER_IFACE, "Position")
 		if err != nil {
 			continue
 		}
 
-		// Mettre à jour via UpdateProperty (gère le cache proprement)
+		// Update via UpdateProperty (handles cache properly)
 		if err := h.backend.UpdateProperty(player.BusName, "Position", variant); err != nil {
 			logger.Warn("[mpris] failed to update position for %s: %v", player.BusName, err)
 		}

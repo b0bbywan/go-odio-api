@@ -11,7 +11,7 @@ type Entry[T any] struct {
 }
 
 func (e Entry[T]) IsExpired() bool {
-	// Si ExpiresAt est zero value, le cache n'expire jamais
+	// If ExpiresAt is zero value, the cache never expires
 	if e.ExpiresAt.IsZero() {
 		return false
 	}
@@ -57,7 +57,7 @@ func (c *Cache[T]) Set(key string, value T) {
 	if c.ttl > 0 {
 		expiresAt = time.Now().Add(c.ttl)
 	}
-	// Si ttl == 0, expiresAt reste à zero value = pas d'expiration
+	// If ttl == 0, expiresAt remains at zero value = no expiration
 
 	c.entries[key] = Entry[T]{
 		Value:     value,

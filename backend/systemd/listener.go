@@ -20,7 +20,7 @@ const (
 func NewListener(backend *SystemdBackend) *Listener {
 	ctx, cancel := context.WithCancel(backend.ctx)
 
-	// Map pour filtrage rapide
+	// Map for fast filtering
 	sysWatched := make(map[string]bool, len(backend.config.SystemServices))
 	for _, name := range backend.config.SystemServices {
 		sysWatched[name] = true
@@ -42,14 +42,14 @@ func NewListener(backend *SystemdBackend) *Listener {
 	}
 }
 
-// Start démarre l'écoute des signaux D-Bus directement via godbus
+// Start starts listening for D-Bus signals directly via godbus
 func (l *Listener) Start() error {
-	// Connexions D-Bus brutes pour les signaux
+	// Raw D-Bus connections for signals
 	if err := l.startScope(ScopeSystem, l.sysWatched); err != nil {
 		return err
 	}
 
-	// En mode headless, utiliser fsnotify au lieu de D-Bus pour les services user
+	// In headless mode, use fsnotify instead of D-Bus for user services
 	if l.headless {
 		if err := l.StartHeadless(); err != nil {
 			l.Stop()
@@ -78,7 +78,7 @@ func (l *Listener) startScope(scope UnitScope, watched map[string]bool) error {
 		return err
 	}
 
-	// S'abonner aux signaux de systemd (path filtre sur systemd1)
+	// Subscribe to systemd signals (path filters on systemd1)
 	matchRule := "type='signal',sender='org.freedesktop.systemd1'"
 
 	if err := conn.BusObject().Call("org.freedesktop.DBus.AddMatch", 0, matchRule).Err; err != nil {
@@ -97,18 +97,18 @@ func (l *Listener) startScope(scope UnitScope, watched map[string]bool) error {
 }
 
 func (l *Listener) checkUnit(sig *dbus.Signal, scope UnitScope) (string, bool) {
-	// Extraire le nom de l'unité depuis le path
+	// Extract unit name from the path
 	unitName := unitNameFromPath(sig.Path)
 	if unitName == "" {
 		return unitName, false
 	}
 
-	// Filtrer : uniquement les services surveillés
+	// Filter: only monitored services
 	if !l.Watched(unitName, scope) {
 		return unitName, false
 	}
 
-	// Extraire SubState depuis les propriétés changées (signaux PropertiesChanged)
+	// Extract SubState from changed properties (PropertiesChanged signals)
 	if len(sig.Body) < 2 {
 		return unitName, false
 	}
@@ -126,7 +126,7 @@ func (l *Listener) checkUnit(sig *dbus.Signal, scope UnitScope) (string, bool) {
 		return unitName, false
 	}
 
-	// Déduplication : ignorer si même état que précédemment
+	// Deduplication: ignore if same state as previously
 	key := stateKey(unitName, scope)
 	l.lastStateMu.RLock()
 	lastState := l.lastState[key]
@@ -136,7 +136,7 @@ func (l *Listener) checkUnit(sig *dbus.Signal, scope UnitScope) (string, bool) {
 		return unitName, false
 	}
 
-	// Mettre à jour le dernier état connu
+	// Update the last known state
 	l.lastStateMu.Lock()
 	l.lastState[key] = subState
 	l.lastStateMu.Unlock()
@@ -185,24 +185,24 @@ func (l *Listener) listen(
 	}
 }
 
-// Stop arrête le listener
+// Stop stops the listener
 func (l *Listener) Stop() {
 	logger.Info("[systemd] stopping listener")
 	l.cancel()
 	logger.Debug("[systemd] listener stopped")
 }
 
-// StartHeadless démarre l'écoute des événements systemd via fsnotify
+// StartHeadless starts listening for systemd events via fsnotify
 func (l *Listener) StartHeadless() error {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		return err
 	}
 
-	// Utiliser le répertoire XDG_RUNTIME_DIR depuis la config
+	// Use the XDG_RUNTIME_DIR directory from the config
 	unitsDir := filepath.Join(l.backend.config.XDGRuntimeDir, "systemd/units")
 
-	// Vérifier que le répertoire existe
+	// Verify that the directory exists
 	if _, err := os.Stat(unitsDir); os.IsNotExist(err) {
 		if closeErr := watcher.Close(); closeErr != nil {
 			logger.Info("Failed to close watcher: %v", closeErr)
@@ -251,7 +251,7 @@ func (l *Listener) listenHeadless(watcher *fsnotify.Watcher) {
 }
 
 func (l *Listener) dispatchHeadless(event fsnotify.Event) {
-	// Filtre sur invocation:*.service
+	// Filter on invocation:*.service
 	basename := filepath.Base(event.Name)
 	if len(basename) <= 11 || basename[:11] != "invocation:" {
 		return
@@ -259,7 +259,7 @@ func (l *Listener) dispatchHeadless(event fsnotify.Event) {
 
 	serviceName := basename[11:]
 
-	// Filtrer uniquement les services surveillés
+	// Filter only monitored services
 	if !l.userWatched[serviceName] {
 		return
 	}

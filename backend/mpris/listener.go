@@ -9,7 +9,7 @@ import (
 	"github.com/b0bbywan/go-odio-api/logger"
 )
 
-// NewListener crée un nouveau listener MPRIS
+// NewListener creates a new MPRIS listener
 func NewListener(backend *MPRISBackend) *Listener {
 	ctx, cancel := context.WithCancel(backend.ctx)
 
@@ -21,9 +21,9 @@ func NewListener(backend *MPRISBackend) *Listener {
 	}
 }
 
-// Start démarre l'écoute des signaux D-Bus MPRIS
+// Start starts listening to MPRIS D-Bus signals
 func (l *Listener) Start() error {
-	// Utiliser la connexion du backend
+	// Use the backend connection
 	conn := l.backend.conn
 
 	if err := l.backend.addListenMatchRules(); err != nil {
@@ -39,7 +39,7 @@ func (l *Listener) Start() error {
 	return nil
 }
 
-// listen écoute les signaux D-Bus en continu
+// listen continuously listens to D-Bus signals
 func (l *Listener) listen(ch <-chan *dbus.Signal) {
 	for {
 		select {
@@ -55,7 +55,7 @@ func (l *Listener) listen(ch <-chan *dbus.Signal) {
 	}
 }
 
-// handleSignal traite un signal D-Bus
+// handleSignal processes a D-Bus signal
 func (l *Listener) handleSignal(sig *dbus.Signal) {
 	switch sig.Name {
 	case DBUS_PROP_CHANGED_SIGNAL:
@@ -67,7 +67,7 @@ func (l *Listener) handleSignal(sig *dbus.Signal) {
 	}
 }
 
-// handlePropertiesChanged traite les changements de propriétés MPRIS
+// handlePropertiesChanged processes MPRIS property changes
 func (l *Listener) handlePropertiesChanged(sig *dbus.Signal) {
 	// Body[0] = interface name
 	// Body[1] = changed properties (map[string]Variant)
@@ -79,7 +79,7 @@ func (l *Listener) handlePropertiesChanged(sig *dbus.Signal) {
 
 	iface, ok := sig.Body[0].(string)
 	if !ok || iface != MPRIS_PLAYER_IFACE {
-		// On ne s'intéresse qu'aux changements du Player
+		// We only care about Player changes
 		return
 	}
 
@@ -88,20 +88,20 @@ func (l *Listener) handlePropertiesChanged(sig *dbus.Signal) {
 		return
 	}
 
-	// Le signal contient le unique name (:1.107), pas le well-known name
-	// Trouver le player MPRIS correspondant
+	// The signal contains the unique name (:1.107), not the well-known name
+	// Find the corresponding MPRIS player
 	busName := l.backend.findPlayerByUniqueName(sig.Sender)
 	if busName == "" {
-		// Signal d'un player non connu, ignorer
+		// Signal from unknown player, ignore
 		return
 	}
 
-	// Vérifier si PlaybackStatus a changé pour la déduplication
+	// Check if PlaybackStatus changed for deduplication
 	if statusVar, hasStatus := changed["PlaybackStatus"]; hasStatus {
 		if status, ok := extractString(statusVar); ok {
 			newStatus := PlaybackStatus(status)
 
-			// Déduplication
+			// Deduplication
 			l.lastStateMu.RLock()
 			lastStatus := l.lastState[busName]
 			l.lastStateMu.RUnlock()
@@ -113,7 +113,7 @@ func (l *Listener) handlePropertiesChanged(sig *dbus.Signal) {
 
 				logger.Debug("[mpris] player %s changed status: %s -> %s", busName, lastStatus, newStatus)
 
-				// Si le player passe en Playing, s'assurer que le heartbeat tourne
+				// If player switches to Playing, ensure heartbeat is running
 				if newStatus == StatusPlaying {
 					l.backend.heartbeat.Start()
 				}
@@ -121,20 +121,20 @@ func (l *Listener) handlePropertiesChanged(sig *dbus.Signal) {
 		}
 	}
 
-	// Logger les propriétés qui vont être mises à jour
+	// Log the properties that will be updated
 	propNames := make([]string, 0, len(changed))
 	for propName := range changed {
 		propNames = append(propNames, propName)
 	}
 	logger.Debug("[mpris] updating %s properties: %v", busName, propNames)
 
-	// Mettre à jour les propriétés directement depuis le signal (pas d'appels D-Bus!)
+	// Update properties directly from signal (no D-Bus calls!)
 	if err := l.backend.UpdatePlayerProperties(busName, changed); err != nil {
 		logger.Error("[mpris] failed to update player %s properties: %v", busName, err)
 	}
 }
 
-// handleNameOwnerChanged détecte quand un lecteur apparaît ou disparaît
+// handleNameOwnerChanged detects when a player appears or disappears
 func (l *Listener) handleNameOwnerChanged(sig *dbus.Signal) {
 	// Body[0] = bus name
 	// Body[1] = old owner
@@ -153,13 +153,13 @@ func (l *Listener) handleNameOwnerChanged(sig *dbus.Signal) {
 	newOwner, _ := sig.Body[2].(string)
 
 	if oldOwner == "" && newOwner != "" {
-		// Nouveau lecteur apparu
+		// New player appeared
 		logger.Info("[mpris] new player detected: %s", busName)
 		if _, err := l.backend.ReloadPlayerFromDBus(busName); err != nil {
 			logger.Error("[mpris] failed to add new player %s: %v", busName, err)
 		}
 	} else if oldOwner != "" && newOwner == "" {
-		// Lecteur disparu
+		// Player disappeared
 		logger.Info("[mpris] player removed: %s", busName)
 		if err := l.backend.RemovePlayer(busName); err != nil {
 			logger.Error("[mpris] failed to remove player %s: %v", busName, err)
@@ -167,7 +167,7 @@ func (l *Listener) handleNameOwnerChanged(sig *dbus.Signal) {
 	}
 }
 
-// Stop arrête le listener
+// Stop stops the listener
 func (l *Listener) Stop() {
 	logger.Info("[mpris] stopping listener")
 	l.cancel()

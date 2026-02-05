@@ -38,7 +38,7 @@ func (s *Server) Run(ctx context.Context) error {
 		Handler: s.mux,
 	}
 
-	// Goroutine pour signal handling
+	// Goroutine for signal handling
 	go func() {
 		<-ctx.Done()
 		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
