@@ -205,34 +205,34 @@ func (m *MPRISBackend) UpdatePlayerProperties(busName string, changed map[string
 		for key, variant := range changed {
 			switch key {
 			case "PlaybackStatus":
-				if val, ok := variant.Value().(string); ok {
+				if val, ok := extractString(variant); ok {
 					players[i].PlaybackStatus = PlaybackStatus(val)
 				}
 			case "LoopStatus":
-				if val, ok := variant.Value().(string); ok {
+				if val, ok := extractString(variant); ok {
 					players[i].LoopStatus = LoopStatus(val)
 				}
 			case "Shuffle":
-				if val, ok := variant.Value().(bool); ok {
+				if val, ok := extractBool(variant); ok {
 					players[i].Shuffle = val
 				}
 			case "Volume":
-				if val, ok := variant.Value().(float64); ok {
+				if val, ok := extractFloat64(variant); ok {
 					players[i].Volume = val
 				}
 			case "Metadata":
-				if metaMap, ok := variant.Value().(map[string]dbus.Variant); ok {
+				if metaMap, ok := extractMetadataMap(variant); ok {
 					players[i].Metadata = make(map[string]string)
 					for k, v := range metaMap {
 						players[i].Metadata[k] = formatMetadataValue(v)
 					}
 				}
 			case "Rate":
-				if val, ok := variant.Value().(float64); ok {
+				if val, ok := extractFloat64(variant); ok {
 					players[i].Rate = val
 				}
 			case "Position":
-				if val, ok := variant.Value().(int64); ok {
+				if val, ok := extractInt64(variant); ok {
 					players[i].Position = val
 				}
 			}
@@ -319,11 +319,29 @@ func (m *MPRISBackend) findPlayerByUniqueName(uniqueName string) string {
 // Elle crée un nouveau Player et appelle loadFromDBus() pour récupérer toutes les propriétés
 // en utilisant GetAll (2 appels D-Bus au lieu de ~15 appels individuels).
 func (m *MPRISBackend) getPlayerFromDBus(busName string) (Player, error) {
-	player := newPlayer(m.conn, busName, m.timeout)
+	player := newPlayer(m, busName)
 	if err := player.loadFromDBus(); err != nil {
 		return Player{}, err
 	}
 	return *player, nil
+}
+
+// callMethod appelle une méthode MPRIS sur un player avec timeout
+func (m *MPRISBackend) callMethod(busName, method string, args ...interface{}) error {
+	obj := m.conn.Object(busName, MPRIS_PATH)
+	return m.callWithTimeout(obj.Call(method, 0, args...))
+}
+
+// setProperty définit une propriété sur un player
+func (m *MPRISBackend) setProperty(busName, property string, value interface{}) error {
+	obj := m.conn.Object(busName, MPRIS_PATH)
+	return m.callWithTimeout(obj.Call(DBUS_PROP_SET, 0, MPRIS_PLAYER_IFACE, property, dbus.MakeVariant(value)))
+}
+
+// getProperty récupère une propriété depuis D-Bus pour un busName donné
+func (m *MPRISBackend) getProperty(busName, iface, prop string) (dbus.Variant, error) {
+	player := newPlayer(m, busName)
+	return player.getProperty(iface, prop)
 }
 
 // Play démarre la lecture
@@ -337,8 +355,7 @@ func (m *MPRISBackend) Play(busName string) error {
 	}
 
 	logger.Debug("[mpris] playing %s", busName)
-	obj := m.conn.Object(busName, MPRIS_PATH)
-	return m.callWithTimeout(obj.Call(MPRIS_PLAYER_IFACE+".Play", 0))
+	return m.callMethod(busName, MPRIS_METHOD_PLAY)
 }
 
 // Pause met en pause la lecture
@@ -352,8 +369,7 @@ func (m *MPRISBackend) Pause(busName string) error {
 	}
 
 	logger.Debug("[mpris] pausing %s", busName)
-	obj := m.conn.Object(busName, MPRIS_PATH)
-	return m.callWithTimeout(obj.Call(MPRIS_PLAYER_IFACE+".Pause", 0))
+	return m.callMethod(busName, MPRIS_METHOD_PAUSE)
 }
 
 // PlayPause bascule entre lecture et pause
@@ -367,8 +383,7 @@ func (m *MPRISBackend) PlayPause(busName string) error {
 	}
 
 	logger.Debug("[mpris] toggling play/pause for %s", busName)
-	obj := m.conn.Object(busName, MPRIS_PATH)
-	return m.callWithTimeout(obj.Call(MPRIS_PLAYER_IFACE+".PlayPause", 0))
+	return m.callMethod(busName, MPRIS_METHOD_PLAY_PAUSE)
 }
 
 // Stop arrête la lecture
@@ -382,8 +397,7 @@ func (m *MPRISBackend) Stop(busName string) error {
 	}
 
 	logger.Debug("[mpris] stopping %s", busName)
-	obj := m.conn.Object(busName, MPRIS_PATH)
-	return m.callWithTimeout(obj.Call(MPRIS_PLAYER_IFACE+".Stop", 0))
+	return m.callMethod(busName, MPRIS_METHOD_STOP)
 }
 
 // Next passe à la piste suivante
@@ -397,8 +411,7 @@ func (m *MPRISBackend) Next(busName string) error {
 	}
 
 	logger.Debug("[mpris] next track for %s", busName)
-	obj := m.conn.Object(busName, MPRIS_PATH)
-	return m.callWithTimeout(obj.Call(MPRIS_PLAYER_IFACE+".Next", 0))
+	return m.callMethod(busName, MPRIS_METHOD_NEXT)
 }
 
 // Previous revient à la piste précédente
@@ -412,8 +425,7 @@ func (m *MPRISBackend) Previous(busName string) error {
 	}
 
 	logger.Debug("[mpris] previous track for %s", busName)
-	obj := m.conn.Object(busName, MPRIS_PATH)
-	return m.callWithTimeout(obj.Call(MPRIS_PLAYER_IFACE+".Previous", 0))
+	return m.callMethod(busName, MPRIS_METHOD_PREVIOUS)
 }
 
 // Seek déplace la position de lecture
@@ -427,8 +439,7 @@ func (m *MPRISBackend) Seek(busName string, offset int64) error {
 	}
 
 	logger.Debug("[mpris] seeking %d for %s", offset, busName)
-	obj := m.conn.Object(busName, MPRIS_PATH)
-	return m.callWithTimeout(obj.Call(MPRIS_PLAYER_IFACE+".Seek", 0, offset))
+	return m.callMethod(busName, MPRIS_METHOD_SEEK, offset)
 }
 
 // SetPosition définit la position de lecture
@@ -446,8 +457,7 @@ func (m *MPRISBackend) SetPosition(busName, trackID string, position int64) erro
 	}
 
 	logger.Debug("[mpris] setting position to %d for %s", position, busName)
-	obj := m.conn.Object(busName, MPRIS_PATH)
-	return m.callWithTimeout(obj.Call(MPRIS_PLAYER_IFACE+".SetPosition", 0, dbus.ObjectPath(trackID), position))
+	return m.callMethod(busName, MPRIS_METHOD_SET_POSITION, dbus.ObjectPath(trackID), position)
 }
 
 // SetVolume définit le volume
@@ -465,8 +475,7 @@ func (m *MPRISBackend) SetVolume(busName string, volume float64) error {
 	}
 
 	logger.Debug("[mpris] setting volume to %.2f for %s", volume, busName)
-	obj := m.conn.Object(busName, MPRIS_PATH)
-	return m.callWithTimeout(obj.Call(DBUS_PROP_SET, 0, MPRIS_PLAYER_IFACE, "Volume", dbus.MakeVariant(volume)))
+	return m.setProperty(busName, "Volume", volume)
 }
 
 // SetLoopStatus définit le statut de boucle
@@ -487,8 +496,7 @@ func (m *MPRISBackend) SetLoopStatus(busName string, status LoopStatus) error {
 	}
 
 	logger.Debug("[mpris] setting loop status to %s for %s", status, busName)
-	obj := m.conn.Object(busName, MPRIS_PATH)
-	return m.callWithTimeout(obj.Call(DBUS_PROP_SET, 0, MPRIS_PLAYER_IFACE, "LoopStatus", dbus.MakeVariant(string(status))))
+	return m.setProperty(busName, "LoopStatus", string(status))
 }
 
 // SetShuffle active/désactive le mode aléatoire
@@ -502,8 +510,7 @@ func (m *MPRISBackend) SetShuffle(busName string, shuffle bool) error {
 	}
 
 	logger.Debug("[mpris] setting shuffle to %v for %s", shuffle, busName)
-	obj := m.conn.Object(busName, MPRIS_PATH)
-	return m.callWithTimeout(obj.Call(DBUS_PROP_SET, 0, MPRIS_PLAYER_IFACE, "Shuffle", dbus.MakeVariant(shuffle)))
+	return m.setProperty(busName, "Shuffle", shuffle)
 }
 
 // InvalidateCache invalide tout le cache

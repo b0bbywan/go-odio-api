@@ -5,8 +5,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/godbus/dbus/v5"
-
 	"github.com/b0bbywan/go-odio-api/logger"
 )
 
@@ -115,14 +113,9 @@ func (h *Heartbeat) updatePlayingPositions() bool {
 
 		hasPlaying = true
 
-		// Récupérer la position actuelle
-		obj := h.backend.conn.Object(player.BusName, MPRIS_PATH)
-		call := obj.Call(DBUS_PROP_GET, 0, MPRIS_PLAYER_IFACE, "Position")
-		if err := h.backend.callWithTimeout(call); err != nil {
-			continue
-		}
-		var variant dbus.Variant
-		if err := call.Store(&variant); err != nil {
+		// Récupérer la position actuelle via l'helper
+		variant, err := h.backend.getProperty(player.BusName, MPRIS_PLAYER_IFACE, "Position")
+		if err != nil {
 			continue
 		}
 

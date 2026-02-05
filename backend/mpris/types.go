@@ -32,6 +32,16 @@ const (
 	DBUS_PROP_CHANGED_SIGNAL = DBUS_PROP_IFACE + ".PropertiesChanged"
 	DBUS_NAME_OWNER_CHANGED  = DBUS_INTERFACE + ".NameOwnerChanged"
 	DBUS_GET_NAME_OWNER      = DBUS_INTERFACE + ".GetNameOwner"
+
+	// MPRIS Player methods
+	MPRIS_METHOD_PLAY         = MPRIS_PLAYER_IFACE + ".Play"
+	MPRIS_METHOD_PAUSE        = MPRIS_PLAYER_IFACE + ".Pause"
+	MPRIS_METHOD_PLAY_PAUSE   = MPRIS_PLAYER_IFACE + ".PlayPause"
+	MPRIS_METHOD_STOP         = MPRIS_PLAYER_IFACE + ".Stop"
+	MPRIS_METHOD_NEXT         = MPRIS_PLAYER_IFACE + ".Next"
+	MPRIS_METHOD_PREVIOUS     = MPRIS_PLAYER_IFACE + ".Previous"
+	MPRIS_METHOD_SEEK         = MPRIS_PLAYER_IFACE + ".Seek"
+	MPRIS_METHOD_SET_POSITION = MPRIS_PLAYER_IFACE + ".SetPosition"
 )
 
 // PlaybackStatus represents the current playback state
@@ -132,6 +142,7 @@ type MPRISBackend struct {
 
 // Player représente un lecteur multimédia MPRIS
 type Player struct {
+	backend    *MPRISBackend // Backend parent (non exporté)
 	conn       *dbus.Conn    // Connexion D-Bus (non exporté)
 	timeout    time.Duration // Timeout pour les appels D-Bus (non exporté)
 	uniqueName string        // Unique connection name D-Bus (ex: :1.107)

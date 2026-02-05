@@ -3,10 +3,43 @@ package mpris
 import (
 	"fmt"
 	"reflect"
-	"time"
 
 	"github.com/godbus/dbus/v5"
 )
+
+// Helpers d'extraction de valeurs depuis dbus.Variant
+// Ces helpers sont utilisés pour extraire les valeurs des variants reçus
+// dans les signaux D-Bus sans faire d'appels D-Bus supplémentaires.
+
+// extractString extrait une string d'un dbus.Variant
+func extractString(v dbus.Variant) (string, bool) {
+	val, ok := v.Value().(string)
+	return val, ok
+}
+
+// extractBool extrait un bool d'un dbus.Variant
+func extractBool(v dbus.Variant) (bool, bool) {
+	val, ok := v.Value().(bool)
+	return val, ok
+}
+
+// extractInt64 extrait un int64 d'un dbus.Variant
+func extractInt64(v dbus.Variant) (int64, bool) {
+	val, ok := v.Value().(int64)
+	return val, ok
+}
+
+// extractFloat64 extrait un float64 d'un dbus.Variant
+func extractFloat64(v dbus.Variant) (float64, bool) {
+	val, ok := v.Value().(float64)
+	return val, ok
+}
+
+// extractMetadataMap extrait une map de metadata d'un dbus.Variant
+func extractMetadataMap(v dbus.Variant) (map[string]dbus.Variant, bool) {
+	val, ok := v.Value().(map[string]dbus.Variant)
+	return val, ok
+}
 
 // callWithTimeout méthode receiver pour Player
 func (p *Player) callWithTimeout(call *dbus.Call) error {
@@ -295,11 +328,12 @@ func formatMetadataValue(value interface{}) string {
 	}
 }
 
-// newPlayer crée un nouveau Player avec connexion D-Bus
-func newPlayer(conn *dbus.Conn, busName string, timeout time.Duration) *Player {
+// newPlayer crée un nouveau Player avec connexion au backend
+func newPlayer(backend *MPRISBackend, busName string) *Player {
 	return &Player{
-		conn:    conn,
-		timeout: timeout,
+		backend: backend,
+		conn:    backend.conn,
+		timeout: backend.timeout,
 		BusName: busName,
 	}
 }
