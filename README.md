@@ -106,10 +106,10 @@ POST   /players/{player}/shuffle          # Set shuffle (body: {"shuffle": true}
 ```
 GET    /audio/server                      # Get server info
 POST   /audio/server/mute                 # Mute/unmute server
-POST   /audio/server/volume               # Set server volume
+POST   /audio/server/volume               # Set server volume (body: {"volume": 0.5})
 GET    /audio/clients                     # List audio clients (sink-inputs)
 POST   /audio/clients/{sink}/mute         # Mute/unmute client
-POST   /audio/clients/{sink}/volume       # Set client volume
+POST   /audio/clients/{sink}/volume       # Set client volume (body: {"volume": 0.5})
 ```
 
 ### Systemd Services
