@@ -293,7 +293,7 @@ func (pa *PulseAudioBackend) Close() {
 
 func (pa *PulseAudioBackend) ToggleMuteMaster() error {
 	if _, err := pa.client.ToggleMute(); err != nil {
-		return fmt.Errorf("Failed to get default sink: %w", err)
+		return fmt.Errorf("failed to get default sink: %w", err)
 	}
 	return nil
 }
@@ -306,7 +306,7 @@ func (pa *PulseAudioBackend) ToggleMute(name string) error {
 	logger.Debug("[pulseaudio] toggling mute for client %q", name)
 	sink, err := pa.client.GetSinkInputByName(name)
 	if err != nil {
-		return fmt.Errorf("Failed to get Sink Input: %w", err)
+		return fmt.Errorf("failed to get sink input: %w", err)
 	}
 
 	if err := sink.ToggleMute(); err != nil {
@@ -319,7 +319,7 @@ func (pa *PulseAudioBackend) SetVolume(name string, vol float32) error {
 	logger.Debug("[pulseaudio] setting volume for client %q to %.2f", name, vol)
 	sink, err := pa.client.GetSinkInputByName(name)
 	if err != nil {
-		return fmt.Errorf("Failed to get Sink Input: %w", err)
+		return fmt.Errorf("failed to get sink input: %w", err)
 	}
 
 	if err := sink.SetVolume(vol); err != nil {
