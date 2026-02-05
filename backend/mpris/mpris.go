@@ -42,12 +42,6 @@ func callWithTimeout(call *dbus.Call, timeout time.Duration) error {
 	}
 }
 
-type dbusTimeoutError struct{}
-
-func (e *dbusTimeoutError) Error() string {
-	return "D-Bus call timeout"
-}
-
 // callWithTimeout méthode receiver pour MPRISBackend
 func (m *MPRISBackend) callWithTimeout(call *dbus.Call) error {
 	return callWithTimeout(call, m.timeout)
