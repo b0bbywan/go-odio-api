@@ -43,7 +43,6 @@ func (m *MPRISBackend) callWithTimeout(call *dbus.Call) error {
 	return callWithTimeout(call, m.timeout)
 }
 
-
 // callMethod appelle une méthode MPRIS sur un player avec timeout
 func (m *MPRISBackend) callMethod(busName, method string, args ...interface{}) error {
 	obj := m.conn.Object(busName, MPRIS_PATH)
@@ -102,13 +101,12 @@ func (m *MPRISBackend) addListenMatchRules() error {
 }
 
 func (m *MPRISBackend) getNameOwner(busName string) (string, error) {
-    var owner string
-    if err := m.conn.BusObject().Call(DBUS_GET_NAME_OWNER, 0, busName).Store(&owner); err != nil {
-        return "", err
-    }
-    return owner, nil
+	var owner string
+	if err := m.conn.BusObject().Call(DBUS_GET_NAME_OWNER, 0, busName).Store(&owner); err != nil {
+		return "", err
+	}
+	return owner, nil
 }
-
 
 // Helpers d'extraction de valeurs depuis dbus.Variant
 // Ces helpers sont utilisés pour extraire les valeurs des variants reçus

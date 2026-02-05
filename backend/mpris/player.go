@@ -17,7 +17,6 @@ func newPlayer(backend *MPRISBackend, busName string) *Player {
 	}
 }
 
-
 // Capability getter methods (raccourcis pour un accès plus court)
 
 // CanPlay retourne si le lecteur peut jouer
@@ -59,7 +58,7 @@ func (p *Player) loadFromDBus() error {
 	// Récupérer le unique name via GetNameOwner
 	owner, err := p.backend.getNameOwner(p.BusName)
 	if err != nil {
-	    return err
+		return err
 	}
 	p.uniqueName = owner
 

@@ -1,14 +1,13 @@
 package mpris
 
-
 const (
 	CACHE_KEY = "players"
 
 	// MPRIS D-Bus constants
-	MPRIS_PREFIX        = "org.mpris.MediaPlayer2"
-	MPRIS_PATH          = "/org/mpris/MediaPlayer2"
-	MPRIS_INTERFACE     = "org.mpris.MediaPlayer2"
-	MPRIS_PLAYER_IFACE  = "org.mpris.MediaPlayer2.Player"
+	MPRIS_PREFIX       = "org.mpris.MediaPlayer2"
+	MPRIS_PATH         = "/org/mpris/MediaPlayer2"
+	MPRIS_INTERFACE    = "org.mpris.MediaPlayer2"
+	MPRIS_PLAYER_IFACE = "org.mpris.MediaPlayer2.Player"
 
 	// D-Bus system constants
 	DBUS_INTERFACE  = "org.freedesktop.DBus"

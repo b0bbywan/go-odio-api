@@ -641,9 +641,9 @@ func TestExtractFloat64(t *testing.T) {
 
 func TestExtractMetadataMap(t *testing.T) {
 	tests := []struct {
-		name   string
+		name    string
 		variant dbus.Variant
-		wantOk bool
+		wantOk  bool
 	}{
 		{
 			name: "valid metadata map",
@@ -653,14 +653,14 @@ func TestExtractMetadataMap(t *testing.T) {
 			wantOk: true,
 		},
 		{
-			name:   "empty map",
+			name:    "empty map",
 			variant: dbus.MakeVariant(map[string]dbus.Variant{}),
-			wantOk: true,
+			wantOk:  true,
 		},
 		{
-			name:   "not a map",
+			name:    "not a map",
 			variant: dbus.MakeVariant("invalid"),
-			wantOk: false,
+			wantOk:  false,
 		},
 	}
 
