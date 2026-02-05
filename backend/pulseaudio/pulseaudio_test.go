@@ -114,7 +114,7 @@ func TestCloneProps(t *testing.T) {
 			}
 
 			// Ensure it's a deep copy (modifying original shouldn't affect clone)
-			if tt.input != nil && len(tt.input) > 0 {
+			if len(tt.input) > 0 {
 				tt.input["new_key"] = "new_value"
 				if _, exists := result["new_key"]; exists {
 					t.Error("cloneProps() did not create a deep copy")
