@@ -60,18 +60,9 @@ func (p *Player) getAllProperties(iface string) (map[string]dbus.Variant, error)
 	return props, err
 }
 
-// getProperty récupère une propriété D-Bus
+// getProperty récupère une propriété D-Bus via le backend
 func (p *Player) getProperty(iface, prop string) (dbus.Variant, error) {
-	obj := p.conn.Object(p.BusName, MPRIS_PATH)
-	var v dbus.Variant
-
-	call := obj.Call(DBUS_PROP_GET, 0, iface, prop)
-	if err := p.callWithTimeout(call); err != nil {
-		return dbus.Variant{}, err
-	}
-
-	err := call.Store(&v)
-	return v, err
+	return p.backend.getProperty(p.BusName, iface, prop)
 }
 
 // getStringProperty récupère une propriété string
