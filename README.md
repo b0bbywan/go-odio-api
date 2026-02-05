@@ -85,6 +85,8 @@ Configuration file can be placed at:
 - `~/.config/odio-api/config.yaml` (user-specific)
 - A default configuration is available in `share/config.yaml`
 
+Disabling a backend will disable its routes !
+
 Example configuration:
 
 ```yaml
