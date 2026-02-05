@@ -39,6 +39,8 @@ func main() {
 
 	server := api.NewServer(http.NewServeMux(), cfg.Api, b)
 
+	// Channel pour synchroniser le shutdown
+	shutdownDone := make(chan struct{})
 	// Goroutine pour signal handling
 	go func() {
 		sigChan := make(chan os.Signal, 1)
@@ -52,6 +54,9 @@ func main() {
 
 		// Cleanup des backends
 		b.Close()
+
+		// Signaler que le cleanup est terminé
+		close(shutdownDone)
 	}()
 
 	logger.Info("[%s] started", config.AppName)
@@ -60,5 +65,7 @@ func main() {
 			logger.Error("[%s] http server error: %v", config.AppName, err)
 		}
 	}
+
+	<-shutdownDone
 	logger.Info("[%s] stopped", config.AppName)
 }
