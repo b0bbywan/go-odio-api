@@ -151,7 +151,6 @@ The application uses a modular backend architecture:
 ### Prerequisites
 
 - Go 1.21 or higher
-- systemd with D-Bus support
 
 ### Running Tests
 
