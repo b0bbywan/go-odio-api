@@ -10,108 +10,11 @@ import (
 	"github.com/b0bbywan/go-odio-api/cache"
 )
 
-const (
-	cacheKey = "players"
-
-	// MPRIS D-Bus constants
-	mprisPrefix      = "org.mpris.MediaPlayer2"
-	mprisPath        = "/org/mpris/MediaPlayer2"
-	mprisInterface   = "org.mpris.MediaPlayer2"
-	mprisPlayerIface = "org.mpris.MediaPlayer2.Player"
-
-	// D-Bus system constants
-	dbusInterface = "org.freedesktop.DBus"
-	dbusPropIface = "org.freedesktop.DBus.Properties"
-
-	// D-Bus method names
-	dbusListNamesMethod   = dbusInterface + ".ListNames"
-	dbusAddMatchMethod    = dbusInterface + ".AddMatch"
-	dbusPropGet           = dbusPropIface + ".Get"
-	dbusPropGetAll        = dbusPropIface + ".GetAll"
-	dbusPropSet           = dbusPropIface + ".Set"
-	dbusPropChangedSignal = dbusPropIface + ".PropertiesChanged"
-	dbusNameOwnerChanged  = dbusInterface + ".NameOwnerChanged"
-)
-
 // PlaybackStatus represents the current playback state
 type PlaybackStatus string
 
-const (
-	StatusPlaying PlaybackStatus = "Playing"
-	StatusPaused  PlaybackStatus = "Paused"
-	StatusStopped PlaybackStatus = "Stopped"
-)
-
 // LoopStatus represents the current loop/repeat state
 type LoopStatus string
-
-const (
-	LoopNone     LoopStatus = "None"
-	LoopTrack    LoopStatus = "Track"
-	LoopPlaylist LoopStatus = "Playlist"
-)
-
-// Capabilities représente les actions supportées par un lecteur
-type Capabilities struct {
-	CanPlay       bool `json:"can_play" dbus:"CanPlay"`
-	CanPause      bool `json:"can_pause" dbus:"CanPause"`
-	CanGoNext     bool `json:"can_go_next" dbus:"CanGoNext"`
-	CanGoPrevious bool `json:"can_go_previous" dbus:"CanGoPrevious"`
-	CanSeek       bool `json:"can_seek" dbus:"CanSeek"`
-	CanControl    bool `json:"can_control" dbus:"CanControl"`
-}
-
-// CapabilityError indique qu'une action n'est pas supportée par le player
-type CapabilityError struct {
-	Required string
-}
-
-func (e *CapabilityError) Error() string {
-	return "action not allowed (requires " + e.Required + ")"
-}
-
-// PlayerNotFoundError indique qu'un player n'existe pas
-type PlayerNotFoundError struct {
-	BusName string
-}
-
-func (e *PlayerNotFoundError) Error() string {
-	return "player not found: " + e.BusName
-}
-
-// InvalidBusNameError indique qu'un busName est invalide
-type InvalidBusNameError struct {
-	BusName string
-	Reason  string
-}
-
-func (e *InvalidBusNameError) Error() string {
-	return "invalid player name: " + e.Reason
-}
-
-// ValidationError indique qu'un paramètre est invalide
-type ValidationError struct {
-	Field   string
-	Message string
-}
-
-func (e *ValidationError) Error() string {
-	if e.Field != "" {
-		return e.Field + ": " + e.Message
-	}
-	return e.Message
-}
-
-// Listener écoute les changements MPRIS via signaux D-Bus
-type Listener struct {
-	backend *MPRISBackend
-	ctx     context.Context
-	cancel  context.CancelFunc
-
-	// Déduplication : dernier état connu par player
-	lastState   map[string]PlaybackStatus
-	lastStateMu sync.RWMutex
-}
 
 // MPRISBackend gère les connexions aux lecteurs multimédias via MPRIS
 type MPRISBackend struct {
@@ -126,12 +29,23 @@ type MPRISBackend struct {
 	listener *Listener
 
 	// heartbeat pour mettre à jour Position des players en lecture
-	heartbeatMu     sync.Mutex
-	heartbeatActive bool
+	heartbeat *Heartbeat
+}
+
+// Listener écoute les changements MPRIS via signaux D-Bus
+type Listener struct {
+	backend *MPRISBackend
+	ctx     context.Context
+	cancel  context.CancelFunc
+
+	// Déduplication : dernier état connu par player
+	lastState   map[string]PlaybackStatus
+	lastStateMu sync.RWMutex
 }
 
 // Player représente un lecteur multimédia MPRIS
 type Player struct {
+	backend    *MPRISBackend // Backend parent (non exporté)
 	conn       *dbus.Conn    // Connexion D-Bus (non exporté)
 	timeout    time.Duration // Timeout pour les appels D-Bus (non exporté)
 	uniqueName string        // Unique connection name D-Bus (ex: :1.107)
@@ -147,6 +61,16 @@ type Player struct {
 	Rate           float64           `json:"rate,omitempty" dbus:"Rate" iface:"org.mpris.MediaPlayer2.Player"`
 	Metadata       map[string]string `json:"metadata,omitempty" dbus:"Metadata" iface:"org.mpris.MediaPlayer2.Player"`
 	Capabilities   Capabilities      `json:"capabilities"`
+}
+
+// Capabilities représente les actions supportées par un lecteur
+type Capabilities struct {
+	CanPlay       bool `json:"can_play" dbus:"CanPlay"`
+	CanPause      bool `json:"can_pause" dbus:"CanPause"`
+	CanGoNext     bool `json:"can_go_next" dbus:"CanGoNext"`
+	CanGoPrevious bool `json:"can_go_previous" dbus:"CanGoPrevious"`
+	CanSeek       bool `json:"can_seek" dbus:"CanSeek"`
+	CanControl    bool `json:"can_control" dbus:"CanControl"`
 }
 
 // Request types pour l'API

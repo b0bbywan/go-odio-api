@@ -3,83 +3,20 @@ package mpris
 import (
 	"fmt"
 	"reflect"
-	"time"
 
 	"github.com/godbus/dbus/v5"
 )
 
-// callWithTimeout méthode receiver pour Player
-func (p *Player) callWithTimeout(call *dbus.Call) error {
-	return callWithTimeout(call, p.timeout)
-}
-
-// getAllProperties récupère toutes les propriétés d'une interface D-Bus en un seul appel
-func (p *Player) getAllProperties(iface string) (map[string]dbus.Variant, error) {
-	obj := p.conn.Object(p.BusName, mprisPath)
-	var props map[string]dbus.Variant
-
-	call := obj.Call(dbusPropGetAll, 0, iface)
-	if err := p.callWithTimeout(call); err != nil {
-		return nil, err
+// newPlayer crée un nouveau Player avec connexion au backend
+func newPlayer(backend *MPRISBackend, busName string) *Player {
+	return &Player{
+		backend: backend,
+		conn:    backend.conn,
+		timeout: backend.timeout,
+		BusName: busName,
 	}
-
-	err := call.Store(&props)
-	return props, err
 }
 
-// getProperty récupère une propriété D-Bus
-func (p *Player) getProperty(iface, prop string) (dbus.Variant, error) {
-	obj := p.conn.Object(p.BusName, mprisPath)
-	var v dbus.Variant
-
-	call := obj.Call(dbusPropGet, 0, iface, prop)
-	if err := p.callWithTimeout(call); err != nil {
-		return dbus.Variant{}, err
-	}
-
-	err := call.Store(&v)
-	return v, err
-}
-
-// getStringProperty récupère une propriété string
-func (p *Player) getStringProperty(iface, prop string) (string, bool) {
-	v, err := p.getProperty(iface, prop)
-	if err != nil {
-		return "", false
-	}
-	val, ok := v.Value().(string)
-	return val, ok
-}
-
-// getBoolProperty récupère une propriété bool
-func (p *Player) getBoolProperty(iface, prop string) (bool, bool) {
-	v, err := p.getProperty(iface, prop)
-	if err != nil {
-		return false, false
-	}
-	val, ok := v.Value().(bool)
-	return val, ok
-}
-
-// getFloat64Property récupère une propriété float64
-func (p *Player) getFloat64Property(iface, prop string) (float64, bool) {
-	v, err := p.getProperty(iface, prop)
-	if err != nil {
-		return 0, false
-	}
-	val, ok := v.Value().(float64)
-	return val, ok
-}
-
-// getInt64Property récupère une propriété int64
-func (p *Player) getInt64Property(iface, prop string) (int64, bool) {
-	v, err := p.getProperty(iface, prop)
-	if err != nil {
-		return 0, false
-	}
-	val, ok := v.Value().(int64)
-	return val, ok
-}
 
 // Capability getter methods (raccourcis pour un accès plus court)
 
@@ -113,30 +50,34 @@ func (p *Player) CanControl() bool {
 	return p.Capabilities.CanControl
 }
 
-// Load charge toutes les propriétés du player depuis D-Bus
-func (p *Player) Load() error {
+// loadFromDBus charge toutes les propriétés du player depuis D-Bus.
+// Cette fonction privée effectue les appels D-Bus nécessaires pour remplir tous les champs
+// du Player en utilisant GetAll (2 appels) au lieu d'appels individuels Get (~15 appels).
+// Le mapping des propriétés vers les champs struct se fait via reflection en utilisant
+// les tags `dbus` et `iface`.
+func (p *Player) loadFromDBus() error {
 	// Récupérer le unique name via GetNameOwner
-	var owner string
-	if err := p.conn.BusObject().Call("org.freedesktop.DBus.GetNameOwner", 0, p.BusName).Store(&owner); err != nil {
-		return err
+	owner, err := p.backend.getNameOwner(p.BusName)
+	if err != nil {
+	    return err
 	}
 	p.uniqueName = owner
 
 	// Récupérer toutes les propriétés des deux interfaces en 2 appels au lieu de ~15
-	propsMediaPlayer2, err := p.getAllProperties("org.mpris.MediaPlayer2")
+	propsMediaPlayer2, err := p.getAllProperties(MPRIS_INTERFACE)
 	if err != nil {
 		return err
 	}
 
-	propsPlayer, err := p.getAllProperties(mprisPlayerIface)
+	propsPlayer, err := p.getAllProperties(MPRIS_PLAYER_IFACE)
 	if err != nil {
 		return err
 	}
 
 	// Combiner les deux maps
 	allProps := make(map[string]map[string]dbus.Variant)
-	allProps["org.mpris.MediaPlayer2"] = propsMediaPlayer2
-	allProps[mprisPlayerIface] = propsPlayer
+	allProps[MPRIS_INTERFACE] = propsMediaPlayer2
+	allProps[MPRIS_PLAYER_IFACE] = propsPlayer
 
 	// Mapper les propriétés aux champs du struct
 	val := reflect.ValueOf(p).Elem()
@@ -169,22 +110,22 @@ func (p *Player) Load() error {
 		// Gérer selon le type de champ
 		switch field.Kind() {
 		case reflect.String:
-			if val, ok := variant.Value().(string); ok {
+			if val, ok := extractString(variant); ok {
 				field.SetString(val)
 			}
 
 		case reflect.Bool:
-			if val, ok := variant.Value().(bool); ok {
+			if val, ok := extractBool(variant); ok {
 				field.SetBool(val)
 			}
 
 		case reflect.Float64:
-			if val, ok := variant.Value().(float64); ok {
+			if val, ok := extractFloat64(variant); ok {
 				field.SetFloat(val)
 			}
 
 		case reflect.Int64:
-			if val, ok := variant.Value().(int64); ok {
+			if val, ok := extractInt64(variant); ok {
 				field.SetInt(val)
 			}
 
@@ -202,7 +143,10 @@ func (p *Player) Load() error {
 	return nil
 }
 
-// loadCapabilitiesFromProps charge les capabilities depuis les propriétés déjà récupérées
+// loadCapabilitiesFromProps charge les capabilities depuis les propriétés déjà récupérées.
+// Utilisé par loadFromDBus() pour éviter des appels D-Bus supplémentaires.
+// Mappe les propriétés D-Bus (CanPlay, CanPause, etc.) vers le struct Capabilities
+// en utilisant reflection et les tags `dbus`.
 func (p *Player) loadCapabilitiesFromProps(props map[string]dbus.Variant) Capabilities {
 	var caps Capabilities
 
@@ -221,35 +165,9 @@ func (p *Player) loadCapabilitiesFromProps(props map[string]dbus.Variant) Capabi
 
 		// Récupérer la propriété depuis les props
 		if variant, ok := props[dbusTag]; ok {
-			if boolVal, ok := variant.Value().(bool); ok {
+			if boolVal, ok := extractBool(variant); ok {
 				field.SetBool(boolVal)
 			}
-		}
-	}
-
-	return caps
-}
-
-// loadCapabilities charge les capabilities depuis D-Bus (legacy, pour compatibilité)
-func (p *Player) loadCapabilities() Capabilities {
-	var caps Capabilities
-
-	val := reflect.ValueOf(&caps).Elem()
-	typ := val.Type()
-
-	for i := 0; i < val.NumField(); i++ {
-		field := val.Field(i)
-		fieldType := typ.Field(i)
-
-		// Récupérer le tag dbus
-		dbusTag := fieldType.Tag.Get("dbus")
-		if dbusTag == "" {
-			continue
-		}
-
-		// Récupérer la propriété D-Bus
-		if propVal, ok := p.getBoolProperty(mprisPlayerIface, dbusTag); ok {
-			field.SetBool(propVal)
 		}
 	}
 
@@ -311,14 +229,5 @@ func formatMetadataValue(value interface{}) string {
 		return result
 	default:
 		return fmt.Sprintf("%v", v)
-	}
-}
-
-// newPlayer crée un nouveau Player avec connexion D-Bus
-func newPlayer(conn *dbus.Conn, busName string, timeout time.Duration) *Player {
-	return &Player{
-		conn:    conn,
-		timeout: timeout,
-		BusName: busName,
 	}
 }

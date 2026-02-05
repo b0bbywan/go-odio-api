@@ -26,15 +26,7 @@ func (l *Listener) Start() error {
 	// Utiliser la connexion du backend
 	conn := l.backend.conn
 
-	// S'abonner aux signaux PropertiesChanged pour tous les lecteurs MPRIS
-	matchRule := "type='signal',interface='" + dbusPropIface + "',member='PropertiesChanged',arg0namespace='" + mprisPrefix + "'"
-	if err := conn.BusObject().Call(dbusAddMatchMethod, 0, matchRule).Err; err != nil {
-		return err
-	}
-
-	// S'abonner aux signaux NameOwnerChanged pour détecter les nouveaux/anciens lecteurs
-	ownerMatchRule := "type='signal',interface='" + dbusInterface + "',member='NameOwnerChanged',arg0namespace='" + mprisPrefix + "'"
-	if err := conn.BusObject().Call(dbusAddMatchMethod, 0, ownerMatchRule).Err; err != nil {
+	if err := l.backend.addListenMatchRules(); err != nil {
 		return err
 	}
 
@@ -66,9 +58,9 @@ func (l *Listener) listen(ch <-chan *dbus.Signal) {
 // handleSignal traite un signal D-Bus
 func (l *Listener) handleSignal(sig *dbus.Signal) {
 	switch sig.Name {
-	case dbusPropChangedSignal:
+	case DBUS_PROP_CHANGED_SIGNAL:
 		l.handlePropertiesChanged(sig)
-	case dbusNameOwnerChanged:
+	case DBUS_NAME_OWNER_CHANGED:
 		l.handleNameOwnerChanged(sig)
 	default:
 		logger.Debug("[mpris] unhandled signal: %s", sig.Name)
@@ -86,7 +78,7 @@ func (l *Listener) handlePropertiesChanged(sig *dbus.Signal) {
 	}
 
 	iface, ok := sig.Body[0].(string)
-	if !ok || iface != mprisPlayerIface {
+	if !ok || iface != MPRIS_PLAYER_IFACE {
 		// On ne s'intéresse qu'aux changements du Player
 		return
 	}
@@ -106,7 +98,7 @@ func (l *Listener) handlePropertiesChanged(sig *dbus.Signal) {
 
 	// Vérifier si PlaybackStatus a changé pour la déduplication
 	if statusVar, hasStatus := changed["PlaybackStatus"]; hasStatus {
-		if status, ok := statusVar.Value().(string); ok {
+		if status, ok := extractString(statusVar); ok {
 			newStatus := PlaybackStatus(status)
 
 			// Déduplication
@@ -123,7 +115,7 @@ func (l *Listener) handlePropertiesChanged(sig *dbus.Signal) {
 
 				// Si le player passe en Playing, s'assurer que le heartbeat tourne
 				if newStatus == StatusPlaying {
-					l.backend.ensureHeartbeatRunning()
+					l.backend.heartbeat.Start()
 				}
 			}
 		}
@@ -153,7 +145,7 @@ func (l *Listener) handleNameOwnerChanged(sig *dbus.Signal) {
 	}
 
 	busName, ok := sig.Body[0].(string)
-	if !ok || !strings.HasPrefix(busName, mprisPrefix+".") {
+	if !ok || !strings.HasPrefix(busName, MPRIS_PREFIX+".") {
 		return
 	}
 
@@ -163,7 +155,7 @@ func (l *Listener) handleNameOwnerChanged(sig *dbus.Signal) {
 	if oldOwner == "" && newOwner != "" {
 		// Nouveau lecteur apparu
 		logger.Info("[mpris] new player detected: %s", busName)
-		if _, err := l.backend.RefreshPlayer(busName); err != nil {
+		if _, err := l.backend.ReloadPlayerFromDBus(busName); err != nil {
 			logger.Error("[mpris] failed to add new player %s: %v", busName, err)
 		}
 	} else if oldOwner != "" && newOwner == "" {
