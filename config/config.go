@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/spf13/viper"
 
@@ -16,13 +17,20 @@ const (
 )
 
 type Config struct {
+	Api        *ApiConfig
 	Systemd    *SystemdConfig
 	Pulseaudio *PulseAudioConfig
-	Port       int
+	MPRIS      *MPRISConfig
 	LogLevel   logger.Level
 }
 
+type ApiConfig struct {
+	Enabled bool
+	Port    int
+}
+
 type SystemdConfig struct {
+	Enabled        bool
 	SystemServices []string
 	UserServices   []string
 	Headless       bool
@@ -30,7 +38,13 @@ type SystemdConfig struct {
 }
 
 type PulseAudioConfig struct {
+	Enabled       bool
 	XDGRuntimeDir string
+}
+
+type MPRISConfig struct {
+	Enabled bool
+	Timeout time.Duration
 }
 
 // parseLogLevel converts a string to a logger.Level
@@ -52,9 +66,17 @@ func parseLogLevel(levelStr string) logger.Level {
 }
 
 func New() (*Config, error) {
+	viper.SetDefault("api.enabled", true)
+	viper.SetDefault("systemd.enabled", true)
 	viper.SetDefault("services.system", []string{})
 	viper.SetDefault("services.user", []string{})
-	viper.SetDefault("Port", 8080)
+
+	viper.SetDefault("pulseaudio.enabled", true)
+
+	viper.SetDefault("mpris.enabled", true)
+	viper.SetDefault("mpris.timeout", "5s")
+
+	viper.SetDefault("api.port", 8080)
 	viper.SetDefault("LogLevel", "WARN")
 
 	// Load from configuration file, environment variables, and CLI flags
@@ -88,7 +110,13 @@ func New() (*Config, error) {
 		xdgRuntimeDir = fmt.Sprintf("/run/user/%d", os.Getuid())
 	}
 
+	apiCfg := ApiConfig{
+		Enabled: viper.GetBool("api.enabled"),
+		Port:    port,
+	}
+
 	syscfg := SystemdConfig{
+		Enabled:        viper.GetBool("systemd.enabled"),
 		SystemServices: viper.GetStringSlice("services.system"),
 		UserServices:   viper.GetStringSlice("services.user"),
 		Headless:       headless,
@@ -96,13 +124,25 @@ func New() (*Config, error) {
 	}
 
 	pulsecfg := PulseAudioConfig{
+		Enabled:       viper.GetBool("pulseaudio.enabled"),
 		XDGRuntimeDir: xdgRuntimeDir,
 	}
 
+	mprisTimeout := viper.GetDuration("mpris.timeout")
+	if mprisTimeout <= 0 {
+		mprisTimeout = 5 * time.Second
+	}
+
+	mpriscfg := MPRISConfig{
+		Enabled: viper.GetBool("mpris.enabled"),
+		Timeout: mprisTimeout,
+	}
+
 	cfg := Config{
+		Api:        &apiCfg,
 		Systemd:    &syscfg,
 		Pulseaudio: &pulsecfg,
-		Port:       port,
+		MPRIS:      &mpriscfg,
 		LogLevel:   parseLogLevel(viper.GetString("LogLevel")),
 	}
 

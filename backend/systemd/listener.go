@@ -82,7 +82,9 @@ func (l *Listener) startScope(scope UnitScope, watched map[string]bool) error {
 	matchRule := "type='signal',sender='org.freedesktop.systemd1'"
 
 	if err := conn.BusObject().Call("org.freedesktop.DBus.AddMatch", 0, matchRule).Err; err != nil {
-		conn.Close()
+		if closeErr := conn.Close(); closeErr != nil {
+			logger.Info("Failed to close D-Bus connection: %v", closeErr)
+		}
 		return err
 	}
 	ch := make(chan *dbus.Signal, 10)
@@ -96,9 +98,7 @@ func (l *Listener) startScope(scope UnitScope, watched map[string]bool) error {
 
 func (l *Listener) checkUnit(sig *dbus.Signal, scope UnitScope) (string, bool) {
 	// Extraire le nom de l'unité depuis le path
-	var unitName string
-
-	unitName = unitNameFromPath(sig.Path)
+	unitName := unitNameFromPath(sig.Path)
 	if unitName == "" {
 		return unitName, false
 	}
@@ -162,7 +162,11 @@ func (l *Listener) listen(
 	scope UnitScope,
 	watched map[string]bool,
 ) {
-	defer conn.Close()
+	defer func() {
+		if err := conn.Close(); err != nil {
+			logger.Info("Failed to close D-Bus connection: %v", err)
+		}
+	}()
 
 	for {
 		select {
@@ -200,12 +204,16 @@ func (l *Listener) StartHeadless() error {
 
 	// Vérifier que le répertoire existe
 	if _, err := os.Stat(unitsDir); os.IsNotExist(err) {
-		watcher.Close()
+		if closeErr := watcher.Close(); closeErr != nil {
+			logger.Info("Failed to close watcher: %v", closeErr)
+		}
 		return fmt.Errorf("units directory does not exist: %s", unitsDir)
 	}
 
 	if err := watcher.Add(unitsDir); err != nil {
-		watcher.Close()
+		if closeErr := watcher.Close(); closeErr != nil {
+			logger.Info("Failed to close watcher: %v", closeErr)
+		}
 		return err
 	}
 
@@ -217,7 +225,11 @@ func (l *Listener) StartHeadless() error {
 }
 
 func (l *Listener) listenHeadless(watcher *fsnotify.Watcher) {
-	defer watcher.Close()
+	defer func() {
+		if err := watcher.Close(); err != nil {
+			logger.Info("Failed to close watcher: %v", err)
+		}
+	}()
 
 	for {
 		select {
