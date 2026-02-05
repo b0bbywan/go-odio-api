@@ -7,7 +7,7 @@ import (
 	"github.com/godbus/dbus/v5"
 )
 
-// newPlayer crée un nouveau Player avec connexion au backend
+// newPlayer creates a new Player with backend connection
 func newPlayer(backend *MPRISBackend, busName string) *Player {
 	return &Player{
 		backend: backend,
@@ -17,52 +17,52 @@ func newPlayer(backend *MPRISBackend, busName string) *Player {
 	}
 }
 
-// Capability getter methods (raccourcis pour un accès plus court)
+// Capability getter methods (shortcuts for shorter access)
 
-// CanPlay retourne si le lecteur peut jouer
+// CanPlay returns whether the player can play
 func (p *Player) CanPlay() bool {
 	return p.Capabilities.CanPlay
 }
 
-// CanPause retourne si le lecteur peut mettre en pause
+// CanPause returns whether the player can pause
 func (p *Player) CanPause() bool {
 	return p.Capabilities.CanPause
 }
 
-// CanGoNext retourne si le lecteur peut passer à la piste suivante
+// CanGoNext returns whether the player can skip to the next track
 func (p *Player) CanGoNext() bool {
 	return p.Capabilities.CanGoNext
 }
 
-// CanGoPrevious retourne si le lecteur peut revenir à la piste précédente
+// CanGoPrevious returns whether the player can go back to the previous track
 func (p *Player) CanGoPrevious() bool {
 	return p.Capabilities.CanGoPrevious
 }
 
-// CanSeek retourne si le lecteur peut chercher dans la piste
+// CanSeek returns whether the player can seek within the track
 func (p *Player) CanSeek() bool {
 	return p.Capabilities.CanSeek
 }
 
-// CanControl retourne si le lecteur peut être contrôlé
+// CanControl returns whether the player can be controlled
 func (p *Player) CanControl() bool {
 	return p.Capabilities.CanControl
 }
 
-// loadFromDBus charge toutes les propriétés du player depuis D-Bus.
-// Cette fonction privée effectue les appels D-Bus nécessaires pour remplir tous les champs
-// du Player en utilisant GetAll (2 appels) au lieu d'appels individuels Get (~15 appels).
-// Le mapping des propriétés vers les champs struct se fait via reflection en utilisant
-// les tags `dbus` et `iface`.
+// loadFromDBus loads all player properties from D-Bus.
+// This private function performs the necessary D-Bus calls to fill all Player fields
+// using GetAll (2 calls) instead of individual Get calls (~15 calls).
+// Property mapping to struct fields is done via reflection using
+// the `dbus` and `iface` tags.
 func (p *Player) loadFromDBus() error {
-	// Récupérer le unique name via GetNameOwner
+	// Retrieve the unique name via GetNameOwner
 	owner, err := p.backend.getNameOwner(p.BusName)
 	if err != nil {
 		return err
 	}
 	p.uniqueName = owner
 
-	// Récupérer toutes les propriétés des deux interfaces en 2 appels au lieu de ~15
+	// Retrieve all properties from both interfaces in 2 calls instead of ~15
 	propsMediaPlayer2, err := p.getAllProperties(MPRIS_INTERFACE)
 	if err != nil {
 		return err
@@ -73,12 +73,12 @@ func (p *Player) loadFromDBus() error {
 		return err
 	}
 
-	// Combiner les deux maps
+	// Combine both maps
 	allProps := make(map[string]map[string]dbus.Variant)
 	allProps[MPRIS_INTERFACE] = propsMediaPlayer2
 	allProps[MPRIS_PLAYER_IFACE] = propsPlayer
 
-	// Mapper les propriétés aux champs du struct
+	// Map properties to struct fields
 	val := reflect.ValueOf(p).Elem()
 	typ := val.Type()
 
@@ -86,16 +86,16 @@ func (p *Player) loadFromDBus() error {
 		field := val.Field(i)
 		fieldType := typ.Field(i)
 
-		// Récupérer les tags
+		// Retrieve tags
 		dbusTag := fieldType.Tag.Get("dbus")
 		ifaceTag := fieldType.Tag.Get("iface")
 
-		// Ignorer les champs sans tag dbus (conn, BusName, Capabilities)
+		// Ignore fields without dbus tag (conn, BusName, Capabilities)
 		if dbusTag == "" {
 			continue
 		}
 
-		// Récupérer la propriété depuis le cache
+		// Retrieve property from cache
 		props, ok := allProps[ifaceTag]
 		if !ok {
 			continue
@@ -106,7 +106,7 @@ func (p *Player) loadFromDBus() error {
 			continue
 		}
 
-		// Gérer selon le type de champ
+		// Handle according to field type
 		switch field.Kind() {
 		case reflect.String:
 			if val, ok := extractString(variant); ok {
@@ -129,23 +129,23 @@ func (p *Player) loadFromDBus() error {
 			}
 
 		case reflect.Map:
-			// Cas spécial pour Metadata
+			// Special case for Metadata
 			if dbusTag == "Metadata" {
 				field.Set(reflect.ValueOf(extractMetadata(variant.Value())))
 			}
 		}
 	}
 
-	// Charger les capabilities depuis les propriétés déjà récupérées
+	// Load capabilities from already retrieved properties
 	p.Capabilities = p.loadCapabilitiesFromProps(propsPlayer)
 
 	return nil
 }
 
-// loadCapabilitiesFromProps charge les capabilities depuis les propriétés déjà récupérées.
-// Utilisé par loadFromDBus() pour éviter des appels D-Bus supplémentaires.
-// Mappe les propriétés D-Bus (CanPlay, CanPause, etc.) vers le struct Capabilities
-// en utilisant reflection et les tags `dbus`.
+// loadCapabilitiesFromProps loads capabilities from already retrieved properties.
+// Used by loadFromDBus() to avoid additional D-Bus calls.
+// Maps D-Bus properties (CanPlay, CanPause, etc.) to the Capabilities struct
+// using reflection and `dbus` tags.
 func (p *Player) loadCapabilitiesFromProps(props map[string]dbus.Variant) Capabilities {
 	var caps Capabilities
 
@@ -156,13 +156,13 @@ func (p *Player) loadCapabilitiesFromProps(props map[string]dbus.Variant) Capabi
 		field := val.Field(i)
 		fieldType := typ.Field(i)
 
-		// Récupérer le tag dbus
+		// Retrieve dbus tag
 		dbusTag := fieldType.Tag.Get("dbus")
 		if dbusTag == "" {
 			continue
 		}
 
-		// Récupérer la propriété depuis les props
+		// Retrieve property from props
 		if variant, ok := props[dbusTag]; ok {
 			if boolVal, ok := extractBool(variant); ok {
 				field.SetBool(boolVal)
@@ -173,7 +173,7 @@ func (p *Player) loadCapabilitiesFromProps(props map[string]dbus.Variant) Capabi
 	return caps
 }
 
-// extractMetadata extrait les métadonnées pertinentes
+// extractMetadata extracts relevant metadata
 func extractMetadata(raw interface{}) map[string]string {
 	metadata := make(map[string]string)
 
@@ -182,7 +182,7 @@ func extractMetadata(raw interface{}) map[string]string {
 		return metadata
 	}
 
-	// Extraire les métadonnées courantes
+	// Extract common metadata
 	metadataKeys := []string{
 		"xesam:title",
 		"xesam:artist",
@@ -203,11 +203,11 @@ func extractMetadata(raw interface{}) map[string]string {
 	return metadata
 }
 
-// formatMetadataValue formate une valeur de métadonnée en string
+// formatMetadataValue formats a metadata value as string
 func formatMetadataValue(value interface{}) string {
 	switch v := value.(type) {
 	case []string:
-		// Joindre les tableaux de strings avec des virgules
+		// Join string arrays with commas
 		result := ""
 		for i, s := range v {
 			if i > 0 {
@@ -217,7 +217,7 @@ func formatMetadataValue(value interface{}) string {
 		}
 		return result
 	case []interface{}:
-		// Gérer les slices génériques
+		// Handle generic slices
 		result := ""
 		for i, item := range v {
 			if i > 0 {

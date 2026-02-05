@@ -10,7 +10,7 @@ import (
 	"github.com/b0bbywan/go-odio-api/config"
 )
 
-// Listener écoute les changements systemd via signaux D-Bus natifs (godbus)
+// Listener listens for systemd changes via native D-Bus signals (godbus)
 type Listener struct {
 	backend     *SystemdBackend
 	ctx         context.Context
@@ -19,7 +19,7 @@ type Listener struct {
 	userWatched map[string]bool
 	headless    bool
 
-	// Déduplication : dernier état connu par service/scope
+	// Deduplication: last known state per service/scope
 	lastState   map[string]string
 	lastStateMu sync.RWMutex
 }
@@ -36,12 +36,12 @@ type SystemdBackend struct {
 	sysConn  *dbus.Conn
 	userConn *dbus.Conn
 	ctx      context.Context
-	config   *config.SystemdConfig // Vient de la config
+	config   *config.SystemdConfig // Comes from the config
 
-	// cache permanent (pas d'expiration)
+	// permanent cache (no expiration)
 	cache *cache.Cache[[]Service]
 
-	// listener pour les changements systemd
+	// listener for systemd changes
 	listener *Listener
 }
 

@@ -7,7 +7,7 @@ import (
 	"github.com/b0bbywan/go-odio-api/backend/mpris"
 )
 
-// withPlayer extrait le busName et appelle next
+// withPlayer extracts the busName and calls next
 func withPlayer(
 	next func(w http.ResponseWriter, r *http.Request, busName string),
 ) http.HandlerFunc {
@@ -17,35 +17,35 @@ func withPlayer(
 	}
 }
 
-// handleMPRISError gère les erreurs MPRIS et retourne la réponse HTTP appropriée
+// handleMPRISError handles MPRIS errors and returns the appropriate HTTP response
 func handleMPRISError(w http.ResponseWriter, err error) {
 	if err == nil {
 		w.WriteHeader(http.StatusAccepted)
 		return
 	}
 
-	// Gérer les erreurs de busName invalide
+	// Handle invalid busName errors
 	var invalidBusNameErr *mpris.InvalidBusNameError
 	if errors.As(err, &invalidBusNameErr) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	// Gérer les erreurs de validation
+	// Handle validation errors
 	var validErr *mpris.ValidationError
 	if errors.As(err, &validErr) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	// Gérer les erreurs de player not found
+	// Handle player not found errors
 	var notFoundErr *mpris.PlayerNotFoundError
 	if errors.As(err, &notFoundErr) {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
 
-	// Gérer les erreurs de capability
+	// Handle capability errors
 	var capErr *mpris.CapabilityError
 	if errors.As(err, &capErr) {
 		http.Error(w, err.Error(), http.StatusForbidden)
@@ -55,14 +55,14 @@ func handleMPRISError(w http.ResponseWriter, err error) {
 	http.Error(w, err.Error(), http.StatusInternalServerError)
 }
 
-// ListPlayersHandler retourne la liste de tous les lecteurs MPRIS
+// ListPlayersHandler returns the list of all MPRIS players
 func ListPlayersHandler(m *mpris.MPRISBackend) http.HandlerFunc {
 	return JSONHandler(func(w http.ResponseWriter, r *http.Request) (any, error) {
 		return m.ListPlayers()
 	})
 }
 
-// Handlers pour actions simples
+// Handlers for simple actions
 func PlayHandler(m *mpris.MPRISBackend) http.HandlerFunc {
 	return withPlayer(func(w http.ResponseWriter, r *http.Request, busName string) {
 		handleMPRISError(w, m.Play(busName))
@@ -99,7 +99,7 @@ func PreviousHandler(m *mpris.MPRISBackend) http.HandlerFunc {
 	})
 }
 
-// Handlers pour actions avec body
+// Handlers for actions with body
 func SeekHandler(m *mpris.MPRISBackend) http.HandlerFunc {
 	return withPlayer(func(w http.ResponseWriter, r *http.Request, busName string) {
 		withBody(nil, func(w http.ResponseWriter, r *http.Request, req *mpris.SeekRequest) {

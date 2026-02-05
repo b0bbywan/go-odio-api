@@ -11,7 +11,7 @@ import (
 	"github.com/b0bbywan/go-odio-api/logger"
 )
 
-// New prend maintenant la liste des services depuis la config
+// New now takes the services list from the config
 func New(ctx context.Context, config *config.SystemdConfig) (*SystemdBackend, error) {
 	if config == nil || !config.Enabled {
 		return nil, nil
@@ -31,20 +31,20 @@ func New(ctx context.Context, config *config.SystemdConfig) (*SystemdBackend, er
 		userConn: userC,
 		ctx:      ctx,
 		config:   config,
-		cache:    cache.New[[]Service](0), // TTL=0 = pas d'expiration
+		cache:    cache.New[[]Service](0), // TTL=0 = no expiration
 	}, nil
 }
 
-// Start charge le cache initial et démarre le listener
+// Start loads the initial cache and starts the listener
 func (s *SystemdBackend) Start() error {
 	logger.Debug("[systemd] starting backend (headless=%v)", s.config.Headless)
 
-	// Charger le cache au démarrage
+	// Load the cache at startup
 	if _, err := s.ListServices(); err != nil {
 		return err
 	}
 
-	// Démarrer le listener pour les changements systemd
+	// Start the listener for systemd changes
 	s.listener = NewListener(s)
 	if err := s.listener.Start(); err != nil {
 		return err
@@ -55,13 +55,13 @@ func (s *SystemdBackend) Start() error {
 }
 
 func (s *SystemdBackend) ListServices() ([]Service, error) {
-	// Vérifier le cache d'abord
+	// Check the cache first
 	if services, ok := s.cache.Get(cacheKey); ok {
 		logger.Debug("[systemd] returning %d units from cache", len(services))
 		return services, nil
 	}
 
-	// Cache miss, charger depuis D-Bus
+	// Cache miss, load from D-Bus
 	logger.Debug("[systemd] cache miss, loading units")
 	out := make([]Service, 0, len(s.config.SystemServices)+len(s.config.UserServices))
 	start := time.Now()
@@ -80,13 +80,13 @@ func (s *SystemdBackend) ListServices() ([]Service, error) {
 	out = append(out, userSvcs...)
 	logger.Debug("[systemd] loaded %d units in %s", len(out), elapsed)
 
-	// Mettre à jour le cache
+	// Update the cache
 	s.cache.Set(cacheKey, out)
 
 	return out, nil
 }
 
-// GetService récupère un service spécifique du cache
+// GetService retrieves a specific service from the cache
 func (s *SystemdBackend) GetService(name string, scope UnitScope) (*Service, bool) {
 	services, ok := s.cache.Get(cacheKey)
 	if !ok {
@@ -101,11 +101,11 @@ func (s *SystemdBackend) GetService(name string, scope UnitScope) (*Service, boo
 	return nil, false
 }
 
-// UpdateService met à jour un service spécifique dans le cache
+// UpdateService updates a specific service in the cache
 func (s *SystemdBackend) UpdateService(updated Service) error {
 	services, ok := s.cache.Get(cacheKey)
 	if !ok {
-		// Si pas de cache, on recharge tout
+		// If no cache, reload everything
 		_, err := s.ListServices()
 		return err
 	}
@@ -120,7 +120,7 @@ func (s *SystemdBackend) UpdateService(updated Service) error {
 	}
 
 	if !found {
-		// Service pas dans le cache, on l'ajoute
+		// Service not in cache, add it
 		services = append(services, updated)
 	}
 
@@ -128,7 +128,7 @@ func (s *SystemdBackend) UpdateService(updated Service) error {
 	return nil
 }
 
-// RefreshService recharge un service spécifique depuis systemd et met à jour le cache
+// RefreshService reloads a specific service from systemd and updates the cache
 func (s *SystemdBackend) RefreshService(name string, scope UnitScope) (*Service, error) {
 	conn := s.connForScope(scope)
 
@@ -254,17 +254,17 @@ func (s *SystemdBackend) connForScope(scope UnitScope) *dbus.Conn {
 	return s.sysConn
 }
 
-// invalidateCache invalide tout le cache (utilisé si besoin de recharger tout)
+// invalidateCache invalidates the entire cache (used if need to reload everything)
 func (s *SystemdBackend) invalidateCache() {
 	s.cache.Delete(cacheKey)
 }
 
-// InvalidateCache est l'API publique pour invalider le cache si nécessaire
+// InvalidateCache is the public API to invalidate the cache if necessary
 func (s *SystemdBackend) InvalidateCache() {
 	s.invalidateCache()
 }
 
-// Close ferme proprement les connexions et arrête le listener
+// Close cleanly closes the connections and stops the listener
 func (s *SystemdBackend) Close() {
 	if s.listener != nil {
 		s.listener.Stop()

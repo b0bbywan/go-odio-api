@@ -16,39 +16,39 @@ type PlaybackStatus string
 // LoopStatus represents the current loop/repeat state
 type LoopStatus string
 
-// MPRISBackend gère les connexions aux lecteurs multimédias via MPRIS
+// MPRISBackend manages connections to media players via MPRIS
 type MPRISBackend struct {
 	conn    *dbus.Conn
 	ctx     context.Context
 	timeout time.Duration
 
-	// cache permanent (pas d'expiration)
+	// permanent cache (no expiration)
 	cache *cache.Cache[[]Player]
 
-	// listener pour les changements MPRIS
+	// listener for MPRIS changes
 	listener *Listener
 
-	// heartbeat pour mettre à jour Position des players en lecture
+	// heartbeat to update Position of playing players
 	heartbeat *Heartbeat
 }
 
-// Listener écoute les changements MPRIS via signaux D-Bus
+// Listener listens to MPRIS changes via D-Bus signals
 type Listener struct {
 	backend *MPRISBackend
 	ctx     context.Context
 	cancel  context.CancelFunc
 
-	// Déduplication : dernier état connu par player
+	// Deduplication: last known state per player
 	lastState   map[string]PlaybackStatus
 	lastStateMu sync.RWMutex
 }
 
-// Player représente un lecteur multimédia MPRIS
+// Player represents an MPRIS media player
 type Player struct {
-	backend    *MPRISBackend // Backend parent (non exporté)
-	conn       *dbus.Conn    // Connexion D-Bus (non exporté)
-	timeout    time.Duration // Timeout pour les appels D-Bus (non exporté)
-	uniqueName string        // Unique connection name D-Bus (ex: :1.107)
+	backend    *MPRISBackend // Parent backend (not exported)
+	conn       *dbus.Conn    // D-Bus connection (not exported)
+	timeout    time.Duration // Timeout for D-Bus calls (not exported)
+	uniqueName string        // Unique D-Bus connection name (e.g., :1.107)
 
 	BusName string `json:"bus_name"`
 
@@ -63,7 +63,7 @@ type Player struct {
 	Capabilities   Capabilities      `json:"capabilities"`
 }
 
-// Capabilities représente les actions supportées par un lecteur
+// Capabilities represents the actions supported by a player
 type Capabilities struct {
 	CanPlay       bool `json:"can_play" dbus:"CanPlay"`
 	CanPause      bool `json:"can_pause" dbus:"CanPause"`
@@ -73,7 +73,7 @@ type Capabilities struct {
 	CanControl    bool `json:"can_control" dbus:"CanControl"`
 }
 
-// Request types pour l'API
+// Request types for the API
 
 type SeekRequest struct {
 	Offset int64 `json:"offset"`
