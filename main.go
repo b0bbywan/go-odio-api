@@ -2,12 +2,10 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/b0bbywan/go-odio-api/api"
 	"github.com/b0bbywan/go-odio-api/backend"
@@ -39,15 +37,7 @@ func main() {
 		logger.Fatal("Backend start failed: %v", err)
 	}
 
-	mux := http.NewServeMux()
-	api.Register(mux, b)
-
-	port := fmt.Sprintf(":%d", cfg.Port)
-	// HTTP server
-	srv := &http.Server{
-		Addr:    port,
-		Handler: mux,
-	}
+	server := api.NewServer(http.NewServeMux(), cfg.Api, b)
 
 	// Goroutine pour signal handling
 	go func() {
@@ -62,18 +52,12 @@ func main() {
 
 		// Cleanup des backends
 		b.Close()
-
-		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer shutdownCancel()
-
-		if err := srv.Shutdown(shutdownCtx); err != nil {
-			logger.Error("Server shutdown error: %v", err)
-		}
 	}()
 
-	logger.Info("Odio Audio API running on %s", port)
-	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		logger.Error("Server error: %v", err)
+	if server != nil {
+		if err := server.Run(ctx); err != nil && err != http.ErrServerClosed {
+			logger.Error("Server error: %v", err)
+		}
 	}
 	logger.Info("Server stopped")
 }
