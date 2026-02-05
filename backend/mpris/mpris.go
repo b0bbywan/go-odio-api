@@ -36,7 +36,7 @@ func (m *MPRISBackend) Start() error {
 	logger.Debug("[mpris] starting backend")
 
 	// Load cache at startup
-	players, err := m.ListPlayers()
+	_, err := m.ListPlayers()
 	if err != nil {
 		return err
 	}
