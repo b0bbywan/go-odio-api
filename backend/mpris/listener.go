@@ -26,15 +26,7 @@ func (l *Listener) Start() error {
 	// Utiliser la connexion du backend
 	conn := l.backend.conn
 
-	// S'abonner aux signaux PropertiesChanged pour tous les lecteurs MPRIS
-	matchRule := "type='signal',interface='" + DBUS_PROP_IFACE + "',member='PropertiesChanged',arg0namespace='" + MPRIS_PREFIX + "'"
-	if err := conn.BusObject().Call(DBUS_ADD_MATCH_METHOD, 0, matchRule).Err; err != nil {
-		return err
-	}
-
-	// S'abonner aux signaux NameOwnerChanged pour détecter les nouveaux/anciens lecteurs
-	ownerMatchRule := "type='signal',interface='" + DBUS_INTERFACE + "',member='NameOwnerChanged',arg0namespace='" + MPRIS_PREFIX + "'"
-	if err := conn.BusObject().Call(DBUS_ADD_MATCH_METHOD, 0, ownerMatchRule).Err; err != nil {
+	if err := l.backend.addListenMatchRules(); err != nil {
 		return err
 	}
 

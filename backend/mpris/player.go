@@ -7,99 +7,16 @@ import (
 	"github.com/godbus/dbus/v5"
 )
 
-// Helpers d'extraction de valeurs depuis dbus.Variant
-// Ces helpers sont utilisés pour extraire les valeurs des variants reçus
-// dans les signaux D-Bus sans faire d'appels D-Bus supplémentaires.
-
-// extractString extrait une string d'un dbus.Variant
-func extractString(v dbus.Variant) (string, bool) {
-	val, ok := v.Value().(string)
-	return val, ok
-}
-
-// extractBool extrait un bool d'un dbus.Variant
-func extractBool(v dbus.Variant) (bool, bool) {
-	val, ok := v.Value().(bool)
-	return val, ok
-}
-
-// extractInt64 extrait un int64 d'un dbus.Variant
-func extractInt64(v dbus.Variant) (int64, bool) {
-	val, ok := v.Value().(int64)
-	return val, ok
-}
-
-// extractFloat64 extrait un float64 d'un dbus.Variant
-func extractFloat64(v dbus.Variant) (float64, bool) {
-	val, ok := v.Value().(float64)
-	return val, ok
-}
-
-// extractMetadataMap extrait une map de metadata d'un dbus.Variant
-func extractMetadataMap(v dbus.Variant) (map[string]dbus.Variant, bool) {
-	val, ok := v.Value().(map[string]dbus.Variant)
-	return val, ok
-}
-
-// callWithTimeout méthode receiver pour Player
-func (p *Player) callWithTimeout(call *dbus.Call) error {
-	return callWithTimeout(call, p.timeout)
-}
-
-// getAllProperties récupère toutes les propriétés d'une interface D-Bus en un seul appel
-func (p *Player) getAllProperties(iface string) (map[string]dbus.Variant, error) {
-	obj := p.conn.Object(p.BusName, MPRIS_PATH)
-	var props map[string]dbus.Variant
-
-	call := obj.Call(DBUS_PROP_GET_ALL, 0, iface)
-	if err := p.callWithTimeout(call); err != nil {
-		return nil, err
+// newPlayer crée un nouveau Player avec connexion au backend
+func newPlayer(backend *MPRISBackend, busName string) *Player {
+	return &Player{
+		backend: backend,
+		conn:    backend.conn,
+		timeout: backend.timeout,
+		BusName: busName,
 	}
-
-	err := call.Store(&props)
-	return props, err
 }
 
-// getProperty récupère une propriété D-Bus via le backend
-func (p *Player) getProperty(iface, prop string) (dbus.Variant, error) {
-	return p.backend.getProperty(p.BusName, iface, prop)
-}
-
-// getStringProperty récupère une propriété string
-func (p *Player) getStringProperty(iface, prop string) (string, bool) {
-	v, err := p.getProperty(iface, prop)
-	if err != nil {
-		return "", false
-	}
-	return extractString(v)
-}
-
-// getBoolProperty récupère une propriété bool
-func (p *Player) getBoolProperty(iface, prop string) (bool, bool) {
-	v, err := p.getProperty(iface, prop)
-	if err != nil {
-		return false, false
-	}
-	return extractBool(v)
-}
-
-// getFloat64Property récupère une propriété float64
-func (p *Player) getFloat64Property(iface, prop string) (float64, bool) {
-	v, err := p.getProperty(iface, prop)
-	if err != nil {
-		return 0, false
-	}
-	return extractFloat64(v)
-}
-
-// getInt64Property récupère une propriété int64
-func (p *Player) getInt64Property(iface, prop string) (int64, bool) {
-	v, err := p.getProperty(iface, prop)
-	if err != nil {
-		return 0, false
-	}
-	return extractInt64(v)
-}
 
 // Capability getter methods (raccourcis pour un accès plus court)
 
@@ -140,9 +57,9 @@ func (p *Player) CanControl() bool {
 // les tags `dbus` et `iface`.
 func (p *Player) loadFromDBus() error {
 	// Récupérer le unique name via GetNameOwner
-	var owner string
-	if err := p.conn.BusObject().Call(DBUS_GET_NAME_OWNER, 0, p.BusName).Store(&owner); err != nil {
-		return err
+	owner, err := p.backend.getNameOwner(p.BusName)
+	if err != nil {
+	    return err
 	}
 	p.uniqueName = owner
 
@@ -312,15 +229,5 @@ func formatMetadataValue(value interface{}) string {
 		return result
 	default:
 		return fmt.Sprintf("%v", v)
-	}
-}
-
-// newPlayer crée un nouveau Player avec connexion au backend
-func newPlayer(backend *MPRISBackend, busName string) *Player {
-	return &Player{
-		backend: backend,
-		conn:    backend.conn,
-		timeout: backend.timeout,
-		BusName: busName,
 	}
 }

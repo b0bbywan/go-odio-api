@@ -11,42 +11,6 @@ import (
 	"github.com/b0bbywan/go-odio-api/logger"
 )
 
-// validateBusName valide qu'un busName est conforme à MPRIS
-func validateBusName(busName string) error {
-	if busName == "" {
-		return &InvalidBusNameError{BusName: busName, Reason: "empty bus name"}
-	}
-	if !strings.HasPrefix(busName, MPRIS_PREFIX+".") {
-		return &InvalidBusNameError{BusName: busName, Reason: "must start with org.mpris.MediaPlayer2."}
-	}
-	// Vérifier qu'il ne contient pas de caractères dangereux
-	if strings.Contains(busName, "..") || strings.Contains(busName, "/") || strings.ContainsAny(busName, "\x00\r\n") {
-		return &InvalidBusNameError{BusName: busName, Reason: "contains illegal characters"}
-	}
-	return nil
-}
-
-// callWithTimeout exécute un appel D-Bus avec timeout
-func callWithTimeout(call *dbus.Call, timeout time.Duration) error {
-	done := make(chan error, 1)
-
-	go func() {
-		done <- call.Err
-	}()
-
-	select {
-	case err := <-done:
-		return err
-	case <-time.After(timeout):
-		return &dbusTimeoutError{}
-	}
-}
-
-// callWithTimeout méthode receiver pour MPRISBackend
-func (m *MPRISBackend) callWithTimeout(call *dbus.Call) error {
-	return callWithTimeout(call, m.timeout)
-}
-
 // New crée un nouveau backend MPRIS
 func New(ctx context.Context, timeout time.Duration) (*MPRISBackend, error) {
 	conn, err := dbus.ConnectSessionBus()
@@ -218,7 +182,7 @@ func (m *MPRISBackend) UpdatePlayerProperties(busName string, changed map[string
 				if metaMap, ok := extractMetadataMap(variant); ok {
 					players[i].Metadata = make(map[string]string)
 					for k, v := range metaMap {
-						players[i].Metadata[k] = formatMetadataValue(v)
+						players[i].Metadata[k] = formatMetadataValue(v.Value())
 					}
 				}
 			case "Rate":
@@ -318,41 +282,6 @@ func (m *MPRISBackend) getPlayerFromDBus(busName string) (Player, error) {
 		return Player{}, err
 	}
 	return *player, nil
-}
-
-// callMethod appelle une méthode MPRIS sur un player avec timeout
-func (m *MPRISBackend) callMethod(busName, method string, args ...interface{}) error {
-	obj := m.conn.Object(busName, MPRIS_PATH)
-	return m.callWithTimeout(obj.Call(method, 0, args...))
-}
-
-// setProperty définit une propriété sur un player
-func (m *MPRISBackend) setProperty(busName, property string, value interface{}) error {
-	obj := m.conn.Object(busName, MPRIS_PATH)
-	return m.callWithTimeout(obj.Call(DBUS_PROP_SET, 0, MPRIS_PLAYER_IFACE, property, dbus.MakeVariant(value)))
-}
-
-// getProperty récupère une propriété depuis D-Bus pour un busName donné
-func (m *MPRISBackend) getProperty(busName, iface, prop string) (dbus.Variant, error) {
-	obj := m.conn.Object(busName, MPRIS_PATH)
-	var v dbus.Variant
-	call := obj.Call(DBUS_PROP_GET, 0, iface, prop)
-	if err := m.callWithTimeout(call); err != nil {
-		return dbus.Variant{}, err
-	}
-	if err := call.Store(&v); err != nil {
-		return dbus.Variant{}, err
-	}
-	return v, nil
-}
-
-// listDBusNames récupère la liste de tous les bus names sur D-Bus
-func (m *MPRISBackend) listDBusNames() ([]string, error) {
-	var names []string
-	if err := m.conn.BusObject().Call(DBUS_LIST_NAMES_METHOD, 0).Store(&names); err != nil {
-		return nil, err
-	}
-	return names, nil
 }
 
 // Play démarre la lecture
