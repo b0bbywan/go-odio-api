@@ -1,4 +1,5 @@
 services:
+  enabled: true
   system:
     - bluetooth.service
     - upmpdcli.service
@@ -10,5 +11,15 @@ services:
     - snapclient.service
     - spotifyd.service
 
-port: 8080
+pulseaudio:
+  enabled: true
+
+mpris:
+  enabled: true
+  timeout: 5s
+
+api:
+  enabled: true
+  port: 8080
+
 logLevel: warn

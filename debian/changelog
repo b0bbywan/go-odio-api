@@ -1,4 +1,31 @@
-odio-api (0.2.0) trixie; urgency=medium
+odio-api (0.3.0) trixie; urgency=low
+
+  Complete implementation of MPRIS backend with auto-discovery, real-time event
+  listening, and full playback control for D-Bus media players.
+
+  * Add MPRIS D-Bus backend for media player control
+  * Add auto-discovery of MPRIS-compatible players (Spotify, VLC, Firefox, etc.)
+  * Add event-driven updates via D-Bus signals (PropertiesChanged, NameOwnerChanged)
+  * Add full playback control: Play, Pause, Stop, Next, Previous, Seek, SetPosition
+  * Add volume and playback mode management (Loop, Shuffle)
+  * Add metadata retrieval with proper type handling
+  * Add multi-player concurrent control support
+  * Add capability-based validation (CanPlay, CanPause, CanSeek, etc.)
+  * Add REST API endpoints for all MPRIS operations
+  * Add configuration options: mpris.enabled and mpris.timeout (default: 5s)
+  * Optimize D-Bus calls with batched GetAll operations (~85% reduction)
+  * Implement intelligent position heartbeat with lazy start/stop
+  * Add comprehensive timeout handling to all D-Bus operations
+  * Add unique name caching to eliminate repeated lookups
+  * Add semantic error types: PlayerNotFoundError, CapabilityError, ValidationError
+  * Add bus name validation against injection attacks
+  * Add prefixed logging ([mpris]) for observability
+  * Add padding on WARN and INFO logs for readability
+
+ -- Mathieu Réquillart <mathieu.requillart@gmail.com>  Thu, 05 Feb 2026 16:00:00 +0000
+
+
+odio-api (0.2.0) trixie; urgency=low
 
   * feat: add configuration for services, port and headless mode
   * feat: structured logging with configurable levels (DEBUG/INFO/WARN/ERROR/FATAL)
@@ -9,7 +36,7 @@ odio-api (0.2.0) trixie; urgency=medium
   * fix: DBus resource cleanup
   * improvement: better error handling and log messages
 
- -- Mathieu Réquillart <mathieu.requillart@gmail.com>  Mon, 03 Feb 2026 01:30:00 +0000
+ -- Mathieu Réquillart <mathieu.requillart@gmail.com>  Tue, 03 Feb 2026 01:30:00 +0000
 
 
 odio-api (0.1.2) trixie; urgency=low
