@@ -72,7 +72,11 @@ func (m *MPRISBackend) getProperty(busName, iface, prop string) (dbus.Variant, e
 // listDBusNames récupère la liste de tous les bus names sur D-Bus
 func (m *MPRISBackend) listDBusNames() ([]string, error) {
 	var names []string
-	if err := m.conn.BusObject().Call(DBUS_LIST_NAMES_METHOD, 0).Store(&names); err != nil {
+	call := m.conn.BusObject().Call(DBUS_LIST_NAMES_METHOD, 0)
+	if err := m.callWithTimeout(call); err != nil {
+		return nil, err
+	}
+	if err := call.Store(&names); err != nil {
 		return nil, err
 	}
 	return names, nil
@@ -80,7 +84,8 @@ func (m *MPRISBackend) listDBusNames() ([]string, error) {
 
 // addMatchRule s'abonne à un signal D-Bus via une match rule
 func (m *MPRISBackend) addMatchRule(rule string) error {
-	return m.conn.BusObject().Call(DBUS_ADD_MATCH_METHOD, 0, rule).Err
+	call := m.conn.BusObject().Call(DBUS_ADD_MATCH_METHOD, 0, rule)
+	return m.callWithTimeout(call)
 }
 
 // addListenMatchRules s'abonne aux signaux D-Bus nécessaires pour le listener.
@@ -102,7 +107,11 @@ func (m *MPRISBackend) addListenMatchRules() error {
 
 func (m *MPRISBackend) getNameOwner(busName string) (string, error) {
 	var owner string
-	if err := m.conn.BusObject().Call(DBUS_GET_NAME_OWNER, 0, busName).Store(&owner); err != nil {
+	call := m.conn.BusObject().Call(DBUS_GET_NAME_OWNER, 0, busName)
+	if err := m.callWithTimeout(call); err != nil {
+		return "", err
+	}
+	if err := call.Store(&owner); err != nil {
 		return "", err
 	}
 	return owner, nil
