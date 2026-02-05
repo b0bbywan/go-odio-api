@@ -8,11 +8,16 @@ import (
 	"github.com/godbus/dbus/v5"
 
 	"github.com/b0bbywan/go-odio-api/cache"
+	"github.com/b0bbywan/go-odio-api/config"
 	"github.com/b0bbywan/go-odio-api/logger"
 )
 
 // New crée un nouveau backend MPRIS
-func New(ctx context.Context, timeout time.Duration) (*MPRISBackend, error) {
+func New(ctx context.Context, cfg *config.MPRISConfig) (*MPRISBackend, error) {
+	if cfg == nil || !cfg.Enabled {
+		return nil, nil
+	}
+
 	conn, err := dbus.ConnectSessionBus()
 	if err != nil {
 		return nil, err
@@ -21,7 +26,7 @@ func New(ctx context.Context, timeout time.Duration) (*MPRISBackend, error) {
 	return &MPRISBackend{
 		conn:    conn,
 		ctx:     ctx,
-		timeout: timeout,
+		timeout: cfg.Timeout,
 		cache:   cache.New[[]Player](0), // TTL=0 = pas d'expiration
 	}, nil
 }

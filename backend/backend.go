@@ -16,28 +16,22 @@ type Backend struct {
 }
 
 func New(ctx context.Context, syscfg *config.SystemdConfig, pulscfg *config.PulseAudioConfig, mpriscfg *config.MPRISConfig) (*Backend, error) {
-	var backend Backend
-	p, err := pulseaudio.New(ctx, pulscfg)
-	if err != nil {
+	var b Backend
+	var err error
+
+	if b.Pulse, err = pulseaudio.New(ctx, pulscfg); err != nil {
 		return nil, err
 	}
-	backend.Pulse = p
 
-	s, err := systemd.New(ctx, syscfg)
-	if err != nil {
+	if b.Systemd, err = systemd.New(ctx, syscfg); err != nil {
 		return nil, err
 	}
-	backend.Systemd = s
 
-	if mpriscfg.Enabled {
-		m, err := mpris.New(ctx, mpriscfg.Timeout)
-		if err != nil {
-			return nil, err
-		}
-		backend.MPRIS = m
+	if b.MPRIS, err = mpris.New(ctx, mpriscfg); err != nil {
+		return nil, err
 	}
 
-	return &backend, nil
+	return &b, nil
 }
 
 func (b *Backend) Start() error {

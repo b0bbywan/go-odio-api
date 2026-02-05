@@ -42,12 +42,14 @@ func TestConfigStructFields(t *testing.T) {
 		Systemd: &SystemdConfig{
 			Headless: false,
 		},
-		Port:     8080,
+		Api: &ApiConfig{
+			Port: 8080,
+		},
 		LogLevel: logger.INFO,
 	}
 
-	if cfg.Port != 8080 {
-		t.Errorf("Port = %d, want 8080", cfg.Port)
+	if cfg.Api.Port != 8080 {
+		t.Errorf("Port = %d, want 8080", cfg.Api.Port)
 	}
 	if cfg.LogLevel != logger.INFO {
 		t.Errorf("LogLevel = %d, want %d", cfg.LogLevel, logger.INFO)

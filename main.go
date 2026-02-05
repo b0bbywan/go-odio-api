@@ -2,12 +2,10 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/b0bbywan/go-odio-api/api"
 	"github.com/b0bbywan/go-odio-api/backend"
@@ -18,7 +16,7 @@ import (
 func main() {
 	cfg, err := config.New()
 	if err != nil {
-		logger.Fatal("Failed to load config: %v", err)
+		logger.Fatal("[%s] Failed to load config: %v", config.AppName, err)
 	}
 
 	// Set log level from config
@@ -31,31 +29,25 @@ func main() {
 	// Initialize backends
 	b, err := backend.New(ctx, cfg.Systemd, cfg.Pulseaudio, cfg.MPRIS)
 	if err != nil {
-		logger.Fatal("Backend initialization failed: %v", err)
+		logger.Fatal("[%s] Backend initialization failed: %v", config.AppName, err)
 	}
 
 	// systemd backend
 	if err := b.Start(); err != nil {
-		logger.Fatal("Backend start failed: %v", err)
+		logger.Fatal("[%s] Backend start failed: %v", config.AppName, err)
 	}
 
-	mux := http.NewServeMux()
-	api.Register(mux, b)
+	server := api.NewServer(http.NewServeMux(), cfg.Api, b)
 
-	port := fmt.Sprintf(":%d", cfg.Port)
-	// HTTP server
-	srv := &http.Server{
-		Addr:    port,
-		Handler: mux,
-	}
-
+	// Channel pour synchroniser le shutdown
+	shutdownDone := make(chan struct{})
 	// Goroutine pour signal handling
 	go func() {
 		sigChan := make(chan os.Signal, 1)
 		signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 		<-sigChan
 
-		logger.Info("Shutdown signal received, stopping server...")
+		logger.Info("[%s] Shutdown signal received, stopping server...", config.AppName)
 
 		// Cancel le context global - arrête tous les listeners
 		cancel()
@@ -63,17 +55,17 @@ func main() {
 		// Cleanup des backends
 		b.Close()
 
-		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer shutdownCancel()
-
-		if err := srv.Shutdown(shutdownCtx); err != nil {
-			logger.Error("Server shutdown error: %v", err)
-		}
+		// Signaler que le cleanup est terminé
+		close(shutdownDone)
 	}()
 
-	logger.Info("Odio Audio API running on %s", port)
-	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		logger.Error("Server error: %v", err)
+	logger.Info("[%s] started", config.AppName)
+	if server != nil {
+		if err := server.Run(ctx); err != nil && err != http.ErrServerClosed {
+			logger.Error("[%s] http server error: %v", config.AppName, err)
+		}
 	}
-	logger.Info("Server stopped")
+
+	<-shutdownDone
+	logger.Info("[%s] stopped", config.AppName)
 }

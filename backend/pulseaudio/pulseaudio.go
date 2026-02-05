@@ -15,6 +15,10 @@ import (
 const cacheKey = "clients"
 
 func New(ctx context.Context, cfg *config.PulseAudioConfig) (*PulseAudioBackend, error) {
+	if cfg == nil || !cfg.Enabled {
+		return nil, nil
+	}
+
 	address := fmt.Sprintf("%s/pulse/native", cfg.XDGRuntimeDir)
 
 	backend := &PulseAudioBackend{

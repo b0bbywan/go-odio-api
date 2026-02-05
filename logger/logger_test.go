@@ -35,8 +35,8 @@ func TestLoggerFormat(t *testing.T) {
 	logger := New(INFO)
 	formatted := logger.format(INFO, "test message")
 
-	if !strings.Contains(formatted, "[INFO]") {
-		t.Errorf("formatted message should contain '[INFO]', got: %s", formatted)
+	if !strings.Contains(formatted, "[INFO ]") {
+		t.Errorf("formatted message should contain '[INFO ]', got: %s", formatted)
 	}
 	if !strings.Contains(formatted, "test message") {
 		t.Errorf("formatted message should contain 'test message', got: %s", formatted)
@@ -46,8 +46,8 @@ func TestLoggerFormat(t *testing.T) {
 func TestLevelNames(t *testing.T) {
 	tests := map[Level]string{
 		DEBUG: "DEBUG",
-		INFO:  "INFO",
-		WARN:  "WARN",
+		INFO:  "INFO ",
+		WARN:  "WARN ",
 		ERROR: "ERROR",
 		FATAL: "FATAL",
 	}
