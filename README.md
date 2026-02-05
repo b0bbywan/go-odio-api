@@ -1,7 +1,6 @@
 # go-odio-api
 
 [![CI](https://github.com/b0bbywan/go-odio-api/actions/workflows/ci.yml/badge.svg)](https://github.com/b0bbywan/go-odio-api/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/b0bbywan/go-odio-api/branch/main/graph/badge.svg)](https://codecov.io/gh/b0bbywan/go-odio-api)
 [![Go Report Card](https://goreportcard.com/badge/github.com/b0bbywan/go-odio-api)](https://goreportcard.com/report/github.com/b0bbywan/go-odio-api)
 
 A lightweight REST API for controlling Linux audio and media players, built in Go. Provides unified interfaces for MPRIS media players, PulseAudio/PipeWire audio control, and systemd service management.
@@ -152,8 +151,6 @@ The application uses a modular backend architecture:
 ### Prerequisites
 
 - Go 1.21 or higher
-- D-Bus development libraries
-- PulseAudio/PipeWire libraries
 - systemd with D-Bus support
 
 ### Running Tests
@@ -189,15 +186,15 @@ GOOS=linux GOARCH=arm64 go build -o odio-api-arm64
 
 ```bash
 # Build Debian package
-dpkg-deb --build debian
+dpkg-buildpackage -us -uc -b
 ```
 
 ## Dependencies
 
+- [spf13/viper](https://github.com/spf13/viper) - Go configuration with fangs
 - [godbus/dbus](https://github.com/godbus/dbus) - D-Bus bindings for Go
-- [gin-gonic/gin](https://github.com/gin-gonic/gin) - HTTP web framework
-- PulseAudio client library
-- systemd D-Bus API
+- [coreos/go-systemd](https://github.com/coreos/go-systemd) - Go bindings to systemd socket activation, journal, D-Bus, and unit files
+- [the-jonsey/pulseaudio](https://github.com/the-jonsey/pulseaudio) - Pure-Go (no libpulse) implementation of the PulseAudio native protocol.
 
 ## Contributing
 
