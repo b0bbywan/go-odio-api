@@ -16,7 +16,7 @@ import (
 func main() {
 	cfg, err := config.New()
 	if err != nil {
-		logger.Fatal("Failed to load config: %v", err)
+		logger.Fatal("[%s] Failed to load config: %v", config.AppName, err)
 	}
 
 	// Set log level from config
@@ -29,12 +29,12 @@ func main() {
 	// Initialize backends
 	b, err := backend.New(ctx, cfg.Systemd, cfg.Pulseaudio, cfg.MPRIS)
 	if err != nil {
-		logger.Fatal("Backend initialization failed: %v", err)
+		logger.Fatal("[%s] Backend initialization failed: %v", config.AppName, err)
 	}
 
 	// systemd backend
 	if err := b.Start(); err != nil {
-		logger.Fatal("Backend start failed: %v", err)
+		logger.Fatal("[%s] Backend start failed: %v", config.AppName, err)
 	}
 
 	server := api.NewServer(http.NewServeMux(), cfg.Api, b)
@@ -45,7 +45,7 @@ func main() {
 		signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 		<-sigChan
 
-		logger.Info("Shutdown signal received, stopping server...")
+		logger.Info("[%s] Shutdown signal received, stopping server...", config.AppName)
 
 		// Cancel le context global - arrête tous les listeners
 		cancel()
@@ -54,10 +54,11 @@ func main() {
 		b.Close()
 	}()
 
+	logger.Info("[%s] started", config.AppName)
 	if server != nil {
 		if err := server.Run(ctx); err != nil && err != http.ErrServerClosed {
-			logger.Error("Server error: %v", err)
+			logger.Error("[%s] http server error: %v", config.AppName, err)
 		}
 	}
-	logger.Info("Server stopped")
+	logger.Info("[%s] stopped", config.AppName)
 }

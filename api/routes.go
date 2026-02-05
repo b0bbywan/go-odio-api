@@ -45,11 +45,11 @@ func (s *Server) Run(ctx context.Context) error {
 		defer shutdownCancel()
 
 		if err := srv.Shutdown(shutdownCtx); err != nil {
-			logger.Info("Server shutdown error: %v", err)
+			logger.Info("[api] Server shutdown error: %v", err)
 		}
 	}()
 
-	logger.Info("Odio Audio API running on %d", s.config.Port)
+	logger.Info("[api] http server running on %d", s.config.Port)
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		return fmt.Errorf("Server error: %w", err)
 	}
