@@ -900,3 +900,141 @@ func TestExtractMetadataWithRealData(t *testing.T) {
 		t.Errorf("artist = %q, want %q", result["xesam:artist"], "Artist 1, Artist 2")
 	}
 }
+
+// loadCapabilitiesFromProps tests
+
+func TestLoadCapabilitiesFromProps(t *testing.T) {
+	tests := []struct {
+		name  string
+		props map[string]dbus.Variant
+		want  Capabilities
+	}{
+		{
+			name: "all capabilities true",
+			props: map[string]dbus.Variant{
+				"CanPlay":       dbus.MakeVariant(true),
+				"CanPause":      dbus.MakeVariant(true),
+				"CanGoNext":     dbus.MakeVariant(true),
+				"CanGoPrevious": dbus.MakeVariant(true),
+				"CanSeek":       dbus.MakeVariant(true),
+				"CanControl":    dbus.MakeVariant(true),
+			},
+			want: Capabilities{
+				CanPlay:       true,
+				CanPause:      true,
+				CanGoNext:     true,
+				CanGoPrevious: true,
+				CanSeek:       true,
+				CanControl:    true,
+			},
+		},
+		{
+			name: "all capabilities false",
+			props: map[string]dbus.Variant{
+				"CanPlay":       dbus.MakeVariant(false),
+				"CanPause":      dbus.MakeVariant(false),
+				"CanGoNext":     dbus.MakeVariant(false),
+				"CanGoPrevious": dbus.MakeVariant(false),
+				"CanSeek":       dbus.MakeVariant(false),
+				"CanControl":    dbus.MakeVariant(false),
+			},
+			want: Capabilities{
+				CanPlay:       false,
+				CanPause:      false,
+				CanGoNext:     false,
+				CanGoPrevious: false,
+				CanSeek:       false,
+				CanControl:    false,
+			},
+		},
+		{
+			name: "mixed capabilities",
+			props: map[string]dbus.Variant{
+				"CanPlay":       dbus.MakeVariant(true),
+				"CanPause":      dbus.MakeVariant(true),
+				"CanGoNext":     dbus.MakeVariant(false),
+				"CanGoPrevious": dbus.MakeVariant(false),
+				"CanSeek":       dbus.MakeVariant(true),
+				"CanControl":    dbus.MakeVariant(true),
+			},
+			want: Capabilities{
+				CanPlay:       true,
+				CanPause:      true,
+				CanGoNext:     false,
+				CanGoPrevious: false,
+				CanSeek:       true,
+				CanControl:    true,
+			},
+		},
+		{
+			name: "partial capabilities (missing properties default to false)",
+			props: map[string]dbus.Variant{
+				"CanPlay":  dbus.MakeVariant(true),
+				"CanPause": dbus.MakeVariant(true),
+			},
+			want: Capabilities{
+				CanPlay:       true,
+				CanPause:      true,
+				CanGoNext:     false,
+				CanGoPrevious: false,
+				CanSeek:       false,
+				CanControl:    false,
+			},
+		},
+		{
+			name:  "empty properties map",
+			props: map[string]dbus.Variant{},
+			want: Capabilities{
+				CanPlay:       false,
+				CanPause:      false,
+				CanGoNext:     false,
+				CanGoPrevious: false,
+				CanSeek:       false,
+				CanControl:    false,
+			},
+		},
+		{
+			name: "properties with wrong types are ignored",
+			props: map[string]dbus.Variant{
+				"CanPlay":   dbus.MakeVariant(true),
+				"CanPause":  dbus.MakeVariant("not a bool"), // Wrong type
+				"CanGoNext": dbus.MakeVariant(123),          // Wrong type
+				"CanSeek":   dbus.MakeVariant(false),
+			},
+			want: Capabilities{
+				CanPlay:       true,
+				CanPause:      false, // Ignored due to wrong type
+				CanGoNext:     false, // Ignored due to wrong type
+				CanGoPrevious: false,
+				CanSeek:       false,
+				CanControl:    false,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			player := &Player{}
+			got := player.loadCapabilitiesFromProps(tt.props)
+
+			if got.CanPlay != tt.want.CanPlay {
+				t.Errorf("CanPlay = %v, want %v", got.CanPlay, tt.want.CanPlay)
+			}
+			if got.CanPause != tt.want.CanPause {
+				t.Errorf("CanPause = %v, want %v", got.CanPause, tt.want.CanPause)
+			}
+			if got.CanGoNext != tt.want.CanGoNext {
+				t.Errorf("CanGoNext = %v, want %v", got.CanGoNext, tt.want.CanGoNext)
+			}
+			if got.CanGoPrevious != tt.want.CanGoPrevious {
+				t.Errorf("CanGoPrevious = %v, want %v", got.CanGoPrevious, tt.want.CanGoPrevious)
+			}
+			if got.CanSeek != tt.want.CanSeek {
+				t.Errorf("CanSeek = %v, want %v", got.CanSeek, tt.want.CanSeek)
+			}
+			if got.CanControl != tt.want.CanControl {
+				t.Errorf("CanControl = %v, want %v", got.CanControl, tt.want.CanControl)
+			}
+		})
+	}
+}
