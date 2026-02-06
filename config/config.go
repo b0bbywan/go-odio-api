@@ -13,7 +13,8 @@ import (
 )
 
 const (
-	AppName = "odio-api"
+	AppName    = "odio-api"
+	AppVersion = "0.3.2"
 )
 
 type Config struct {

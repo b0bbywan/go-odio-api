@@ -63,6 +63,9 @@ func (s *Server) register(b *backend.Backend) {
 		return
 	}
 
+	// server routes
+	s.registerServerRoutes(b)
+
 	// pulse routes
 	if b.Pulse != nil {
 		s.registerPulseRoutes(b.Pulse)
@@ -180,5 +183,14 @@ func (s *Server) registerMPRISRoutes(b *mpris.MPRISBackend) {
 	s.mux.HandleFunc(
 		"POST /players/{player}/shuffle",
 		SetShuffleHandler(b),
+	)
+}
+
+func (s *Server) registerServerRoutes(b *backend.Backend) {
+	s.mux.HandleFunc(
+		"/server",
+		JSONHandler(func(w http.ResponseWriter, r *http.Request) (any, error) {
+			return b.GetServerDeviceInfo()
+		}),
 	)
 }
