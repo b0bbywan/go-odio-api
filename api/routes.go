@@ -65,6 +65,14 @@ func (s *Server) registerSystemdRoutes(b *systemd.SystemdBackend) {
 		withService(b, b.DisableService),
 	)
 	s.mux.HandleFunc(
+		"POST /services/{scope}/{unit}/start",
+		withService(b, b.StartService),
+	)
+	s.mux.HandleFunc(
+		"POST /services/{scope}/{unit}/stop",
+		withService(b, b.StopService),
+	)
+	s.mux.HandleFunc(
 		"POST /services/{scope}/{unit}/restart",
 		withService(b, b.RestartService),
 	)

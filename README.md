@@ -151,9 +151,11 @@ POST   /audio/clients/{sink}/volume       # Set client volume (body: {"volume": 
 
 ```
 GET    /services                          # List all monitored services
+POST   /services/{scope}/{unit}/start     # Start service (scope: system|user)
+POST   /services/{scope}/{unit}/stop      # Stop service (scope: system|user)
+POST   /services/{scope}/{unit}/restart   # Restart service
 POST   /services/{scope}/{unit}/enable    # Enable service (scope: system|user)
 POST   /services/{scope}/{unit}/disable   # Disable service
-POST   /services/{scope}/{unit}/restart   # Restart service
 ```
 
 ## Architecture

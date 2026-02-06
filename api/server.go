@@ -11,7 +11,6 @@ import (
 	"github.com/b0bbywan/go-odio-api/logger"
 )
 
-
 type Server struct {
 	mux    *http.ServeMux
 	config *config.ApiConfig
