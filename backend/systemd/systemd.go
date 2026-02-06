@@ -237,6 +237,26 @@ func (s *SystemdBackend) DisableService(name string, scope UnitScope) error {
 	return nil
 }
 
+func (s *SystemdBackend) StartService(name string, scope UnitScope) error {
+	logger.Debug("[systemd] starting service %s/%s", scope, name)
+	if err := startUnit(s.ctx, s.connForScope(scope), name); err != nil {
+		return err
+	}
+
+	logger.Debug("[systemd] service %s/%s started successfully", scope, name)
+	return nil
+}
+
+func (s *SystemdBackend) StopService(name string, scope UnitScope) error {
+	logger.Debug("[systemd] stopping service %s/%s", scope, name)
+	if err := stopUnit(s.ctx, s.connForScope(scope), name); err != nil {
+		return err
+	}
+
+	logger.Debug("[systemd] service %s/%s stopped successfully", scope, name)
+	return nil
+}
+
 func (s *SystemdBackend) RestartService(name string, scope UnitScope) error {
 	logger.Debug("[systemd] restarting service %s/%s", scope, name)
 	if err := restartUnit(s.ctx, s.connForScope(scope), name); err != nil {

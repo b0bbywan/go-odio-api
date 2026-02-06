@@ -85,7 +85,7 @@ Configuration file can be placed at:
 - `~/.config/odio-api/config.yaml` (user-specific)
 - A default configuration is available in `share/config.yaml`
 
-Disabling a backend will disable its routes !
+Disabling a backend will disable the backend and its routes !
 
 Example configuration:
 
@@ -151,9 +151,17 @@ POST   /audio/clients/{sink}/volume       # Set client volume (body: {"volume": 
 
 ```
 GET    /services                          # List all monitored services
+POST   /services/{scope}/{unit}/start     # Start service (scope: system|user)
+POST   /services/{scope}/{unit}/stop      # Stop service (scope: system|user)
+POST   /services/{scope}/{unit}/restart   # Restart service
 POST   /services/{scope}/{unit}/enable    # Enable service (scope: system|user)
 POST   /services/{scope}/{unit}/disable   # Disable service
-POST   /services/{scope}/{unit}/restart   # Restart service
+```
+
+### Server Informations
+
+```
+GET    /server                             # {"hostname":"","os_platform":"","os_version":"","api_sw":"","api_version":"","backends":{"mpris":true,"pulseaudio":true,"systemd":true}}
 ```
 
 ## Architecture

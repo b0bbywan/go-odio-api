@@ -1,9 +1,15 @@
+odio-api (0.3.2) trixie; urgency=low
+
+ * Add /server route
+
+ -- Mathieu Réquillart <mathieu.requillart@gmail.com>  Thu, 05 Feb 2026 19:00:00 +0000
+
+
 odio-api (0.3.1) trixie; urgency=low
 
  * Fix Api port config
 
  -- Mathieu Réquillart <mathieu.requillart@gmail.com>  Thu, 05 Feb 2026 19:00:00 +0000
-
 
 
 odio-api (0.3.0) trixie; urgency=low

@@ -32,12 +32,13 @@ func main() {
 		logger.Fatal("[%s] Backend initialization failed: %v", config.AppName, err)
 	}
 
-	// systemd backend
+	// Start enabled backend
 	if err := b.Start(); err != nil {
 		logger.Fatal("[%s] Backend start failed: %v", config.AppName, err)
 	}
 
-	server := api.NewServer(http.NewServeMux(), cfg.Api, b)
+	// New api server
+	server := api.NewServer(cfg.Api, b)
 
 	// Channel to synchronize shutdown
 	shutdownDone := make(chan struct{})
