@@ -37,7 +37,7 @@ func New(ctx context.Context, config *config.SystemdConfig) (*SystemdBackend, er
 
 // Start loads the initial cache and starts the listener
 func (s *SystemdBackend) Start() error {
-	logger.Debug("[systemd] starting backend (headless=%v)", s.config.Headless)
+	logger.Debug("[systemd] starting backend (utmp=%v)", s.config.SupportsUTMP)
 
 	// Load the cache at startup
 	if _, err := s.ListServices(); err != nil {

@@ -12,12 +12,12 @@ import (
 
 // Listener listens for systemd changes via native D-Bus signals (godbus)
 type Listener struct {
-	backend     *SystemdBackend
-	ctx         context.Context
-	cancel      context.CancelFunc
-	sysWatched  map[string]bool
-	userWatched map[string]bool
-	headless    bool
+	backend      *SystemdBackend
+	ctx          context.Context
+	cancel       context.CancelFunc
+	sysWatched   map[string]bool
+	userWatched  map[string]bool
+	supportsUTMP bool
 
 	// Deduplication: last known state per service/scope
 	lastState   map[string]string

@@ -34,7 +34,7 @@ type SystemdConfig struct {
 	Enabled        bool
 	SystemServices []string
 	UserServices   []string
-	Headless       bool
+	SupportsUTMP   bool
 	XDGRuntimeDir  string
 }
 
@@ -66,6 +66,11 @@ func parseLogLevel(levelStr string) logger.Level {
 	}
 }
 
+func systemdHasUTMP() bool {
+	_, err := os.Stat("/run/utmp")
+	return err == nil
+}
+
 func New() (*Config, error) {
 	viper.SetDefault("api.enabled", true)
 	viper.SetDefault("systemd.enabled", true)
@@ -95,12 +100,6 @@ func New() (*Config, error) {
 		}
 	}
 
-	var headless bool
-	if desktop := os.Getenv("XDG_SESSION_DESKTOP"); desktop == "" {
-		logger.Info("running in headless mode")
-		headless = true
-	}
-
 	port := viper.GetInt("api.port")
 	if port <= 0 || port > 65535 {
 		return nil, fmt.Errorf("invalid port: %d", port)
@@ -120,7 +119,7 @@ func New() (*Config, error) {
 		Enabled:        viper.GetBool("systemd.enabled"),
 		SystemServices: viper.GetStringSlice("services.system"),
 		UserServices:   viper.GetStringSlice("services.user"),
-		Headless:       headless,
+		SupportsUTMP:   systemdHasUTMP(),
 		XDGRuntimeDir:  xdgRuntimeDir,
 	}
 
