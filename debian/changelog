@@ -1,3 +1,13 @@
+odio-api (0.3.3) trixie; urgency=low
+
+ Fix "headless" mode
+
+ * fix: systemd utmp detection
+ * fix: handling of long transitional unit states
+
+ -- Mathieu Réquillart <mathieu.requillart@gmail.com>  Sat, 07 Feb 2026 15:30:00 +0000
+
+
 odio-api (0.3.2) trixie; urgency=low
 
  * Add /server route
