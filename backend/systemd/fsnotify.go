@@ -121,7 +121,7 @@ func (l *Listener) waitForStableState(service string) {
 	maxWait := 8 * time.Second
 	factor := 1.5
 
-	// fires immediatly
+	// fires immediately
 	timer := time.NewTimer(0)
 	defer timer.Stop()
 
