@@ -42,7 +42,7 @@ func TestConfigStructFields(t *testing.T) {
 	// Just verify the Config struct has the expected fields
 	cfg := &Config{
 		Systemd: &SystemdConfig{
-			Headless: false,
+			SupportsUTMP: false,
 		},
 		Api: &ApiConfig{
 			Port: 8080,
@@ -56,8 +56,8 @@ func TestConfigStructFields(t *testing.T) {
 	if cfg.LogLevel != logger.INFO {
 		t.Errorf("LogLevel = %d, want %d", cfg.LogLevel, logger.INFO)
 	}
-	if cfg.Systemd.Headless != false {
-		t.Errorf("Headless = %v, want false", cfg.Systemd.Headless)
+	if cfg.Systemd.SupportsUTMP != false {
+		t.Errorf("Headless = %v, want false", cfg.Systemd.SupportsUTMP)
 	}
 	if cfg.Systemd == nil {
 		t.Error("Services should not be nil")
@@ -180,26 +180,6 @@ func TestNew_InvalidPort(t *testing.T) {
 				t.Errorf("New() with invalid port should return nil config, got: %+v", cfg)
 			}
 		})
-	}
-}
-
-func TestNew_HeadlessMode(t *testing.T) {
-	// Reset viper to ensure clean state
-	viper.Reset()
-
-	// Isolate from user's config files by using a temp directory
-	t.Setenv("HOME", t.TempDir())
-
-	// Clear XDG_SESSION_DESKTOP to trigger headless mode
-	t.Setenv("XDG_SESSION_DESKTOP", "")
-
-	cfg, err := New()
-	if err != nil {
-		t.Fatalf("New() returned error: %v", err)
-	}
-
-	if !cfg.Systemd.Headless {
-		t.Error("Systemd.Headless should be true when XDG_SESSION_DESKTOP is not set")
 	}
 }
 

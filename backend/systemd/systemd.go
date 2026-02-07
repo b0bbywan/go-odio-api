@@ -37,7 +37,7 @@ func New(ctx context.Context, config *config.SystemdConfig) (*SystemdBackend, er
 
 // Start loads the initial cache and starts the listener
 func (s *SystemdBackend) Start() error {
-	logger.Debug("[systemd] starting backend (headless=%v)", s.config.Headless)
+	logger.Debug("[systemd] starting backend (utmp=%v)", s.config.SupportsUTMP)
 
 	// Load the cache at startup
 	if _, err := s.ListServices(); err != nil {
@@ -129,17 +129,19 @@ func (s *SystemdBackend) UpdateService(updated Service) error {
 }
 
 // RefreshService reloads a specific service from systemd and updates the cache
-func (s *SystemdBackend) RefreshService(name string, scope UnitScope) (*Service, error) {
+func (s *SystemdBackend) RefreshService(ctx context.Context, name string, scope UnitScope) (*Service, error) {
 	conn := s.connForScope(scope)
 
-	props, err := conn.GetUnitPropertiesContext(s.ctx, name)
+	props, err := conn.GetUnitPropertiesContext(ctx, name)
 	if err != nil {
+		logger.Debug("[systemd] failed to get %s unit properties: %v", name, err)
 		props = nil
 	}
 
 	svc := serviceFromProps(name, scope, props)
 
 	if err := s.UpdateService(svc); err != nil {
+		logger.Debug("[systemd] failed to update %s: %v", name, err)
 		return nil, err
 	}
 

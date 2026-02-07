@@ -28,8 +28,7 @@ A lightweight REST API for controlling Linux audio and media players, built in G
 - List and monitor systemd services
 - Enable, disable, and restart services
 - Real-time service state updates via D-Bus signals
-- Headless tracking via filesystem monitoring (for systemd without utmp)
-- User session detection based on DESKTOP environment variable
+- Tracking via filesystem monitoring for systemd without utmp (/run/user/{uid}/systemd/units)
 
 ## Installation
 
