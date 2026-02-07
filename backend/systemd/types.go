@@ -22,6 +22,7 @@ type Listener struct {
 	// Deduplication: last known state per service/scope
 	lastState   map[string]string
 	lastStateMu sync.RWMutex
+	watcherMap  sync.Map
 }
 
 type UnitScope string

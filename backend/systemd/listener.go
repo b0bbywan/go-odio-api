@@ -8,11 +8,6 @@ import (
 	"github.com/b0bbywan/go-odio-api/logger"
 )
 
-const (
-	actionStarted = "STARTED"
-	actionStopped = "STOPPED"
-)
-
 func NewListener(backend *SystemdBackend) *Listener {
 	ctx, cancel := context.WithCancel(backend.ctx)
 
@@ -173,7 +168,7 @@ func (l *Listener) listen(
 				return
 			}
 			if unitName, ok := l.checkUnit(sig, scope); ok {
-				if _, err := l.backend.RefreshService(unitName, scope); err != nil {
+				if _, err := l.backend.RefreshService(l.ctx, unitName, scope); err != nil {
 					logger.Error("[systemd] failed to refresh service %s/%s: %v", scope, unitName, err)
 				}
 			}
