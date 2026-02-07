@@ -19,9 +19,10 @@ const (
 
 type Config struct {
 	Api        *ApiConfig
-	Systemd    *SystemdConfig
-	Pulseaudio *PulseAudioConfig
+	Bluetooth  *BluetoothConfig
 	MPRIS      *MPRISConfig
+	Pulseaudio *PulseAudioConfig
+	Systemd    *SystemdConfig
 	LogLevel   logger.Level
 }
 
@@ -46,6 +47,12 @@ type PulseAudioConfig struct {
 type MPRISConfig struct {
 	Enabled bool
 	Timeout time.Duration
+}
+
+type BluetoothConfig struct {
+	Enabled        bool
+	PairingTimeout time.Duration
+	Timeout        time.Duration
 }
 
 // parseLogLevel converts a string to a logger.Level
@@ -81,6 +88,10 @@ func New() (*Config, error) {
 
 	viper.SetDefault("mpris.enabled", true)
 	viper.SetDefault("mpris.timeout", "5s")
+
+	viper.SetDefault("bluetooth.enabled", true)
+	viper.SetDefault("bluetooth.timeout", "5s")
+	viper.SetDefault("bluetooth.pairingtimeout", "60s")
 
 	viper.SetDefault("api.port", 8080)
 	viper.SetDefault("LogLevel", "WARN")
@@ -138,11 +149,28 @@ func New() (*Config, error) {
 		Timeout: mprisTimeout,
 	}
 
+	bluetoothTimeout := viper.GetDuration("bluetooth.timeout")
+	if bluetoothTimeout <= 0 {
+		bluetoothTimeout = 5 * time.Second
+	}
+
+	bluetoothPairingTimeout := viper.GetDuration("bluetooth.pairingtimeout")
+	if bluetoothPairingTimeout <= 0 {
+		bluetoothPairingTimeout = 60 * time.Second
+	}
+
+	bluetoothcfg := BluetoothConfig{
+		Enabled:        viper.GetBool("bluetooth.enabled"),
+		Timeout:        bluetoothTimeout,
+		PairingTimeout: bluetoothPairingTimeout,
+	}
+
 	cfg := Config{
 		Api:        &apiCfg,
-		Systemd:    &syscfg,
-		Pulseaudio: &pulsecfg,
+		Bluetooth:  &bluetoothcfg,
 		MPRIS:      &mpriscfg,
+		Pulseaudio: &pulsecfg,
+		Systemd:    &syscfg,
 		LogLevel:   parseLogLevel(viper.GetString("LogLevel")),
 	}
 
