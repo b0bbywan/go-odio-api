@@ -37,12 +37,7 @@ func New(ctx context.Context, cfg *config.BluetoothConfig) (*BluetoothBackend, e
 	return &backend, nil
 }
 
-func (b *BluetoothBackend) Start() error {
-	// Connexion Adapter
-	return nil
-}
-
-func (b *BluetoothBackend) PowerOn() error {
+func (b *BluetoothBackend) PowerUp() error {
 	if powered := b.isAdapterOn(); powered {
 		return nil
 	}

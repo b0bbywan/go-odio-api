@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/b0bbywan/go-odio-api/backend"
+	"github.com/b0bbywan/go-odio-api/backend/bluetooth"
 	"github.com/b0bbywan/go-odio-api/backend/mpris"
 	"github.com/b0bbywan/go-odio-api/backend/pulseaudio"
 	"github.com/b0bbywan/go-odio-api/backend/systemd"
@@ -16,6 +17,22 @@ func (s *Server) registerServerRoutes(b *backend.Backend) {
 			return b.GetServerDeviceInfo()
 		}),
 	)
+}
+
+func (s *Server) registerBluetoothRoutes(b *bluetooth.BluetoothBackend) {
+	s.mux.HandleFunc(
+		"POST /bluetooth/power_up",
+		withBluetoothAction(b.PowerUp),
+	)
+	s.mux.HandleFunc(
+		"POST /bluetooth/power_down",
+		withBluetoothAction(b.PowerDown),
+	)
+	s.mux.HandleFunc(
+		"POST /bluetooth/pairable",
+		withBluetoothAction(b.NewPairing),
+	)
+
 }
 
 func (s *Server) registerPulseRoutes(b *pulseaudio.PulseAudioBackend) {
