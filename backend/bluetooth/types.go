@@ -13,6 +13,7 @@ type BluetoothBackend struct {
 	ctx            context.Context
 	timeout        time.Duration
 	pairingTimeout time.Duration
+	agent          *bluezAgent
 }
 
 type dbusTimeoutError struct{}

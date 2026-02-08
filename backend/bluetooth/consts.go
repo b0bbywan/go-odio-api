@@ -12,8 +12,9 @@ const (
 	AGENT_IFACE   = BLUETOOTH_PREFIX + ".Agent1"
 	AGENT_MANAGER = BLUETOOTH_PREFIX + ".AgentManager1"
 
-	REGISTER_AGENT = AGENT_MANAGER + ".RegisterAgent"
-	REQUEST_AGENT  = AGENT_MANAGER + ".RequestDefaultAgent"
+	REGISTER_AGENT   = AGENT_MANAGER + ".RegisterAgent"
+	REQUEST_AGENT    = AGENT_MANAGER + ".RequestDefaultAgent"
+	UNREGISTER_AGENT = AGENT_MANAGER + ".UnregisterAgent"
 
 	BLUEZ_PATH     = "/org/bluez"
 	BLUETOOTH_PATH = BLUEZ_PATH + "/hci0"

@@ -140,6 +140,8 @@ func (b *BluetoothBackend) waitPairing(ctx context.Context) {
 }
 
 func (b *BluetoothBackend) Close() {
+	b.unregisterAgent()
+
 	if b.conn != nil {
 		if err := b.conn.Close(); err != nil {
 			logger.Info("[bluetooth] Failed to close D-Bus connection: %v", err)
@@ -149,6 +151,10 @@ func (b *BluetoothBackend) Close() {
 }
 
 func (b *BluetoothBackend) registerAgent() error {
+	if b.agent != nil {
+		return nil
+	}
+
 	// Export de l'objet sur la connexion system bus
 	agent := bluezAgent{}
 	if err := b.exportAgent(&agent); err != nil {
@@ -159,6 +165,8 @@ func (b *BluetoothBackend) registerAgent() error {
 	if err := b.RequestNoInputOutputAgent(manager); err != nil {
 		return err
 	}
+
+	b.agent = &agent
 
 	return nil
 }

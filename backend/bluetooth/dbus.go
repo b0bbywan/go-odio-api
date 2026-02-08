@@ -190,3 +190,21 @@ func (b *BluetoothBackend) RequestNoInputOutputAgent(manager dbus.BusObject) err
 	logger.Debug("[bluetooth] Agent configuration success")
 	return nil
 }
+
+func (b *BluetoothBackend) unregisterAgent() {
+	if b.agent == nil {
+		return
+	}
+
+	manager := b.getObj(BLUETOOTH_PREFIX, BLUEZ_PATH)
+	if err := b.callMethod(
+		manager,
+		UNREGISTER_AGENT,
+		dbus.ObjectPath(AGENT_PATH),
+	); err != nil {
+		logger.Warn("[bluetooth] failed to unregister agent %s: %v", err)
+	}
+
+	// côté Go, on oublie juste la ref
+	b.agent = nil
+}
