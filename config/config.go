@@ -13,8 +13,10 @@ import (
 )
 
 const (
-	AppName    = "odio-api"
-	AppVersion = "0.3.3"
+	AppName     = "odio-api"
+	AppVersion  = "0.3.3"
+	serviceType = "_http._tcp"
+	domain      = "local."
 )
 
 type Config struct {
@@ -22,6 +24,7 @@ type Config struct {
 	Systemd    *SystemdConfig
 	Pulseaudio *PulseAudioConfig
 	MPRIS      *MPRISConfig
+	Zeroconf   *ZeroConfig
 	LogLevel   logger.Level
 }
 
@@ -46,6 +49,15 @@ type PulseAudioConfig struct {
 type MPRISConfig struct {
 	Enabled bool
 	Timeout time.Duration
+}
+
+type ZeroConfig struct {
+	Enabled      bool
+	InstanceName string
+	ServiceType  string
+	Domain       string
+	Port         int
+	TxtRecords   []string
 }
 
 // parseLogLevel converts a string to a logger.Level
@@ -81,6 +93,8 @@ func New() (*Config, error) {
 
 	viper.SetDefault("mpris.enabled", true)
 	viper.SetDefault("mpris.timeout", "5s")
+
+	viper.SetDefault("zeroconf.enabled", true)
 
 	viper.SetDefault("api.port", 8080)
 	viper.SetDefault("LogLevel", "WARN")
@@ -138,11 +152,21 @@ func New() (*Config, error) {
 		Timeout: mprisTimeout,
 	}
 
+	zerocfg := ZeroConfig{
+		Enabled:      viper.GetBool("zeroconf.enabled"),
+		InstanceName: AppName,
+		ServiceType:  serviceType,
+		Port:         port,
+		Domain:       domain,
+		TxtRecords:   []string{"version=" + AppVersion},
+	}
+
 	cfg := Config{
 		Api:        &apiCfg,
 		Systemd:    &syscfg,
 		Pulseaudio: &pulsecfg,
 		MPRIS:      &mpriscfg,
+		Zeroconf:   &zerocfg,
 		LogLevel:   parseLogLevel(viper.GetString("LogLevel")),
 	}
 
