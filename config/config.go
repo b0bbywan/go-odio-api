@@ -19,15 +19,22 @@ const (
 
 type Config struct {
 	Api        *ApiConfig
-	Systemd    *SystemdConfig
-	Pulseaudio *PulseAudioConfig
+	Bluetooth  *BluetoothConfig
 	MPRIS      *MPRISConfig
+	Pulseaudio *PulseAudioConfig
+	Systemd    *SystemdConfig
 	LogLevel   logger.Level
+}
+
+type UIConfig struct {
+	Enabled bool
 }
 
 type ApiConfig struct {
 	Enabled bool
 	Port    int
+
+	UI *UIConfig
 }
 
 type SystemdConfig struct {
@@ -46,6 +53,12 @@ type PulseAudioConfig struct {
 type MPRISConfig struct {
 	Enabled bool
 	Timeout time.Duration
+}
+
+type BluetoothConfig struct {
+	Enabled        bool
+	PairingTimeout time.Duration
+	Timeout        time.Duration
 }
 
 // parseLogLevel converts a string to a logger.Level
@@ -73,6 +86,10 @@ func systemdHasUTMP() bool {
 
 func New() (*Config, error) {
 	viper.SetDefault("api.enabled", true)
+	viper.SetDefault("api.port", 8080)
+
+	viper.SetDefault("api.ui.enabled", true)
+
 	viper.SetDefault("systemd.enabled", true)
 	viper.SetDefault("services.system", []string{})
 	viper.SetDefault("services.user", []string{})
@@ -82,7 +99,10 @@ func New() (*Config, error) {
 	viper.SetDefault("mpris.enabled", true)
 	viper.SetDefault("mpris.timeout", "5s")
 
-	viper.SetDefault("api.port", 8080)
+	viper.SetDefault("bluetooth.enabled", true)
+	viper.SetDefault("bluetooth.timeout", "5s")
+	viper.SetDefault("bluetooth.pairingtimeout", "60s")
+
 	viper.SetDefault("LogLevel", "WARN")
 
 	// Load from configuration file, environment variables, and CLI flags
@@ -110,9 +130,14 @@ func New() (*Config, error) {
 		xdgRuntimeDir = fmt.Sprintf("/run/user/%d", os.Getuid())
 	}
 
+	uiCfg := UIConfig{
+		Enabled: viper.GetBool("ui.enabled"),
+	}
+
 	apiCfg := ApiConfig{
 		Enabled: viper.GetBool("api.enabled"),
 		Port:    port,
+		UI:      &uiCfg,
 	}
 
 	syscfg := SystemdConfig{
@@ -138,11 +163,28 @@ func New() (*Config, error) {
 		Timeout: mprisTimeout,
 	}
 
+	bluetoothTimeout := viper.GetDuration("bluetooth.timeout")
+	if bluetoothTimeout <= 0 {
+		bluetoothTimeout = 5 * time.Second
+	}
+
+	bluetoothPairingTimeout := viper.GetDuration("bluetooth.pairingtimeout")
+	if bluetoothPairingTimeout <= 0 {
+		bluetoothPairingTimeout = 60 * time.Second
+	}
+
+	bluetoothcfg := BluetoothConfig{
+		Enabled:        viper.GetBool("bluetooth.enabled"),
+		Timeout:        bluetoothTimeout,
+		PairingTimeout: bluetoothPairingTimeout,
+	}
+
 	cfg := Config{
 		Api:        &apiCfg,
-		Systemd:    &syscfg,
-		Pulseaudio: &pulsecfg,
+		Bluetooth:  &bluetoothcfg,
 		MPRIS:      &mpriscfg,
+		Pulseaudio: &pulsecfg,
+		Systemd:    &syscfg,
 		LogLevel:   parseLogLevel(viper.GetString("LogLevel")),
 	}
 

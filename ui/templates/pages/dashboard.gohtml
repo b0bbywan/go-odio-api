@@ -1,0 +1,19 @@
+{{ define "dashboard" }}
+{{ template "base" . }}
+
+{{ define "content" }}
+<div class="grid gap-4 lg:grid-cols-3">
+	{{ if .Backends.MPRIS }}
+		{{ template "section-mpris" . }}
+	{{ end }}
+
+	{{ if .Backends.PulseAudio }}
+		{{ template "section-pulseaudio" . }}
+	{{ end }}
+
+	{{ if .Backends.Systemd }}
+		{{ template "section-systemd" . }}
+	{{ end }}
+</div>
+{{ end }}
+{{ end }}
