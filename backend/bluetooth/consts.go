@@ -3,6 +3,7 @@ package bluetooth
 const (
 	BLUETOOTH_PREFIX  = "org.bluez"
 	BLUETOOTH_ADAPTER = BLUETOOTH_PREFIX + ".Adapter1"
+	BLUETOOTH_DEVICE  = BLUETOOTH_PREFIX + ".Device1"
 
 	DBUS_PROP_IFACE = "org.freedesktop.DBus.Properties"
 	DBUS_PROP_SET   = DBUS_PROP_IFACE + ".Set"
@@ -29,6 +30,7 @@ const (
 	BT_STATE_POWERED      BluetoothState = "Powered"
 	BT_STATE_DISCOVERABLE BluetoothState = "Discoverable"
 	BT_STATE_PAIRABLE     BluetoothState = "Pairable"
+	BT_STATE_TRUSTED      BluetoothState = "Trusted"
 )
 
 func (b BluetoothState) toString() string {

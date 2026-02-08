@@ -2,6 +2,7 @@ package bluetooth
 
 import (
 	"context"
+	"time"
 
 	"github.com/godbus/dbus/v5"
 
@@ -58,9 +59,25 @@ func (b *BluetoothBackend) PowerOn() error {
 }
 
 func (b *BluetoothBackend) NewPairing() error {
+	// RegisterAgent
+	if err := b.registerAgent(); err != nil {
+		if dbusErr, ok := err.(*dbus.Error); ok {
+			if dbusErr.Name == "org.bluez.Error.AlreadyExists" {
+				return nil
+			}
+		}
+	}
+
 	// Bluetooth ON
-	if err := b.setAdapterProp(BT_STATE_POWERED.toString(), true); err != nil {
+	var powered bool
+	var err error
+	if powered, err = b.isAdapterOn(); err != nil {
 		return err
+	}
+	if !powered {
+		if err := b.setAdapterProp(BT_STATE_POWERED.toString(), true); err != nil {
+			return err
+		}
 	}
 
 	// Timeouts (en secondes)
@@ -81,6 +98,29 @@ func (b *BluetoothBackend) NewPairing() error {
 		return err
 	}
 
+ 	// 5️⃣ Attendre qu'un device apparaisse et le marquer Trusted
+    //    Ici on fait un simple polling toutes les 500ms pour exemple
+    timeout := time.After(b.pairingTimeout)
+    ticker := time.NewTicker(500 * time.Millisecond)
+    defer ticker.Stop()
+
+    for {
+        select {
+        case <-timeout:
+            return nil // Timeout atteint, pairing terminé
+        case <-ticker.C:
+            devices, _ := b.listDevices()
+            for _, d := range devices {
+                // Si device n'est pas encore Trusted, on le trust
+                trusted, _ := b.isDeviceTrusted(d)
+                if !trusted {
+                    _ = b.trustDevice(d)
+                }
+            }
+        }
+    }
+
+
 	return nil
 }
 
@@ -94,37 +134,27 @@ func (b *BluetoothBackend) Close() {
 }
 
 func (b *BluetoothBackend) registerAgent() error {
-	agentObj := &agent{}
-
 	// Export de l'objet sur la connexion system bus
-	if err := b.conn.Export(
-		agentObj,
+	agent := bluezAgent{}
+	if err := b.exportAgent(&agent); err != nil {
+		return err
+	}
+
+	manager := b.getObj(BLUETOOTH_PREFIX, BLUEZ_PATH)
+	if err := b.callMethod(
+		manager,
+		REGISTER_AGENT,
 		dbus.ObjectPath(AGENT_PATH),
-		AGENT_IFACE,
+		AGENT_CAPABILITY,
 	); err != nil {
 		return err
 	}
 
-	manager := b.conn.Object(BLUETOOTH_PREFIX, dbus.ObjectPath(BLUEZ_PATH))
-
-	// RegisterAgent
-	call := manager.Call(
-		REGISTER_AGENT,
-		0,
-		dbus.ObjectPath(AGENT_PATH),
-		AGENT_CAPABILITY,
-	)
-	if err := b.callWithTimeout(call); err != nil {
-		return err
-	}
-
-	// RequestDefaultAgent
-	call = manager.Call(
+	if err := b.callMethod(
+		manager,
 		REQUEST_AGENT,
-		0,
 		dbus.ObjectPath(AGENT_PATH),
-	)
-	if err := b.callWithTimeout(call); err != nil {
+	); err != nil {
 		return err
 	}
 
