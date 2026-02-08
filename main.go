@@ -31,7 +31,7 @@ func main() {
 	defer cancel()
 
 	// Initialize backends
-	b, err := backend.New(ctx, cfg.Systemd, cfg.Pulseaudio, cfg.MPRIS)
+	b, err := backend.New(ctx, cfg.Systemd, cfg.Pulseaudio, cfg.MPRIS, cfg.Zeroconf)
 	if err != nil {
 		logger.Fatal("[%s] Backend initialization failed: %v", config.AppName, err)
 	}
