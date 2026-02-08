@@ -26,9 +26,15 @@ type Config struct {
 	LogLevel   logger.Level
 }
 
+type UIConfig struct {
+	Enabled bool
+}
+
 type ApiConfig struct {
 	Enabled bool
 	Port    int
+
+	UI *UIConfig
 }
 
 type SystemdConfig struct {
@@ -80,6 +86,10 @@ func systemdHasUTMP() bool {
 
 func New() (*Config, error) {
 	viper.SetDefault("api.enabled", true)
+	viper.SetDefault("api.port", 8080)
+
+	viper.SetDefault("api.ui.enabled", true)
+
 	viper.SetDefault("systemd.enabled", true)
 	viper.SetDefault("services.system", []string{})
 	viper.SetDefault("services.user", []string{})
@@ -93,7 +103,6 @@ func New() (*Config, error) {
 	viper.SetDefault("bluetooth.timeout", "5s")
 	viper.SetDefault("bluetooth.pairingtimeout", "60s")
 
-	viper.SetDefault("api.port", 8080)
 	viper.SetDefault("LogLevel", "WARN")
 
 	// Load from configuration file, environment variables, and CLI flags
@@ -121,9 +130,14 @@ func New() (*Config, error) {
 		xdgRuntimeDir = fmt.Sprintf("/run/user/%d", os.Getuid())
 	}
 
+	uiCfg := UIConfig{
+		Enabled: viper.GetBool("ui.enabled"),
+	}
+
 	apiCfg := ApiConfig{
 		Enabled: viper.GetBool("api.enabled"),
 		Port:    port,
+		UI:      &uiCfg,
 	}
 
 	syscfg := SystemdConfig{
