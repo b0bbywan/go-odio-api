@@ -1,0 +1,18 @@
+{{ define "mpris-player" }}
+<div id="player-{{ .Name }}"
+	class="flex items-center justify-between rounded-lg bg-zinc-700 p-3">
+
+	<div>
+		<div class="font-medium">{{ .Name }}</div>
+		<div class="text-xs text-zinc-400 truncate">
+			{{ .Artist }} – {{ .Title }}
+		</div>
+	</div>
+
+	<div class="flex gap-2">
+		<button hx-post="/players/{{ .Name }}/previous">⏮</button>
+		<button hx-post="/players/{{ .Name }}/play_pause">▶︎⏸</button>
+		<button hx-post="/players/{{ .Name }}/next">⏭</button>
+	</div>
+</div>
+{{ end }}

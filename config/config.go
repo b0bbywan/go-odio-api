@@ -30,6 +30,10 @@ type Config struct {
 	LogLevel   logger.Level
 }
 
+type UIConfig struct {
+	Enabled bool
+}
+
 type ApiConfig struct {
 	Enabled bool
 	Port    int
