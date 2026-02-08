@@ -29,10 +29,16 @@ type Config struct {
 	LogLevel   logger.Level
 }
 
+type UIConfig struct {
+	Enabled bool
+}
+
 type ApiConfig struct {
 	Enabled bool
 	Port    int
 	Listen  string
+
+	UI *UIConfig
 }
 
 type SystemdConfig struct {
@@ -163,7 +169,6 @@ func validateConfigPath(path string) error {
 	if ext != ".yaml" && ext != ".yml" {
 		return fmt.Errorf("config file must be .yaml or .yml, got: %s", ext)
 	}
-
 	// Check file exists and is readable
 	info, err := os.Stat(path)
 	if err != nil {
@@ -186,7 +191,6 @@ func readConfig(cfgFile *string) error {
 		viper.SetConfigFile(*cfgFile)
 		return viper.ReadInConfig()
 	}
-
 	viper.SetConfigName("config")                       // name of config file (without extension)
 	viper.AddConfigPath(filepath.Join("/etc", AppName)) // Global configuration path
 	if home, err := os.UserHomeDir(); err == nil {
@@ -201,6 +205,7 @@ func New(cfgFile *string) (*Config, error) {
 
 	viper.SetDefault("api.enabled", true)
 	viper.SetDefault("api.port", 8018)
+	viper.SetDefault("api.ui.enabled", false)
 
 	viper.SetDefault("mpris.enabled", true)
 	viper.SetDefault("mpris.timeout", "5s")
@@ -240,10 +245,15 @@ func New(cfgFile *string) (*Config, error) {
 		xdgRuntimeDir = fmt.Sprintf("/run/user/%d", os.Getuid())
 	}
 
+	uiCfg := UIConfig{
+		Enabled: viper.GetBool("api.ui.enabled"),
+	}
+
 	apiCfg := ApiConfig{
 		Enabled: viper.GetBool("api.enabled"),
 		Listen:  fmt.Sprintf("%s:%d", bind, port),
 		Port:    port,
+		UI:      &uiCfg,
 	}
 
 	syscfg := SystemdConfig{

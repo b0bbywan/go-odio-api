@@ -1,0 +1,13 @@
+{{ define "section-mpris" }}
+<section class="rounded-xl bg-zinc-800 p-4 shadow">
+	<h2 class="mb-3 text-lg font-semibold">Media Players</h2>
+
+	<div class="space-y-2">
+		{{ range .Players }}
+			{{ template "mpris-player" . }}
+		{{ else }}
+			<div class="text-sm text-zinc-400">No active players</div>
+		{{ end }}
+	</div>
+</section>
+{{ end }}
