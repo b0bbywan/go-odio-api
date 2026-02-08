@@ -35,99 +35,114 @@ func (b *BluetoothBackend) Start() error {
 }
 
 func (b *BluetoothBackend) PowerOn() error {
-	powered, err := b.isAdapterOn()
-	if err != nil {
-		return err
-	}
-	if powered {
+	if powered := b.isAdapterOn(); powered {
 		return nil
 	}
 
-	if err := b.setAdapterProp(BT_STATE_POWERED.toString(), true); err != nil {
+	if err := b.PowerOnAdapter(true); err != nil {
 		return err
 	}
 
-	if err := b.setAdapterProp(BT_STATE_DISCOVERABLE.toString(), false); err != nil {
+	if err := b.SetDiscoverable(false); err != nil {
 		return err
 	}
 
-	if err := b.setAdapterProp(BT_STATE_PAIRABLE.toString(), false); err != nil {
+	if err := b.SetPairable(false); err != nil {
 		return err
 	}
 
+	return nil
+}
+
+func (b *BluetoothBackend) PowerDown() error {
+	if powered := b.isAdapterOn(); !powered {
+		return nil
+	}
+
+	if err := b.PowerOnAdapter(false); err != nil {
+		return err
+	}
 	return nil
 }
 
 func (b *BluetoothBackend) NewPairing() error {
 	// RegisterAgent
 	if err := b.registerAgent(); err != nil {
-		if dbusErr, ok := err.(*dbus.Error); ok {
-			if dbusErr.Name == "org.bluez.Error.AlreadyExists" {
-				return nil
-			}
+		if dbusErr, ok := err.(*dbus.Error); ok && dbusErr.Name == "org.bluez.Error.AlreadyExists" {
+			logger.Info("[bluetooth] agent already registered")
+		} else {
+			logger.Warn("[bluetooth] failed to register agent: %v", err)
+			return err
 		}
 	}
 
 	// Bluetooth ON
-	var powered bool
-	var err error
-	if powered, err = b.isAdapterOn(); err != nil {
-		return err
-	}
-	if !powered {
-		if err := b.setAdapterProp(BT_STATE_POWERED.toString(), true); err != nil {
+	if powered := b.isAdapterOn(); !powered {
+		if err := b.PowerOnAdapter(true); err != nil {
 			return err
 		}
 	}
 
 	// Timeouts (en secondes)
-	if err := b.setAdapterProp(DISCOVERABLE_TIMEOUT, uint32(b.pairingTimeout.Seconds())); err != nil {
+	if err := b.SetTimeOut(DISCOVERABLE_TIMEOUT); err != nil {
 		return err
 	}
 
-	if err := b.setAdapterProp(PAIRABLE_TIMEOUT, uint32(b.pairingTimeout.Seconds())); err != nil {
+	if err := b.SetTimeOut(PAIRABLE_TIMEOUT); err != nil {
 		return err
 	}
 
-	// Mode pairing
-	if err := b.setAdapterProp(BT_STATE_DISCOVERABLE.toString(), true); err != nil {
+	// pairing mode
+	if err := b.SetDiscoverable(true); err != nil {
 		return err
 	}
 
-	if err := b.setAdapterProp(BT_STATE_PAIRABLE.toString(), true); err != nil {
+	if err := b.SetPairable(true); err != nil {
 		return err
 	}
 
- 	// 5️⃣ Attendre qu'un device apparaisse et le marquer Trusted
-    //    Ici on fait un simple polling toutes les 500ms pour exemple
-    timeout := time.After(b.pairingTimeout)
-    ticker := time.NewTicker(500 * time.Millisecond)
-    defer ticker.Stop()
-
-    for {
-        select {
-        case <-timeout:
-            return nil // Timeout atteint, pairing terminé
-        case <-ticker.C:
-            devices, _ := b.listDevices()
-            for _, d := range devices {
-                // Si device n'est pas encore Trusted, on le trust
-                trusted, _ := b.isDeviceTrusted(d)
-                if !trusted {
-                    _ = b.trustDevice(d)
-                }
-            }
-        }
-    }
-
+	go b.waitPairing(b.ctx)
 
 	return nil
+}
+
+func (b *BluetoothBackend) waitPairing(ctx context.Context) {
+	subCtx, cancel := context.WithTimeout(ctx, b.pairingTimeout)
+	defer cancel()
+
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-subCtx.Done():
+			logger.Info("[bluetooth] pairing stopped")
+			return
+		case <-ticker.C:
+			devices, err := b.listDevices()
+			if err != nil {
+				logger.Warn("[bluetooth] failed to list devices: %v", err)
+			}
+			for _, d := range devices {
+				trusted, ok := b.isDeviceTrusted(d)
+				if !ok {
+					continue
+				}
+				if !trusted {
+					if ok := b.trustDevice(d); ok {
+						return
+					}
+				}
+			}
+		}
+	}
+
 }
 
 func (b *BluetoothBackend) Close() {
 	if b.conn != nil {
 		if err := b.conn.Close(); err != nil {
-			logger.Info("Failed to close D-Bus connection: %v", err)
+			logger.Info("[bluetooth] Failed to close D-Bus connection: %v", err)
 		}
 		b.conn = nil
 	}
@@ -141,20 +156,7 @@ func (b *BluetoothBackend) registerAgent() error {
 	}
 
 	manager := b.getObj(BLUETOOTH_PREFIX, BLUEZ_PATH)
-	if err := b.callMethod(
-		manager,
-		REGISTER_AGENT,
-		dbus.ObjectPath(AGENT_PATH),
-		AGENT_CAPABILITY,
-	); err != nil {
-		return err
-	}
-
-	if err := b.callMethod(
-		manager,
-		REQUEST_AGENT,
-		dbus.ObjectPath(AGENT_PATH),
-	); err != nil {
+	if err := b.RequestNoInputOutputAgent(manager); err != nil {
 		return err
 	}
 
