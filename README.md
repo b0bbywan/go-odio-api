@@ -77,6 +77,38 @@ systemctl --user enable odio-api.service
 systemctl --user start odio-api.service
 ```
 
+### Docker
+You can also run odio as a container!
+
+#### Build
+Build the Go binary and Docker image
+```bash
+docker build -t odio:latest .
+```
+The Dockerfile uses a multi-stage build to compile the Go binary and copy it into a minimal runtime image.
+**Note**: the image includes DBus so that DBus-dependent functionality works correctly inside the container.
+
+#### Run
+A docker-compose.yml is provided in the repository for the most common use cases. It runs the container as a non-root user (UID 1000) and mounts the necessary host directories for DBus, systemd, and PulseAudio. You can adapt it for more specific setups if needed
+
+Environment variables:
+- XDG_RUNTIME_DIR=/run/user/1000 → DBus and Pulse runtime directory
+- DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus → user DBus session
+- HOME=/home/odio → ensures PulseAudio cookie is found
+
+Volumes:
+- /run/user/1000/bus → user DBus session (read-only)
+- /run/user/1000/systemd → user systemd instance (read-only)
+- /run/user/1000/pulse → PulseAudio socket (read-only)
+- /var/run/dbus/system_bus_socket → system DBus socket (read-only)
+- /run/utmp → login sessions (read-only)
+- ./config.yaml → application configuration at /etc/odio-api/config.yml (read-only)
+- ./cookie → PulseAudio authentication cookie at $HOME/.config/pulse/cookie (read-only)
+
+The container exposes port 8080 and is configured to automatically restart unless stopped. With this configuration, audio and DBus-dependent functionality works seamlessly inside Docker.
+
+Security note: All mounts are read-only, minimizing the container’s ability to modify the host system.
+
 ## Configuration
 
 Configuration file can be placed at:
@@ -227,6 +259,7 @@ GOOS=linux GOARCH=arm64 go build -o odio-api-arm64
 
 ```bash
 # Build Debian package
+cd debian
 dpkg-buildpackage -us -uc -b
 ```
 

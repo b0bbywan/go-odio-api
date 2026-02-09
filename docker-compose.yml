@@ -1,0 +1,20 @@
+services:
+  odio:
+    image: odio:latest
+    container_name: odio
+    ports:
+      - "8080:8080"
+    user: "1000:1000"
+    environment:
+      XDG_RUNTIME_DIR: /run/user/1000
+      DBUS_SESSION_BUS_ADDRESS: unix:path=/run/user/1000/bus
+      HOME: /home/odio
+    volumes:
+      - /run/user/1000/bus:/run/user/1000/bus:ro # DBUS_SESSION_BUS_ADDRESS socket
+      - /var/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket:ro # system systemd socket
+      - /run/user/1000/systemd:/run/user/1000/systemd:ro # user systemd folder if utmp unavailable
+      - /run/utmp:/run/utmp:ro # user systemd socket if utmp available
+      - /run/user/1000/pulse:/run/user/1000/pulse:ro # pulse socket
+      - ./cookie:/home/odio/.config/pulse/cookie:ro # pulse cookie
+      - ./config.yaml:/etc/odio-api/config.yml:ro # odio config
+    restart: unless-stopped
