@@ -263,6 +263,12 @@ cd debian
 dpkg-buildpackage -us -uc -b
 ```
 
+### RPM Packaging
+```bash
+mkdir -p ~/rpmbuild/RPMS/
+rpmbuild -ba odio-api.spec
+```
+
 ## Dependencies
 
 - [spf13/viper](https://github.com/spf13/viper) - Go configuration with fangs
