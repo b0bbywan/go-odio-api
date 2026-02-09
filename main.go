@@ -49,24 +49,28 @@ func main() {
 		<-sigChan
 
 		logger.Info("[%s] Shutdown signal received, stopping server...", config.AppName)
-
-		// Cancel the global context - stops all listeners
-		cancel()
-
-		// Cleanup backends
-		b.Close()
-
-		// Signal that cleanup is complete
-		close(shutdownDone)
+		clear(b, cancel, shutdownDone)
 	}()
 
 	logger.Info("[%s] started", config.AppName)
 	if server != nil {
 		if err := server.Run(ctx); err != nil && err != http.ErrServerClosed {
 			logger.Error("[%s] http server error: %v", config.AppName, err)
+			clear(b, cancel, shutdownDone)
 		}
 	}
 
 	<-shutdownDone
 	logger.Info("[%s] stopped", config.AppName)
+}
+
+func clear(b *backend.Backend, cancel context.CancelFunc, shutdown chan struct{}) {
+	// Cancel the global context - stops all listeners
+	cancel()
+
+	// Cleanup backends
+	b.Close()
+
+	// Signal that cleanup is complete
+	close(shutdown)
 }
