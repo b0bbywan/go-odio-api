@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -58,6 +59,7 @@ type ZeroConfig struct {
 	Domain       string
 	Port         int
 	TxtRecords   []string
+	Listen       []net.Interface
 }
 
 // parseLogLevel converts a string to a logger.Level
@@ -76,6 +78,40 @@ func parseLogLevel(levelStr string) logger.Level {
 	default:
 		return logger.WARN // default
 	}
+}
+
+func interfaceForIP(ip string) (*net.Interface, error) {
+	if ip == "127.0.0.1" {
+		return nil, nil
+	}
+	listenIP := net.ParseIP(ip)
+	if listenIP == nil {
+		return nil, fmt.Errorf("invalid bind: %s", ip)
+	}
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, iface := range ifaces {
+		addrs, _ := iface.Addrs()
+		for _, addr := range addrs {
+			var ifaceIP net.IP
+
+			switch v := addr.(type) {
+			case *net.IPNet:
+				ifaceIP = v.IP
+			case *net.IPAddr:
+				ifaceIP = v.IP
+			}
+
+			if ifaceIP != nil && ifaceIP.Equal(listenIP) {
+				return &iface, nil
+			}
+		}
+	}
+
+	return nil, fmt.Errorf("no interface found for IP %s", ip)
 }
 
 func systemdHasUTMP() bool {
@@ -98,7 +134,7 @@ func New() (*Config, error) {
 
 	viper.SetDefault("api.port", 8080)
 	viper.SetDefault("LogLevel", "WARN")
-
+	viper.SetDefault("bind", "127.0.0.1")
 	// Load from configuration file, environment variables, and CLI flags
 	viper.SetConfigName("config")                       // name of config file (without extension)
 	viper.SetConfigType("yaml")                         // config file format
@@ -117,6 +153,13 @@ func New() (*Config, error) {
 	port := viper.GetInt("api.port")
 	if port <= 0 || port > 65535 {
 		return nil, fmt.Errorf("invalid port: %d", port)
+	}
+
+	bind := viper.GetString("bind")
+	var interfaces []net.Interface
+	inet, err := interfaceForIP(bind)
+	if err == nil && inet != nil {
+		interfaces = append(interfaces, *inet)
 	}
 
 	xdgRuntimeDir := os.Getenv("XDG_RUNTIME_DIR")
@@ -159,6 +202,7 @@ func New() (*Config, error) {
 		Port:         port,
 		Domain:       domain,
 		TxtRecords:   []string{"version=" + AppVersion},
+		Listen:       interfaces,
 	}
 
 	cfg := Config{

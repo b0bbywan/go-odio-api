@@ -23,6 +23,10 @@ func New(ctx context.Context, cfg *config.ZeroConfig) (*ZeroConfBackend, error) 
 	if !cfg.Enabled {
 		return nil, nil
 	}
+	if len(cfg.Listen) == 0 {
+		logger.Debug("[zeroconf] no interface selected, zeroconf disabled")
+		return nil, nil
+	}
 
 	subCtx, cancel := context.WithCancel(ctx)
 
@@ -47,7 +51,7 @@ func (z *ZeroConfBackend) Start() error {
 		z.Config.Domain,
 		z.Config.Port,
 		z.Config.TxtRecords,
-		nil,
+		z.Config.Listen,
 	)
 	if err != nil {
 		return err
