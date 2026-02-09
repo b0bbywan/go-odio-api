@@ -1,3 +1,13 @@
+odio-api (0.4.0) trixie; urgency=low
+
+  Bluetooth Support
+
+  * Added Bluetooth audio receiver (A2DP sink) support using D-Bus.
+  * During pairing, a NoInputNoOutput agent is activated for 60 seconds.
+
+ -- Mathieu Réquillart <mathieu.requillart@gmail.com>  Tue, 08 Feb 2026 00:00:00 +0000
+
+
 odio-api (0.3.3) trixie; urgency=low
 
   Fix "headless" mode

@@ -18,6 +18,11 @@ mpris:
   enabled: true
   timeout: 5s
 
+bluetooth:
+  enabled: true
+  timeout: 5s
+  pairingTimeout: 60s
+
 api:
   enabled: true
   port: 8080
