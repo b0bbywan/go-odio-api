@@ -54,6 +54,58 @@ func (s *SystemdBackend) Start() error {
 	return nil
 }
 
+// Close cleanly closes the connections and stops the listener
+func (s *SystemdBackend) Close() {
+	if s.listener != nil {
+		s.listener.Stop()
+		s.listener = nil
+	}
+	if s.sysConn != nil {
+		s.sysConn.Close()
+		s.sysConn = nil
+	}
+	if s.userConn != nil {
+		s.userConn.Close()
+		s.userConn = nil
+	}
+}
+
+func (b *SystemdBackend) canExecute(name string, scope UnitScope) error {
+	switch scope {
+	case ScopeSystem:
+		return &PermissionSystemError{Unit: name}
+	case ScopeUser:
+		if !b.listener.userWatched[name] {
+			return &PermissionUserError{Unit: name}
+		}
+	}
+	return nil
+}
+
+// Execute runs a mutating action on a systemd unit.
+//
+// SECURITY: All mutating actions are intentionally executed using the *user*
+// systemd D-Bus connection only. The system connection is strictly read-only
+// in this backend and can not be used as is for start/stop/enable operations.
+// This provides a structural safety guarantee, even in case of permission
+// check regressions or future refactors.
+func (s *SystemdBackend) Execute(
+	ctx context.Context,
+	name string,
+	scope UnitScope,
+	action unitActionFunc,
+) error {
+	if err := s.canExecute(name, scope); err != nil {
+		return err
+	}
+
+	if err := action(ctx, s.userConn, name); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (s *SystemdBackend) ListServices() ([]Service, error) {
 	// Check the cache first
 	if services, ok := s.cache.Get(cacheKey); ok {
@@ -191,82 +243,27 @@ func (s *SystemdBackend) listServices(
 
 func (s *SystemdBackend) EnableService(name string, scope UnitScope) error {
 	logger.Debug("[systemd] enabling service %s/%s", scope, name)
-	conn := s.connForScope(scope)
-
-	_, _, err := conn.EnableUnitFilesContext(
-		s.ctx,
-		[]string{name},
-		false, // runtime
-		true,  // force
-	)
-	if err != nil {
-		return err
-	}
-
-	if err = conn.ReloadContext(s.ctx); err != nil {
-		return err
-	}
-
-	if err = startUnit(s.ctx, conn, name); err != nil {
-		return err
-	}
-
-	logger.Debug("[systemd] service %s/%s enabled successfully", scope, name)
-	return nil
+	return s.Execute(s.ctx, name, scope, enableUnit)
 }
 
 func (s *SystemdBackend) DisableService(name string, scope UnitScope) error {
 	logger.Debug("[systemd] disabling service %s/%s", scope, name)
-	conn := s.connForScope(scope)
-
-	if err := stopUnit(s.ctx, conn, name); err != nil {
-		return err
-	}
-
-	if _, err := conn.DisableUnitFilesContext(
-		s.ctx,
-		[]string{name},
-		false, // runtime
-	); err != nil {
-		return err
-	}
-
-	if err := conn.ReloadContext(s.ctx); err != nil {
-		return err
-	}
-
-	logger.Debug("[systemd] service %s/%s disabled successfully", scope, name)
-	return nil
+	return s.Execute(s.ctx, name, scope, disableUnit)
 }
 
 func (s *SystemdBackend) StartService(name string, scope UnitScope) error {
 	logger.Debug("[systemd] starting service %s/%s", scope, name)
-	if err := startUnit(s.ctx, s.connForScope(scope), name); err != nil {
-		return err
-	}
-
-	logger.Debug("[systemd] service %s/%s started successfully", scope, name)
-	return nil
+	return s.Execute(s.ctx, name, scope, startUnit)
 }
 
 func (s *SystemdBackend) StopService(name string, scope UnitScope) error {
 	logger.Debug("[systemd] stopping service %s/%s", scope, name)
-	if err := stopUnit(s.ctx, s.connForScope(scope), name); err != nil {
-		return err
-	}
-
-	logger.Debug("[systemd] service %s/%s stopped successfully", scope, name)
-	return nil
+	return s.Execute(s.ctx, name, scope, stopUnit)
 }
 
 func (s *SystemdBackend) RestartService(name string, scope UnitScope) error {
 	logger.Debug("[systemd] restarting service %s/%s", scope, name)
-	if err := restartUnit(s.ctx, s.connForScope(scope), name); err != nil {
-		return err
-	}
-
-	logger.Debug("[systemd] service %s/%s restarted successfully", scope, name)
-	return nil
+	return s.Execute(s.ctx, name, scope, restartUnit)
 }
 
 func (s *SystemdBackend) connForScope(scope UnitScope) *dbus.Conn {
@@ -284,20 +281,4 @@ func (s *SystemdBackend) invalidateCache() {
 // InvalidateCache is the public API to invalidate the cache if necessary
 func (s *SystemdBackend) InvalidateCache() {
 	s.invalidateCache()
-}
-
-// Close cleanly closes the connections and stops the listener
-func (s *SystemdBackend) Close() {
-	if s.listener != nil {
-		s.listener.Stop()
-		s.listener = nil
-	}
-	if s.sysConn != nil {
-		s.sysConn.Close()
-		s.sysConn = nil
-	}
-	if s.userConn != nil {
-		s.userConn.Close()
-		s.userConn = nil
-	}
 }

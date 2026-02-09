@@ -111,6 +111,26 @@ func restartUnit(ctx context.Context, conn *sysdbus.Conn, name string) error {
 	})
 }
 
+func enableUnit(ctx context.Context, conn *sysdbus.Conn, name string) error {
+	if _, _, err := conn.EnableUnitFilesContext(ctx, []string{name}, false, true); err != nil {
+		return err
+	}
+	if err := conn.ReloadContext(ctx); err != nil {
+		return err
+	}
+	return startUnit(ctx, conn, name)
+}
+
+func disableUnit(ctx context.Context, conn *sysdbus.Conn, name string) error {
+	if err := stopUnit(ctx, conn, name); err != nil {
+		return err
+	}
+	if _, err := conn.DisableUnitFilesContext(ctx, []string{name}, false); err != nil {
+		return err
+	}
+	return conn.ReloadContext(ctx)
+}
+
 func doUnitJob(
 	ctx context.Context,
 	f func(chan<- string) (int, error),
