@@ -89,22 +89,35 @@ func (b *BluetoothBackend) getObj(prefix, path string) dbus.BusObject {
 }
 
 func (b *BluetoothBackend) listDevices() ([]dbus.ObjectPath, error) {
-	objManager := b.getObj("org.bluez", "/")
-	var managedObjects map[dbus.ObjectPath]map[string]map[string]dbus.Variant
-
-	err := objManager.Call("org.freedesktop.DBus.ObjectManager.GetManagedObjects", 0).Store(&managedObjects)
+	managedObjects, err := b.getManagedObjects()
 	if err != nil {
-		logger.Warn("[bluetooth] failed to get managed objects: %v", err)
 		return nil, err
 	}
 
 	devices := []dbus.ObjectPath{}
 	for path, ifaces := range managedObjects {
-		if _, ok := ifaces["org.bluez.Device1"]; ok {
-			devices = append(devices, path)
+		logger.Debug("[bluetooth] testing managed object %v", path)
+		dev, ok := ifaces["org.bluez.Device1"]
+		if !ok {
+			continue
 		}
-	}
 
+		if adapterPathVar, ok := dev["Adapter"]; ok {
+			adapterPath, _ := adapterPathVar.Value().(dbus.ObjectPath)
+			if string(adapterPath) != BLUETOOTH_PATH {
+				continue
+			}
+		}
+
+		if trustedVar, ok := dev["Trusted"]; ok {
+			trusted, _ := trustedVar.Value().(bool)
+			if trusted {
+				continue
+			}
+		}
+		devices = append(devices, path)
+		logger.Debug("[bluetooth] listed devices after pairing %v", devices)
+	}
 	return devices, nil
 }
 
