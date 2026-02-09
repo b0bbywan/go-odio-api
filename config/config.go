@@ -16,7 +16,7 @@ const (
 	AppName     = "odio-api"
 	AppVersion  = "0.3.3"
 	serviceType = "_http._tcp"
-	domain      = "local."
+	domain      = ".local."
 )
 
 type Config struct {
