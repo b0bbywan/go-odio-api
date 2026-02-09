@@ -1,4 +1,4 @@
-services:
+systemd:
   enabled: true
   system:
     - bluetooth.service

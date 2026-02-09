@@ -89,7 +89,7 @@ Disabling a backend will disable the backend and its routes !
 Example configuration:
 
 ```yaml
-services:
+systemd:
   enabled: true
   system:
     - bluetooth.service
