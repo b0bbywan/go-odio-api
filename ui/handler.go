@@ -55,8 +55,8 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 	}
 	logger.Debug("[ui] ← API /server: %d backends enabled",
 		boolToInt(serverInfo.Backends.MPRIS)+
-		boolToInt(serverInfo.Backends.PulseAudio)+
-		boolToInt(serverInfo.Backends.Systemd))
+			boolToInt(serverInfo.Backends.PulseAudio)+
+			boolToInt(serverInfo.Backends.Systemd))
 
 	// Build view data
 	data := DashboardView{
