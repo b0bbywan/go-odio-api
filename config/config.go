@@ -15,7 +15,7 @@ import (
 
 const (
 	AppName     = "odio-api"
-	AppVersion  = "0.3.3"
+	AppVersion  = "0.5.0"
 	serviceType = "_http._tcp"
 	domain      = "local."
 )
@@ -32,6 +32,7 @@ type Config struct {
 type ApiConfig struct {
 	Enabled bool
 	Port    int
+	Listen  string
 }
 
 type SystemdConfig struct {
@@ -119,32 +120,42 @@ func systemdHasUTMP() bool {
 	return err == nil
 }
 
-func New() (*Config, error) {
-	viper.SetDefault("api.enabled", true)
-	viper.SetDefault("systemd.enabled", true)
-	viper.SetDefault("services.system", []string{})
-	viper.SetDefault("services.user", []string{})
+func readConfig(cfgFile *string) error {
+	if cfgFile != nil && *cfgFile != "" {
+		viper.SetConfigFile(*cfgFile)
+		return viper.ReadInConfig()
+	}
 
-	viper.SetDefault("pulseaudio.enabled", true)
-
-	viper.SetDefault("mpris.enabled", true)
-	viper.SetDefault("mpris.timeout", "5s")
-
-	viper.SetDefault("zeroconf.enabled", true)
-
-	viper.SetDefault("api.port", 8080)
-	viper.SetDefault("LogLevel", "WARN")
-	viper.SetDefault("bind", "127.0.0.1")
-	// Load from configuration file, environment variables, and CLI flags
 	viper.SetConfigName("config")                       // name of config file (without extension)
-	viper.SetConfigType("yaml")                         // config file format
 	viper.AddConfigPath(filepath.Join("/etc", AppName)) // Global configuration path
 	if home, err := os.UserHomeDir(); err == nil {
 		viper.AddConfigPath(filepath.Join(home, ".config", AppName)) // User config path
 	}
+	return viper.ReadInConfig()
+}
 
-	if err := viper.ReadInConfig(); err != nil {
-		// Config file is optional, continue with defaults if not found
+func New(cfgFile *string) (*Config, error) {
+	viper.SetDefault("bind", "127.0.0.1")
+	viper.SetDefault("LogLevel", "WARN")
+
+	viper.SetDefault("api.enabled", true)
+	viper.SetDefault("api.port", 8018)
+
+	viper.SetDefault("mpris.enabled", true)
+	viper.SetDefault("mpris.timeout", "5s")
+
+	viper.SetDefault("pulseaudio.enabled", true)
+
+	viper.SetDefault("systemd.enabled", false)
+	viper.SetDefault("systemd.system", []string{})
+	viper.SetDefault("systemd.user", []string{})
+
+	viper.SetDefault("zeroconf.enabled", true)
+
+	// Load from configuration file, environment variables, and CLI flags
+	viper.SetConfigType("yaml") // config file format
+
+	if err := readConfig(cfgFile); err != nil {
 		if _, isNotFound := err.(viper.ConfigFileNotFoundError); !isNotFound {
 			logger.Warn("failed to read config: %v", err)
 		}
@@ -169,13 +180,14 @@ func New() (*Config, error) {
 
 	apiCfg := ApiConfig{
 		Enabled: viper.GetBool("api.enabled"),
+		Listen:  fmt.Sprintf("%s:%d", bind, port),
 		Port:    port,
 	}
 
 	syscfg := SystemdConfig{
 		Enabled:        viper.GetBool("systemd.enabled"),
-		SystemServices: viper.GetStringSlice("services.system"),
-		UserServices:   viper.GetStringSlice("services.user"),
+		SystemServices: viper.GetStringSlice("systemd.system"),
+		UserServices:   viper.GetStringSlice("systemd.user"),
 		SupportsUTMP:   systemdHasUTMP(),
 		XDGRuntimeDir:  xdgRuntimeDir,
 	}
