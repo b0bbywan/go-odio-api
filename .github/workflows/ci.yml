@@ -148,3 +148,14 @@ jobs:
         else
           echo "✅ go.mod and go.sum are tidy"
         fi
+
+  docker:
+    name: Build Docker image
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t odio:latest .
