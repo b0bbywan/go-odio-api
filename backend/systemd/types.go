@@ -55,3 +55,21 @@ type Service struct {
 	Exists      bool      `json:"exists"`
 	Description string    `json:"description,omitempty"`
 }
+
+type unitActionFunc func(ctx context.Context, conn *dbus.Conn, name string) error
+
+type PermissionSystemError struct {
+	Unit string
+}
+
+func (e *PermissionSystemError) Error() string {
+	return "can not act on system units: " + e.Unit
+}
+
+type PermissionUserError struct {
+	Unit string
+}
+
+func (e *PermissionUserError) Error() string {
+	return "cannot act on unmanaged user unit: " + e.Unit
+}

@@ -32,7 +32,7 @@ func NewServer(cfg *config.ApiConfig, b *backend.Backend) *Server {
 
 func (s *Server) Run(ctx context.Context) error {
 	srv := &http.Server{
-		Addr:    fmt.Sprintf(":%d", s.config.Port),
+		Addr:    s.config.Listen,
 		Handler: s.mux,
 	}
 
@@ -47,7 +47,7 @@ func (s *Server) Run(ctx context.Context) error {
 		}
 	}()
 
-	logger.Info("[api] http server running on %d", s.config.Port)
+	logger.Info("[api] http server running on %s", s.config.Listen)
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		return fmt.Errorf("Server error: %w", err)
 	}

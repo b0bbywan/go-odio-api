@@ -1,3 +1,16 @@
+odio-api (0.5.0) trixie; urgency=high
+
+  Add zeroconf support
+
+  * zeroconf support
+  * change default port to 8018
+  * add config and version cli arguments
+  * fix systemd config
+  * disable systemd by default
+
+ -- Mathieu Réquillart <mathieu.requillart@gmail.com>  Sat, 07 Feb 2026 15:30:00 +0000
+
+
 odio-api (0.4.0) trixie; urgency=low
 
   Bluetooth Support
