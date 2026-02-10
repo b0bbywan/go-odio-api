@@ -82,15 +82,9 @@ Yes, systemd control is controversial and potentially dangerous if misused. Odio
 Odio is free software and comes with no warranty. Enabling systemd integration is at your own risk.
 
 ```
-# config.yaml
+# config.yaml (Useful service examples for audio servers or media centers, some are provided in `share/`)
 systemd:
-  enabled: false
-```
-
-Useful examples for audio servers or media centers, some are provided in `share/`:
-```
-# config.yaml
-systemd:
+  enabled: true
   system:
     - bluetooth.service
     - upmpdcli.service
@@ -120,6 +114,52 @@ zeroconf:
 ```
 
 Developers can discover the API with any mDNS/Bonjour browser on the network. Look for the service type `_http._tcp.local.` and instance name `odio-api`.
+
+
+### Bluetooth Sink (A2DP)
+
+Odio can act as a Bluetooth audio receiver (A2DP sink) using D-Bus, allowing phones, computers, and other Bluetooth devices to stream audio to it.
+
+#### Configuration
+
+To ensure the device is correctly identified by phones and computers, you must edit `/etc/bluetooth/main.conf`:
+
+```ini
+[General]
+Name=Odio       # Bluetooth name shown during device discovery
+Class=0x240428
+```
+
+Class of Device (CoD) breakdown:
+- `0x24` → Major Device Class: **Audio/Video**
+- `0x0428` → Minor + services :
+  - **Audio Sink**
+  - Loudspeaker
+  - Rendering device
+
+This configuration makes Odio appear as a standard Bluetooth speaker or audio receiver.
+
+After modifying the configuration file, restart the Bluetooth service:
+```bash
+sudo systemctl restart bluetooth
+```
+
+#### Usage
+
+Bluetooth is intentionally not left in an automatic or always-on state.
+All Bluetooth operations are explicitly controlled through the Odio API.
+
+- **Power up**:
+  Bluetooth is enabled, but the device is not discoverable.
+- **Power Down** There is no idle timeout on bluetooth (yet), so you have to explicitely turn off bluetooth
+- **Pairing mode**:
+  The device becomes visible to nearby Bluetooth devices and accepts new pairings.
+  After a successful pairing (or when the timeout expires), Bluetooth automatically returns to its normal state:
+    - Not discoverable
+    - Not pairable
+- Audio profile: **A2DP** (high-quality audio streaming).
+
+This behavior matches how most Bluetooth speakers and audio receivers work.
 
 ### Logs
 Different log levels, exhaustive info and debug logs to provide in issues.
@@ -192,13 +232,13 @@ Environment variables:
 - HOME=/home/odio                                           ensures `PulseAudio cookie` is found
 
 Volumes:
-- /run/user/1000/bus → user DBus session                    (read-only)
-- /run/user/1000/systemd → user systemd instance            (read-only)
-- /run/user/1000/pulse → PulseAudio socket                  (read-only)
-- /var/run/dbus/system_bus_socket → system DBus socket      (read-only)
-- /run/utmp → login sessions                                (read-only)
-- ./config.yaml → application configuration                 (read-only)
-- ./cookie → `PulseAudio cookie` ($HOME/.config/pulse/cookie) (read-only)
+- ./config.yaml                    (odio configuration)       (read-only)
+- /run/user/1000/bus               (user DBus session)        (read-only)
+- /run/user/1000/systemd           (user systemd folder)      (read-only)
+- /run/utmp                        (user systemd monitoring)  (read-only)
+- /var/run/dbus/system_bus_socket  (system DBus socket)       (read-only)
+- /run/user/1000/pulse             (PulseAudio socket)        (read-only)
+- ./cookie    (`PulseAudio cookie`$HOME/.config/pulse/cookie) (read-only)
 
 The container exposes port 8018 by default and is configured to automatically restart unless stopped. With this configuration, audio and DBus-dependent functionality works seamlessly inside Docker.
 
@@ -249,6 +289,11 @@ mpris:
   enabled: true
   timeout: 5s
 
+bluetooth:
+  enabled: true
+  timeout: 5s
+  pairingTimeout: 60s
+
 ```
 
 ## API Endpoints
@@ -257,6 +302,15 @@ mpris:
 
 ```
 GET    /server                             # {"hostname":"","os_platform":"","os_version":"","api_sw":"","api_version":"","backends":{"mpris":true,"pulseaudio":true,"systemd":true, "zeroconf": true}}
+```
+
+### Bluetooth Sink
+```
+GET    /bluetooth                         # Get Bluetooth status (powered, pairing mode state)
+POST   /bluetooth/power_up                # Turns Bluetooth on and makes the device ready to connect to already paired devices.
+POST   /bluetooth/power_down              # Turns Bluetooth off and disconnects any active Bluetooth connections.
+POST   /bluetooth/pairing_mode            # Enables Bluetooth pairing mode for 60s (configurable).
+                                          # Returns to non-discoverable state after timeout or successful pairing.
 ```
 
 ### MPRIS Media Players
@@ -307,6 +361,7 @@ The application uses a modular backend architecture:
 - **MPRIS Backend**: Communicates with media players via D-Bus, implements smart caching and real-time updates through D-Bus signals
 - **PulseAudio Backend**: Interacts with PulseAudio/PipeWire for audio control, supports real-time event monitoring
 - **Systemd Backend**: Manages systemd services via D-Bus with native signal-based monitoring
+- **Bluetooth Backend**: Act as a Bluetooth audio receiver (A2DP sink) via D-Bus
 
 ### Key Components
 
@@ -358,7 +413,7 @@ GOOS=linux GOARCH=amd64 go build -o odio-api-amd64
 GOOS=linux GOARCH=arm64 go build -o odio-api-arm64
 ```
 
-### Debian Package
+### Debian Packaging
 
 ```bash
 # Build Debian package

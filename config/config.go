@@ -22,9 +22,10 @@ const (
 
 type Config struct {
 	Api        *ApiConfig
-	Systemd    *SystemdConfig
-	Pulseaudio *PulseAudioConfig
+	Bluetooth  *BluetoothConfig
 	MPRIS      *MPRISConfig
+	Pulseaudio *PulseAudioConfig
+	Systemd    *SystemdConfig
 	Zeroconf   *ZeroConfig
 	LogLevel   logger.Level
 }
@@ -61,6 +62,12 @@ type ZeroConfig struct {
 	Port         int
 	TxtRecords   []string
 	Listen       []net.Interface
+}
+
+type BluetoothConfig struct {
+	Enabled        bool
+	PairingTimeout time.Duration
+	Timeout        time.Duration
 }
 
 // parseLogLevel converts a string to a logger.Level
@@ -246,11 +253,28 @@ func New(cfgFile *string) (*Config, error) {
 		Listen:       interfaces,
 	}
 
+	bluetoothTimeout := viper.GetDuration("bluetooth.timeout")
+	if bluetoothTimeout <= 0 {
+		bluetoothTimeout = 5 * time.Second
+	}
+
+	bluetoothPairingTimeout := viper.GetDuration("bluetooth.pairingtimeout")
+	if bluetoothPairingTimeout <= 0 {
+		bluetoothPairingTimeout = 60 * time.Second
+	}
+
+	bluetoothcfg := BluetoothConfig{
+		Enabled:        viper.GetBool("bluetooth.enabled"),
+		Timeout:        bluetoothTimeout,
+		PairingTimeout: bluetoothPairingTimeout,
+	}
+
 	cfg := Config{
 		Api:        &apiCfg,
-		Systemd:    &syscfg,
-		Pulseaudio: &pulsecfg,
+		Bluetooth:  &bluetoothcfg,
 		MPRIS:      &mpriscfg,
+		Pulseaudio: &pulsecfg,
+		Systemd:    &syscfg,
 		Zeroconf:   &zerocfg,
 		LogLevel:   parseLogLevel(viper.GetString("LogLevel")),
 	}
