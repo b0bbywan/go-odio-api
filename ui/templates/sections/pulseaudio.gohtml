@@ -1,0 +1,41 @@
+{{ define "section-pulseaudio" }}
+<section class="rounded-xl bg-zinc-800 p-4 shadow-lg">
+	<div class="mb-4 flex items-center justify-between">
+		<h2 class="text-lg font-semibold">🔊 Audio Server</h2>
+		{{ if .AudioInfo }}
+		<span class="rounded-full {{ if .AudioInfo.Muted }}bg-red-500/10 text-red-400{{ else }}bg-blue-500/10 text-blue-400{{ end }} px-2 py-1 text-xs">
+			{{ if .AudioInfo.Muted }}Muted{{ else }}{{ printf "%.0f%%" (mul .AudioInfo.Volume 100) }}{{ end }}
+		</span>
+		{{ end }}
+	</div>
+
+	{{ if .AudioInfo }}
+	<!-- Server info -->
+	<div class="mb-4 rounded-lg bg-zinc-900/50 p-3">
+		<div class="mb-1 text-xs text-zinc-500">Default Sink</div>
+		<div class="truncate text-sm font-medium">{{ .AudioInfo.DefaultSink }}</div>
+	</div>
+
+	<!-- Audio clients -->
+	{{ if .AudioClients }}
+	<div class="space-y-2">
+		<div class="text-xs font-semibold uppercase text-zinc-500">
+			Active Clients ({{ len .AudioClients }})
+		</div>
+		{{ range .AudioClients }}
+			{{ template "pulseaudio-sink" . }}
+		{{ end }}
+	</div>
+	{{ else }}
+	<div class="flex flex-col items-center justify-center py-4 text-center">
+		<p class="text-sm text-zinc-400">No active audio clients</p>
+	</div>
+	{{ end }}
+	{{ else }}
+	<div class="flex flex-col items-center justify-center py-8 text-center">
+		<div class="mb-2 text-4xl opacity-50">🔊</div>
+		<p class="text-sm text-zinc-400">Audio info unavailable</p>
+	</div>
+	{{ end }}
+</section>
+{{ end }}
