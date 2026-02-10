@@ -66,6 +66,12 @@ func (b *BluetoothBackend) PowerDown() error {
 }
 
 func (b *BluetoothBackend) NewPairing() error {
+	// Prevent concurrent pairing sessions
+	if !b.pairingMu.TryLock() {
+		logger.Info("[bluetooth] pairing already in progress")
+		return nil
+	}
+
 	// RegisterAgent
 	if err := b.registerAgent(); err != nil {
 		if dbusErr, ok := err.(*dbus.Error); ok && dbusErr.Name == "org.bluez.Error.AlreadyExists" {
@@ -111,6 +117,7 @@ func (b *BluetoothBackend) waitPairing(ctx context.Context) {
 			logger.Warn("[bluetooth] failed to reset adapter state after pairing: %v", err)
 		}
 		cancel()
+		b.pairingMu.Unlock()
 	}()
 
 	ticker := time.NewTicker(500 * time.Millisecond)
