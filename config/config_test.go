@@ -1,6 +1,7 @@
 package config
 
 import (
+	"os"
 	"testing"
 
 	"github.com/spf13/viper"
@@ -217,5 +218,162 @@ func TestNew_CustomLogLevel(t *testing.T) {
 				t.Errorf("LogLevel = %d, want %d (%s)", cfg.LogLevel, tt.expected, tt.level)
 			}
 		})
+	}
+}
+
+func TestValidateConfigPath_ValidFiles(t *testing.T) {
+	tests := []struct {
+		name      string
+		extension string
+	}{
+		{"yaml extension", ".yaml"},
+		{"yml extension", ".yml"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a temporary file with the given extension
+			tmpDir := t.TempDir()
+			tmpFile := tmpDir + "/config" + tt.extension
+			if err := os.WriteFile(tmpFile, []byte("test: value"), 0644); err != nil {
+				t.Fatalf("Failed to create test file: %v", err)
+			}
+
+			// Validate the file
+			err := validateConfigPath(tmpFile)
+			if err != nil {
+				t.Errorf("validateConfigPath(%q) returned error: %v, want nil", tmpFile, err)
+			}
+		})
+	}
+}
+
+func TestValidateConfigPath_InvalidExtensions(t *testing.T) {
+	tests := []struct {
+		name      string
+		extension string
+	}{
+		{"no extension", ""},
+		{"txt extension", ".txt"},
+		{"json extension", ".json"},
+		{"toml extension", ".toml"},
+		{"conf extension", ".conf"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a temporary file with invalid extension
+			tmpDir := t.TempDir()
+			tmpFile := tmpDir + "/config" + tt.extension
+			if err := os.WriteFile(tmpFile, []byte("test: value"), 0644); err != nil {
+				t.Fatalf("Failed to create test file: %v", err)
+			}
+
+			// Validate should fail
+			err := validateConfigPath(tmpFile)
+			if err == nil {
+				t.Errorf("validateConfigPath(%q) should return error for invalid extension", tmpFile)
+			}
+		})
+	}
+}
+
+func TestValidateConfigPath_FileNotExists(t *testing.T) {
+	tmpDir := t.TempDir()
+	nonExistentFile := tmpDir + "/nonexistent.yaml"
+
+	err := validateConfigPath(nonExistentFile)
+	if err == nil {
+		t.Error("validateConfigPath should return error for non-existent file")
+	}
+}
+
+func TestValidateConfigPath_Directory(t *testing.T) {
+	// Create a directory with .yaml extension
+	tmpDir := t.TempDir()
+	configDir := tmpDir + "/config.yaml"
+	if err := os.Mkdir(configDir, 0755); err != nil {
+		t.Fatalf("Failed to create test directory: %v", err)
+	}
+
+	err := validateConfigPath(configDir)
+	if err == nil {
+		t.Error("validateConfigPath should return error for directory")
+	}
+}
+
+func TestValidateConfigPath_PathTraversal(t *testing.T) {
+	tests := []struct {
+		name string
+		path string
+	}{
+		{"etc passwd", "/etc/passwd"},
+		{"etc shadow", "/etc/shadow"},
+		{"etc hosts", "/etc/hosts"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// These files don't have .yaml extension, should fail
+			err := validateConfigPath(tt.path)
+			if err == nil {
+				t.Errorf("validateConfigPath(%q) should return error for system file", tt.path)
+			}
+		})
+	}
+}
+
+func TestNew_InvalidConfigFile(t *testing.T) {
+	viper.Reset()
+
+	tmpDir := t.TempDir()
+	invalidFile := tmpDir + "/invalid.txt"
+	if err := os.WriteFile(invalidFile, []byte("test"), 0644); err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
+
+	cfg, err := New(&invalidFile)
+	if err == nil {
+		t.Error("New() should return error for invalid config file extension")
+	}
+	if cfg != nil {
+		t.Errorf("New() should return nil config for invalid file, got: %+v", cfg)
+	}
+}
+
+func TestNew_ValidConfigFile(t *testing.T) {
+	viper.Reset()
+
+	// Create a valid YAML config file
+	tmpDir := t.TempDir()
+	validFile := tmpDir + "/config.yaml"
+	configContent := `
+api:
+  port: 9999
+  enabled: true
+logLevel: DEBUG
+`
+	if err := os.WriteFile(validFile, []byte(configContent), 0644); err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
+
+	cfg, err := New(&validFile)
+	if err != nil {
+		t.Fatalf("New() with valid config file returned error: %v", err)
+	}
+	if cfg == nil {
+		t.Fatal("New() should return config for valid file")
+	}
+	if cfg.Api.Port != 9999 {
+		t.Errorf("Api.Port = %d, want 9999", cfg.Api.Port)
+	}
+	if cfg.LogLevel != logger.DEBUG {
+		t.Errorf("LogLevel = %d, want %d (DEBUG)", cfg.LogLevel, logger.DEBUG)
 	}
 }

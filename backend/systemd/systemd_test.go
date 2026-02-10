@@ -315,3 +315,167 @@ func TestListenerWatched(t *testing.T) {
 		})
 	}
 }
+
+// Security Tests
+
+func TestPermissionSystemError(t *testing.T) {
+	err := &PermissionSystemError{Unit: "test.service"}
+	expected := "can not act on system units: test.service"
+	if err.Error() != expected {
+		t.Errorf("PermissionSystemError.Error() = %q, want %q", err.Error(), expected)
+	}
+}
+
+func TestPermissionUserError(t *testing.T) {
+	err := &PermissionUserError{Unit: "unmanaged.service"}
+	expected := "cannot act on unmanaged user unit: unmanaged.service"
+	if err.Error() != expected {
+		t.Errorf("PermissionUserError.Error() = %q, want %q", err.Error(), expected)
+	}
+}
+
+func TestCanExecute_SystemScope(t *testing.T) {
+	backend := &SystemdBackend{
+		listener: &Listener{
+			sysWatched: map[string]bool{
+				"watched.service": true,
+			},
+			userWatched: map[string]bool{},
+		},
+	}
+
+	tests := []struct {
+		name      string
+		unitName  string
+		scope     UnitScope
+		wantError bool
+		errorType string
+	}{
+		{
+			name:      "system scope always blocked",
+			unitName:  "watched.service",
+			scope:     ScopeSystem,
+			wantError: true,
+			errorType: "*systemd.PermissionSystemError",
+		},
+		{
+			name:      "system scope unmanaged unit",
+			unitName:  "unwatched.service",
+			scope:     ScopeSystem,
+			wantError: true,
+			errorType: "*systemd.PermissionSystemError",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := backend.canExecute(tt.unitName, tt.scope)
+			if tt.wantError {
+				if err == nil {
+					t.Errorf("canExecute(%q, %q) should return error", tt.unitName, tt.scope)
+					return
+				}
+				// Check error type
+				switch err.(type) {
+				case *PermissionSystemError:
+					if tt.errorType != "*systemd.PermissionSystemError" {
+						t.Errorf("canExecute error type = %T, want %s", err, tt.errorType)
+					}
+				case *PermissionUserError:
+					if tt.errorType != "*systemd.PermissionUserError" {
+						t.Errorf("canExecute error type = %T, want %s", err, tt.errorType)
+					}
+				default:
+					t.Errorf("unexpected error type: %T", err)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("canExecute(%q, %q) unexpected error: %v", tt.unitName, tt.scope, err)
+				}
+			}
+		})
+	}
+}
+
+func TestCanExecute_UserScope(t *testing.T) {
+	backend := &SystemdBackend{
+		listener: &Listener{
+			sysWatched: map[string]bool{},
+			userWatched: map[string]bool{
+				"managed.service": true,
+			},
+		},
+	}
+
+	tests := []struct {
+		name      string
+		unitName  string
+		wantError bool
+	}{
+		{
+			name:      "managed user unit allowed",
+			unitName:  "managed.service",
+			wantError: false,
+		},
+		{
+			name:      "unmanaged user unit blocked",
+			unitName:  "unmanaged.service",
+			wantError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := backend.canExecute(tt.unitName, ScopeUser)
+			if tt.wantError {
+				if err == nil {
+					t.Errorf("canExecute(%q, ScopeUser) should return error for unmanaged unit", tt.unitName)
+					return
+				}
+				// Should be PermissionUserError
+				if _, ok := err.(*PermissionUserError); !ok {
+					t.Errorf("canExecute error type = %T, want *PermissionUserError", err)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("canExecute(%q, ScopeUser) unexpected error: %v", tt.unitName, err)
+				}
+			}
+		})
+	}
+}
+
+func TestCanExecute_WhitelistEnforcement(t *testing.T) {
+	// Test that ONLY explicitly whitelisted user units can be executed
+	backend := &SystemdBackend{
+		listener: &Listener{
+			sysWatched: map[string]bool{},
+			userWatched: map[string]bool{
+				"allowed.service": true,
+			},
+		},
+	}
+
+	// Try common service names that should be blocked
+	dangerousServices := []string{
+		"ssh.service",
+		"sshd.service",
+		"systemd-logind.service",
+		"dbus.service",
+		"polkit.service",
+		"../../../etc/passwd",
+		"../../systemd/system/dangerous.service",
+	}
+
+	for _, service := range dangerousServices {
+		t.Run(service, func(t *testing.T) {
+			err := backend.canExecute(service, ScopeUser)
+			if err == nil {
+				t.Errorf("canExecute(%q, ScopeUser) should block non-whitelisted service", service)
+			}
+			if _, ok := err.(*PermissionUserError); !ok {
+				t.Errorf("canExecute should return PermissionUserError, got: %T", err)
+			}
+		})
+	}
+}
