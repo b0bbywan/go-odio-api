@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+
+	"github.com/b0bbywan/go-odio-api/logger"
 )
 
 // APIClient makes HTTP requests to the local JSON API
@@ -73,8 +75,11 @@ func (c *APIClient) get(path string, dest interface{}) error {
 	if err != nil {
 		return fmt.Errorf("API call failed: %w", err)
 	}
-	defer resp.Body.Close()
-
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			logger.Warn("failed to close body during get call")
+		}
+	}()
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("API returned status %d", resp.StatusCode)
 	}
