@@ -9,6 +9,7 @@ import (
 	"github.com/b0bbywan/go-odio-api/backend"
 	"github.com/b0bbywan/go-odio-api/config"
 	"github.com/b0bbywan/go-odio-api/logger"
+	"github.com/b0bbywan/go-odio-api/ui"
 )
 
 type Server struct {
@@ -60,6 +61,17 @@ func (s *Server) register(b *backend.Backend) {
 		return
 	}
 
+	// 404 on root for security
+	s.mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/" {
+			http.NotFound(w, r)
+			return
+		}
+	})
+
+	// UI routes
+	s.registerUIRoutes()
+
 	// server routes
 	s.registerServerRoutes(b)
 
@@ -81,4 +93,10 @@ func (s *Server) register(b *backend.Backend) {
 	if b.MPRIS != nil {
 		s.registerMPRISRoutes(b.MPRIS)
 	}
+}
+
+func (s *Server) registerUIRoutes() {
+	uiHandler := ui.NewHandler(s.config.Port)
+	uiHandler.RegisterRoutes(s.mux)
+	logger.Info("[api] UI routes registered at /ui")
 }
