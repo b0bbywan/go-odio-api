@@ -1,3 +1,13 @@
+bind: 127.0.0.1
+logLevel: warn
+
+api:
+  enabled: true
+  port: 8018
+
+zeroconf:
+  enabled: true
+
 systemd:
   enabled: true
   system:
@@ -22,9 +32,3 @@ bluetooth:
   enabled: true
   timeout: 5s
   pairingTimeout: 60s
-
-api:
-  enabled: true
-  port: 8080
-
-logLevel: warn

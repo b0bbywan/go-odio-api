@@ -14,6 +14,10 @@ import (
 
 // StartFSNotifier starts listening for systemd events via fsnotify
 func (l *Listener) StartFSNotifier() error {
+	if len(l.userWatched) == 0 {
+		return nil
+	}
+
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		return err

@@ -3,7 +3,7 @@ services:
     image: odio:latest
     container_name: odio
     ports:
-      - "8080:8080"
+      - "8018:8018"
     user: "1000:1000"
     environment:
       XDG_RUNTIME_DIR: /run/user/1000
