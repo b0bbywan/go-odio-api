@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/godbus/dbus/v5"
+
+	"github.com/b0bbywan/go-odio-api/cache"
 )
 
 type BluetoothBackend struct {
@@ -15,10 +17,8 @@ type BluetoothBackend struct {
 	pairingTimeout time.Duration
 	agent          *bluezAgent
 	pairingMu      sync.Mutex
-	// State tracking (in-memory, no D-Bus polling)
-	stateMu      sync.RWMutex
-	powered      bool
-	pairingUntil *time.Time
+	// permanent cache (no expiration) for status tracking
+	statusCache *cache.Cache[BluetoothStatus]
 }
 
 type dbusTimeoutError struct{}
@@ -36,6 +36,8 @@ func (e *bluetoothUnsupportedError) Error() string {
 // BluetoothStatus represents the current Bluetooth state
 type BluetoothStatus struct {
 	Powered       bool       `json:"powered"`
+	Discoverable  bool       `json:"discoverable"`
+	Pairable      bool       `json:"pairable"`
 	PairingActive bool       `json:"pairing_active"`
 	PairingUntil  *time.Time `json:"pairing_until,omitempty"`
 }
