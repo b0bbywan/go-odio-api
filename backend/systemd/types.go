@@ -63,7 +63,7 @@ type PermissionSystemError struct {
 }
 
 func (e *PermissionSystemError) Error() string {
-	return "can not act on system units" + e.Unit
+	return "can not act on system units: " + e.Unit
 }
 
 type PermissionUserError struct {
