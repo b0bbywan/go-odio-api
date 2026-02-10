@@ -1,18 +1,47 @@
 {{ define "mpris-player" }}
 <div id="player-{{ .Name }}"
-	class="flex items-center justify-between rounded-lg bg-zinc-700 p-3">
+	class="flex flex-col gap-3 rounded-lg bg-zinc-700/50 p-3 transition-colors hover:bg-zinc-700 sm:flex-row sm:items-center sm:justify-between">
 
-	<div>
-		<div class="font-medium">{{ .Name }}</div>
-		<div class="text-xs text-zinc-400 truncate">
-			{{ .Artist }} – {{ .Title }}
+	<!-- Player info -->
+	<div class="min-w-0 flex-1">
+		<div class="mb-1 flex items-center gap-2">
+			<div class="truncate font-medium text-zinc-200">{{ .Name }}</div>
+			<span class="rounded px-1.5 py-0.5 text-xs {{ if eq .State "Playing" }}bg-green-500/20 text-green-400{{ else }}bg-zinc-600 text-zinc-400{{ end }}">
+				{{ .State }}
+			</span>
 		</div>
+		{{ if or .Artist .Title }}
+		<div class="truncate text-sm text-zinc-400">
+			{{ if .Artist }}{{ .Artist }}{{ end }}{{ if and .Artist .Title }} – {{ end }}{{ if .Title }}{{ .Title }}{{ end }}
+		</div>
+		{{ else }}
+		<div class="text-sm text-zinc-500">No media playing</div>
+		{{ end }}
+		{{ if .Album }}
+		<div class="truncate text-xs text-zinc-500">{{ .Album }}</div>
+		{{ end }}
 	</div>
 
-	<div class="flex gap-2">
-		<button hx-post="/players/{{ .Name }}/previous">⏮</button>
-		<button hx-post="/players/{{ .Name }}/play_pause">▶︎⏸</button>
-		<button hx-post="/players/{{ .Name }}/next">⏭</button>
+	<!-- Control buttons - read-only for now -->
+	<div class="flex shrink-0 gap-1 sm:gap-2">
+		<button
+			class="rounded-lg bg-zinc-600/50 px-3 py-2 text-sm transition-colors hover:bg-zinc-600 disabled:cursor-not-allowed disabled:opacity-50"
+			disabled
+			title="Controls coming soon">
+			⏮
+		</button>
+		<button
+			class="rounded-lg bg-zinc-600/50 px-3 py-2 text-sm transition-colors hover:bg-zinc-600 disabled:cursor-not-allowed disabled:opacity-50"
+			disabled
+			title="Controls coming soon">
+			{{ if eq .State "Playing" }}⏸{{ else }}▶{{ end }}
+		</button>
+		<button
+			class="rounded-lg bg-zinc-600/50 px-3 py-2 text-sm transition-colors hover:bg-zinc-600 disabled:cursor-not-allowed disabled:opacity-50"
+			disabled
+			title="Controls coming soon">
+			⏭
+		</button>
 	</div>
 </div>
 {{ end }}
