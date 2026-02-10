@@ -120,8 +120,32 @@ func systemdHasUTMP() bool {
 	return err == nil
 }
 
+func validateConfigPath(path string) error {
+	// Check file extension
+	ext := filepath.Ext(path)
+	if ext != ".yaml" && ext != ".yml" {
+		return fmt.Errorf("config file must be .yaml or .yml, got: %s", ext)
+	}
+
+	// Check file exists and is readable
+	info, err := os.Stat(path)
+	if err != nil {
+		return fmt.Errorf("cannot access config file: %w", err)
+	}
+
+	// Check it's not a directory
+	if info.IsDir() {
+		return fmt.Errorf("config path is a directory, not a file: %s", path)
+	}
+
+	return nil
+}
+
 func readConfig(cfgFile *string) error {
 	if cfgFile != nil && *cfgFile != "" {
+		if err := validateConfigPath(*cfgFile); err != nil {
+			return err
+		}
 		viper.SetConfigFile(*cfgFile)
 		return viper.ReadInConfig()
 	}
