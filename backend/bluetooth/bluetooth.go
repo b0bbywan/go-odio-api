@@ -50,6 +50,10 @@ func (b *BluetoothBackend) PowerUp() error {
 		return err
 	}
 
+	b.stateMu.Lock()
+	b.powered = true
+	b.stateMu.Unlock()
+
 	logger.Info("[bluetooth] Bluetooth ready to connect to already known devices")
 	return nil
 }
@@ -62,6 +66,11 @@ func (b *BluetoothBackend) PowerDown() error {
 	if err := b.PowerOnAdapter(false); err != nil {
 		return err
 	}
+
+	b.stateMu.Lock()
+	b.powered = false
+	b.stateMu.Unlock()
+
 	return nil
 }
 
@@ -103,6 +112,13 @@ func (b *BluetoothBackend) NewPairing() error {
 		return err
 	}
 
+	// Track pairing state
+	pairingUntil := time.Now().Add(b.pairingTimeout)
+	b.stateMu.Lock()
+	b.pairingUntil = &pairingUntil
+	b.powered = true
+	b.stateMu.Unlock()
+
 	go b.waitPairing(b.ctx)
 	logger.Info("[bluetooth] Bluetooth pairing mode enabled")
 
@@ -116,6 +132,9 @@ func (b *BluetoothBackend) waitPairing(ctx context.Context) {
 		if err := b.SetDiscoverableAndPairable(false); err != nil {
 			logger.Warn("[bluetooth] failed to reset adapter state after pairing: %v", err)
 		}
+		b.stateMu.Lock()
+		b.pairingUntil = nil
+		b.stateMu.Unlock()
 		cancel()
 		b.pairingMu.Unlock()
 	}()
@@ -161,6 +180,17 @@ func (b *BluetoothBackend) Close() {
 			logger.Warn("[bluetooth] Failed to close D-Bus connection: %v", err)
 		}
 		b.conn = nil
+	}
+}
+
+func (b *BluetoothBackend) GetStatus() BluetoothStatus {
+	b.stateMu.RLock()
+	defer b.stateMu.RUnlock()
+
+	return BluetoothStatus{
+		Powered:       b.powered,
+		PairingActive: b.pairingUntil != nil,
+		PairingUntil:  b.pairingUntil,
 	}
 }
 
