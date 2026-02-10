@@ -1,12 +1,20 @@
 {{ define "section-mpris" }}
-<section class="rounded-xl bg-zinc-800 p-4 shadow">
-	<h2 class="mb-3 text-lg font-semibold">Media Players</h2>
+<section class="rounded-xl bg-zinc-800 p-4 shadow-lg">
+	<div class="mb-4 flex items-center justify-between">
+		<h2 class="text-lg font-semibold">🎵 Media Players</h2>
+		<span class="rounded-full bg-green-500/10 px-2 py-1 text-xs text-green-400">
+			{{ len . }} active
+		</span>
+	</div>
 
-	<div class="space-y-2">
-		{{ range .Players }}
+	<div class="space-y-3">
+		{{ range . }}
 			{{ template "mpris-player" . }}
 		{{ else }}
-			<div class="text-sm text-zinc-400">No active players</div>
+			<div class="flex flex-col items-center justify-center py-8 text-center">
+				<div class="mb-2 text-4xl opacity-50">🎵</div>
+				<p class="text-sm text-zinc-400">No active media players</p>
+			</div>
 		{{ end }}
 	</div>
 </section>
