@@ -129,6 +129,66 @@ func (b *BluetoothBackend) listDevices() ([]dbus.ObjectPath, error) {
 	return devices, nil
 }
 
+func (b *BluetoothBackend) listKnownDevices() ([]BluetoothDevice, error) {
+	managedObjects, err := b.getManagedObjects()
+	if err != nil {
+		return nil, err
+	}
+
+	devices := []BluetoothDevice{}
+	for _, ifaces := range managedObjects {
+		dev, ok := ifaces["org.bluez.Device1"]
+		if !ok {
+			continue
+		}
+
+		// Filter by adapter
+		if adapterPathVar, ok := dev["Adapter"]; ok {
+			adapterPath, ok := adapterPathVar.Value().(dbus.ObjectPath)
+			if !ok || string(adapterPath) != BLUETOOTH_PATH {
+				continue
+			}
+		}
+
+		// Only keep trusted devices
+		trustedVar, ok := dev["Trusted"]
+		if !ok {
+			continue
+		}
+		trusted, ok := trustedVar.Value().(bool)
+		if !ok || !trusted {
+			continue
+		}
+
+		// Extract device info
+		device := BluetoothDevice{
+			Address: extractString(dev, "Address"),
+			Name:    extractString(dev, "Name"),
+			Trusted: trusted,
+		}
+
+		// Check if connected
+		if connectedVar, ok := dev["Connected"]; ok {
+			if connected, ok := connectedVar.Value().(bool); ok {
+				device.Connected = connected
+			}
+		}
+
+		devices = append(devices, device)
+	}
+
+	return devices, nil
+}
+
+func extractString(props map[string]dbus.Variant, key string) string {
+	if v, ok := props[key]; ok {
+		if s, ok := v.Value().(string); ok {
+			return s
+		}
+	}
+	return ""
+}
+
 func (b *BluetoothBackend) isAdapterOn() bool {
 	v, err := b.getAdapterProp(BT_STATE_POWERED)
 	if err != nil {
