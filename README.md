@@ -61,6 +61,26 @@ pulseaudio:
 - Real-time service state updates via D-Bus signals
 - Tracking via filesystem monitoring for systemd without utmp (/run/user/{uid}/systemd/units)
 - Disabled by default for obvious security reasons
+
+⚠️ **Security Notice**
+
+Yes, systemd control is controversial and potentially dangerous if misused. Odio mitigates risks with these deliberate security designs:
+
+- **Disabled by default**: Systemd backend off unless explicitly enabled + units configured in `config.yaml` (empty config → auto-disabled, even with `systemd.enabled: true`).
+- **Localhost only**: API binds to `127.0.0.1` by default. Never expose to untrusted networks/Internet.
+- **No preconfigured units**: Nothing managed unless explicitly listed in config.
+- **User-only mutations**: Mutating ops (start/stop//restart/enable/disable) use *user* D-Bus connection only. System units strictly read-only, by default on your system if it's properly configured, inside odio if it's not.
+- **Hardened permission checks**: All public methods (`StartService`, `EnableService`, etc.) route through a unique code entrypoint called `Execute()` which **mandatorily** calls check actions are permitted in the configuration:
+  | Scope | Check | Error |
+  |-------|-------|-------|
+  | System | Always blocked | `PermissionSystemError` |
+  | User | Must be explicitly configured/watched | `PermissionUserError` |
+
+**Root/sudo is not supported by design**: Odio runs as an unprivileged user with a user D‑Bus session. Running it as root is strictly forbidden and will be refused by the program. It is not supported, will not work by default, and should never be attempted. Issues or requests related to this will not be accepted, unless they improve security.
+
+**You must knowingly enable this at your own risk.**
+Odio is free software and comes with no warranty. Enabling systemd integration is at your own risk.
+
 ```
 # config.yaml
 systemd:
@@ -104,25 +124,6 @@ Developers can discover the API with any mDNS/Bonjour browser on the network. Lo
 ### Logs
 Different log levels, exhaustive info and debug logs to provide in issues.
 
-
-⚠️ **Security Notice**
-
-Yes, systemd control is controversial and potentially dangerous if misused. Odio mitigates risks with these deliberate security designs:
-
-- **Disabled by default**: Systemd backend off unless explicitly enabled + units configured in `config.yaml` (empty config → auto-disabled, even with `systemd.enabled: true`).
-- **Localhost only**: API binds to `127.0.0.1` by default. Never expose to untrusted networks/Internet.
-- **No preconfigured units**: Nothing managed unless explicitly listed in config.
-- **User-only mutations**: Mutating ops (start/stop//restart/enable/disable) use *user* D-Bus connection only. System units strictly read-only, by default on your system if it's properly configured, inside odio if it's not.
-- **Hardened permission checks**: All public methods (`StartService`, `EnableService`, etc.) route through a unique code entrypoint called `Execute()` which **mandatorily** calls check actions are permitted in the configuration:
-  | Scope | Check | Error |
-  |-------|-------|-------|
-  | System | Always blocked | `PermissionSystemError` |
-  | User | Must be explicitly configured/watched | `PermissionUserError` |
-
-**Root/sudo is not supported by design**: Odio runs as an unprivileged user with a user D‑Bus session. Running it as root is strictly forbidden and will be refused by the program. It is not supported, will not work by default, and should never be attempted. Issues or requests related to this will not be accepted, unless they improve security.
-
-**You must knowingly enable this at your own risk.**
-Odio is free software and comes with no warranty. Enabling systemd integration is at your own risk.
 
 ## Installation
 
