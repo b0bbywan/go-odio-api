@@ -16,6 +16,10 @@ import (
 )
 
 func main() {
+	if os.Getuid() == 0 {
+		logger.Fatal("[%s] root user is strictly forbidden! Odio cannot and will not run as root.", config.AppName)
+	}
+
 	flag.Usage = usage
 	configFile := flag.String("config", "", "path to configuration file")
 	versionFlag := flag.Bool("version", false, "Print version")
