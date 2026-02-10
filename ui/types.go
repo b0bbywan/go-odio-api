@@ -24,7 +24,7 @@ type Backends struct {
 
 // Player represents an MPRIS player from /players
 type Player struct {
-	Name     string            `json:"name"`
+	Name     string            `json:"bus_name"` // API returns "bus_name", not "name"
 	Metadata map[string]string `json:"metadata"`
 	Status   string            `json:"status"`
 	Position int64             `json:"position"`
