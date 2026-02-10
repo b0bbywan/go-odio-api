@@ -2,6 +2,7 @@ package bluetooth
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/godbus/dbus/v5"
@@ -13,6 +14,7 @@ type BluetoothBackend struct {
 	timeout        time.Duration
 	pairingTimeout time.Duration
 	agent          *bluezAgent
+	pairingMu      sync.Mutex
 }
 
 type dbusTimeoutError struct{}
