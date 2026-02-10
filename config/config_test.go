@@ -367,9 +367,6 @@ logLevel: DEBUG
 	if err != nil {
 		t.Fatalf("New() with valid config file returned error: %v", err)
 	}
-	if cfg == nil {
-		t.Fatal("New() should return config for valid file")
-	}
 	if cfg.Api.Port != 9999 {
 		t.Errorf("Api.Port = %d, want 9999", cfg.Api.Port)
 	}
