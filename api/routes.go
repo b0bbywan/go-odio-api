@@ -21,6 +21,12 @@ func (s *Server) registerServerRoutes(b *backend.Backend) {
 
 func (s *Server) registerBluetoothRoutes(b *bluetooth.BluetoothBackend) {
 	s.mux.HandleFunc(
+		"GET /bluetooth",
+		JSONHandler(func(w http.ResponseWriter, r *http.Request) (any, error) {
+			return b.GetStatus(), nil
+		}),
+	)
+	s.mux.HandleFunc(
 		"POST /bluetooth/power_up",
 		withBluetoothAction(b.PowerUp),
 	)
@@ -29,7 +35,7 @@ func (s *Server) registerBluetoothRoutes(b *bluetooth.BluetoothBackend) {
 		withBluetoothAction(b.PowerDown),
 	)
 	s.mux.HandleFunc(
-		"POST /bluetooth/pairable",
+		"POST /bluetooth/pairing_mode",
 		withBluetoothAction(b.NewPairing),
 	)
 

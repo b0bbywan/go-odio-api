@@ -6,6 +6,7 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
+	"github.com/b0bbywan/go-odio-api/cache"
 	"github.com/b0bbywan/go-odio-api/config"
 	"github.com/b0bbywan/go-odio-api/logger"
 )
@@ -26,6 +27,7 @@ func New(ctx context.Context, cfg *config.BluetoothConfig) (*BluetoothBackend, e
 		ctx:            ctx,
 		timeout:        cfg.Timeout,
 		pairingTimeout: cfg.PairingTimeout,
+		statusCache:    cache.New[BluetoothStatus](0), // no expiration
 	}
 
 	if err = backend.CheckBluetoothSupport(); err != nil {
@@ -50,6 +52,13 @@ func (b *BluetoothBackend) PowerUp() error {
 		return err
 	}
 
+	b.updateStatus(func(s *BluetoothStatus) {
+		s.Powered = true
+		s.Discoverable = false
+		s.Pairable = false
+	})
+	b.refreshKnownDevices()
+
 	logger.Info("[bluetooth] Bluetooth ready to connect to already known devices")
 	return nil
 }
@@ -62,10 +71,25 @@ func (b *BluetoothBackend) PowerDown() error {
 	if err := b.PowerOnAdapter(false); err != nil {
 		return err
 	}
+
+	b.updateStatus(func(s *BluetoothStatus) {
+		s.Powered = false
+		s.Discoverable = false
+		s.Pairable = false
+		s.PairingActive = false
+		s.PairingUntil = nil
+	})
+
 	return nil
 }
 
 func (b *BluetoothBackend) NewPairing() error {
+	// Prevent concurrent pairing sessions
+	if !b.pairingMu.TryLock() {
+		logger.Info("[bluetooth] pairing already in progress")
+		return nil
+	}
+
 	// RegisterAgent
 	if err := b.registerAgent(); err != nil {
 		if dbusErr, ok := err.(*dbus.Error); ok && dbusErr.Name == "org.bluez.Error.AlreadyExists" {
@@ -97,6 +121,16 @@ func (b *BluetoothBackend) NewPairing() error {
 		return err
 	}
 
+	// Track pairing state
+	pairingUntil := time.Now().Add(b.pairingTimeout)
+	b.updateStatus(func(s *BluetoothStatus) {
+		s.Powered = true
+		s.Discoverable = true
+		s.Pairable = true
+		s.PairingActive = true
+		s.PairingUntil = &pairingUntil
+	})
+
 	go b.waitPairing(b.ctx)
 	logger.Info("[bluetooth] Bluetooth pairing mode enabled")
 
@@ -110,7 +144,14 @@ func (b *BluetoothBackend) waitPairing(ctx context.Context) {
 		if err := b.SetDiscoverableAndPairable(false); err != nil {
 			logger.Warn("[bluetooth] failed to reset adapter state after pairing: %v", err)
 		}
+		b.updateStatus(func(s *BluetoothStatus) {
+			s.Discoverable = false
+			s.Pairable = false
+			s.PairingActive = false
+			s.PairingUntil = nil
+		})
 		cancel()
+		b.pairingMu.Unlock()
 	}()
 
 	ticker := time.NewTicker(500 * time.Millisecond)
@@ -134,6 +175,7 @@ func (b *BluetoothBackend) waitPairing(ctx context.Context) {
 				if !trusted {
 					if ok := b.trustDevice(d); ok {
 						logger.Info("[bluetooth] New device %v trusted", d)
+						b.refreshKnownDevices()
 						return
 					}
 				}
@@ -155,6 +197,33 @@ func (b *BluetoothBackend) Close() {
 		}
 		b.conn = nil
 	}
+}
+
+func (b *BluetoothBackend) GetStatus() BluetoothStatus {
+	const statusKey = "current"
+	status, ok := b.statusCache.Get(statusKey)
+	if !ok {
+		return BluetoothStatus{}
+	}
+	return status
+}
+
+func (b *BluetoothBackend) updateStatus(fn func(*BluetoothStatus)) {
+	const statusKey = "current"
+	status, _ := b.statusCache.Get(statusKey)
+	fn(&status)
+	b.statusCache.Set(statusKey, status)
+}
+
+func (b *BluetoothBackend) refreshKnownDevices() {
+	devices, err := b.listKnownDevices()
+	if err != nil {
+		logger.Warn("[bluetooth] failed to list known devices: %v", err)
+		return
+	}
+	b.updateStatus(func(s *BluetoothStatus) {
+		s.KnownDevices = devices
+	})
 }
 
 func (b *BluetoothBackend) registerAgent() error {

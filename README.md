@@ -36,12 +36,14 @@ Odio can act as a Bluetooth audio receiver (A2DP sink) using D-Bus, allowing pho
 
 #### Configuration
 
-To ensure the device is correctly identified by phones and computers, you must edit `/etc/bluetooth/main.conf`
-```
+To ensure the device is correctly identified by phones and computers, you must edit `/etc/bluetooth/main.conf`:
+
+```ini
 [General]
 Name=Odio       # Bluetooth name shown during device discovery
 Class=0x240428
 ```
+
 Class of Device (CoD) breakdown:
 - `0x24` → Major Device Class: **Audio/Video**
 - `0x0428` → Minor + services :
@@ -50,6 +52,11 @@ Class of Device (CoD) breakdown:
   - Rendering device
 
 This configuration makes Odio appear as a standard Bluetooth speaker or audio receiver.
+
+After modifying the configuration file, restart the Bluetooth service:
+```bash
+sudo systemctl restart bluetooth
+```
 
 #### Usage
 
@@ -202,9 +209,11 @@ POST   /services/{scope}/{unit}/disable   # Disable service
 
 ### Bluetooth Sink
 ```
+GET    /bluetooth                         # Get Bluetooth status (powered, pairing mode state)
 POST   /bluetooth/power_up                # Turns Bluetooth on and makes the device ready to connect to already paired devices.
 POST   /bluetooth/power_down              # Turns Bluetooth off and disconnects any active Bluetooth connections.
-POST   /bluetooth/pairable                # Enables Bluetooth pairing mode for a limited time:
+POST   /bluetooth/pairing_mode            # Enables Bluetooth pairing mode for 60s (configurable).
+                                           # Returns to non-discoverable state after timeout or successful pairing.
 ```
 
 ### Server Informations
