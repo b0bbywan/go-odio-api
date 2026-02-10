@@ -88,21 +88,22 @@ func (b *BluetoothBackend) getObj(prefix, path string) dbus.BusObject {
 	return b.conn.Object(prefix, dbus.ObjectPath(path))
 }
 
-func (b *BluetoothBackend) listDevices() ([]dbus.ObjectPath, error) {
+// iterateAdapterDevices iterates over all devices belonging to our adapter
+// and calls the provided function for each device
+func (b *BluetoothBackend) iterateAdapterDevices(fn func(path dbus.ObjectPath, props map[string]dbus.Variant) bool) error {
 	managedObjects, err := b.getManagedObjects()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	devices := []dbus.ObjectPath{}
 	for path, ifaces := range managedObjects {
-		logger.Debug("[bluetooth] testing managed object %v", path)
-		dev, ok := ifaces["org.bluez.Device1"]
+		dev, ok := ifaces[BLUETOOTH_DEVICE]
 		if !ok {
 			continue
 		}
 
-		if adapterPathVar, ok := dev["Adapter"]; ok {
+		// Filter by adapter
+		if adapterPathVar, ok := dev[BT_PROP_ADAPTER]; ok {
 			adapterPath, ok := adapterPathVar.Value().(dbus.ObjectPath)
 			if !ok {
 				logger.Warn("[bluetooth] invalid adapter path type for device %v", path)
@@ -113,71 +114,68 @@ func (b *BluetoothBackend) listDevices() ([]dbus.ObjectPath, error) {
 			}
 		}
 
-		if trustedVar, ok := dev["Trusted"]; ok {
+		// Call the callback, stop if it returns false
+		if !fn(path, dev) {
+			break
+		}
+	}
+
+	return nil
+}
+
+func (b *BluetoothBackend) listDevices() ([]dbus.ObjectPath, error) {
+	devices := []dbus.ObjectPath{}
+
+	err := b.iterateAdapterDevices(func(path dbus.ObjectPath, props map[string]dbus.Variant) bool {
+		logger.Debug("[bluetooth] testing managed object %v", path)
+
+		// Only keep non-trusted devices (for pairing)
+		if trustedVar, ok := props[BT_PROP_TRUSTED]; ok {
 			trusted, ok := trustedVar.Value().(bool)
 			if !ok {
 				logger.Warn("[bluetooth] invalid trusted value type for device %v", path)
-				continue
+				return true
 			}
 			if trusted {
-				continue
+				return true
 			}
 		}
+
 		devices = append(devices, path)
 		logger.Debug("[bluetooth] listed devices after pairing %v", devices)
-	}
-	return devices, nil
+		return true
+	})
+
+	return devices, err
 }
 
 func (b *BluetoothBackend) listKnownDevices() ([]BluetoothDevice, error) {
-	managedObjects, err := b.getManagedObjects()
-	if err != nil {
-		return nil, err
-	}
-
 	devices := []BluetoothDevice{}
-	for _, ifaces := range managedObjects {
-		dev, ok := ifaces["org.bluez.Device1"]
-		if !ok {
-			continue
-		}
 
-		// Filter by adapter
-		if adapterPathVar, ok := dev["Adapter"]; ok {
-			adapterPath, ok := adapterPathVar.Value().(dbus.ObjectPath)
-			if !ok || string(adapterPath) != BLUETOOTH_PATH {
-				continue
-			}
-		}
-
+	err := b.iterateAdapterDevices(func(path dbus.ObjectPath, props map[string]dbus.Variant) bool {
 		// Only keep trusted devices
-		trustedVar, ok := dev["Trusted"]
+		trustedVar, ok := props[BT_PROP_TRUSTED]
 		if !ok {
-			continue
+			return true
 		}
 		trusted, ok := trustedVar.Value().(bool)
 		if !ok || !trusted {
-			continue
+			return true
 		}
 
 		// Extract device info
 		device := BluetoothDevice{
-			Address: extractString(dev, "Address"),
-			Name:    extractString(dev, "Name"),
-			Trusted: trusted,
-		}
-
-		// Check if connected
-		if connectedVar, ok := dev["Connected"]; ok {
-			if connected, ok := connectedVar.Value().(bool); ok {
-				device.Connected = connected
-			}
+			Address:   extractString(props, BT_PROP_ADDRESS),
+			Name:      extractString(props, BT_PROP_NAME),
+			Trusted:   trusted,
+			Connected: extractBoolProp(props, BT_PROP_CONNECTED),
 		}
 
 		devices = append(devices, device)
-	}
+		return true
+	})
 
-	return devices, nil
+	return devices, err
 }
 
 func extractString(props map[string]dbus.Variant, key string) string {
@@ -187,6 +185,15 @@ func extractString(props map[string]dbus.Variant, key string) string {
 		}
 	}
 	return ""
+}
+
+func extractBoolProp(props map[string]dbus.Variant, key string) bool {
+	if v, ok := props[key]; ok {
+		if b, ok := v.Value().(bool); ok {
+			return b
+		}
+	}
+	return false
 }
 
 func (b *BluetoothBackend) isAdapterOn() bool {
