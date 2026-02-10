@@ -1,0 +1,24 @@
+{{ define "pulseaudio-sink" }}
+<div class="flex items-center justify-between rounded-lg bg-zinc-900/50 p-2.5 transition-colors hover:bg-zinc-900">
+	<!-- Client info -->
+	<div class="min-w-0 flex-1">
+		<div class="truncate text-sm font-medium text-zinc-200">
+			{{ if .Application }}{{ .Application }}{{ else }}{{ .Name }}{{ end }}
+		</div>
+		{{ if .Application }}
+		<div class="truncate text-xs text-zinc-500">{{ .Name }}</div>
+		{{ end }}
+	</div>
+
+	<!-- Volume indicator -->
+	<div class="ml-3 flex shrink-0 items-center gap-2">
+		<div class="text-xs {{ if .Muted }}text-red-400{{ else }}text-blue-400{{ end }}">
+			{{ if .Muted }}
+				🔇 Muted
+			{{ else }}
+				🔊 {{ printf "%.0f%%" (mul .Volume 100) }}
+			{{ end }}
+		</div>
+	</div>
+</div>
+{{ end }}
