@@ -12,7 +12,12 @@ import (
 var templatesFS embed.FS
 
 func LoadTemplates() *template.Template {
-	return template.Must(template.New("").ParseFS(templatesFS, "templates/**/*.gohtml"))
+	funcMap := template.FuncMap{
+		"mul": func(a, b float64) float64 {
+			return a * b
+		},
+	}
+	return template.Must(template.New("").Funcs(funcMap).ParseFS(templatesFS, "templates/**/*.gohtml"))
 }
 
 // Handler manages UI routes and rendering
