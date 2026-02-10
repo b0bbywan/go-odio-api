@@ -1,0 +1,16 @@
+[Unit]
+Description=%i
+After=graphical-session.target
+
+[Service]
+Type=simple
+Environment=WAYLAND_DISPLAY=wayland-1
+Environment=XDG_RUNTIME_DIR=/run/user/%U
+ExecStart=/usr/bin/firefox --new-window --kiosk https://%i
+ExecStop=/bin/kill $MAINPID
+Restart=no
+KillMode=mixed
+TimeoutStopSec=5
+
+[Install]
+WantedBy=default.target

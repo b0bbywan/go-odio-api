@@ -1,3 +1,13 @@
+bind: 127.0.0.1
+logLevel: warn
+
+api:
+  enabled: true
+  port: 8018
+
+zeroconf:
+  enabled: true
+
 systemd:
   enabled: true
   system:
@@ -17,9 +27,3 @@ pulseaudio:
 mpris:
   enabled: true
   timeout: 5s
-
-api:
-  enabled: true
-  port: 8080
-
-logLevel: warn
