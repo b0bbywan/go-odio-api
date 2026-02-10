@@ -8,7 +8,7 @@ import (
 	"github.com/b0bbywan/go-odio-api/logger"
 )
 
-//go:embed templates/**/*.gohtml
+//go:embed templates
 var templatesFS embed.FS
 
 func LoadTemplates() *template.Template {
@@ -17,7 +17,14 @@ func LoadTemplates() *template.Template {
 			return a * b
 		},
 	}
-	return template.Must(template.New("").Funcs(funcMap).ParseFS(templatesFS, "templates/**/*.gohtml"))
+	// Load all .gohtml templates recursively
+	tmpl := template.New("").Funcs(funcMap)
+	return template.Must(tmpl.ParseFS(templatesFS,
+		"templates/base.gohtml",
+		"templates/pages/*.gohtml",
+		"templates/sections/*.gohtml",
+		"templates/components/*.gohtml",
+	))
 }
 
 // Handler manages UI routes and rendering
