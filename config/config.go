@@ -180,6 +180,11 @@ func New(cfgFile *string) (*Config, error) {
 	viper.SetConfigType("yaml") // config file format
 
 	if err := readConfig(cfgFile); err != nil {
+		// If user explicitly provided a config file, fail hard on any error
+		if cfgFile != nil && *cfgFile != "" {
+			return nil, fmt.Errorf("failed to read config file: %w", err)
+		}
+		// Otherwise, only warn for non-file-not-found errors
 		if _, isNotFound := err.(viper.ConfigFileNotFoundError); !isNotFound {
 			logger.Warn("failed to read config: %v", err)
 		}
