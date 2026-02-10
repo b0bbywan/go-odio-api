@@ -14,6 +14,10 @@ import (
 )
 
 func main() {
+	if os.Getuid() == 0 {
+		logger.Fatal("[%s] root user is strictly forbidden! Odio cannot and will not run as root.", config.AppName)
+	}
+
 	cfg, err := config.New()
 	if err != nil {
 		logger.Fatal("[%s] Failed to load config: %v", config.AppName, err)
