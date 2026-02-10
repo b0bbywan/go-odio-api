@@ -29,7 +29,7 @@ func (s *Server) registerBluetoothRoutes(b *bluetooth.BluetoothBackend) {
 		withBluetoothAction(b.PowerDown),
 	)
 	s.mux.HandleFunc(
-		"POST /bluetooth/pairable",
+		"POST /bluetooth/pairing_mode",
 		withBluetoothAction(b.NewPairing),
 	)
 
