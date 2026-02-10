@@ -103,14 +103,22 @@ func (b *BluetoothBackend) listDevices() ([]dbus.ObjectPath, error) {
 		}
 
 		if adapterPathVar, ok := dev["Adapter"]; ok {
-			adapterPath, _ := adapterPathVar.Value().(dbus.ObjectPath)
+			adapterPath, ok := adapterPathVar.Value().(dbus.ObjectPath)
+			if !ok {
+				logger.Warn("[bluetooth] invalid adapter path type for device %v", path)
+				continue
+			}
 			if string(adapterPath) != BLUETOOTH_PATH {
 				continue
 			}
 		}
 
 		if trustedVar, ok := dev["Trusted"]; ok {
-			trusted, _ := trustedVar.Value().(bool)
+			trusted, ok := trustedVar.Value().(bool)
+			if !ok {
+				logger.Warn("[bluetooth] invalid trusted value type for device %v", path)
+				continue
+			}
 			if trusted {
 				continue
 			}
