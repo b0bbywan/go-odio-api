@@ -30,8 +30,8 @@ func TestExtractString(t *testing.T) {
 			expected: "",
 		},
 		{
-			name: "empty map",
-			props: map[string]dbus.Variant{},
+			name:     "empty map",
+			props:    map[string]dbus.Variant{},
 			key:      "Name",
 			expected: "",
 		},
