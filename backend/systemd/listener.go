@@ -57,6 +57,11 @@ func (l *Listener) Start() error {
 }
 
 func (l *Listener) startScope(scope UnitScope, watched map[string]bool) error {
+	if len(watched) == 0 {
+		logger.Debug("[systemd] no units configured for %s scope, skipping listener", scope)
+		return nil
+	}
+
 	var conn *dbus.Conn
 	var err error
 	switch scope {

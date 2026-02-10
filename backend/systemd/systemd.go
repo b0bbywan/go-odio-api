@@ -17,13 +17,25 @@ func New(ctx context.Context, config *config.SystemdConfig) (*SystemdBackend, er
 		return nil, nil
 	}
 
-	sysC, err := dbus.NewSystemConnectionContext(ctx)
-	if err != nil {
-		return nil, err
+	if len(config.SystemServices) == 0 && len(config.UserServices) == 0 {
+		logger.Debug("[systemd] no unit configured, disabling backend")
+		return nil, nil
 	}
-	userC, err := dbus.NewUserConnectionContext(ctx)
-	if err != nil {
-		return nil, err
+
+	var sysC, userC *dbus.Conn
+	var err error
+	if len(config.SystemServices) > 0 {
+		sysC, err = dbus.NewSystemConnectionContext(ctx)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if len(config.UserServices) > 0 {
+		userC, err = dbus.NewUserConnectionContext(ctx)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return &SystemdBackend{
