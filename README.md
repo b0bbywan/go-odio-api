@@ -7,7 +7,26 @@ A lightweight REST API for controlling Linux audio and media players, built in G
 
 **Target Environment:** Designed for multimedia systems running with a user session (XDG_RUNTIME_DIR). Ideal for headless music servers, home audio systems, and dedicated media players.
 
+**Headless systems:** On fully headless systems, lingering needs to be enabled:
+
+`loginctl enable-linger <username>`
+
+This ensures the Pulseaudio/Pipewire, user D-Bus session and XDG_RUNTIME_DIR are available even without an active login session.
+
 ## Features
+
+### API
+Lightweight and fast REST API (<50ms 95% response time, 0% CPU on idle mode, tested on Raspberry B and B+)
+enabled by default, listen on localhost by default. Change with your own IP according to your needs
+Port can also be configured
+
+```
+# config.yaml
+listen: 127.0.0.1
+api:
+  enabled: true
+  port: 8018
+```
 
 ### Media Player Control (MPRIS)
 - List and control MPRIS-compatible media players (Spotify, VLC, Firefox, etc.)
@@ -18,17 +37,90 @@ A lightweight REST API for controlling Linux audio and media players, built in G
 - Smart caching with automatic cache invalidation
 - Position heartbeat for accurate playback tracking
 
+```
+# config.yaml
+mpris:
+  enabled: true
+```
+
 ### Audio Management (PulseAudio/PipeWire)
 - List audio sinks and sources
 - Volume control for sink-inputs only
 - Real-time audio events via native PulseAudio monitoring
 - Limited PipeWire support with pipewire-pulse
 
+```
+# config.yaml
+pulseaudio:
+  enabled: true
+```
+
 ### Service Management (systemd)
 - List and monitor systemd services
 - Enable, disable, and restart services
 - Real-time service state updates via D-Bus signals
 - Tracking via filesystem monitoring for systemd without utmp (/run/user/{uid}/systemd/units)
+- Disabled by default for obvious security reasons
+
+⚠️ **Security Notice**
+
+Yes, systemd control is controversial and potentially dangerous if misused. Odio mitigates risks with these deliberate security designs:
+
+- **Disabled by default**: Systemd backend off unless explicitly enabled + units configured in `config.yaml` (empty config → auto-disabled, even with `systemd.enabled: true`).
+- **Localhost only**: API binds to `127.0.0.1` by default. Never expose to untrusted networks/Internet.
+- **No preconfigured units**: Nothing managed unless explicitly listed in config.
+- **User-only mutations**: Mutating ops (start/stop//restart/enable/disable) use *user* D-Bus connection only. System units strictly read-only, by default on your system if it's properly configured, inside odio if it's not.
+- **Hardened permission checks**: All public methods (`StartService`, `EnableService`, etc.) route through a unique code entrypoint called `Execute()` which **mandatorily** calls check actions are permitted in the configuration:
+  | Scope | Check | Error |
+  |-------|-------|-------|
+  | System | Always blocked | `PermissionSystemError` |
+  | User | Must be explicitly configured/watched | `PermissionUserError` |
+
+**Root/sudo is not supported by design**: Odio runs as an unprivileged user with a user D‑Bus session. Running it as root is strictly forbidden and will be refused by the program. It is not supported, will not work by default, and should never be attempted. Issues or requests related to this will not be accepted, unless they improve security.
+
+**You must knowingly enable this at your own risk.**
+Odio is free software and comes with no warranty. Enabling systemd integration is at your own risk.
+
+```
+# config.yaml
+systemd:
+  enabled: true
+```
+
+Useful service examples for audio servers or media centers, some are provided in `share/`:
+```
+# config.yaml
+systemd:
+  system:
+    - bluetooth.service
+    - upmpdcli.service
+  user:
+    - mpd.service                       (use mpd-mpris and mpDris2 for mpris support)
+    - pipewire-pulse.service
+    - pulseaudio.service
+    - shairport-sync.service            (uncompatible with mpris but volume and mute can be controlled through pulseaudio)
+    - snapclient.service                (same)
+    - spotifyd.service                  (if mpris support available in spotifyd)
+
+    - firefox-kiosk@netflix.com.service (will be detected by mpris)
+    - firefox-kiosk@youtube.com.service (will be detected by mpris)
+    - firefox-kiosk@my.home-assistant.io.service
+    - kodi.service                      (install Kodi Add-on:MPRIS D-Bus interface)
+    - vlc.service                       (will be detected by mpris)
+    - plex.service                      (maybe, untested)
+```
+
+### Zeroconf / mDNS
+The API advertise itself using Zeroconf (mDNS). This allows users to discover the API without knowing the host IP or port. Disabled with default 127.0.0.1, enabled otherwise
+
+Disable in configuration:
+```
+zeroconf:
+  enabled: false
+```
+
+Developers can discover the API with any mDNS/Bonjour browser on the network. Look for the service type `_http._tcp.local.` and instance name `odio-api`.
+
 
 ### Bluetooth Sink (A2DP)
 
@@ -74,6 +166,10 @@ All Bluetooth operations are explicitly controlled through the Odio API.
 - Audio profile: **A2DP** (high-quality audio streaming).
 
 This behavior matches how most Bluetooth speakers and audio receivers work.
+
+### Logs
+Different log levels, exhaustive info and debug logs to provide in issues.
+
 
 ## Installation
 
@@ -137,28 +233,37 @@ The Dockerfile uses a multi-stage build to compile the Go binary and copy it int
 A docker-compose.yml is provided in the repository for the most common use cases. It runs the container as a non-root user (UID 1000) and mounts the necessary host directories for DBus, systemd, and PulseAudio. You can adapt it for more specific setups if needed
 
 Environment variables:
-- XDG_RUNTIME_DIR=/run/user/1000 → DBus and Pulse runtime directory
-- DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus → user DBus session
-- HOME=/home/odio → ensures PulseAudio cookie is found
+- XDG_RUNTIME_DIR=/run/user/1000                            DBus and Pulse runtime directory
+- DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus     user DBus session
+- HOME=/home/odio                                           ensures `PulseAudio cookie` is found
 
 Volumes:
-- /run/user/1000/bus → user DBus session (read-only)
-- /run/user/1000/systemd → user systemd instance (read-only)
-- /run/user/1000/pulse → PulseAudio socket (read-only)
-- /var/run/dbus/system_bus_socket → system DBus socket (read-only)
-- /run/utmp → login sessions (read-only)
-- ./config.yaml → application configuration at /etc/odio-api/config.yml (read-only)
-- ./cookie → PulseAudio authentication cookie at $HOME/.config/pulse/cookie (read-only)
+- /run/user/1000/bus → user DBus session                    (read-only)
+- /run/user/1000/systemd → user systemd instance            (read-only)
+- /run/user/1000/pulse → PulseAudio socket                  (read-only)
+- /var/run/dbus/system_bus_socket → system DBus socket      (read-only)
+- /run/utmp → login sessions                                (read-only)
+- ./config.yaml → application configuration                 (read-only)
+- ./cookie → `PulseAudio cookie` ($HOME/.config/pulse/cookie) (read-only)
 
-The container exposes port 8080 and is configured to automatically restart unless stopped. With this configuration, audio and DBus-dependent functionality works seamlessly inside Docker.
+The container exposes port 8018 by default and is configured to automatically restart unless stopped. With this configuration, audio and DBus-dependent functionality works seamlessly inside Docker.
 
-Security note: All mounts are read-only, minimizing the container’s ability to modify the host system.
+**Note:** `listen` should be set to `0.0.0.0` in `config.yaml` for remote access with docker. Zeroconf won't work in bridge network mode. It's strongly advised against using host network mode.
+
+All mounts are read-only, minimizing the container’s ability to modify the host system.
+
+#### Command-line Flags
+
+- --config <path> specify a custom **yaml** configuration file.
+- --version       print the version of go-odio-api and exit.
+- --help          show help message
 
 ## Configuration
 
 Configuration file can be placed at:
 - `/etc/odio-api/config.yaml` (system-wide)
 - `~/.config/odio-api/config.yaml` (user-specific)
+- specified with `-config <path>`
 - A default configuration is available in `share/config.yaml`
 
 Disabling a backend will disable the backend and its routes !
@@ -166,18 +271,22 @@ Disabling a backend will disable the backend and its routes !
 Example configuration:
 
 ```yaml
+bind: 127.0.0.1
+logLevel: warn
+
+api:
+  enabled: true
+  port: 8018
+
+zeroconf:
+  enabled: true
+
 systemd:
   enabled: true
   system:
-    - bluetooth.service
-    - upmpdcli.service
+    -
   user:
-    - mpd.service
-    - pipewire-pulse.service
-    - pulseaudio.service
-    - shairport-sync.service
-    - snapclient.service
-    - spotifyd.service
+    -
 
 pulseaudio:
   enabled: true
@@ -186,19 +295,15 @@ mpris:
   enabled: true
   timeout: 5s
 
-bluetooth:
-  enabled: true
-  timeout: 5s
-  pairingTimeout: 60s
-
-api:
-  enabled: true
-  port: 8080
-
-logLevel: warn
 ```
 
 ## API Endpoints
+
+### Server Informations
+
+```
+GET    /server                             # {"hostname":"","os_platform":"","os_version":"","api_sw":"","api_version":"","backends":{"mpris":true,"pulseaudio":true,"systemd":true, "zeroconf": true}}
+```
 
 ### MPRIS Media Players
 
@@ -239,21 +344,6 @@ POST   /services/{scope}/{unit}/enable    # Enable service (scope: system|user)
 POST   /services/{scope}/{unit}/disable   # Disable service
 ```
 
-### Bluetooth Sink
-```
-GET    /bluetooth                         # Get Bluetooth status (powered, pairing mode state)
-POST   /bluetooth/power_up                # Turns Bluetooth on and makes the device ready to connect to already paired devices.
-POST   /bluetooth/power_down              # Turns Bluetooth off and disconnects any active Bluetooth connections.
-POST   /bluetooth/pairing_mode            # Enables Bluetooth pairing mode for 60s (configurable).
-                                           # Returns to non-discoverable state after timeout or successful pairing.
-```
-
-### Server Informations
-
-```
-GET    /server                             # {"hostname":"","os_platform":"","os_version":"","api_sw":"","api_version":"","backends":{"mpris":true,"pulseaudio":true,"systemd":true, "bluetooth": true}}
-```
-
 ## Architecture
 
 ### Backends
@@ -263,7 +353,6 @@ The application uses a modular backend architecture:
 - **MPRIS Backend**: Communicates with media players via D-Bus, implements smart caching and real-time updates through D-Bus signals
 - **PulseAudio Backend**: Interacts with PulseAudio/PipeWire for audio control, supports real-time event monitoring
 - **Systemd Backend**: Manages systemd services via D-Bus with native signal-based monitoring
-- **Bluetooth Backend**: Act as a Bluetooth audio receiver (A2DP sink) via D-Bus
 
 ### Key Components
 
@@ -274,8 +363,8 @@ The application uses a modular backend architecture:
 
 ### Performance Optimizations
 
-- Smart caching reduces D-Bus calls by ~90%
-- Batch property retrieval (GetAll vs individual Gets)
+- caching reduces D-Bus calls by ~90%
+- Batch property retrieval
 - D-Bus signal-based updates instead of polling
 - Automatic heartbeat management for position tracking
 - Connection pooling and timeout handling
@@ -335,6 +424,7 @@ rpmbuild -ba odio-api.spec
 - [godbus/dbus](https://github.com/godbus/dbus) - D-Bus bindings for Go
 - [coreos/go-systemd](https://github.com/coreos/go-systemd) - Go bindings to systemd socket activation, journal, D-Bus, and unit files
 - [the-jonsey/pulseaudio](https://github.com/the-jonsey/pulseaudio) - Pure-Go (no libpulse) implementation of the PulseAudio native protocol.
+- [grandcat/zeroconf](https://github.com/grandcat/zeroconf) - mDNS / DNS-SD Service Discovery in pure Go
 
 ## Contributing
 
@@ -348,7 +438,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the BSD 2-Clause License - see the LICENSE file for details.
 
 ## Acknowledgments
 
