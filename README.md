@@ -82,15 +82,9 @@ Yes, systemd control is controversial and potentially dangerous if misused. Odio
 Odio is free software and comes with no warranty. Enabling systemd integration is at your own risk.
 
 ```
-# config.yaml
+# config.yaml (Useful service examples for audio servers or media centers, some are provided in `share/`)
 systemd:
   enabled: true
-```
-
-Useful service examples for audio servers or media centers, some are provided in `share/`:
-```
-# config.yaml
-systemd:
   system:
     - bluetooth.service
     - upmpdcli.service
