@@ -120,8 +120,32 @@ func systemdHasUTMP() bool {
 	return err == nil
 }
 
+func validateConfigPath(path string) error {
+	// Check file extension
+	ext := filepath.Ext(path)
+	if ext != ".yaml" && ext != ".yml" {
+		return fmt.Errorf("config file must be .yaml or .yml, got: %s", ext)
+	}
+
+	// Check file exists and is readable
+	info, err := os.Stat(path)
+	if err != nil {
+		return fmt.Errorf("cannot access config file: %w", err)
+	}
+
+	// Check it's not a directory
+	if info.IsDir() {
+		return fmt.Errorf("config path is a directory, not a file: %s", path)
+	}
+
+	return nil
+}
+
 func readConfig(cfgFile *string) error {
 	if cfgFile != nil && *cfgFile != "" {
+		if err := validateConfigPath(*cfgFile); err != nil {
+			return err
+		}
 		viper.SetConfigFile(*cfgFile)
 		return viper.ReadInConfig()
 	}
@@ -156,6 +180,11 @@ func New(cfgFile *string) (*Config, error) {
 	viper.SetConfigType("yaml") // config file format
 
 	if err := readConfig(cfgFile); err != nil {
+		// If user explicitly provided a config file, fail hard on any error
+		if cfgFile != nil && *cfgFile != "" {
+			return nil, fmt.Errorf("failed to read config file: %w", err)
+		}
+		// Otherwise, only warn for non-file-not-found errors
 		if _, isNotFound := err.(viper.ConfigFileNotFoundError); !isNotFound {
 			logger.Warn("failed to read config: %v", err)
 		}
