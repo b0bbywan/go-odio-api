@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,8 +14,10 @@ import (
 )
 
 const (
-	AppName    = "odio-api"
-	AppVersion = "0.3.3"
+	AppName     = "odio-api"
+	AppVersion  = "0.5.0"
+	serviceType = "_http._tcp"
+	domain      = "local."
 )
 
 type Config struct {
@@ -22,12 +25,14 @@ type Config struct {
 	Systemd    *SystemdConfig
 	Pulseaudio *PulseAudioConfig
 	MPRIS      *MPRISConfig
+	Zeroconf   *ZeroConfig
 	LogLevel   logger.Level
 }
 
 type ApiConfig struct {
 	Enabled bool
 	Port    int
+	Listen  string
 }
 
 type SystemdConfig struct {
@@ -48,6 +53,16 @@ type MPRISConfig struct {
 	Timeout time.Duration
 }
 
+type ZeroConfig struct {
+	Enabled      bool
+	InstanceName string
+	ServiceType  string
+	Domain       string
+	Port         int
+	TxtRecords   []string
+	Listen       []net.Interface
+}
+
 // parseLogLevel converts a string to a logger.Level
 func parseLogLevel(levelStr string) logger.Level {
 	switch strings.ToUpper(levelStr) {
@@ -66,35 +81,81 @@ func parseLogLevel(levelStr string) logger.Level {
 	}
 }
 
+func interfaceForIP(ip string) (*net.Interface, error) {
+	if ip == "127.0.0.1" {
+		return nil, nil
+	}
+	listenIP := net.ParseIP(ip)
+	if listenIP == nil {
+		return nil, fmt.Errorf("invalid bind: %s", ip)
+	}
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, iface := range ifaces {
+		addrs, _ := iface.Addrs()
+		for _, addr := range addrs {
+			var ifaceIP net.IP
+
+			switch v := addr.(type) {
+			case *net.IPNet:
+				ifaceIP = v.IP
+			case *net.IPAddr:
+				ifaceIP = v.IP
+			}
+
+			if ifaceIP != nil && ifaceIP.Equal(listenIP) {
+				return &iface, nil
+			}
+		}
+	}
+
+	return nil, fmt.Errorf("no interface found for IP %s", ip)
+}
+
 func systemdHasUTMP() bool {
 	_, err := os.Stat("/run/utmp")
 	return err == nil
 }
 
-func New() (*Config, error) {
-	viper.SetDefault("api.enabled", true)
-	viper.SetDefault("systemd.enabled", true)
-	viper.SetDefault("services.system", []string{})
-	viper.SetDefault("services.user", []string{})
+func readConfig(cfgFile *string) error {
+	if cfgFile != nil && *cfgFile != "" {
+		viper.SetConfigFile(*cfgFile)
+		return viper.ReadInConfig()
+	}
 
-	viper.SetDefault("pulseaudio.enabled", true)
-
-	viper.SetDefault("mpris.enabled", true)
-	viper.SetDefault("mpris.timeout", "5s")
-
-	viper.SetDefault("api.port", 8080)
-	viper.SetDefault("LogLevel", "WARN")
-
-	// Load from configuration file, environment variables, and CLI flags
 	viper.SetConfigName("config")                       // name of config file (without extension)
-	viper.SetConfigType("yaml")                         // config file format
 	viper.AddConfigPath(filepath.Join("/etc", AppName)) // Global configuration path
 	if home, err := os.UserHomeDir(); err == nil {
 		viper.AddConfigPath(filepath.Join(home, ".config", AppName)) // User config path
 	}
+	return viper.ReadInConfig()
+}
 
-	if err := viper.ReadInConfig(); err != nil {
-		// Config file is optional, continue with defaults if not found
+func New(cfgFile *string) (*Config, error) {
+	viper.SetDefault("bind", "127.0.0.1")
+	viper.SetDefault("LogLevel", "WARN")
+
+	viper.SetDefault("api.enabled", true)
+	viper.SetDefault("api.port", 8018)
+
+	viper.SetDefault("mpris.enabled", true)
+	viper.SetDefault("mpris.timeout", "5s")
+
+	viper.SetDefault("pulseaudio.enabled", true)
+
+	viper.SetDefault("systemd.enabled", false)
+	viper.SetDefault("systemd.system", []string{})
+	viper.SetDefault("systemd.user", []string{})
+
+	viper.SetDefault("zeroconf.enabled", true)
+
+	// Load from configuration file, environment variables, and CLI flags
+	viper.SetConfigType("yaml") // config file format
+
+	if err := readConfig(cfgFile); err != nil {
 		if _, isNotFound := err.(viper.ConfigFileNotFoundError); !isNotFound {
 			logger.Warn("failed to read config: %v", err)
 		}
@@ -105,6 +166,13 @@ func New() (*Config, error) {
 		return nil, fmt.Errorf("invalid port: %d", port)
 	}
 
+	bind := viper.GetString("bind")
+	var interfaces []net.Interface
+	inet, err := interfaceForIP(bind)
+	if err == nil && inet != nil {
+		interfaces = append(interfaces, *inet)
+	}
+
 	xdgRuntimeDir := os.Getenv("XDG_RUNTIME_DIR")
 	if xdgRuntimeDir == "" {
 		xdgRuntimeDir = fmt.Sprintf("/run/user/%d", os.Getuid())
@@ -112,13 +180,14 @@ func New() (*Config, error) {
 
 	apiCfg := ApiConfig{
 		Enabled: viper.GetBool("api.enabled"),
+		Listen:  fmt.Sprintf("%s:%d", bind, port),
 		Port:    port,
 	}
 
 	syscfg := SystemdConfig{
 		Enabled:        viper.GetBool("systemd.enabled"),
-		SystemServices: viper.GetStringSlice("services.system"),
-		UserServices:   viper.GetStringSlice("services.user"),
+		SystemServices: viper.GetStringSlice("systemd.system"),
+		UserServices:   viper.GetStringSlice("systemd.user"),
 		SupportsUTMP:   systemdHasUTMP(),
 		XDGRuntimeDir:  xdgRuntimeDir,
 	}
@@ -138,11 +207,22 @@ func New() (*Config, error) {
 		Timeout: mprisTimeout,
 	}
 
+	zerocfg := ZeroConfig{
+		Enabled:      viper.GetBool("zeroconf.enabled"),
+		InstanceName: AppName,
+		ServiceType:  serviceType,
+		Port:         port,
+		Domain:       domain,
+		TxtRecords:   []string{"version=" + AppVersion},
+		Listen:       interfaces,
+	}
+
 	cfg := Config{
 		Api:        &apiCfg,
 		Systemd:    &syscfg,
 		Pulseaudio: &pulsecfg,
 		MPRIS:      &mpriscfg,
+		Zeroconf:   &zerocfg,
 		LogLevel:   parseLogLevel(viper.GetString("LogLevel")),
 	}
 

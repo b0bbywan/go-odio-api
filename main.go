@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"flag"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -18,7 +20,18 @@ func main() {
 		logger.Fatal("[%s] root user is strictly forbidden! Odio cannot and will not run as root.", config.AppName)
 	}
 
-	cfg, err := config.New()
+	flag.Usage = usage
+	configFile := flag.String("config", "", "path to configuration file")
+	versionFlag := flag.Bool("version", false, "Print version")
+
+	flag.Parse()
+
+	if *versionFlag {
+		fmt.Printf("%s v%s\n", config.AppName, config.AppVersion)
+		return
+	}
+
+	cfg, err := config.New(configFile)
 	if err != nil {
 		logger.Fatal("[%s] Failed to load config: %v", config.AppName, err)
 	}
@@ -31,7 +44,7 @@ func main() {
 	defer cancel()
 
 	// Initialize backends
-	b, err := backend.New(ctx, cfg.Systemd, cfg.Pulseaudio, cfg.MPRIS)
+	b, err := backend.New(ctx, cfg.Systemd, cfg.Pulseaudio, cfg.MPRIS, cfg.Zeroconf)
 	if err != nil {
 		logger.Fatal("[%s] Backend initialization failed: %v", config.AppName, err)
 	}
@@ -77,4 +90,14 @@ func clear(b *backend.Backend, cancel context.CancelFunc, shutdown chan struct{}
 
 	// Signal that cleanup is complete
 	close(shutdown)
+}
+
+func usage() {
+	fmt.Println("Usage:")
+	fmt.Println("  odio-api [options]")
+	fmt.Println("")
+	fmt.Println("Options:")
+	fmt.Println("  --config <path>  configuration file to use")
+	fmt.Println("  --version        Discplay version")
+	fmt.Println("  -h, --help       this help message")
 }

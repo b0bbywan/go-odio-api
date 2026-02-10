@@ -31,6 +31,7 @@ type Backends struct {
 	MPRIS      bool `json:"mpris"`
 	PulseAudio bool `json:"pulseaudio"`
 	Systemd    bool `json:"systemd"`
+	Zeroconf   bool `json:"zeroconf"`
 }
 
 func init() {
@@ -98,6 +99,7 @@ func (b *Backend) GetServerDeviceInfo() (ServerDeviceInfo, error) {
 			MPRIS:      b.MPRIS != nil,
 			PulseAudio: b.Pulse != nil,
 			Systemd:    b.Systemd != nil,
+			Zeroconf:   b.Zeroconf != nil,
 		},
 	}, nil
 }
