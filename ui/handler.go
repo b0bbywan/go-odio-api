@@ -43,13 +43,20 @@ func NewHandler(apiPort int) *Handler {
 
 // Dashboard renders the main dashboard page
 func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
+	logger.Debug("[ui] %s %s from %s", r.Method, r.URL.Path, r.RemoteAddr)
+
 	// Fetch server info to know which backends are available
+	logger.Debug("[ui] → API GET /server")
 	serverInfo, err := h.client.GetServerInfo()
 	if err != nil {
 		logger.Error("[ui] Failed to fetch server info: %v", err)
 		http.Error(w, "Failed to load server information", http.StatusInternalServerError)
 		return
 	}
+	logger.Debug("[ui] ← API /server: %d backends enabled",
+		boolToInt(serverInfo.Backends.MPRIS)+
+		boolToInt(serverInfo.Backends.PulseAudio)+
+		boolToInt(serverInfo.Backends.Systemd))
 
 	// Build view data
 	data := DashboardView{
@@ -59,30 +66,38 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 
 	// Conditionally fetch data based on enabled backends
 	if serverInfo.Backends.MPRIS {
+		logger.Debug("[ui] → API GET /players")
 		if players, err := h.client.GetPlayers(); err == nil {
 			data.Players = convertPlayers(players)
+			logger.Debug("[ui] ← API /players: %d players", len(players))
 		} else {
 			logger.Warn("[ui] Failed to fetch players: %v", err)
 		}
 	}
 
 	if serverInfo.Backends.PulseAudio {
+		logger.Debug("[ui] → API GET /audio/server")
 		if audioInfo, err := h.client.GetAudioInfo(); err == nil {
 			data.AudioInfo = audioInfo
+			logger.Debug("[ui] ← API /audio/server: volume=%.2f muted=%v", audioInfo.Volume, audioInfo.Muted)
 		} else {
 			logger.Warn("[ui] Failed to fetch audio info: %v", err)
 		}
 
+		logger.Debug("[ui] → API GET /audio/clients")
 		if audioClients, err := h.client.GetAudioClients(); err == nil {
 			data.AudioClients = audioClients
+			logger.Debug("[ui] ← API /audio/clients: %d clients", len(audioClients))
 		} else {
 			logger.Warn("[ui] Failed to fetch audio clients: %v", err)
 		}
 	}
 
 	if serverInfo.Backends.Systemd {
+		logger.Debug("[ui] → API GET /services")
 		if services, err := h.client.GetServices(); err == nil {
 			data.Services = convertServices(services)
+			logger.Debug("[ui] ← API /services: %d services", len(services))
 		} else {
 			logger.Warn("[ui] Failed to fetch services: %v", err)
 		}
@@ -97,12 +112,16 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 
 // MPRISSection renders just the MPRIS section (for HTMX updates)
 func (h *Handler) MPRISSection(w http.ResponseWriter, r *http.Request) {
+	logger.Debug("[ui] %s %s (HTMX section refresh)", r.Method, r.URL.Path)
+
+	logger.Debug("[ui] → API GET /players")
 	players, err := h.client.GetPlayers()
 	if err != nil {
 		logger.Error("[ui] Failed to fetch players: %v", err)
 		http.Error(w, "Failed to load players", http.StatusInternalServerError)
 		return
 	}
+	logger.Debug("[ui] ← API /players: %d players", len(players))
 
 	playerViews := convertPlayers(players)
 	if err := h.tmpl.ExecuteTemplate(w, "section-mpris", playerViews); err != nil {
@@ -113,19 +132,25 @@ func (h *Handler) MPRISSection(w http.ResponseWriter, r *http.Request) {
 
 // AudioSection renders just the PulseAudio section (for HTMX updates)
 func (h *Handler) AudioSection(w http.ResponseWriter, r *http.Request) {
+	logger.Debug("[ui] %s %s (HTMX section refresh)", r.Method, r.URL.Path)
+
+	logger.Debug("[ui] → API GET /audio/server")
 	audioInfo, err := h.client.GetAudioInfo()
 	if err != nil {
 		logger.Error("[ui] Failed to fetch audio info: %v", err)
 		http.Error(w, "Failed to load audio info", http.StatusInternalServerError)
 		return
 	}
+	logger.Debug("[ui] ← API /audio/server: volume=%.2f muted=%v", audioInfo.Volume, audioInfo.Muted)
 
+	logger.Debug("[ui] → API GET /audio/clients")
 	audioClients, err := h.client.GetAudioClients()
 	if err != nil {
 		logger.Error("[ui] Failed to fetch audio clients: %v", err)
 		http.Error(w, "Failed to load audio clients", http.StatusInternalServerError)
 		return
 	}
+	logger.Debug("[ui] ← API /audio/clients: %d clients", len(audioClients))
 
 	data := struct {
 		AudioInfo    *AudioInfo
@@ -143,12 +168,16 @@ func (h *Handler) AudioSection(w http.ResponseWriter, r *http.Request) {
 
 // SystemdSection renders just the Systemd section (for HTMX updates)
 func (h *Handler) SystemdSection(w http.ResponseWriter, r *http.Request) {
+	logger.Debug("[ui] %s %s (HTMX section refresh)", r.Method, r.URL.Path)
+
+	logger.Debug("[ui] → API GET /services")
 	services, err := h.client.GetServices()
 	if err != nil {
 		logger.Error("[ui] Failed to fetch services: %v", err)
 		http.Error(w, "Failed to load services", http.StatusInternalServerError)
 		return
 	}
+	logger.Debug("[ui] ← API /services: %d services", len(services))
 
 	serviceViews := convertServices(services)
 	if err := h.tmpl.ExecuteTemplate(w, "section-systemd", serviceViews); err != nil {
@@ -184,4 +213,12 @@ func convertServices(services []Service) []ServiceView {
 		})
 	}
 	return views
+}
+
+// boolToInt converts bool to int for counting
+func boolToInt(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
 }
