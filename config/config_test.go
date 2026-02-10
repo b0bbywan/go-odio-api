@@ -94,22 +94,22 @@ func TestNew_Defaults(t *testing.T) {
 	// Set XDG_SESSION_DESKTOP to avoid headless mode detection
 	t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
 
-	cfg, err := New()
+	cfg, err := New(nil)
 	if err != nil {
-		t.Fatalf("New() returned error: %v", err)
+		t.Fatalf("New(nil) returned error: %v", err)
 	}
 
 	// Test default port
-	if cfg.Api.Port != 8080 {
-		t.Errorf("Api.Port = %d, want 8080", cfg.Api.Port)
+	if cfg.Api.Port != 8018 {
+		t.Errorf("Api.Port = %d, want 8018", cfg.Api.Port)
 	}
 
 	// Test default enabled flags
 	if !cfg.Api.Enabled {
 		t.Error("Api.Enabled should be true by default")
 	}
-	if !cfg.Systemd.Enabled {
-		t.Error("Systemd.Enabled should be true by default")
+	if cfg.Systemd.Enabled {
+		t.Error("Systemd.Enabled should be false by default")
 	}
 	if !cfg.Pulseaudio.Enabled {
 		t.Error("Pulseaudio.Enabled should be true by default")
@@ -137,9 +137,9 @@ func TestNew_CustomPort(t *testing.T) {
 	// Set XDG_SESSION_DESKTOP to avoid headless mode detection
 	t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
 
-	cfg, err := New()
+	cfg, err := New(nil)
 	if err != nil {
-		t.Fatalf("New() returned error: %v", err)
+		t.Fatalf("New(nil) returned error: %v", err)
 	}
 
 	if cfg.Api.Port != 9090 {
@@ -172,12 +172,12 @@ func TestNew_InvalidPort(t *testing.T) {
 			// Set XDG_SESSION_DESKTOP to avoid headless mode detection
 			t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
 
-			cfg, err := New()
+			cfg, err := New(nil)
 			if err == nil {
-				t.Errorf("New() with port %d should return error, got config: %+v", tt.port, cfg)
+				t.Errorf("New(nil) with port %d should return error, got config: %+v", tt.port, cfg)
 			}
 			if cfg != nil {
-				t.Errorf("New() with invalid port should return nil config, got: %+v", cfg)
+				t.Errorf("New(nil) with invalid port should return nil config, got: %+v", cfg)
 			}
 		})
 	}
@@ -208,9 +208,9 @@ func TestNew_CustomLogLevel(t *testing.T) {
 			// Set XDG_SESSION_DESKTOP to avoid headless mode detection
 			t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
 
-			cfg, err := New()
+			cfg, err := New(nil)
 			if err != nil {
-				t.Fatalf("New() returned error: %v", err)
+				t.Fatalf("New(nil) returned error: %v", err)
 			}
 
 			if cfg.LogLevel != tt.expected {
