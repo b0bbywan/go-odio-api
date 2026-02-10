@@ -22,24 +22,27 @@
 		{{ end }}
 	</div>
 
-	<!-- Control buttons - read-only for now -->
+	<!-- Control buttons -->
 	<div class="flex shrink-0 gap-1 sm:gap-2">
 		<button
-			class="rounded-lg bg-zinc-600/50 px-3 py-2 text-sm transition-colors hover:bg-zinc-600 disabled:cursor-not-allowed disabled:opacity-50"
-			disabled
-			title="Controls coming soon">
+			class="rounded-lg bg-zinc-600/50 px-3 py-2 text-sm transition-colors hover:bg-zinc-600 active:scale-95"
+			hx-post="/players/{{ .Name }}/previous"
+			hx-swap="none"
+			title="Previous track">
 			⏮
 		</button>
 		<button
-			class="rounded-lg bg-zinc-600/50 px-3 py-2 text-sm transition-colors hover:bg-zinc-600 disabled:cursor-not-allowed disabled:opacity-50"
-			disabled
-			title="Controls coming soon">
+			class="rounded-lg bg-zinc-600/50 px-3 py-2 text-sm transition-colors hover:bg-zinc-600 active:scale-95"
+			hx-post="/players/{{ .Name }}/play_pause"
+			hx-swap="none"
+			title="{{ if eq .State "Playing" }}Pause{{ else }}Play{{ end }}">
 			{{ if eq .State "Playing" }}⏸{{ else }}▶{{ end }}
 		</button>
 		<button
-			class="rounded-lg bg-zinc-600/50 px-3 py-2 text-sm transition-colors hover:bg-zinc-600 disabled:cursor-not-allowed disabled:opacity-50"
-			disabled
-			title="Controls coming soon">
+			class="rounded-lg bg-zinc-600/50 px-3 py-2 text-sm transition-colors hover:bg-zinc-600 active:scale-95"
+			hx-post="/players/{{ .Name }}/next"
+			hx-swap="none"
+			title="Next track">
 			⏭
 		</button>
 	</div>
