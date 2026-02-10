@@ -16,7 +16,7 @@ type Backend struct {
 	MPRIS     *mpris.MPRISBackend
 	Pulse     *pulseaudio.PulseAudioBackend
 	Systemd   *systemd.SystemdBackend
-	Zeroconf *zeroconf.ZeroConfBackend
+	Zeroconf  *zeroconf.ZeroConfBackend
 }
 
 func New(
@@ -25,7 +25,7 @@ func New(
 	mpriscfg *config.MPRISConfig,
 	pulscfg *config.PulseAudioConfig,
 	syscfg *config.SystemdConfig,
-  zerocfg *config.ZeroConfig,
+	zerocfg *config.ZeroConfig,
 ) (*Backend, error) {
 	var b Backend
 	var err error
@@ -82,7 +82,7 @@ func (b *Backend) Start() error {
 }
 
 func (b *Backend) Close() {
-  if b.Bluetooth != nil {
+	if b.Bluetooth != nil {
 		b.Bluetooth.Close()
 	}
 	if b.MPRIS != nil {
@@ -96,5 +96,5 @@ func (b *Backend) Close() {
 	}
 	if b.Zeroconf != nil {
 		b.Zeroconf.Close()
-  }
+	}
 }

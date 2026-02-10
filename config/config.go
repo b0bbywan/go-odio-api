@@ -172,7 +172,7 @@ func New(cfgFile *string) (*Config, error) {
 	viper.SetDefault("api.enabled", true)
 	viper.SetDefault("api.port", 8018)
 
-  viper.SetDefault("bluetooth.enabled", true)
+	viper.SetDefault("bluetooth.enabled", true)
 	viper.SetDefault("bluetooth.timeout", "5s")
 	viper.SetDefault("bluetooth.pairingtimeout", "60s")
 
@@ -255,7 +255,7 @@ func New(cfgFile *string) (*Config, error) {
 		Domain:       domain,
 		TxtRecords:   []string{"version=" + AppVersion},
 		Listen:       interfaces,
-  }
+	}
 
 	bluetoothTimeout := viper.GetDuration("bluetooth.timeout")
 	if bluetoothTimeout <= 0 {
