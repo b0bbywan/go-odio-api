@@ -1,0 +1,21 @@
+{{ define "section-systemd" }}
+<section class="rounded-xl bg-zinc-800 p-4 shadow-lg">
+	<div class="mb-4 flex items-center justify-between">
+		<h2 class="text-lg font-semibold">⚙️ Services</h2>
+		<span class="rounded-full bg-purple-500/10 px-2 py-1 text-xs text-purple-400">
+			{{ len . }} configured
+		</span>
+	</div>
+
+	<div class="space-y-2">
+		{{ range . }}
+			{{ template "systemd-unit" . }}
+		{{ else }}
+			<div class="flex flex-col items-center justify-center py-8 text-center">
+				<div class="mb-2 text-4xl opacity-50">⚙️</div>
+				<p class="text-sm text-zinc-400">No services configured</p>
+			</div>
+		{{ end }}
+	</div>
+</section>
+{{ end }}
