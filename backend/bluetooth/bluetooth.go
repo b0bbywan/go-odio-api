@@ -57,6 +57,7 @@ func (b *BluetoothBackend) PowerUp() error {
 		s.Discoverable = false
 		s.Pairable = false
 	})
+	b.refreshKnownDevices()
 
 	logger.Info("[bluetooth] Bluetooth ready to connect to already known devices")
 	return nil
@@ -174,6 +175,7 @@ func (b *BluetoothBackend) waitPairing(ctx context.Context) {
 				if !trusted {
 					if ok := b.trustDevice(d); ok {
 						logger.Info("[bluetooth] New device %v trusted", d)
+						b.refreshKnownDevices()
 						return
 					}
 				}
@@ -211,6 +213,17 @@ func (b *BluetoothBackend) updateStatus(fn func(*BluetoothStatus)) {
 	status, _ := b.statusCache.Get(statusKey)
 	fn(&status)
 	b.statusCache.Set(statusKey, status)
+}
+
+func (b *BluetoothBackend) refreshKnownDevices() {
+	devices, err := b.listKnownDevices()
+	if err != nil {
+		logger.Warn("[bluetooth] failed to list known devices: %v", err)
+		return
+	}
+	b.updateStatus(func(s *BluetoothStatus) {
+		s.KnownDevices = devices
+	})
 }
 
 func (b *BluetoothBackend) registerAgent() error {
