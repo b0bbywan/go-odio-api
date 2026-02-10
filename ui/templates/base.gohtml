@@ -29,6 +29,22 @@
 		::-webkit-scrollbar-thumb:hover {
 			background: #52525b;
 		}
+
+		/* HTMX request indicator for buttons */
+		button.htmx-request {
+			opacity: 0.6;
+			pointer-events: none;
+		}
+
+		/* Pulse animation for active requests */
+		@keyframes pulse-opacity {
+			0%, 100% { opacity: 0.6; }
+			50% { opacity: 0.8; }
+		}
+
+		button.htmx-request {
+			animation: pulse-opacity 1s ease-in-out infinite;
+		}
 	</style>
 </head>
 
