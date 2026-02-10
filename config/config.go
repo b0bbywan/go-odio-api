@@ -172,6 +172,10 @@ func New(cfgFile *string) (*Config, error) {
 	viper.SetDefault("api.enabled", true)
 	viper.SetDefault("api.port", 8018)
 
+  viper.SetDefault("bluetooth.enabled", true)
+	viper.SetDefault("bluetooth.timeout", "5s")
+	viper.SetDefault("bluetooth.pairingtimeout", "60s")
+  
 	viper.SetDefault("mpris.enabled", true)
 	viper.SetDefault("mpris.timeout", "5s")
 

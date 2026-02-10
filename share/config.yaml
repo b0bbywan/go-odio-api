@@ -33,3 +33,4 @@ bluetooth:
   timeout: 5s
   pairingTimeout: 60s
 
+

@@ -9,7 +9,7 @@ A lightweight REST API for controlling Linux audio and media players, built in G
 
 **Headless systems:** On fully headless systems, lingering needs to be enabled:
 
-`loginctl enable-linger <username>`
+`sudo loginctl enable-linger <username>`
 
 This ensures the Pulseaudio/Pipewire, user D-Bus session and XDG_RUNTIME_DIR are available even without an active login session.
 
@@ -81,16 +81,12 @@ Yes, systemd control is controversial and potentially dangerous if misused. Odio
 **You must knowingly enable this at your own risk.**
 Odio is free software and comes with no warranty. Enabling systemd integration is at your own risk.
 
-```
-# config.yaml
-systemd:
-  enabled: false
-```
+Useful service examples for audio servers or media centers, some are provided in `share/`:
 
-Useful examples for audio servers or media centers, some are provided in `share/`:
 ```
 # config.yaml
 systemd:
+  enabled: true
   system:
     - bluetooth.service
     - upmpdcli.service
@@ -120,9 +116,6 @@ zeroconf:
 ```
 
 Developers can discover the API with any mDNS/Bonjour browser on the network. Look for the service type `_http._tcp.local.` and instance name `odio-api`.
-
-### Logs
-Different log levels, exhaustive info and debug logs to provide in issues.
 
 
 ### Bluetooth Sink (A2DP)
@@ -169,6 +162,10 @@ All Bluetooth operations are explicitly controlled through the Odio API.
 - Audio profile: **A2DP** (high-quality audio streaming).
 
 This behavior matches how most Bluetooth speakers and audio receivers work.
+
+### Logs
+Different log levels, exhaustive info and debug logs to provide in issues.
+
 
 ## Installation
 
@@ -237,19 +234,20 @@ Environment variables:
 - HOME=/home/odio                                           ensures `PulseAudio cookie` is found
 
 Volumes:
-- /run/user/1000/bus → user DBus session                    (read-only)
-- /run/user/1000/systemd → user systemd instance            (read-only)
-- /run/user/1000/pulse → PulseAudio socket                  (read-only)
-- /var/run/dbus/system_bus_socket → system DBus socket      (read-only)
-- /run/utmp → login sessions                                (read-only)
-- ./config.yaml → application configuration                 (read-only)
-- ./cookie → `PulseAudio cookie` ($HOME/.config/pulse/cookie) (read-only)
+- ./config.yaml                    (odio configuration)       (read-only)
+- /run/user/1000/bus               (user DBus session)        (read-only)
+- /run/user/1000/systemd           (user systemd folder)      (read-only)
+- /run/utmp                        (user systemd monitoring)  (read-only)
+- /var/run/dbus/system_bus_socket  (system DBus socket)       (read-only)
+- /run/user/1000/pulse             (PulseAudio socket)        (read-only)
+- ./cookie    (`PulseAudio cookie`$HOME/.config/pulse/cookie) (read-only)
 
 The container exposes port 8018 by default and is configured to automatically restart unless stopped. With this configuration, audio and DBus-dependent functionality works seamlessly inside Docker.
 
 **Note:** `listen` should be set to `0.0.0.0` in `config.yaml` for remote access with docker. Zeroconf won't work in bridge network mode. It's strongly advised against using host network mode.
 
 All mounts are read-only, minimizing the container’s ability to modify the host system.
+
 
 #### Command-line Flags
 
@@ -309,6 +307,15 @@ bluetooth:
 GET    /server                             # {"hostname":"","os_platform":"","os_version":"","api_sw":"","api_version":"","backends":{"mpris":true,"pulseaudio":true,"systemd":true, "zeroconf": true}}
 ```
 
+### Bluetooth Sink
+```
+GET    /bluetooth                         # Get Bluetooth status (powered, pairing mode state)
+POST   /bluetooth/power_up                # Turns Bluetooth on and makes the device ready to connect to already paired devices.
+POST   /bluetooth/power_down              # Turns Bluetooth off and disconnects any active Bluetooth connections.
+POST   /bluetooth/pairing_mode            # Enables Bluetooth pairing mode for 60s (configurable).
+                                          # Returns to non-discoverable state after timeout or successful pairing.
+```
+
 ### MPRIS Media Players
 
 ```
@@ -346,15 +353,6 @@ POST   /services/{scope}/{unit}/stop      # Stop service (scope: system|user)
 POST   /services/{scope}/{unit}/restart   # Restart service
 POST   /services/{scope}/{unit}/enable    # Enable service (scope: system|user)
 POST   /services/{scope}/{unit}/disable   # Disable service
-```
-
-### Bluetooth Sink
-```
-GET    /bluetooth                         # Get Bluetooth status (powered, pairing mode state)
-POST   /bluetooth/power_up                # Turns Bluetooth on and makes the device ready to connect to already paired devices.
-POST   /bluetooth/power_down              # Turns Bluetooth off and disconnects any active Bluetooth connections.
-POST   /bluetooth/pairing_mode            # Enables Bluetooth pairing mode for 60s (configurable).
-                                          # Returns to non-discoverable state after timeout or successful pairing.
 ```
 
 ## Architecture
@@ -418,7 +416,7 @@ GOOS=linux GOARCH=amd64 go build -o odio-api-amd64
 GOOS=linux GOARCH=arm64 go build -o odio-api-arm64
 ```
 
-### Debian Package
+### Debian Packaging
 
 ```bash
 # Build Debian package

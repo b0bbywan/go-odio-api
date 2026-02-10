@@ -42,7 +42,7 @@ func New(
 		return nil, err
 	}
 
-	if b.Systemd, err = systemd.New(ctx, syscfg); err != nil {
+	if b.MPRIS, err = mpris.New(ctx, mpriscfg); err != nil {
 		return nil, err
 	}
 
