@@ -6,6 +6,7 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
+	"github.com/b0bbywan/go-odio-api/cache"
 	"github.com/b0bbywan/go-odio-api/config"
 	"github.com/b0bbywan/go-odio-api/logger"
 )
@@ -26,6 +27,7 @@ func New(ctx context.Context, cfg *config.BluetoothConfig) (*BluetoothBackend, e
 		ctx:            ctx,
 		timeout:        cfg.Timeout,
 		pairingTimeout: cfg.PairingTimeout,
+		statusCache:    cache.New[BluetoothStatus](0), // no expiration
 	}
 
 	if err = backend.CheckBluetoothSupport(); err != nil {
@@ -50,9 +52,11 @@ func (b *BluetoothBackend) PowerUp() error {
 		return err
 	}
 
-	b.stateMu.Lock()
-	b.powered = true
-	b.stateMu.Unlock()
+	b.updateStatus(func(s *BluetoothStatus) {
+		s.Powered = true
+		s.Discoverable = false
+		s.Pairable = false
+	})
 
 	logger.Info("[bluetooth] Bluetooth ready to connect to already known devices")
 	return nil
@@ -67,9 +71,13 @@ func (b *BluetoothBackend) PowerDown() error {
 		return err
 	}
 
-	b.stateMu.Lock()
-	b.powered = false
-	b.stateMu.Unlock()
+	b.updateStatus(func(s *BluetoothStatus) {
+		s.Powered = false
+		s.Discoverable = false
+		s.Pairable = false
+		s.PairingActive = false
+		s.PairingUntil = nil
+	})
 
 	return nil
 }
@@ -114,10 +122,13 @@ func (b *BluetoothBackend) NewPairing() error {
 
 	// Track pairing state
 	pairingUntil := time.Now().Add(b.pairingTimeout)
-	b.stateMu.Lock()
-	b.pairingUntil = &pairingUntil
-	b.powered = true
-	b.stateMu.Unlock()
+	b.updateStatus(func(s *BluetoothStatus) {
+		s.Powered = true
+		s.Discoverable = true
+		s.Pairable = true
+		s.PairingActive = true
+		s.PairingUntil = &pairingUntil
+	})
 
 	go b.waitPairing(b.ctx)
 	logger.Info("[bluetooth] Bluetooth pairing mode enabled")
@@ -132,9 +143,12 @@ func (b *BluetoothBackend) waitPairing(ctx context.Context) {
 		if err := b.SetDiscoverableAndPairable(false); err != nil {
 			logger.Warn("[bluetooth] failed to reset adapter state after pairing: %v", err)
 		}
-		b.stateMu.Lock()
-		b.pairingUntil = nil
-		b.stateMu.Unlock()
+		b.updateStatus(func(s *BluetoothStatus) {
+			s.Discoverable = false
+			s.Pairable = false
+			s.PairingActive = false
+			s.PairingUntil = nil
+		})
 		cancel()
 		b.pairingMu.Unlock()
 	}()
@@ -184,14 +198,19 @@ func (b *BluetoothBackend) Close() {
 }
 
 func (b *BluetoothBackend) GetStatus() BluetoothStatus {
-	b.stateMu.RLock()
-	defer b.stateMu.RUnlock()
-
-	return BluetoothStatus{
-		Powered:       b.powered,
-		PairingActive: b.pairingUntil != nil,
-		PairingUntil:  b.pairingUntil,
+	const statusKey = "current"
+	status, ok := b.statusCache.Get(statusKey)
+	if !ok {
+		return BluetoothStatus{}
 	}
+	return status
+}
+
+func (b *BluetoothBackend) updateStatus(fn func(*BluetoothStatus)) {
+	const statusKey = "current"
+	status, _ := b.statusCache.Get(statusKey)
+	fn(&status)
+	b.statusCache.Set(statusKey, status)
 }
 
 func (b *BluetoothBackend) registerAgent() error {
