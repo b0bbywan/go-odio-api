@@ -56,6 +56,7 @@ type Service struct {
 	LoadState   string `json:"load_state"`
 	ActiveState string `json:"active_state"`
 	SubState    string `json:"sub_state"`
+	Scope       string `json:"scope"` // "system" or "user"
 }
 
 // ============================================================================
@@ -89,4 +90,5 @@ type ServiceView struct {
 	Description string
 	Active      bool
 	State       string
+	IsUser      bool // true if scope is "user", false if "system"
 }

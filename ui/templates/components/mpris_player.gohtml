@@ -5,14 +5,14 @@
 	<div class="text-center mb-3">
 		<div class="player-name mb-1">{{ .DisplayName }}</div>
 		{{ if or .Artist .Title }}
-		<div class="player-meta">
+		<div class="player-meta" title="{{ if .Artist }}{{ .Artist }}{{ end }}{{ if and .Artist .Title }} – {{ end }}{{ if .Title }}{{ .Title }}{{ end }}">
 			{{ if .Artist }}{{ .Artist }}{{ end }}{{ if and .Artist .Title }} – {{ end }}{{ if .Title }}{{ .Title }}{{ end }}
 		</div>
 		{{ else }}
 		<div class="text-sm text-subtle">No media playing</div>
 		{{ end }}
 		{{ if .Album }}
-		<div class="player-meta-small">{{ .Album }}</div>
+		<div class="player-meta-small" title="{{ .Album }}">{{ .Album }}</div>
 		{{ end }}
 	</div>
 
