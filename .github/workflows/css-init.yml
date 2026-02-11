@@ -7,6 +7,7 @@ on:
       - 'tailwind.config.js'
       - 'ui/**/*.gohtml'
       - 'ui/styles/**'
+      - '.github/workflows/**'
 
 jobs:
   init-css:
