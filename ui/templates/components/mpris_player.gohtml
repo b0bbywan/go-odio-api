@@ -4,7 +4,7 @@
 	<!-- Player info -->
 	<div class="content-area">
 		<div class="mb-1 flex items-center gap-2">
-			<div class="player-name">{{ .Name }}</div>
+			<div class="player-name">{{ .DisplayName }}</div>
 			<span class="status-badge {{ if eq .State "Playing" }}status-badge-playing{{ else }}status-badge-paused{{ end }}">
 				{{ .State }}
 			</span>
