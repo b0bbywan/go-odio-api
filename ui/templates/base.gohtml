@@ -98,6 +98,31 @@
 		</div>
 	</footer>
 	{{ end }}
+
+	<script>
+	function togglePlayPause(button, playerName) {
+		// Get current state from button content
+		const currentIcon = button.textContent.trim();
+		const isPlaying = currentIcon === '⏸';
+
+		// Toggle icon immediately for instant feedback
+		const newIcon = isPlaying ? '▶' : '⏸';
+		const newTitle = isPlaying ? 'Play' : 'Pause';
+
+		button.textContent = newIcon;
+		button.title = newTitle;
+
+		// Send POST to API
+		fetch(`/players/${playerName}/play_pause`, {
+			method: 'POST'
+		}).catch(() => {
+			// Revert on error
+			button.textContent = currentIcon;
+			button.title = isPlaying ? 'Pause' : 'Play';
+			console.error('Failed to toggle play/pause');
+		});
+	}
+	</script>
 </body>
 </html>
 {{ end }}
