@@ -194,14 +194,15 @@ func (h *Handler) SystemdSection(w http.ResponseWriter, r *http.Request) {
 func convertPlayers(players []Player) []PlayerView {
 	views := make([]PlayerView, 0, len(players))
 	for _, p := range players {
-		// Truncate "org.mpris.MediaPlayer2." prefix for cleaner display
-		name := strings.TrimPrefix(p.Name, "org.mpris.MediaPlayer2.")
+		// Keep full bus_name for API endpoints, truncate for display
+		displayName := strings.TrimPrefix(p.Name, "org.mpris.MediaPlayer2.")
 		views = append(views, PlayerView{
-			Name:   name,
-			Artist: p.Metadata["xesam:artist"],
-			Title:  p.Metadata["xesam:title"],
-			Album:  p.Metadata["xesam:album"],
-			State:  p.Status,
+			Name:        p.Name, // Full bus_name for endpoints
+			DisplayName: displayName,
+			Artist:      p.Metadata["xesam:artist"],
+			Title:       p.Metadata["xesam:title"],
+			Album:       p.Metadata["xesam:album"],
+			State:       p.Status,
 		})
 	}
 	return views
