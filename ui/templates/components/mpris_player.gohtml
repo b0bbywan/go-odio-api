@@ -3,12 +3,7 @@
 
 	<!-- Player info -->
 	<div class="content-area">
-		<div class="mb-1 flex items-center gap-2">
-			<div class="player-name">{{ .DisplayName }}</div>
-			<span class="status-badge {{ if eq .State "Playing" }}status-badge-playing{{ else }}status-badge-paused{{ end }}">
-				{{ .State }}
-			</span>
-		</div>
+        <div class="player-name mb-1">{{ .DisplayName }}</div>
 		{{ if or .Artist .Title }}
 		<div class="player-meta">
 			{{ if .Artist }}{{ .Artist }}{{ end }}{{ if and .Artist .Title }} – {{ end }}{{ if .Title }}{{ .Title }}{{ end }}
