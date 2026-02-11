@@ -175,7 +175,7 @@ func TestWithService(t *testing.T) {
 				startFunc: tt.mockFunc,
 			}
 
-			handler := withService(mock, mock.StartService)
+			handler := withService(nil, mock.StartService)
 
 			req := httptest.NewRequest("POST", "/services/scope/unit/start", nil)
 			req.SetPathValue("scope", tt.pathScope)
@@ -255,7 +255,7 @@ func TestStartServiceHandler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mock := tt.setupMock()
-			handler := withService(mock, mock.StartService)
+			handler := withService(nil, mock.StartService)
 
 			req := httptest.NewRequest("POST", "/services/"+tt.pathScope+"/"+tt.pathUnit+"/start", nil)
 			req.SetPathValue("scope", tt.pathScope)
@@ -320,7 +320,7 @@ func TestStopServiceHandler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mock := tt.setupMock()
-			handler := withService(mock, mock.StopService)
+			handler := withService(nil, mock.StopService)
 
 			req := httptest.NewRequest("POST", "/services/"+tt.pathScope+"/"+tt.pathUnit+"/stop", nil)
 			req.SetPathValue("scope", tt.pathScope)
@@ -385,7 +385,7 @@ func TestEnableServiceHandler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mock := tt.setupMock()
-			handler := withService(mock, mock.EnableService)
+			handler := withService(nil, mock.EnableService)
 
 			req := httptest.NewRequest("POST", "/services/"+tt.pathScope+"/"+tt.pathUnit+"/enable", nil)
 			req.SetPathValue("scope", tt.pathScope)
@@ -450,7 +450,7 @@ func TestDisableServiceHandler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mock := tt.setupMock()
-			handler := withService(mock, mock.DisableService)
+			handler := withService(nil, mock.DisableService)
 
 			req := httptest.NewRequest("POST", "/services/"+tt.pathScope+"/"+tt.pathUnit+"/disable", nil)
 			req.SetPathValue("scope", tt.pathScope)
@@ -515,7 +515,7 @@ func TestRestartServiceHandler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mock := tt.setupMock()
-			handler := withService(mock, mock.RestartService)
+			handler := withService(nil, mock.RestartService)
 
 			req := httptest.NewRequest("POST", "/services/"+tt.pathScope+"/"+tt.pathUnit+"/restart", nil)
 			req.SetPathValue("scope", tt.pathScope)
