@@ -10,6 +10,9 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event.ref_type == 'branch'
     steps:
+      - name: Install lftp
+        run: sudo apt-get update && sudo apt-get install -y lftp
+
       - name: Remove branch CSS from CDN
         env:
           SFTP_HOST: ${{ secrets.SFTP_HOST }}

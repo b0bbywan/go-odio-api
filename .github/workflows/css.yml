@@ -25,6 +25,9 @@ jobs:
       - name: Build CSS
         run: task css-local
 
+      - name: Install lftp
+        run: sudo apt-get update && sudo apt-get install -y lftp
+
       - name: Upload to SFTP
         env:
           SFTP_HOST: ${{ secrets.SFTP_HOST }}
