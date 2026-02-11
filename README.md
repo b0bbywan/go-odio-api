@@ -393,8 +393,8 @@ GOOS=linux GOARCH=arm GOARM=6 go build -o bin/go-odio-api-armv6
 The UI uses Tailwind CSS with an intelligent multi-architecture build strategy:
 
 - **Development (x64/arm64/armv7)**: `task build` automatically compiles CSS locally using Tailwind CLI
-- **Legacy ARM (ARMv6 - Raspberry Pi B/B+)**: `task build` downloads pre-built CSS from GitHub Releases (tagged by commit hash)
-- **CI/CD**: Automatically builds and publishes CSS to GitHub Releases on every UI change
+- **Legacy ARM (ARMv6 - Raspberry Pi B/B+)**: `task build` downloads pre-built CSS from CDN (https://bobbywan.me/odio-css/)
+- **CI/CD**: Automatically builds and publishes CSS to CDN on every UI change, organized by branch and tags
 
 **Why?** Tailwind CLI doesn't provide ARMv6 binaries. The CSS is architecture-independent (just text), so it's compiled on x64 and distributed via CDN.
 
@@ -404,7 +404,15 @@ git pull
 task build  # Downloads CSS automatically, then builds Go binary
 ```
 
-**Note:** CSS files are NOT committed to the repository. They're generated locally or downloaded from GitHub Releases based on the current commit hash.
+**CDN Structure:**
+```
+https://bobbywan.me/odio-css/
+  main/abc1234.css              # Main branch commits
+  claude-branch-name/def5678.css # Feature branches
+  tags/v0.6.0.css               # Release tags (never cleaned)
+```
+
+**Note:** CSS files are NOT committed to the repository. They're generated locally or downloaded from CDN based on the current branch and commit hash.
 
 ### Debian Packaging
 

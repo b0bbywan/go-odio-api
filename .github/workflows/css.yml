@@ -8,12 +8,12 @@ on:
       - 'ui/**/*.gohtml'
       - 'ui/styles/**'
       - '.github/workflows/css.yml'
+  release:
+    types: [published]
 
 jobs:
   build-css:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write  # Pour créer des releases
     steps:
       - uses: actions/checkout@v4
 
@@ -25,20 +25,34 @@ jobs:
       - name: Build CSS
         run: task css-local
 
-      - name: Upload to GitHub Releases
+      - name: Upload to SFTP
         env:
-          GH_TOKEN: ${{ github.token }}
+          SFTP_HOST: ${{ secrets.SFTP_HOST }}
+          SFTP_USER: ${{ secrets.SFTP_USER }}
+          SFTP_PASS: ${{ secrets.SFTP_PASS }}
         run: |
           COMMIT_SHORT=$(git rev-parse --short HEAD)
-          RELEASE_TAG="css-${COMMIT_SHORT}"
 
-          # Créer la release (ou ignorer si existe)
-          gh release create "$RELEASE_TAG" \
-            --title "CSS for commit ${COMMIT_SHORT}" \
-            --notes "Auto-generated CSS build for commit ${GITHUB_SHA}" \
-            2>/dev/null || true
+          # Déterminer le chemin de destination
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            # Tag → tags/v0.6.0.css
+            VERSION=${GITHUB_REF#refs/tags/}
+            REMOTE_PATH="odio-css/tags/${VERSION}.css"
+            URL_PATH="tags/${VERSION}.css"
+          else
+            # Branche → main/abc1234.css ou claude-xxx/def5678.css
+            BRANCH=${GITHUB_REF#refs/heads/}
+            REMOTE_PATH="odio-css/${BRANCH}/${COMMIT_SHORT}.css"
+            URL_PATH="${BRANCH}/${COMMIT_SHORT}.css"
+          fi
 
-          # Upload le fichier CSS
-          gh release upload "$RELEASE_TAG" ui/static/output.css --clobber
+          # Upload via lftp (supporte SFTP)
+          lftp -c "
+            set sftp:auto-confirm yes
+            open -u ${SFTP_USER},${SFTP_PASS} sftp://${SFTP_HOST}
+            mkdir -p $(dirname ${REMOTE_PATH})
+            put ui/static/output.css -o ${REMOTE_PATH}
+            bye
+          "
 
-          echo "✅ CSS uploaded: ${RELEASE_TAG}/output.css"
+          echo "✅ CSS uploaded to https://bobbywan.me/${URL_PATH}"
