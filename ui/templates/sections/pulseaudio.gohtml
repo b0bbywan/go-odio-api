@@ -19,8 +19,23 @@
 	{{ if .AudioInfo }}
 	<!-- Server info -->
 	<div class="info-card mb-4">
-		<div class="mb-1 text-xs text-subtle">Default Sink</div>
-		<div class="truncate text-sm font-medium">{{ .AudioInfo.DefaultSink }}</div>
+		<div class="mb-2 text-xs text-subtle">Default Sink</div>
+		<div class="truncate text-sm font-medium mb-3">{{ .AudioInfo.DefaultSink }}</div>
+
+		<!-- Volume control -->
+		<div class="flex items-center gap-2">
+			<button class="text-lg" onclick="toggleMute(this, '', 'audio-server')" title="Toggle mute">
+				{{ if .AudioInfo.Muted }}🔇{{ else }}🔊{{ end }}
+			</button>
+			<input type="range"
+			       class="volume-slider flex-1"
+			       min="0"
+			       max="100"
+			       value="{{ printf "%.0f" (mul .AudioInfo.Volume 100) }}"
+			       oninput="updateVolume(this, '', 'audio-server')"
+			       title="Master volume">
+			<span class="text-xs text-zinc-400 w-10">{{ printf "%.0f%%" (mul .AudioInfo.Volume 100) }}</span>
+		</div>
 	</div>
 
 	<!-- Audio clients -->
