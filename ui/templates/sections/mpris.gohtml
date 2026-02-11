@@ -9,9 +9,9 @@
 		{{ range . }}
 			{{ template "mpris-player" . }}
 		{{ else }}
-			<div class="flex flex-col items-center justify-center py-8 text-center">
-				<div class="mb-2 text-4xl opacity-50">🎵</div>
-				<p class="text-sm text-zinc-400">No active media players</p>
+			<div class="empty-state">
+				<div class="empty-state-icon">🎵</div>
+				<p class="text-sm text-muted">No active media players</p>
 			</div>
 		{{ end }}
 	</div>

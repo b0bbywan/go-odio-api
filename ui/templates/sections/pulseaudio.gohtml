@@ -27,13 +27,13 @@
 		{{ end }}
 	</div>
 	{{ else }}
-	<div class="flex flex-col items-center justify-center py-4 text-center">
+	<div class="empty-state">
 		<p class="text-sm text-muted">No active audio clients</p>
 	</div>
 	{{ end }}
 	{{ else }}
-	<div class="flex flex-col items-center justify-center py-8 text-center">
-		<div class="mb-2 text-4xl opacity-50">🔊</div>
+	<div class="empty-state">
+		<div class="empty-state-icon">🔊</div>
 		<p class="text-sm text-muted">Audio info unavailable</p>
 	</div>
 	{{ end }}

@@ -1,17 +1,17 @@
 {{ define "pulseaudio-sink" }}
 <div class="client-card">
 	<!-- Client info -->
-	<div class="min-w-0 flex-1">
-		<div class="truncate text-sm font-medium text-zinc-200">
+	<div class="content-area">
+		<div class="player-name text-sm">
 			{{ if .Application }}{{ .Application }}{{ else }}{{ .Name }}{{ end }}
 		</div>
 		{{ if .Application }}
-		<div class="truncate text-xs text-subtle">{{ .Name }}</div>
+		<div class="player-meta-small">{{ .Name }}</div>
 		{{ end }}
 	</div>
 
 	<!-- Volume indicator -->
-	<div class="ml-3 flex shrink-0 items-center gap-2">
+	<div class="meta-area">
 		<div class="text-xs {{ if .Muted }}text-red-400{{ else }}text-blue-400{{ end }}">
 			{{ if .Muted }}
 				🔇 Muted
