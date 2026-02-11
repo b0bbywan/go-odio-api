@@ -39,6 +39,7 @@ tasks:
   css-local:
     desc: Build CSS locally (if Tailwind CLI available)
     deps: [install-tailwind]
+    method: checksum
     sources:
       - "{{.CSS_INPUT}}"
       - ui/templates/**/*.gohtml
