@@ -43,7 +43,7 @@ type AudioInfo struct {
 type AudioClient struct {
 	Index       uint32  `json:"index"`
 	Name        string  `json:"name"`
-	Application string  `json:"application"`
+	Application string  `json:"app"` // API returns "app", not "application"
 	Volume      float64 `json:"volume"`
 	Muted       bool    `json:"muted"`
 }
