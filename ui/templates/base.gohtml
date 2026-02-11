@@ -45,6 +45,67 @@
 		button.htmx-request {
 			animation: pulse-opacity 1s ease-in-out infinite;
 		}
+
+		/* Component utility classes */
+		.section-card {
+			@apply rounded-xl bg-zinc-800 p-4 shadow-lg;
+		}
+
+		.section-header {
+			@apply mb-4 flex items-center justify-between;
+		}
+
+		.section-title {
+			@apply text-lg font-semibold;
+		}
+
+		.badge {
+			@apply rounded-full px-2 py-1 text-xs;
+		}
+
+		.badge-green {
+			@apply bg-green-500/10 text-green-400;
+		}
+
+		.badge-blue {
+			@apply bg-blue-500/10 text-blue-400;
+		}
+
+		.badge-purple {
+			@apply bg-purple-500/10 text-purple-400;
+		}
+
+		.badge-red {
+			@apply bg-red-500/20 text-red-400;
+		}
+
+		.player-card {
+			@apply flex flex-col gap-3 rounded-lg bg-zinc-700/50 p-3 transition-colors hover:bg-zinc-700 sm:flex-row sm:items-center sm:justify-between;
+		}
+
+		.btn {
+			@apply rounded-lg bg-zinc-600/50 px-3 py-2 text-sm transition-colors hover:bg-zinc-600 active:scale-95;
+		}
+
+		.text-muted {
+			@apply text-zinc-400;
+		}
+
+		.text-subtle {
+			@apply text-zinc-500;
+		}
+
+		.info-card {
+			@apply rounded-lg bg-zinc-900/50 p-3;
+		}
+
+		.client-card {
+			@apply flex items-center justify-between rounded-lg bg-zinc-900/50 p-2.5 transition-colors hover:bg-zinc-900;
+		}
+
+		.service-card {
+			@apply flex items-center justify-between rounded-lg bg-zinc-900/50 p-3 transition-colors hover:bg-zinc-900;
+		}
 	</style>
 </head>
 

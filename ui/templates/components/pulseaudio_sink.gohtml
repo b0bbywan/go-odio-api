@@ -1,12 +1,12 @@
 {{ define "pulseaudio-sink" }}
-<div class="flex items-center justify-between rounded-lg bg-zinc-900/50 p-2.5 transition-colors hover:bg-zinc-900">
+<div class="client-card">
 	<!-- Client info -->
 	<div class="min-w-0 flex-1">
 		<div class="truncate text-sm font-medium text-zinc-200">
 			{{ if .Application }}{{ .Application }}{{ else }}{{ .Name }}{{ end }}
 		</div>
 		{{ if .Application }}
-		<div class="truncate text-xs text-zinc-500">{{ .Name }}</div>
+		<div class="truncate text-xs text-subtle">{{ .Name }}</div>
 		{{ end }}
 	</div>
 
