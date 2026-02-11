@@ -410,6 +410,9 @@ go install github.com/go-task/task/v3/cmd/task@latest
 # Build everything (CSS + Go binary)
 task build
 
+# Build and run
+task run
+
 # Or build components separately
 task css              # Ensure CSS is available (generate or download)
 task css-local        # Compile CSS locally (requires Tailwind CLI)
@@ -418,8 +421,9 @@ task css:watch        # Watch mode for development
 # Standard Go build (without Task)
 go build -o bin/go-odio-api
 
-# Build with optimizations
-go build -ldflags="-s -w" -o bin/go-odio-api
+# Build with version injection (version from git tags)
+VERSION=$(git describe --tags --always --dirty)
+go build -ldflags="-X github.com/b0bbywan/go-odio-api/config.AppVersion=${VERSION}" -o bin/go-odio-api
 
 # Cross-compile for different architectures
 GOOS=linux GOARCH=amd64 go build -o bin/go-odio-api-amd64
@@ -461,17 +465,47 @@ https://bobbywan.me/odio-css/
 
 ### Debian Packaging
 
+**Local build:**
 ```bash
-# Build Debian package
+# Build Debian package locally
 cd debian
 dpkg-buildpackage -us -uc -b
 ```
 
-### RPM Packaging
+**Docker build (recommended):**
 ```bash
+# Build Debian package using Docker
+task docker:build-deb
+
+# Package will be in bin/packages/
+```
+
+The version is automatically extracted from git tags and injected at build time.
+
+### RPM Packaging
+
+**Local build:**
+```bash
+# Build RPM package locally
 mkdir -p ~/rpmbuild/RPMS/
 rpmbuild -ba odio-api.spec
 ```
+
+**Docker build (recommended):**
+```bash
+# Build RPM package using Docker
+task docker:build-rpm
+
+# Package will be in bin/packages/
+```
+
+**Build all packages at once:**
+```bash
+# Build both deb and rpm packages
+task docker:build-packages
+```
+
+The version is automatically extracted from git tags and injected at build time.
 
 ## Dependencies
 

@@ -10,7 +10,8 @@ override_dh_auto_test:
 	:
 
 override_dh_auto_build:
-	go build -v -o odio-api .
+	$(eval VERSION := $(shell git describe --tags --always --dirty 2>/dev/null | sed 's/^v//' || dpkg-parsechangelog -S Version | cut -d- -f1))
+	go build -v -ldflags="-X github.com/b0bbywan/go-odio-api/config.AppVersion=$(VERSION)" -o odio-api .
 
 override_dh_auto_install:
 	install -D -m 0755 odio-api debian/odio-api/usr/bin/odio-api

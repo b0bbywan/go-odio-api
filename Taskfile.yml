@@ -5,6 +5,9 @@ vars:
   BIN_DIR: bin
   CSS_INPUT: ui/styles/input.css
   CSS_OUTPUT: ui/static/output.css
+  VERSION:
+    sh: git describe --tags --always --dirty 2>/dev/null || echo "dev"
+  LDFLAGS: -X github.com/b0bbywan/go-odio-api/config.AppVersion={{.VERSION}}
 
 tasks:
   default:
@@ -106,8 +109,8 @@ tasks:
     desc: Build the application (includes CSS compilation)
     deps: [css]
     cmds:
-      - go build -o {{.BIN_DIR}}/go-odio-api
-      - echo "✓ Built to {{.BIN_DIR}}/go-odio-api"
+      - go build -ldflags="{{.LDFLAGS}}" -o {{.BIN_DIR}}/go-odio-api
+      - echo "✓ Built {{.VERSION}} to {{.BIN_DIR}}/go-odio-api"
     sources:
       - "**/*.go"
       - go.mod
@@ -161,3 +164,42 @@ tasks:
       - echo "Starting CSS watch mode..."
       - echo "Run 'go run .' in another terminal to start the server"
       - task: css:watch
+
+  run:
+    desc: Build and run the application
+    deps: [build]
+    cmds:
+      - "{{.BIN_DIR}}/go-odio-api {{.CLI_ARGS}}"
+
+  docker:build:
+    desc: Build Docker image
+    cmds:
+      - docker build -t odio-api:{{.VERSION}} -t odio-api:latest .
+      - echo "✓ Built Docker image odio-api:{{.VERSION}}"
+
+  docker:build-deb:
+    desc: Build Debian package using Docker
+    cmds:
+      - docker build -f Dockerfile.deb -t odio-api-deb-builder:{{.VERSION}} .
+      - docker create --name odio-deb-tmp odio-api-deb-builder:{{.VERSION}}
+      - mkdir -p {{.BIN_DIR}}/packages
+      - docker cp odio-deb-tmp:/packages/. {{.BIN_DIR}}/packages/
+      - docker rm odio-deb-tmp
+      - echo "✓ Debian package built in {{.BIN_DIR}}/packages/"
+
+  docker:build-rpm:
+    desc: Build RPM package using Docker
+    cmds:
+      - docker build -f Dockerfile.rpm -t odio-api-rpm-builder:{{.VERSION}} --build-arg VERSION={{.VERSION}} .
+      - docker create --name odio-rpm-tmp odio-api-rpm-builder:{{.VERSION}}
+      - mkdir -p {{.BIN_DIR}}/packages
+      - docker cp odio-rpm-tmp:/packages/. {{.BIN_DIR}}/packages/
+      - docker rm odio-rpm-tmp
+      - echo "✓ RPM package built in {{.BIN_DIR}}/packages/"
+
+  docker:build-packages:
+    desc: Build both deb and rpm packages using Docker
+    cmds:
+      - task: docker:build-deb
+      - task: docker:build-rpm
+      - echo "✓ All packages built in {{.BIN_DIR}}/packages/"

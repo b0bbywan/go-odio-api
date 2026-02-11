@@ -15,10 +15,12 @@ import (
 
 const (
 	AppName     = "odio-api"
-	AppVersion  = "0.5.0"
 	serviceType = "_http._tcp"
 	domain      = "local."
 )
+
+// AppVersion can be set at build time using -ldflags "-X github.com/b0bbywan/go-odio-api/config.AppVersion=x.y.z"
+var AppVersion = "dev"
 
 type Config struct {
 	Api        *ApiConfig

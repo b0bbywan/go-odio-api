@@ -1,5 +1,7 @@
+%define version_from_git %(git describe --tags --always --dirty 2>/dev/null | sed 's/^v//' | sed 's/-/./g' || echo "0.0.0")
+
 Name:           odio-api
-Version:        0.5.0
+Version:        %{?version}%{!?version:%{version_from_git}}
 Release:        1%{?dist}
 Summary:        Web API for mpris, pulseaudio and systemd
 License:        BSD-2-Clause
@@ -19,7 +21,7 @@ Web API for mpris, pulseaudio and systemd.
 # Dossier temporaire pour le binaire
 mkdir -p %{_tmppath}/bin
 export GO111MODULE=on
-go build -o %{_tmppath}/bin/odio-api github.com/b0bbywan/go-odio-api
+go build -ldflags="-X github.com/b0bbywan/go-odio-api/config.AppVersion=%{version}" -o %{_tmppath}/bin/odio-api github.com/b0bbywan/go-odio-api
 
 %install
 install -d %{buildroot}%{_bindir}
