@@ -177,6 +177,11 @@ tasks:
       - docker build -t odio-api:{{.VERSION}} -t odio-api:latest .
       - echo "✓ Built Docker image odio-api:{{.VERSION}}"
 
+  docker:up:
+    desc: Start services with Docker Compose
+    cmds:
+      - docker compose up {{.CLI_ARGS}}
+
   build-deb:
     desc: Build Debian package
     cmds:
