@@ -38,6 +38,7 @@ func TestServerEnabled(t *testing.T) {
 
 	if server == nil {
 		t.Fatal("NewServer should return a non-nil server when API is enabled")
+		return
 	}
 
 	if server.mux == nil {
@@ -65,6 +66,7 @@ func TestRoutesWithDisabledBackends(t *testing.T) {
 	server := NewServer(cfg, backend)
 	if server == nil {
 		t.Fatal("NewServer should return a non-nil server")
+		return
 	}
 
 	tests := []struct {
@@ -176,6 +178,7 @@ func TestRoutesWithEnabledSystemdBackend(t *testing.T) {
 	server := NewServer(cfg, backend)
 	if server == nil {
 		t.Fatal("NewServer should return a non-nil server")
+		return
 	}
 
 	// Without a real systemd backend, the route won't be registered
@@ -201,6 +204,7 @@ func TestNilBackendHandling(t *testing.T) {
 	server := NewServer(cfg, nil)
 	if server == nil {
 		t.Fatal("NewServer should return a non-nil server even with nil backend")
+		return
 	}
 
 	// Should not panic when accessing routes
@@ -228,6 +232,7 @@ func TestServerRouteAlwaysRegistered(t *testing.T) {
 	server := NewServer(cfg, backend)
 	if server == nil {
 		t.Fatal("NewServer should return a non-nil server")
+		return
 	}
 
 	req := httptest.NewRequest("GET", "/server", nil)
