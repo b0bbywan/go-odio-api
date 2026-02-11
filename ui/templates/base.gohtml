@@ -35,6 +35,40 @@
 			opacity: 0.6;
 			pointer-events: none;
 		}
+
+		/* Volume slider styling */
+		.volume-slider {
+			width: 100%;
+			height: 4px;
+			border-radius: 2px;
+			background: #3f3f46; /* zinc-700 */
+			outline: none;
+			opacity: 0.9;
+			transition: opacity 0.2s;
+		}
+
+		.volume-slider:hover {
+			opacity: 1;
+		}
+
+		.volume-slider::-webkit-slider-thumb {
+			-webkit-appearance: none;
+			appearance: none;
+			width: 14px;
+			height: 14px;
+			border-radius: 50%;
+			background: #3b82f6; /* blue-500 */
+			cursor: pointer;
+		}
+
+		.volume-slider::-moz-range-thumb {
+			width: 14px;
+			height: 14px;
+			border-radius: 50%;
+			background: #3b82f6;
+			cursor: pointer;
+			border: none;
+		}
 	</style>
 </head>
 
@@ -121,6 +155,41 @@
 			button.title = isPlaying ? 'Pause' : 'Play';
 			console.error('Failed to toggle play/pause');
 		});
+	}
+
+	function updateVolume(slider, target, type) {
+		const volume = slider.value / 100; // Convert 0-100 to 0.0-1.0
+
+		let url;
+		if (type === 'mpris') {
+			url = `/players/${target}/volume`;
+		} else if (type === 'audio-server') {
+			url = '/audio/server/volume';
+		} else if (type === 'audio-client') {
+			url = `/audio/clients/${target}/volume`;
+		}
+
+		fetch(url, {
+			method: 'POST',
+			headers: {'Content-Type': 'application/json'},
+			body: JSON.stringify({volume: volume})
+		}).catch(err => console.error('Failed to set volume:', err));
+	}
+
+	function toggleMute(button, target, type) {
+		let url;
+		if (type === 'audio-server') {
+			url = '/audio/server/mute';
+		} else if (type === 'audio-client') {
+			url = `/audio/clients/${target}/mute`;
+		}
+
+		fetch(url, {method: 'POST'})
+			.then(() => {
+				// Toggle mute icon
+				button.textContent = button.textContent === '🔇' ? '🔊' : '🔇';
+			})
+			.catch(err => console.error('Failed to toggle mute:', err));
 	}
 	</script>
 </body>

@@ -2,19 +2,23 @@
 <div class="client-card">
 	<!-- Client info -->
 	<div class="content-area">
-		<div class="player-name text-sm">
+		<div class="player-name text-sm mb-2">
 			{{ if .Application }}{{ .Application }}{{ else }}Unknown{{ end }}
 		</div>
-	</div>
 
-	<!-- Volume indicator -->
-	<div class="meta-area">
-		<div class="text-xs {{ if .Muted }}text-red-400{{ else }}text-blue-400{{ end }}">
-			{{ if .Muted }}
-				🔇 Muted
-			{{ else }}
-				🔊 {{ printf "%.0f%%" (mul .Volume 100) }}
-			{{ end }}
+		<!-- Volume control -->
+		<div class="flex items-center gap-2">
+			<button class="text-base" onclick="toggleMute(this, '{{ .Index }}', 'audio-client')" title="Toggle mute">
+				{{ if .Muted }}🔇{{ else }}🔊{{ end }}
+			</button>
+			<input type="range"
+			       class="volume-slider flex-1"
+			       min="0"
+			       max="100"
+			       value="{{ printf "%.0f" (mul .Volume 100) }}"
+			       oninput="updateVolume(this, '{{ .Index }}', 'audio-client')"
+			       title="Volume">
+			<span class="text-xs text-zinc-400 w-8">{{ printf "%.0f%%" (mul .Volume 100) }}</span>
 		</div>
 	</div>
 </div>
