@@ -63,12 +63,8 @@ tasks:
         sh: git rev-parse --abbrev-ref HEAD
       CSS_URL: https://bobbywan.me/odio-css/{{.BRANCH}}/{{.COMMIT_HASH}}.css
     cmds:
+      - mkdir -p ui/static
       - |
-        if [ -f {{.CSS_OUTPUT}} ]; then
-          echo "ℹ️  CSS already exists, skipping download"
-          exit 0
-        fi
-        mkdir -p ui/static
         echo "📥 Downloading CSS for {{.BRANCH}}/{{.COMMIT_HASH}}..."
         if curl -fsSL {{.CSS_URL}} -o {{.CSS_OUTPUT}}; then
           echo "✅ CSS downloaded from {{.BRANCH}}/{{.COMMIT_HASH}}.css"
