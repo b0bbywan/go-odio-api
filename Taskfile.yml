@@ -55,13 +55,15 @@ tasks:
         echo "✓ CSS compiled to {{.CSS_OUTPUT}}"
 
   css-download:
-    desc: Download pre-built CSS from CDN
+    desc: Download pre-built CSS from CDN (only if Tailwind CLI unavailable)
     vars:
       COMMIT_HASH:
         sh: git rev-parse --short HEAD
       BRANCH:
         sh: git rev-parse --abbrev-ref HEAD
       CSS_URL: https://bobbywan.me/odio-css/{{.BRANCH}}/{{.COMMIT_HASH}}.css
+    status:
+      - test -x {{.BIN_DIR}}/tailwindcss  # Skip if we can compile locally
     cmds:
       - mkdir -p ui/static
       - |
