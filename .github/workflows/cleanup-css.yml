@@ -1,0 +1,31 @@
+name: Cleanup CSS on branch deletion
+
+on:
+  delete:
+    branches:
+      - '**'
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    if: github.event.ref_type == 'branch'
+    steps:
+      - name: Remove branch CSS from CDN
+        env:
+          SFTP_HOST: ${{ secrets.SFTP_HOST }}
+          SFTP_USER: ${{ secrets.SFTP_USER }}
+          SFTP_PASS: ${{ secrets.SFTP_PASS }}
+        run: |
+          BRANCH=${{ github.event.ref }}
+
+          echo "🗑️  Cleaning up CSS for deleted branch: ${BRANCH}"
+
+          # Supprimer le dossier de la branche via SFTP
+          lftp -c "
+            set sftp:auto-confirm yes
+            open -u ${SFTP_USER},${SFTP_PASS} sftp://${SFTP_HOST}
+            rm -rf odio-css/${BRANCH}
+            bye
+          "
+
+          echo "✅ Cleaned up CSS for branch ${BRANCH}"
