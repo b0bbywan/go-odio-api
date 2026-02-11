@@ -5,7 +5,15 @@
 		<div class="player-name mb-1">
 			{{ if .Description }}{{ .Description }}{{ else }}{{ .Name }}{{ end }}
 		</div>
-		<div class="player-meta-small">{{ .Name }}</div>
+		<div class="flex items-center gap-2">
+			<div class="player-meta-small">{{ .Name }}</div>
+			{{ if .IsUser }}
+			<button class="text-sm hover:scale-110 transition-transform"
+			        hx-post="/services/user/{{ .Name }}/restart"
+			        hx-swap="none"
+			        title="Restart service">🔄</button>
+			{{ end }}
+		</div>
 	</div>
 
 	<!-- Status indicator -->
@@ -16,12 +24,6 @@
 				{{ .State }}
 			</span>
 		</span>
-		{{ if .IsUser }}
-		<button class="text-base hover:scale-110 transition-transform"
-		        hx-post="/services/user/{{ .Name }}/restart"
-		        hx-swap="none"
-		        title="Restart service">🔄</button>
-		{{ end }}
 	</div>
 </div>
 {{ end }}
