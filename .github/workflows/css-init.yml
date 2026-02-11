@@ -1,0 +1,60 @@
+name: Initialize CSS for new branches
+
+on:
+  push:
+    branches: [main, 'claude/**']
+    paths-ignore:
+      - 'tailwind.config.js'
+      - 'ui/**/*.gohtml'
+      - 'ui/styles/**'
+
+jobs:
+  init-css:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install lftp
+        run: sudo apt-get update && sudo apt-get install -y lftp
+
+      - name: Check and initialize CSS if needed
+        env:
+          BASE_PATH: "www/odio-css/"
+          SFTP_HOST: ${{ secrets.FTP_HOST }}
+          SFTP_USER: ${{ secrets.FTP_USER }}
+          SFTP_PASS: ${{ secrets.FTP_PASS }}
+        run: |
+          BRANCH=${GITHUB_REF#refs/heads/}
+          REMOTE_PATH_LATEST="${BASE_PATH}${BRANCH}/latest.css"
+
+          echo "🔍 Checking if CSS exists for branch ${BRANCH}..."
+
+          # Check si latest.css existe pour cette branche
+          if lftp -c "
+            set sftp:auto-confirm yes
+            open -u ${SFTP_USER},${SFTP_PASS} sftp://${SFTP_HOST}
+            ls ${REMOTE_PATH_LATEST}
+            bye
+          " 2>/dev/null; then
+            echo "✅ CSS already exists for ${BRANCH}, skipping"
+            exit 0
+          fi
+
+          echo "📦 New branch detected, initializing CSS..."
+
+          # Installer Task pour builder le CSS
+          curl -sL https://taskfile.dev/install.sh | sh -s -- -b /usr/local/bin
+
+          # Builder le CSS
+          task css-local
+
+          # Upload latest.css pour la nouvelle branche
+          lftp -c "
+            set sftp:auto-confirm yes
+            open -u ${SFTP_USER},${SFTP_PASS} sftp://${SFTP_HOST}
+            mkdir -p ${BASE_PATH}${BRANCH}
+            put ui/static/output.css -o ${REMOTE_PATH_LATEST}
+            bye
+          "
+
+          echo "✅ CSS initialized for new branch: https://bobbywan.me/odio-css/${BRANCH}/latest.css"

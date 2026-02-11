@@ -3,7 +3,11 @@ name: Build and publish CSS
 on:
   push:
     branches: [main, 'claude/**']
-    # Pas de paths: CSS uploadé à chaque commit pour garantir latest.css
+    paths:
+      - 'tailwind.config.js'
+      - 'ui/**/*.gohtml'
+      - 'ui/styles/**'
+      - '.github/workflows/css.yml'
   release:
     types: [published]
 
@@ -31,26 +35,37 @@ jobs:
           SFTP_USER: ${{ secrets.FTP_USER }}
           SFTP_PASS: ${{ secrets.FTP_PASS }}
         run: |
+          COMMIT_SHORT=$(git rev-parse --short HEAD)
+
           # Déterminer le chemin de destination
           if [[ "$GITHUB_REF" == refs/tags/* ]]; then
             # Tag → tags/v0.6.0.css
             VERSION=${GITHUB_REF#refs/tags/}
-            REMOTE_PATH="${BASE_PATH}tags/${VERSION}.css"
-            URL_PATH="tags/${VERSION}.css"
+            REMOTE_PATH_TAG="${BASE_PATH}tags/${VERSION}.css"
+
+            lftp -c "
+              set sftp:auto-confirm yes
+              open -u ${SFTP_USER},${SFTP_PASS} sftp://${SFTP_HOST}
+              mkdir -p $(dirname ${REMOTE_PATH_TAG})
+              put ui/static/output.css -o ${REMOTE_PATH_TAG}
+              bye
+            "
+            echo "✅ CSS uploaded to https://bobbywan.me/odio-css/tags/${VERSION}.css"
           else
-            # Branche → main/latest.css ou claude-xxx/latest.css
+            # Branche → upload commit_hash.css + latest.css
             BRANCH=${GITHUB_REF#refs/heads/}
-            REMOTE_PATH="${BASE_PATH}${BRANCH}/latest.css"
-            URL_PATH="${BRANCH}/latest.css"
+            REMOTE_PATH_COMMIT="${BASE_PATH}${BRANCH}/${COMMIT_SHORT}.css"
+            REMOTE_PATH_LATEST="${BASE_PATH}${BRANCH}/latest.css"
+
+            lftp -c "
+              set sftp:auto-confirm yes
+              open -u ${SFTP_USER},${SFTP_PASS} sftp://${SFTP_HOST}
+              mkdir -p ${BASE_PATH}${BRANCH}
+              put ui/static/output.css -o ${REMOTE_PATH_COMMIT}
+              put ui/static/output.css -o ${REMOTE_PATH_LATEST}
+              bye
+            "
+            echo "✅ CSS uploaded to:"
+            echo "  - https://bobbywan.me/odio-css/${BRANCH}/${COMMIT_SHORT}.css"
+            echo "  - https://bobbywan.me/odio-css/${BRANCH}/latest.css"
           fi
-
-          # Upload via lftp (supporte SFTP)
-          lftp -c "
-            set sftp:auto-confirm yes
-            open -u ${SFTP_USER},${SFTP_PASS} sftp://${SFTP_HOST}
-            mkdir -p $(dirname ${REMOTE_PATH})
-            put ui/static/output.css -o ${REMOTE_PATH}
-            bye
-          "
-
-          echo "✅ CSS uploaded to https://bobbywan.me/odio-css/${URL_PATH}"
