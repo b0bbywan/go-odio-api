@@ -30,9 +30,10 @@ jobs:
 
       - name: Upload to SFTP
         env:
-          SFTP_HOST: ${{ secrets.SFTP_HOST }}
-          SFTP_USER: ${{ secrets.SFTP_USER }}
-          SFTP_PASS: ${{ secrets.SFTP_PASS }}
+          BASE_PATH: "www/odio-css/"
+          SFTP_HOST: ${{ secrets.FTP_HOST }}
+          SFTP_USER: ${{ secrets.FTP_USER }}
+          SFTP_PASS: ${{ secrets.FTP_PASS }}
         run: |
           COMMIT_SHORT=$(git rev-parse --short HEAD)
 
@@ -40,12 +41,12 @@ jobs:
           if [[ "$GITHUB_REF" == refs/tags/* ]]; then
             # Tag → tags/v0.6.0.css
             VERSION=${GITHUB_REF#refs/tags/}
-            REMOTE_PATH="odio-css/tags/${VERSION}.css"
+            REMOTE_PATH="${BASE_PATH}/tags/${VERSION}.css"
             URL_PATH="tags/${VERSION}.css"
           else
             # Branche → main/abc1234.css ou claude-xxx/def5678.css
             BRANCH=${GITHUB_REF#refs/heads/}
-            REMOTE_PATH="odio-css/${BRANCH}/${COMMIT_SHORT}.css"
+            REMOTE_PATH="${BASE_PATH}/${BRANCH}/${COMMIT_SHORT}.css"
             URL_PATH="${BRANCH}/${COMMIT_SHORT}.css"
           fi
 
