@@ -12,6 +12,11 @@
 	{{ if .AudioInfo }}
 	<!-- Server info -->
 	<div class="info-card mb-4">
+		{{ if .AudioInfo.Kind }}
+		<div class="mb-2">
+			<span class="badge badge-blue text-xs">{{ .AudioInfo.Kind }}</span>
+		</div>
+		{{ end }}
 		<div class="mb-1 text-xs text-subtle">Default Sink</div>
 		<div class="truncate text-sm font-medium">{{ .AudioInfo.DefaultSink }}</div>
 	</div>
