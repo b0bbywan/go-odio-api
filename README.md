@@ -362,17 +362,31 @@ go test ./backend/systemd/...
 
 ### Building
 
+The project uses [Task](https://taskfile.dev) for build automation.
+
 ```bash
-# Standard build
-go build -o odio-api
+# Install Task (once)
+go install github.com/go-task/task/v3/cmd/task@latest
+
+# Build everything (CSS + Go binary)
+task build
+
+# Or build components separately
+task css              # Compile CSS only
+task css:watch        # Watch mode for development
+
+# Standard Go build (without Task)
+go build -o bin/go-odio-api
 
 # Build with optimizations
-go build -ldflags="-s -w" -o odio-api
+go build -ldflags="-s -w" -o bin/go-odio-api
 
 # Cross-compile for different architectures
-GOOS=linux GOARCH=amd64 go build -o odio-api-amd64
-GOOS=linux GOARCH=arm64 go build -o odio-api-arm64
+GOOS=linux GOARCH=amd64 go build -o bin/go-odio-api-amd64
+GOOS=linux GOARCH=arm64 go build -o bin/go-odio-api-arm64
 ```
+
+**Note:** `task build` automatically compiles Tailwind CSS before building the Go binary. For manual builds without Task, compile CSS first with `task css` or use the Makefile equivalent commands.
 
 ### Debian Packaging
 

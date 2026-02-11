@@ -110,8 +110,11 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-go-build-
 
-    - name: Build
-      run: go build -v ./...
+    - name: Install Task
+      run: go install github.com/go-task/task/v3/cmd/task@latest
+
+    - name: Build with Task (CSS + Go)
+      run: task build
 
   format:
     name: Format Check
