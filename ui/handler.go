@@ -203,6 +203,7 @@ func convertPlayers(players []Player) []PlayerView {
 			Title:       p.Metadata["xesam:title"],
 			Album:       p.Metadata["xesam:album"],
 			State:       p.Status,
+			Volume:      p.Volume,
 		})
 	}
 	return views
