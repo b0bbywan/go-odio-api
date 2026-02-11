@@ -39,6 +39,12 @@ jobs:
     - name: Verify dependencies
       run: go mod verify
 
+    - name: Install Task
+      run: go install github.com/go-task/task/v3/cmd/task@latest
+
+    - name: Compile CSS (required for embed)
+      run: task css
+
     - name: Run tests
       run: go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
 
