@@ -372,7 +372,8 @@ go install github.com/go-task/task/v3/cmd/task@latest
 task build
 
 # Or build components separately
-task css              # Compile CSS only
+task css              # Ensure CSS is available (generate or download)
+task css-local        # Compile CSS locally (requires Tailwind CLI)
 task css:watch        # Watch mode for development
 
 # Standard Go build (without Task)
@@ -384,9 +385,26 @@ go build -ldflags="-s -w" -o bin/go-odio-api
 # Cross-compile for different architectures
 GOOS=linux GOARCH=amd64 go build -o bin/go-odio-api-amd64
 GOOS=linux GOARCH=arm64 go build -o bin/go-odio-api-arm64
+GOOS=linux GOARCH=arm GOARM=6 go build -o bin/go-odio-api-armv6
 ```
 
-**Note:** `task build` automatically compiles Tailwind CSS before building the Go binary. For manual builds without Task, compile CSS first with `task css` or use the Makefile equivalent commands.
+#### CSS Build Strategy
+
+The UI uses Tailwind CSS with an intelligent multi-architecture build strategy:
+
+- **Development (x64/arm64/armv7)**: `task build` automatically compiles CSS locally using Tailwind CLI
+- **Legacy ARM (ARMv6 - Raspberry Pi B/B+)**: `task build` downloads pre-built CSS from GitHub Releases (tagged by commit hash)
+- **CI/CD**: Automatically builds and publishes CSS to GitHub Releases on every UI change
+
+**Why?** Tailwind CLI doesn't provide ARMv6 binaries. The CSS is architecture-independent (just text), so it's compiled on x64 and distributed via CDN.
+
+**For Raspberry Pi B/B+ users:**
+```bash
+git pull
+task build  # Downloads CSS automatically, then builds Go binary
+```
+
+**Note:** CSS files are NOT committed to the repository. They're generated locally or downloaded from GitHub Releases based on the current commit hash.
 
 ### Debian Packaging
 
