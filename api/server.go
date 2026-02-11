@@ -15,6 +15,7 @@ import (
 type Server struct {
 	mux    *http.ServeMux
 	config *config.ApiConfig
+	ui     bool
 }
 
 func NewServer(cfg *config.ApiConfig, b *backend.Backend) *Server {
@@ -25,6 +26,7 @@ func NewServer(cfg *config.ApiConfig, b *backend.Backend) *Server {
 	server := &Server{
 		mux:    http.NewServeMux(),
 		config: cfg,
+		ui:     cfg.UI.Enabled,
 	}
 	server.register(b)
 	return server
@@ -71,11 +73,13 @@ func (s *Server) register(b *backend.Backend) {
 		http.NotFound(w, r)
 	})
 
-	// UI routes
-	s.registerUIRoutes()
-
 	// server routes
 	s.registerServerRoutes(b)
+
+	// UI routes
+	if s.ui {
+		s.registerUIRoutes()
+	}
 
 	// pulse routes
 	if b.Pulse != nil {
