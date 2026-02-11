@@ -465,44 +465,26 @@ https://bobbywan.me/odio-css/
 
 ### Debian Packaging
 
-**Local build:**
 ```bash
-# Build Debian package locally
+# Build Debian package
 cd debian
 dpkg-buildpackage -us -uc -b
-```
 
-**Docker build (recommended):**
-```bash
-# Build Debian package using Docker
-task docker:build-deb
-
-# Package will be in bin/packages/
+# Or using Task
+task build-deb
 ```
 
 The version is automatically extracted from git tags and injected at build time.
 
 ### RPM Packaging
 
-**Local build:**
 ```bash
-# Build RPM package locally
+# Build RPM package
 mkdir -p ~/rpmbuild/RPMS/
 rpmbuild -ba odio-api.spec
-```
 
-**Docker build (recommended):**
-```bash
-# Build RPM package using Docker
-task docker:build-rpm
-
-# Package will be in bin/packages/
-```
-
-**Build all packages at once:**
-```bash
-# Build both deb and rpm packages
-task docker:build-packages
+# Or using Task
+task build-rpm
 ```
 
 The version is automatically extracted from git tags and injected at build time.

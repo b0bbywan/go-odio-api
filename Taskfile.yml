@@ -177,29 +177,15 @@ tasks:
       - docker build -t odio-api:{{.VERSION}} -t odio-api:latest .
       - echo "✓ Built Docker image odio-api:{{.VERSION}}"
 
-  docker:build-deb:
-    desc: Build Debian package using Docker
+  build-deb:
+    desc: Build Debian package
     cmds:
-      - docker build -f Dockerfile.deb -t odio-api-deb-builder:{{.VERSION}} .
-      - docker create --name odio-deb-tmp odio-api-deb-builder:{{.VERSION}}
-      - mkdir -p {{.BIN_DIR}}/packages
-      - docker cp odio-deb-tmp:/packages/. {{.BIN_DIR}}/packages/
-      - docker rm odio-deb-tmp
-      - echo "✓ Debian package built in {{.BIN_DIR}}/packages/"
+      - cd debian && dpkg-buildpackage -us -uc -b
+      - echo "✓ Debian package built"
 
-  docker:build-rpm:
-    desc: Build RPM package using Docker
+  build-rpm:
+    desc: Build RPM package
     cmds:
-      - docker build -f Dockerfile.rpm -t odio-api-rpm-builder:{{.VERSION}} --build-arg VERSION={{.VERSION}} .
-      - docker create --name odio-rpm-tmp odio-api-rpm-builder:{{.VERSION}}
-      - mkdir -p {{.BIN_DIR}}/packages
-      - docker cp odio-rpm-tmp:/packages/. {{.BIN_DIR}}/packages/
-      - docker rm odio-rpm-tmp
-      - echo "✓ RPM package built in {{.BIN_DIR}}/packages/"
-
-  docker:build-packages:
-    desc: Build both deb and rpm packages using Docker
-    cmds:
-      - task: docker:build-deb
-      - task: docker:build-rpm
-      - echo "✓ All packages built in {{.BIN_DIR}}/packages/"
+      - mkdir -p ~/rpmbuild/RPMS/
+      - rpmbuild -ba odio-api.spec
+      - echo "✓ RPM package built"
