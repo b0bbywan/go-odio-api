@@ -3,12 +3,7 @@
 
 	<!-- Player info -->
 	<div class="content-area">
-		<div class="mb-1 flex items-center gap-2">
-			<div class="player-name">{{ .DisplayName }}</div>
-			<span class="status-badge {{ if eq .State "Playing" }}status-badge-playing{{ else }}status-badge-paused{{ end }}">
-				{{ .State }}
-			</span>
-		</div>
+		<div class="player-name mb-1">{{ .DisplayName }}</div>
 		{{ if or .Artist .Title }}
 		<div class="player-meta">
 			{{ if .Artist }}{{ .Artist }}{{ end }}{{ if and .Artist .Title }} – {{ end }}{{ if .Title }}{{ .Title }}{{ end }}
@@ -23,11 +18,23 @@
 
 	<!-- Control buttons -->
 	<div class="controls-group">
-		<button class="btn" hx-post="/players/{{ .Name }}/previous" hx-swap="none" title="Previous track">⏮</button>
-		<button class="btn" hx-post="/players/{{ .Name }}/play_pause" hx-swap="none" title="{{ if eq .State "Playing" }}Pause{{ else }}Play{{ end }}">
+		<button class="btn"
+		        hx-post="/players/{{ .Name }}/previous"
+		        hx-swap="none"
+		        hx-on::after-request="htmx.trigger('body', 'refreshMpris')"
+		        title="Previous track">⏮</button>
+		<button class="btn"
+		        hx-post="/players/{{ .Name }}/play_pause"
+		        hx-swap="none"
+		        hx-on::after-request="htmx.trigger('body', 'refreshMpris')"
+		        title="{{ if eq .State "Playing" }}Pause{{ else }}Play{{ end }}">
 			{{ if eq .State "Playing" }}⏸{{ else }}▶{{ end }}
 		</button>
-		<button class="btn" hx-post="/players/{{ .Name }}/next" hx-swap="none" title="Next track">⏭</button>
+		<button class="btn"
+		        hx-post="/players/{{ .Name }}/next"
+		        hx-swap="none"
+		        hx-on::after-request="htmx.trigger('body', 'refreshMpris')"
+		        title="Next track">⏭</button>
 	</div>
 </div>
 {{ end }}

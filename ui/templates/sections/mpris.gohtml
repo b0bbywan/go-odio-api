@@ -1,5 +1,9 @@
 {{ define "section-mpris" }}
-<section class="section-card">
+<section class="section-card"
+         id="mpris-section"
+         hx-get="/ui/sections/mpris"
+         hx-trigger="refreshMpris from:body"
+         hx-swap="outerHTML">
 	<div class="section-header">
 		<h2 class="section-title">🎵 Media Players</h2>
 		<span class="badge badge-green">{{ len . }} active</span>
