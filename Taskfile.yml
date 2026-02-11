@@ -1,0 +1,94 @@
+version: '3'
+
+vars:
+  TAILWIND_VERSION: v3.4.17
+  TAILWIND_URL: https://github.com/tailwindlabs/tailwindcss/releases/download/{{.TAILWIND_VERSION}}/tailwindcss-linux-x64
+  BIN_DIR: bin
+  CSS_INPUT: ui/styles/input.css
+  CSS_OUTPUT: ui/static/output.css
+
+tasks:
+  default:
+    desc: Show available tasks
+    cmds:
+      - task --list
+
+  install-tailwind:
+    desc: Download Tailwind CLI v3 standalone binary
+    cmds:
+      - mkdir -p {{.BIN_DIR}}
+      - curl -sL {{.TAILWIND_URL}} -o {{.BIN_DIR}}/tailwindcss
+      - chmod +x {{.BIN_DIR}}/tailwindcss
+      - echo "✓ Tailwind CLI v3 installed to {{.BIN_DIR}}/tailwindcss"
+    status:
+      - test -f {{.BIN_DIR}}/tailwindcss
+    silent: false
+
+  css:
+    desc: Compile CSS for production (minified)
+    deps: [install-tailwind]
+    cmds:
+      - "{{.BIN_DIR}}/tailwindcss -i {{.CSS_INPUT}} -o {{.CSS_OUTPUT}} --minify"
+      - echo "✓ CSS compiled to {{.CSS_OUTPUT}}"
+    sources:
+      - "{{.CSS_INPUT}}"
+      - ui/templates/**/*.gohtml
+      - tailwind.config.js
+    generates:
+      - "{{.CSS_OUTPUT}}"
+
+  css:watch:
+    desc: Watch and recompile CSS on changes (development)
+    deps: [install-tailwind]
+    cmds:
+      - "{{.BIN_DIR}}/tailwindcss -i {{.CSS_INPUT}} -o {{.CSS_OUTPUT}} --watch"
+
+  build:
+    desc: Build the application (includes CSS compilation)
+    deps: [css]
+    cmds:
+      - go build -o {{.BIN_DIR}}/go-odio-api
+      - echo "✓ Built to {{.BIN_DIR}}/go-odio-api"
+    sources:
+      - "**/*.go"
+      - go.mod
+      - go.sum
+    generates:
+      - "{{.BIN_DIR}}/go-odio-api"
+
+  test:
+    desc: Run all tests
+    cmds:
+      - go test ./...
+
+  test:verbose:
+    desc: Run all tests with verbose output
+    cmds:
+      - go test -v ./...
+
+  test:ui:
+    desc: Run UI tests only
+    cmds:
+      - go test -v ./ui/...
+
+  clean:
+    desc: Clean build artifacts
+    cmds:
+      - rm -rf {{.BIN_DIR}}/go-odio-api
+      - rm -f {{.CSS_OUTPUT}}
+      - echo "✓ Cleaned build artifacts"
+
+  clean:all:
+    desc: Clean all generated files (including Tailwind CLI)
+    cmds:
+      - rm -rf {{.BIN_DIR}}
+      - rm -f {{.CSS_OUTPUT}}
+      - echo "✓ Cleaned all generated files"
+
+  dev:
+    desc: Start development mode (CSS watch + manual server restart)
+    deps: [css]
+    cmds:
+      - echo "Starting CSS watch mode..."
+      - echo "Run 'go run .' in another terminal to start the server"
+      - task: css:watch
