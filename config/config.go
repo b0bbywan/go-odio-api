@@ -38,6 +38,7 @@ type ApiConfig struct {
 	Enabled bool
 	Port    int
 	Listen  string
+	UI      *UIConfig
 }
 
 type SystemdConfig struct {
@@ -197,7 +198,7 @@ func New(cfgFile *string) (*Config, error) {
 	viper.SetDefault("api.enabled", true)
 	viper.SetDefault("api.port", 8018)
 
-	viper.SetDefault("api.ui.enabled", true)
+	viper.SetDefault("api.ui.enabled", false)
 
 	viper.SetDefault("mpris.enabled", true)
 	viper.SetDefault("mpris.timeout", "5s")
@@ -234,15 +235,19 @@ func New(cfgFile *string) (*Config, error) {
 		return nil, err
 	}
 
-	apiCfg := ApiConfig{
-		Enabled: viper.GetBool("api.enabled"),
-		Listen:  net.JoinHostPort(listenIP, strconv.Itoa(port)),
-		Port:    port,
-	}
-
 	xdgRuntimeDir := os.Getenv("XDG_RUNTIME_DIR")
 	if xdgRuntimeDir == "" {
 		xdgRuntimeDir = fmt.Sprintf("/run/user/%d", os.Getuid())
+	}
+
+	uiCfg := UIConfig{
+		Enabled: viper.GetBool("api.ui.enabled"),
+	}
+
+	apiCfg := ApiConfig{
+		Enabled: viper.GetBool("api.enabled"),
+		Listen:  net.JoinHostPort(listenIP, strconv.Itoa(port)),		Port:    port,
+		UI:      &uiCfg,
 	}
 
 	syscfg := SystemdConfig{
