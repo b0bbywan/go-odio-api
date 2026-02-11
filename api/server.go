@@ -26,7 +26,7 @@ func NewServer(cfg *config.ApiConfig, b *backend.Backend) *Server {
 	server := &Server{
 		mux:    http.NewServeMux(),
 		config: cfg,
-		ui:     cfg.UI.Enabled,
+		ui:     cfg.UI != nil && cfg.UI.Enabled,
 	}
 	server.register(b)
 	return server
