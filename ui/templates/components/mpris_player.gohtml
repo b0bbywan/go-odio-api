@@ -1,9 +1,9 @@
 {{ define "mpris-player" }}
 <div id="player-{{ .Name }}" class="player-card">
 
-	<!-- Player info -->
-	<div class="content-area">
-        <div class="player-name mb-1">{{ .DisplayName }}</div>
+	<!-- Player info (centered) -->
+	<div class="text-center mb-3">
+		<div class="player-name mb-1">{{ .DisplayName }}</div>
 		{{ if or .Artist .Title }}
 		<div class="player-meta">
 			{{ if .Artist }}{{ .Artist }}{{ end }}{{ if and .Artist .Title }} – {{ end }}{{ if .Title }}{{ .Title }}{{ end }}
@@ -16,8 +16,23 @@
 		{{ end }}
 	</div>
 
-	<!-- Control buttons -->
-	<div class="controls-group">
+	<!-- Volume control -->
+	<div class="mb-3 px-2">
+		<div class="flex items-center gap-2">
+			<span class="text-xs text-zinc-400">🔊</span>
+			<input type="range"
+			       class="volume-slider flex-1"
+			       min="0"
+			       max="100"
+			       value="{{ printf "%.0f" (mul .Volume 100) }}"
+			       oninput="updateVolume(this, '{{ .Name }}', 'mpris')"
+			       title="Volume">
+			<span class="text-xs text-zinc-400 w-8">{{ printf "%.0f%%" (mul .Volume 100) }}</span>
+		</div>
+	</div>
+
+	<!-- Control buttons (centered) -->
+	<div class="flex justify-center gap-2">
 		<button class="btn" hx-post="/players/{{ .Name }}/previous" hx-swap="none" title="Previous track">⏮</button>
 		<button class="btn" onclick="togglePlayPause(this, '{{ .Name }}')" title="{{ if eq .State "Playing" }}Pause{{ else }}Play{{ end }}">
 			{{ if eq .State "Playing" }}⏸{{ else }}▶{{ end }}
