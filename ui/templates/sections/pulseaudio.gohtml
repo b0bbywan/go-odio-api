@@ -34,7 +34,6 @@
 			       value="{{ printf "%.0f" (mul .AudioInfo.Volume 100) }}"
 			       oninput="updateVolume(this, '', 'audio-server')"
 			       title="Master volume">
-			<span class="text-xs text-zinc-400 w-10">{{ printf "%.0f%%" (mul .AudioInfo.Volume 100) }}</span>
 		</div>
 	</div>
 
