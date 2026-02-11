@@ -58,16 +58,26 @@ tasks:
 
   test:
     desc: Run all tests
+    deps: [css]
     cmds:
       - go test ./...
 
   test:verbose:
     desc: Run all tests with verbose output
+    deps: [css]
     cmds:
       - go test -v ./...
 
+  test:coverage:
+    desc: Run tests with coverage report
+    deps: [css]
+    cmds:
+      - go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+      - go tool cover -func=coverage.out
+
   test:ui:
     desc: Run UI tests only
+    deps: [css]
     cmds:
       - go test -v ./ui/...
 
