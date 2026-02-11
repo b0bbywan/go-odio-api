@@ -48,130 +48,261 @@
 
 		/* Component utility classes */
 		.section-card {
-			@apply rounded-xl bg-zinc-800 p-4 shadow-lg;
+			border-radius: 0.75rem;
+			background-color: rgb(39 39 42);
+			padding: 1rem;
+			box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
 		}
 
 		.section-header {
-			@apply mb-4 flex items-center justify-between;
+			margin-bottom: 1rem;
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
 		}
 
 		.section-title {
-			@apply text-lg font-semibold;
+			font-size: 1.125rem;
+			line-height: 1.75rem;
+			font-weight: 600;
 		}
 
 		.badge {
-			@apply rounded-full px-2 py-1 text-xs;
+			border-radius: 9999px;
+			padding: 0.25rem 0.5rem;
+			font-size: 0.75rem;
+			line-height: 1rem;
 		}
 
 		.badge-green {
-			@apply bg-green-500/10 text-green-400;
+			background-color: rgb(34 197 94 / 0.1);
+			color: rgb(74 222 128);
 		}
 
 		.badge-blue {
-			@apply bg-blue-500/10 text-blue-400;
+			background-color: rgb(59 130 246 / 0.1);
+			color: rgb(96 165 250);
 		}
 
 		.badge-purple {
-			@apply bg-purple-500/10 text-purple-400;
+			background-color: rgb(168 85 247 / 0.1);
+			color: rgb(192 132 252);
 		}
 
 		.badge-red {
-			@apply bg-red-500/20 text-red-400;
+			background-color: rgb(239 68 68 / 0.2);
+			color: rgb(248 113 113);
 		}
 
 		.player-card {
-			@apply flex flex-col gap-3 rounded-lg bg-zinc-700/50 p-3 transition-colors hover:bg-zinc-700 sm:flex-row sm:items-center sm:justify-between;
+			display: flex;
+			flex-direction: column;
+			gap: 0.75rem;
+			border-radius: 0.5rem;
+			background-color: rgb(63 63 70 / 0.5);
+			padding: 0.75rem;
+			transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;
+			transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+			transition-duration: 150ms;
+		}
+		.player-card:hover {
+			background-color: rgb(63 63 70);
+		}
+		@media (min-width: 640px) {
+			.player-card {
+				flex-direction: row;
+				align-items: center;
+				justify-content: space-between;
+			}
 		}
 
 		.btn {
-			@apply rounded-lg bg-zinc-600/50 px-3 py-2 text-sm transition-colors hover:bg-zinc-600 active:scale-95;
+			border-radius: 0.5rem;
+			background-color: rgb(82 82 91 / 0.5);
+			padding: 0.5rem 0.75rem;
+			font-size: 0.875rem;
+			line-height: 1.25rem;
+			transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;
+			transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+			transition-duration: 150ms;
+		}
+		.btn:hover {
+			background-color: rgb(82 82 91);
+		}
+		.btn:active {
+			transform: scale(0.95);
 		}
 
 		.text-muted {
-			@apply text-zinc-400;
+			color: rgb(161 161 170);
 		}
 
 		.text-subtle {
-			@apply text-zinc-500;
+			color: rgb(113 113 122);
 		}
 
 		.info-card {
-			@apply rounded-lg bg-zinc-900/50 p-3;
+			border-radius: 0.5rem;
+			background-color: rgb(24 24 27 / 0.5);
+			padding: 0.75rem;
 		}
 
 		.client-card {
-			@apply flex items-center justify-between rounded-lg bg-zinc-900/50 p-2.5 transition-colors hover:bg-zinc-900;
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			border-radius: 0.5rem;
+			background-color: rgb(24 24 27 / 0.5);
+			padding: 0.625rem;
+			transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;
+			transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+			transition-duration: 150ms;
+		}
+		.client-card:hover {
+			background-color: rgb(24 24 27);
 		}
 
 		.service-card {
-			@apply flex items-center justify-between rounded-lg bg-zinc-900/50 p-3 transition-colors hover:bg-zinc-900;
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			border-radius: 0.5rem;
+			background-color: rgb(24 24 27 / 0.5);
+			padding: 0.75rem;
+			transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;
+			transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+			transition-duration: 150ms;
+		}
+		.service-card:hover {
+			background-color: rgb(24 24 27);
 		}
 
 		/* Layout utilities */
 		.grid-responsive {
-			@apply grid gap-4 sm:grid-cols-2 lg:grid-cols-3;
+			display: grid;
+			gap: 1rem;
+		}
+		@media (min-width: 640px) {
+			.grid-responsive {
+				grid-template-columns: repeat(2, minmax(0, 1fr));
+			}
+		}
+		@media (min-width: 1024px) {
+			.grid-responsive {
+				grid-template-columns: repeat(3, minmax(0, 1fr));
+			}
 		}
 
 		.empty-state {
-			@apply flex flex-col items-center justify-center py-8 text-center;
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			justify-content: center;
+			padding: 2rem 0;
+			text-align: center;
 		}
 
 		.empty-state-large {
-			@apply flex min-h-[50vh] items-center justify-center;
+			display: flex;
+			min-height: 50vh;
+			align-items: center;
+			justify-content: center;
 		}
 
 		.content-area {
-			@apply min-w-0 flex-1;
+			min-width: 0;
+			flex: 1 1 0%;
 		}
 
 		.meta-area {
-			@apply ml-3 flex shrink-0 items-center gap-2;
+			margin-left: 0.75rem;
+			display: flex;
+			flex-shrink: 0;
+			align-items: center;
+			gap: 0.5rem;
 		}
 
 		.controls-group {
-			@apply flex shrink-0 gap-1 sm:gap-2;
+			display: flex;
+			flex-shrink: 0;
+			gap: 0.25rem;
+		}
+		@media (min-width: 640px) {
+			.controls-group {
+				gap: 0.5rem;
+			}
 		}
 
 		/* Typography utilities */
 		.player-name {
-			@apply truncate font-medium text-zinc-200;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+			font-weight: 500;
+			color: rgb(228 228 231);
 		}
 
 		.player-meta {
-			@apply truncate text-sm text-muted;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+			font-size: 0.875rem;
+			line-height: 1.25rem;
+			color: rgb(161 161 170);
 		}
 
 		.player-meta-small {
-			@apply truncate text-xs text-subtle;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+			font-size: 0.75rem;
+			line-height: 1rem;
+			color: rgb(113 113 122);
 		}
 
 		.empty-state-icon {
-			@apply mb-2 text-4xl opacity-50;
+			margin-bottom: 0.5rem;
+			font-size: 2.25rem;
+			line-height: 2.5rem;
+			opacity: 0.5;
 		}
 
 		.empty-state-icon-large {
-			@apply mb-4 text-6xl;
+			margin-bottom: 1rem;
+			font-size: 3.75rem;
+			line-height: 1;
 		}
 
 		.empty-state-title {
-			@apply mb-2 text-xl font-semibold text-zinc-300;
+			margin-bottom: 0.5rem;
+			font-size: 1.25rem;
+			line-height: 1.75rem;
+			font-weight: 600;
+			color: rgb(212 212 216);
 		}
 
 		/* Status indicators */
 		.status-badge {
-			@apply rounded px-1.5 py-0.5 text-xs;
+			border-radius: 0.25rem;
+			padding: 0.125rem 0.375rem;
+			font-size: 0.75rem;
+			line-height: 1rem;
 		}
 
 		.status-badge-playing {
-			@apply bg-green-500/20 text-green-400;
+			background-color: rgb(34 197 94 / 0.2);
+			color: rgb(74 222 128);
 		}
 
 		.status-badge-paused {
-			@apply bg-zinc-600 text-zinc-400;
+			background-color: rgb(82 82 91);
+			color: rgb(161 161 170);
 		}
 
 		.status-dot {
-			@apply h-2 w-2 rounded-full;
+			height: 0.5rem;
+			width: 0.5rem;
+			border-radius: 9999px;
 		}
 	</style>
 </head>
