@@ -394,25 +394,31 @@ The UI uses Tailwind CSS with an intelligent multi-architecture build strategy:
 
 - **Development (x64/arm64/armv7)**: `task build` automatically compiles CSS locally using Tailwind CLI
 - **Legacy ARM (ARMv6 - Raspberry Pi B/B+)**: `task build` downloads pre-built CSS from CDN (https://bobbywan.me/odio-css/)
-- **CI/CD**: Automatically builds and publishes CSS to CDN on every push, organized by branch and tags
+- **CI/CD**: Two workflows handle CSS distribution:
+  - **CSS changes**: Builds and uploads `commit_hash.css` + `latest.css`
+  - **Non-CSS changes**: Initializes `latest.css` for new branches
 
 **Why?** Tailwind CLI doesn't provide ARMv6 binaries. The CSS is architecture-independent (just text), so it's compiled on x64 and distributed via CDN.
 
 **For Raspberry Pi B/B+ users:**
 ```bash
 git pull
-task build  # Downloads CSS automatically, then builds Go binary
+task build  # Downloads CSS automatically (commit-specific or latest), then builds Go binary
 ```
 
 **CDN Structure:**
 ```
 https://bobbywan.me/odio-css/
-  main/latest.css               # Main branch (always up to date)
-  claude-branch-name/latest.css # Feature branches
-  tags/v0.6.0.css               # Release tags (versioned, never cleaned)
+  main/abc1234.css             # Commit-specific CSS
+  main/latest.css              # Latest CSS for main branch
+  claude-branch-name/def5678.css
+  claude-branch-name/latest.css
+  tags/v0.6.0.css              # Release tags (versioned, never cleaned)
 ```
 
-**Note:** CSS files are NOT committed to the repository. They're generated locally or downloaded from CDN (latest.css for the current branch).
+**Download strategy:** Task tries `branch/commit_hash.css` first, then falls back to `branch/latest.css` if not found.
+
+**Note:** CSS files are NOT committed to the repository. They're generated locally or downloaded from CDN.
 
 ### Debian Packaging
 

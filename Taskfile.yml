@@ -57,19 +57,30 @@ tasks:
   css-download:
     desc: Download pre-built CSS from CDN (only if Tailwind CLI unavailable)
     vars:
+      COMMIT_HASH:
+        sh: git rev-parse --short HEAD
       BRANCH:
         sh: git rev-parse --abbrev-ref HEAD
-      CSS_URL: https://bobbywan.me/odio-css/{{.BRANCH}}/latest.css
+      CSS_URL_COMMIT: https://bobbywan.me/odio-css/{{.BRANCH}}/{{.COMMIT_HASH}}.css
+      CSS_URL_LATEST: https://bobbywan.me/odio-css/{{.BRANCH}}/latest.css
     status:
       - test -x {{.BIN_DIR}}/tailwindcss  # Skip if we can compile locally
     cmds:
       - mkdir -p ui/static
       - |
-        echo "📥 Downloading latest CSS for {{.BRANCH}}..."
-        if curl -fsSL {{.CSS_URL}} -o {{.CSS_OUTPUT}}; then
+        # Essayer d'abord le commit spécifique
+        echo "📥 Downloading CSS for {{.BRANCH}}/{{.COMMIT_HASH}}..."
+        if curl -fsSL {{.CSS_URL_COMMIT}} -o {{.CSS_OUTPUT}}; then
+          echo "✅ CSS downloaded from {{.BRANCH}}/{{.COMMIT_HASH}}.css"
+          exit 0
+        fi
+
+        # Fallback sur latest.css
+        echo "⚠️  Commit-specific CSS not found, trying latest..."
+        if curl -fsSL {{.CSS_URL_LATEST}} -o {{.CSS_OUTPUT}}; then
           echo "✅ CSS downloaded from {{.BRANCH}}/latest.css"
         else
-          echo "❌ CSS not found for {{.BRANCH}}"
+          echo "❌ No CSS found for {{.BRANCH}}"
           echo "💡 CI may not have run yet on this branch"
           exit 1
         fi
