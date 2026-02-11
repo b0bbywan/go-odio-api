@@ -33,6 +33,7 @@ type Player struct {
 
 // AudioInfo represents PulseAudio server info from /audio/server
 type AudioInfo struct {
+	Kind         string  `json:"kind"` // "pulseaudio" or "pipewire"
 	ServerString string  `json:"server_string"`
 	DefaultSink  string  `json:"default_sink"`
 	Volume       float64 `json:"volume"`
