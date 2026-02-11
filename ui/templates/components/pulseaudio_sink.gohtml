@@ -3,11 +3,8 @@
 	<!-- Client info -->
 	<div class="content-area">
 		<div class="player-name text-sm">
-			{{ if .Application }}{{ .Application }}{{ else }}{{ .Name }}{{ end }}
+			{{ if .Application }}{{ .Application }}{{ else }}Unknown{{ end }}
 		</div>
-		{{ if .Application }}
-		<div class="player-meta-small">{{ .Name }}</div>
-		{{ end }}
 	</div>
 
 	<!-- Volume indicator -->
