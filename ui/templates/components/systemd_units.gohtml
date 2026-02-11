@@ -1,12 +1,12 @@
 {{ define "systemd-unit" }}
-<div class="flex items-center justify-between rounded-lg bg-zinc-900/50 p-3 transition-colors hover:bg-zinc-900">
+<div class="service-card">
 	<!-- Service info -->
 	<div class="min-w-0 flex-1">
 		<div class="mb-1 truncate font-medium text-zinc-200">
 			{{ .Name }}
 		</div>
 		{{ if .Description }}
-		<div class="truncate text-xs text-zinc-500">{{ .Description }}</div>
+		<div class="truncate text-xs text-subtle">{{ .Description }}</div>
 		{{ end }}
 	</div>
 

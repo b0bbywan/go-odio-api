@@ -1,8 +1,8 @@
 {{ define "section-systemd" }}
-<section class="rounded-xl bg-zinc-800 p-4 shadow-lg">
-	<div class="mb-4 flex items-center justify-between">
-		<h2 class="text-lg font-semibold">⚙️ Services</h2>
-		<span class="rounded-full bg-purple-500/10 px-2 py-1 text-xs text-purple-400">
+<section class="section-card">
+	<div class="section-header">
+		<h2 class="section-title">⚙️ Services</h2>
+		<span class="badge badge-purple">
 			{{ len . }} configured
 		</span>
 	</div>
@@ -13,7 +13,7 @@
 		{{ else }}
 			<div class="flex flex-col items-center justify-center py-8 text-center">
 				<div class="mb-2 text-4xl opacity-50">⚙️</div>
-				<p class="text-sm text-zinc-400">No services configured</p>
+				<p class="text-sm text-muted">No services configured</p>
 			</div>
 		{{ end }}
 	</div>
