@@ -5,12 +5,20 @@ FROM golang:1.24-bookworm AS builder
 
 WORKDIR /app
 
+# Install Task for build automation
+RUN go install github.com/go-task/task/v3/cmd/task@latest
+
+# Copy dependency files
 COPY go.mod go.sum ./
 RUN go mod download
 
+# Copy source code and config
 COPY . .
 
-RUN go build -o odio-api
+# Build with Task (compiles CSS + Go binary)
+RUN task build
+
+# Binary is at bin/go-odio-api
 
 # =========================
 # Stage 2: runtime
@@ -25,6 +33,7 @@ RUN apt-get update && \
 
 WORKDIR /app
 
-COPY --from=builder /app/odio-api /app/odio-api
+# Copy binary from correct path (Task builds to bin/go-odio-api)
+COPY --from=builder /app/bin/go-odio-api /app/odio-api
 
 ENTRYPOINT ["/app/odio-api"]
