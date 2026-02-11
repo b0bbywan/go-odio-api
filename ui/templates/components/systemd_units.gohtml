@@ -16,6 +16,9 @@
 				{{ .State }}
 			</span>
 		</span>
+		{{ if .IsUser }}
+		<button class="text-base hover:scale-110 transition-transform" title="Restart service">🔄</button>
+		{{ end }}
 	</div>
 </div>
 {{ end }}
