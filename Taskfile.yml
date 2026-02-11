@@ -55,11 +55,13 @@ tasks:
         echo "✓ CSS compiled to {{.CSS_OUTPUT}}"
 
   css-download:
-    desc: Download pre-built CSS from GitHub Releases
+    desc: Download pre-built CSS from CDN
     vars:
       COMMIT_HASH:
         sh: git rev-parse --short HEAD
-      CSS_URL: https://github.com/b0bbywan/go-odio-api/releases/download/css-{{.COMMIT_HASH}}/output.css
+      BRANCH:
+        sh: git rev-parse --abbrev-ref HEAD
+      CSS_URL: https://bobbywan.me/odio-css/{{.BRANCH}}/{{.COMMIT_HASH}}.css
     cmds:
       - |
         if [ -f {{.CSS_OUTPUT}} ]; then
@@ -67,11 +69,11 @@ tasks:
           exit 0
         fi
         mkdir -p ui/static
-        echo "📥 Downloading CSS for commit {{.COMMIT_HASH}}..."
+        echo "📥 Downloading CSS for {{.BRANCH}}/{{.COMMIT_HASH}}..."
         if curl -fsSL {{.CSS_URL}} -o {{.CSS_OUTPUT}}; then
-          echo "✅ CSS downloaded successfully"
+          echo "✅ CSS downloaded from {{.BRANCH}}/{{.COMMIT_HASH}}.css"
         else
-          echo "❌ CSS not found for commit {{.COMMIT_HASH}}"
+          echo "❌ CSS not found for {{.BRANCH}}/{{.COMMIT_HASH}}"
           echo "💡 Run CI first or build on a platform with Tailwind CLI"
           exit 1
         fi
