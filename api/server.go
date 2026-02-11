@@ -67,6 +67,8 @@ func (s *Server) register(b *backend.Backend) {
 			http.NotFound(w, r)
 			return
 		}
+		// Return 404 for all other unmatched paths
+		http.NotFound(w, r)
 	})
 
 	// UI routes
