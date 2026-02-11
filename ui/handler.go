@@ -64,7 +64,7 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 
 	// Build view data
 	data := DashboardView{
-		Title:      "Go-Odio",
+		Title:      "Odio",
 		ServerInfo: serverInfo,
 	}
 
