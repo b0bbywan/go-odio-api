@@ -22,7 +22,7 @@ Port can also be configured
 
 ```
 # config.yaml
-listen: 127.0.0.1
+bind: 127.0.0.1
 api:
   enabled: true
   port: 8018
@@ -151,7 +151,8 @@ All Bluetooth operations are explicitly controlled through the Odio API.
 
 - **Power up**:
   Bluetooth is enabled, but the device is not discoverable.
-- **Power Down** There is no idle timeout on bluetooth (yet), so you have to explicitely turn off bluetooth
+- **Power down:**
+  There is no idle timeout on bluetooth (yet), so you have to explicitly turn off bluetooth
 - **Pairing mode**:
   The device becomes visible to nearby Bluetooth devices and accepts new pairings.
   After a successful pairing (or when the timeout expires), Bluetooth automatically returns to its normal state:
@@ -238,11 +239,11 @@ Volumes:
 - /run/utmp                        (user systemd monitoring)  (read-only)
 - /var/run/dbus/system_bus_socket  (system DBus socket)       (read-only)
 - /run/user/1000/pulse             (PulseAudio socket)        (read-only)
-- ./cookie    (`PulseAudio cookie`$HOME/.config/pulse/cookie) (read-only)
+- ./cookie    (PulseAudio cookie: $HOME/.config/pulse/cookie) (read-only)
 
 The container exposes port 8018 by default and is configured to automatically restart unless stopped. With this configuration, audio and DBus-dependent functionality works seamlessly inside Docker.
 
-**Note:** `listen` should be set to `0.0.0.0` in `config.yaml` for remote access with docker. Zeroconf won't work in bridge network mode. It's strongly advised against using host network mode.
+**Note:** `bind` should be set to `0.0.0.0` in `config.yaml` for remote access with docker. Zeroconf won't work in bridge network mode. It's strongly advised against using host network mode.
 
 All mounts are read-only, minimizing the container’s ability to modify the host system.
 
