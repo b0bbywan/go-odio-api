@@ -11,6 +11,9 @@ import (
 //go:embed templates
 var templatesFS embed.FS
 
+//go:embed static
+var staticFS embed.FS
+
 func LoadTemplates() *template.Template {
 	funcMap := template.FuncMap{
 		"mul": func(a, b float64) float64 {
