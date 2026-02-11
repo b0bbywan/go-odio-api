@@ -178,7 +178,7 @@ func New(cfgFile *string) (*Config, error) {
 	viper.SetDefault("api.enabled", true)
 	viper.SetDefault("api.port", 8018)
 
-	viper.SetDefault("api.ui.enabled", true)
+	viper.SetDefault("api.ui.enabled", false)
 
 	viper.SetDefault("mpris.enabled", true)
 	viper.SetDefault("mpris.timeout", "5s")
@@ -223,7 +223,7 @@ func New(cfgFile *string) (*Config, error) {
 	}
 
 	uiCfg := UIConfig{
-		Enabled: viper.GetBool("ui.enabled"),
+		Enabled: viper.GetBool("api.ui.enabled"),
 	}
 
 	apiCfg := ApiConfig{
