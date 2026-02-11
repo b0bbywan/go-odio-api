@@ -1,0 +1,44 @@
+name: Build and publish CSS
+
+on:
+  push:
+    branches: [main, 'claude/**']
+    paths:
+      - 'tailwind.config.js'
+      - 'ui/**/*.gohtml'
+      - 'ui/styles/**'
+      - '.github/workflows/css.yml'
+
+jobs:
+  build-css:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # Pour créer des releases
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Task
+        uses: arduino/setup-task@v2
+        with:
+          version: 3.x
+
+      - name: Build CSS
+        run: task css-local
+
+      - name: Upload to GitHub Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          COMMIT_SHORT=$(git rev-parse --short HEAD)
+          RELEASE_TAG="css-${COMMIT_SHORT}"
+
+          # Créer la release (ou ignorer si existe)
+          gh release create "$RELEASE_TAG" \
+            --title "CSS for commit ${COMMIT_SHORT}" \
+            --notes "Auto-generated CSS build for commit ${GITHUB_SHA}" \
+            2>/dev/null || true
+
+          # Upload le fichier CSS
+          gh release upload "$RELEASE_TAG" ui/static/output.css --clobber
+
+          echo "✅ CSS uploaded: ${RELEASE_TAG}/output.css"
