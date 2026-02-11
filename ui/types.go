@@ -74,12 +74,13 @@ type DashboardView struct {
 
 // PlayerView is a view-optimized version of Player for templates
 type PlayerView struct {
-	Name        string // Full bus_name for API endpoints (e.g., org.mpris.MediaPlayer2.spotify)
-	DisplayName string // Truncated name for display (e.g., spotify)
+	Name        string  // Full bus_name for API endpoints (e.g., org.mpris.MediaPlayer2.spotify)
+	DisplayName string  // Truncated name for display (e.g., spotify)
 	Artist      string
 	Title       string
 	Album       string
-	State       string // "playing", "paused", "stopped"
+	State       string  // "playing", "paused", "stopped"
+	Volume      float64 // Volume level 0.0-1.0
 }
 
 // ServiceView is a view-optimized version of Service for templates
