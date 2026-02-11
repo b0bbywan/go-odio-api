@@ -2,7 +2,6 @@ version: '3'
 
 vars:
   TAILWIND_VERSION: v3.4.17
-  TAILWIND_URL: https://github.com/tailwindlabs/tailwindcss/releases/download/{{.TAILWIND_VERSION}}/tailwindcss-linux-x64
   BIN_DIR: bin
   CSS_INPUT: ui/styles/input.css
   CSS_OUTPUT: ui/static/output.css
@@ -14,34 +13,85 @@ tasks:
       - task --list
 
   install-tailwind:
-    desc: Download Tailwind CLI v3 standalone binary
+    desc: Download Tailwind CLI (only on supported architectures)
+    vars:
+      TAILWIND_BINARY:
+        sh: |
+          case "$(uname -m)" in
+            x86_64)  echo "tailwindcss-linux-x64" ;;
+            aarch64|arm64) echo "tailwindcss-linux-arm64" ;;
+            armv7l)  echo "tailwindcss-linux-armv7" ;;
+            *)       echo "" ;;
+          esac
     cmds:
-      - mkdir -p {{.BIN_DIR}}
-      - curl -sL {{.TAILWIND_URL}} -o {{.BIN_DIR}}/tailwindcss
-      - chmod +x {{.BIN_DIR}}/tailwindcss
-      - echo "✓ Tailwind CLI v3 installed to {{.BIN_DIR}}/tailwindcss"
+      - |
+        if [ -z "{{.TAILWIND_BINARY}}" ]; then
+          echo "⚠️  Tailwind CLI not available for $(uname -m), will use CDN"
+          exit 0
+        fi
+        mkdir -p {{.BIN_DIR}}
+        curl -sL https://github.com/tailwindlabs/tailwindcss/releases/download/{{.TAILWIND_VERSION}}/{{.TAILWIND_BINARY}} -o {{.BIN_DIR}}/tailwindcss
+        chmod +x {{.BIN_DIR}}/tailwindcss
+        echo "✓ Tailwind CLI installed to {{.BIN_DIR}}/tailwindcss"
     status:
       - test -f {{.BIN_DIR}}/tailwindcss
-    silent: false
 
-  css:
-    desc: Compile CSS for production (minified)
+  css-local:
+    desc: Build CSS locally (if Tailwind CLI available)
     deps: [install-tailwind]
-    cmds:
-      - "{{.BIN_DIR}}/tailwindcss -i {{.CSS_INPUT}} -o {{.CSS_OUTPUT}} --minify"
-      - echo "✓ CSS compiled to {{.CSS_OUTPUT}}"
     sources:
       - "{{.CSS_INPUT}}"
       - ui/templates/**/*.gohtml
       - tailwind.config.js
     generates:
       - "{{.CSS_OUTPUT}}"
+    cmds:
+      - |
+        if [ ! -x {{.BIN_DIR}}/tailwindcss ]; then
+          echo "⚠️  Tailwind CLI not available, skipping local build"
+          exit 0
+        fi
+        {{.BIN_DIR}}/tailwindcss -i {{.CSS_INPUT}} -o {{.CSS_OUTPUT}} --minify
+        echo "✓ CSS compiled to {{.CSS_OUTPUT}}"
+
+  css-download:
+    desc: Download pre-built CSS from GitHub Releases
+    vars:
+      COMMIT_HASH:
+        sh: git rev-parse --short HEAD
+      CSS_URL: https://github.com/b0bbywan/go-odio-api/releases/download/css-{{.COMMIT_HASH}}/output.css
+    cmds:
+      - |
+        if [ -f {{.CSS_OUTPUT}} ]; then
+          echo "ℹ️  CSS already exists, skipping download"
+          exit 0
+        fi
+        mkdir -p ui/static
+        echo "📥 Downloading CSS for commit {{.COMMIT_HASH}}..."
+        if curl -fsSL {{.CSS_URL}} -o {{.CSS_OUTPUT}}; then
+          echo "✅ CSS downloaded successfully"
+        else
+          echo "❌ CSS not found for commit {{.COMMIT_HASH}}"
+          echo "💡 Run CI first or build on a platform with Tailwind CLI"
+          exit 1
+        fi
+
+  css:
+    desc: Ensure CSS is available (generate locally or download from CDN)
+    cmds:
+      - task: css-local
+      - task: css-download
 
   css:watch:
     desc: Watch and recompile CSS on changes (development)
     deps: [install-tailwind]
     cmds:
-      - "{{.BIN_DIR}}/tailwindcss -i {{.CSS_INPUT}} -o {{.CSS_OUTPUT}} --watch"
+      - |
+        if [ ! -x {{.BIN_DIR}}/tailwindcss ]; then
+          echo "❌ Tailwind CLI required for watch mode"
+          exit 1
+        fi
+        {{.BIN_DIR}}/tailwindcss -i {{.CSS_INPUT}} -o {{.CSS_OUTPUT}} --watch
 
   build:
     desc: Build the application (includes CSS compilation)
