@@ -4,6 +4,7 @@ import (
 	"embed"
 	"html/template"
 	"net/http"
+	"strings"
 
 	"github.com/b0bbywan/go-odio-api/logger"
 )
@@ -193,8 +194,10 @@ func (h *Handler) SystemdSection(w http.ResponseWriter, r *http.Request) {
 func convertPlayers(players []Player) []PlayerView {
 	views := make([]PlayerView, 0, len(players))
 	for _, p := range players {
+		// Truncate "org.mpris.MediaPlayer2." prefix for cleaner display
+		name := strings.TrimPrefix(p.Name, "org.mpris.MediaPlayer2.")
 		views = append(views, PlayerView{
-			Name:   p.Name,
+			Name:   name,
 			Artist: p.Metadata["xesam:artist"],
 			Title:  p.Metadata["xesam:title"],
 			Album:  p.Metadata["xesam:album"],
