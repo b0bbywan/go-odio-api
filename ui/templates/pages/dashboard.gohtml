@@ -1,6 +1,6 @@
 {{ define "content" }}
 <!-- Responsive grid: 1 col mobile, 2 col tablet, 3 col desktop -->
-<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+<div class="grid-responsive">
 	{{ if .ServerInfo.Backends.MPRIS }}
 		{{ template "section-mpris" .Players }}
 	{{ end }}
@@ -16,11 +16,11 @@
 
 {{ if not (or .ServerInfo.Backends.MPRIS .ServerInfo.Backends.PulseAudio .ServerInfo.Backends.Systemd) }}
 <!-- Empty state when no backends are enabled -->
-<div class="flex min-h-[50vh] items-center justify-center">
+<div class="empty-state-large">
 	<div class="text-center">
-		<div class="mb-4 text-6xl">🎵</div>
-		<h2 class="mb-2 text-xl font-semibold text-zinc-300">No backends enabled</h2>
-		<p class="text-zinc-500">Enable MPRIS, PulseAudio, or Systemd in your config</p>
+		<div class="empty-state-icon-large">🎵</div>
+		<h2 class="empty-state-title">No backends enabled</h2>
+		<p class="text-subtle">Enable MPRIS, PulseAudio, or Systemd in your config</p>
 	</div>
 </div>
 {{ end }}
