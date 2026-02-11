@@ -47,7 +47,7 @@ button.htmx-request {
 	}
 
 	.player-card {
-		@apply flex flex-col gap-3 rounded-lg bg-zinc-700/50 p-3 transition-colors hover:bg-zinc-700 sm:flex-row sm:items-center sm:justify-between;
+		@apply flex flex-col gap-3 rounded-lg bg-zinc-700/50 p-3 transition-colors hover:bg-zinc-700;
 	}
 
 	.btn {
