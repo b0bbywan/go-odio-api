@@ -26,7 +26,7 @@ type Backends struct {
 type Player struct {
 	Name     string            `json:"bus_name"` // API returns "bus_name", not "name"
 	Metadata map[string]string `json:"metadata"`
-	Status   string            `json:"status"`
+	Status   string            `json:"playback_status"` // API returns "playback_status", not "status"
 	Position int64             `json:"position"`
 	Volume   float64           `json:"volume"`
 }
