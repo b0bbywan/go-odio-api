@@ -19,7 +19,7 @@
 	<!-- Control buttons -->
 	<div class="controls-group">
 		<button class="btn" hx-post="/players/{{ .Name }}/previous" hx-swap="none" title="Previous track">⏮</button>
-		<button class="btn" hx-post="/players/{{ .Name }}/play_pause" hx-swap="none" title="{{ if eq .State "Playing" }}Pause{{ else }}Play{{ end }}">
+		<button class="btn" onclick="togglePlayPause(this, '{{ .Name }}')" title="{{ if eq .State "Playing" }}Pause{{ else }}Play{{ end }}">
 			{{ if eq .State "Playing" }}⏸{{ else }}▶{{ end }}
 		</button>
 		<button class="btn" hx-post="/players/{{ .Name }}/next" hx-swap="none" title="Next track">⏭</button>
