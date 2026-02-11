@@ -17,7 +17,10 @@
 			</span>
 		</span>
 		{{ if .IsUser }}
-		<button class="text-base hover:scale-110 transition-transform" title="Restart service">🔄</button>
+		<button class="text-base hover:scale-110 transition-transform"
+		        hx-post="/services/user/{{ .Name }}/restart"
+		        hx-swap="none"
+		        title="Restart service">🔄</button>
 		{{ end }}
 	</div>
 </div>
