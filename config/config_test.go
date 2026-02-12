@@ -405,21 +405,15 @@ func TestNew_CustomBindAddress(t *testing.T) {
 	}{
 		{
 			name:         "explicit localhost",
-			bind:         "127.0.0.1",
+			bind:         "lo",
 			port:         8080,
 			expectListen: "127.0.0.1:8080",
 		},
 		{
 			name:         "all interfaces",
-			bind:         "0.0.0.0",
+			bind:         "all",
 			port:         8018,
 			expectListen: "0.0.0.0:8018",
-		},
-		{
-			name:         "specific IP",
-			bind:         "192.168.1.100",
-			port:         9090,
-			expectListen: "192.168.1.100:9090",
 		},
 	}
 
@@ -446,7 +440,7 @@ func TestNew_CustomBindAddress(t *testing.T) {
 
 func TestNew_ZeroconfDisabledOnLocalhost(t *testing.T) {
 	viper.Reset()
-	viper.Set("bind", "127.0.0.1")
+	viper.Set("bind", "lo")
 
 	t.Setenv("HOME", t.TempDir())
 	t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
@@ -465,28 +459,6 @@ func TestNew_ZeroconfDisabledOnLocalhost(t *testing.T) {
 	if len(cfg.Zeroconf.Listen) != 0 {
 		t.Errorf("Zeroconf.Listen should be empty on localhost, got: %v", cfg.Zeroconf.Listen)
 	}
-}
-
-func TestNew_ZeroconfEnabledOnNonLocalhost(t *testing.T) {
-	// Note: This test may fail if the IP doesn't exist on the machine
-	// We just verify the logic works, even if interfaceForIP returns an error
-	viper.Reset()
-	viper.Set("bind", "192.168.1.100")
-
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
-
-	cfg, err := New(nil)
-	if err != nil {
-		t.Fatalf("New(nil) returned error: %v", err)
-	}
-
-	if !cfg.Zeroconf.Enabled {
-		t.Error("Zeroconf.Enabled should be true by default")
-	}
-
-	// Listen interfaces may or may not be populated depending on if IP exists
-	// Just verify config was created successfully
 }
 
 func TestNew_ZeroconfExplicitlyDisabled(t *testing.T) {
@@ -613,45 +585,26 @@ func TestNew_SecurityDefaults(t *testing.T) {
 }
 
 // Tests for network interface helpers
-
-func TestGetAllActiveInterfaces(t *testing.T) {
-	interfaces := getAllActiveInterfaces()
-
-	// Should return some interfaces (at least loopback exists on all systems)
-	// But getAllActiveInterfaces filters out loopback, so may return empty on minimal systems
-	for _, iface := range interfaces {
-		// Verify no loopback interfaces
-		if iface.Flags&net.FlagLoopback != 0 {
-			t.Errorf("getAllActiveInterfaces() returned loopback interface: %s", iface.Name)
-		}
-
-		// Verify all interfaces are UP
-		if iface.Flags&net.FlagUp == 0 {
-			t.Errorf("getAllActiveInterfaces() returned DOWN interface: %s", iface.Name)
-		}
-	}
-}
-
 func TestGetZeroconfInterfaces_Localhost(t *testing.T) {
 	// Localhost should return nil (no zeroconf on loopback)
-	interfaces := getZeroconfInterfaces("127.0.0.1")
+	interfaces := getZeroconfInterfaces("lo")
 
 	if interfaces != nil {
-		t.Errorf("getZeroconfInterfaces(127.0.0.1) = %v, want nil (no zeroconf on localhost)", interfaces)
+		t.Errorf("getZeroconfInterfaces(lo) = %v, want nil (no zeroconf on localhost)", interfaces)
 	}
 }
 
 func TestGetZeroconfInterfaces_AllInterfaces(t *testing.T) {
 	// 0.0.0.0 should return all active non-loopback interfaces
-	interfaces := getZeroconfInterfaces("0.0.0.0")
+	interfaces := getZeroconfInterfaces("all")
 
 	// Should call getAllActiveInterfaces() which filters loopback
 	for _, iface := range interfaces {
 		if iface.Flags&net.FlagLoopback != 0 {
-			t.Errorf("getZeroconfInterfaces(0.0.0.0) returned loopback interface: %s", iface.Name)
+			t.Errorf("getZeroconfInterfaces(all) returned loopback interface: %s", iface.Name)
 		}
 		if iface.Flags&net.FlagUp == 0 {
-			t.Errorf("getZeroconfInterfaces(0.0.0.0) returned DOWN interface: %s", iface.Name)
+			t.Errorf("getZeroconfInterfaces(all) returned DOWN interface: %s", iface.Name)
 		}
 	}
 }
@@ -689,7 +642,7 @@ func TestGetZeroconfInterfaces_NonexistentIP(t *testing.T) {
 
 func TestNew_ZeroconfAllInterfaces(t *testing.T) {
 	viper.Reset()
-	viper.Set("bind", "0.0.0.0")
+	viper.Set("bind", "all")
 
 	t.Setenv("HOME", t.TempDir())
 	t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")

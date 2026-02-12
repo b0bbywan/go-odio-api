@@ -58,8 +58,8 @@ func (z *ZeroConfBackend) Start() error {
 	}
 
 	z.server = server
-	logger.Debug("[zeroconf] '%s' published on local network (type: %s, port: %d)",
-		z.Config.InstanceName, z.Config.ServiceType, z.Config.Port)
+	logger.Debug("[zeroconf] '%s' published on local network (type: %s, port: %d, iface: %v)",
+		z.Config.InstanceName, z.Config.ServiceType, z.Config.Port, z.Config.Listen)
 
 	go func() {
 		<-z.ctx.Done()

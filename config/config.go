@@ -5,6 +5,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -81,71 +82,60 @@ func parseLogLevel(levelStr string) logger.Level {
 	}
 }
 
-func interfaceForIP(ip string) (*net.Interface, error) {
-	listenIP := net.ParseIP(ip)
-	if listenIP == nil {
-		return nil, fmt.Errorf("invalid bind: %s", ip)
+// resolveBindToIP convertit bind (interface name ou "all") en IP pour l'API
+func resolveBindToIP(bind string) (string, error) {
+	if bind == "all" {
+		return "0.0.0.0", nil
 	}
-	ifaces, err := net.Interfaces()
+
+	iface, err := net.InterfaceByName(bind)
 	if err != nil {
-		return nil, err
+		return "", fmt.Errorf("interface %q not found", bind)
 	}
 
-	for _, iface := range ifaces {
-		addrs, _ := iface.Addrs()
-		for _, addr := range addrs {
-			var ifaceIP net.IP
+	addrs, err := iface.Addrs()
+	if err != nil {
+		return "", err
+	}
 
-			switch v := addr.(type) {
-			case *net.IPNet:
-				ifaceIP = v.IP
-			case *net.IPAddr:
-				ifaceIP = v.IP
-			}
-
-			if ifaceIP != nil && ifaceIP.Equal(listenIP) {
-				return &iface, nil
+	for _, addr := range addrs {
+		if ipnet, ok := addr.(*net.IPNet); ok {
+			if ip4 := ipnet.IP.To4(); ip4 != nil {
+				return ip4.String(), nil
 			}
 		}
 	}
 
-	return nil, fmt.Errorf("no interface found for IP %s", ip)
+	return "", fmt.Errorf("no IPv4 on interface %s", bind)
 }
 
-// getZeroconfInterfaces returns network interfaces for zeroconf based on bind address
+// getZeroconfInterfaces retourne les interfaces pour zeroconf
 func getZeroconfInterfaces(bind string) []net.Interface {
-	if bind == "127.0.0.1" {
-		return nil
+	if bind == "all" {
+		return getAllActiveNonLoopback()
 	}
 
-	if bind == "0.0.0.0" {
-		return getAllActiveInterfaces()
-	}
-
-	iface, err := interfaceForIP(bind)
+	iface, err := net.InterfaceByName(bind)
 	if err != nil {
-		logger.Warn("[config] failed to get interface for %s: %v (zeroconf disabled)", bind, err)
+		logger.Warn("[config] interface %q not found: %v", bind, err)
 		return nil
 	}
-
-	if iface == nil {
+	if iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagLoopback != 0 {
 		return nil
 	}
-
 	return []net.Interface{*iface}
 }
 
-// getAllActiveInterfaces returns all non-loopback, active network interfaces
-func getAllActiveInterfaces() []net.Interface {
+// getAllActiveNonLoopback retourne toutes interfaces UP sauf loopback
+func getAllActiveNonLoopback() []net.Interface {
 	ifaces, err := net.Interfaces()
 	if err != nil {
-		logger.Warn("[config] failed to list interfaces: %v", err)
 		return nil
 	}
 
 	var result []net.Interface
 	for _, iface := range ifaces {
-		if iface.Flags&net.FlagLoopback == 0 && iface.Flags&net.FlagUp != 0 {
+		if iface.Flags&net.FlagUp != 0 && iface.Flags&net.FlagLoopback == 0 {
 			result = append(result, iface)
 		}
 	}
@@ -196,7 +186,8 @@ func readConfig(cfgFile *string) error {
 }
 
 func New(cfgFile *string) (*Config, error) {
-	viper.SetDefault("bind", "127.0.0.1")
+
+	viper.SetDefault("bind", "lo")
 	viper.SetDefault("LogLevel", "WARN")
 
 	viper.SetDefault("api.enabled", true)
@@ -231,19 +222,21 @@ func New(cfgFile *string) (*Config, error) {
 	if port <= 0 || port > 65535 {
 		return nil, fmt.Errorf("invalid port: %d", port)
 	}
-
 	bind := viper.GetString("bind")
-	interfaces := getZeroconfInterfaces(bind)
-
-	xdgRuntimeDir := os.Getenv("XDG_RUNTIME_DIR")
-	if xdgRuntimeDir == "" {
-		xdgRuntimeDir = fmt.Sprintf("/run/user/%d", os.Getuid())
+	listenIP, err := resolveBindToIP(bind)
+	if err != nil {
+		return nil, err
 	}
 
 	apiCfg := ApiConfig{
 		Enabled: viper.GetBool("api.enabled"),
-		Listen:  fmt.Sprintf("%s:%d", bind, port),
+		Listen:  net.JoinHostPort(listenIP, strconv.Itoa(port)),
 		Port:    port,
+	}
+
+	xdgRuntimeDir := os.Getenv("XDG_RUNTIME_DIR")
+	if xdgRuntimeDir == "" {
+		xdgRuntimeDir = fmt.Sprintf("/run/user/%d", os.Getuid())
 	}
 
 	syscfg := SystemdConfig{
@@ -269,6 +262,7 @@ func New(cfgFile *string) (*Config, error) {
 		Timeout: mprisTimeout,
 	}
 
+	interfaces := getZeroconfInterfaces(bind)
 	zerocfg := ZeroConfig{
 		Enabled:      viper.GetBool("zeroconf.enabled"),
 		InstanceName: AppName,
