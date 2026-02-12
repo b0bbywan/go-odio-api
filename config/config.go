@@ -82,9 +82,6 @@ func parseLogLevel(levelStr string) logger.Level {
 }
 
 func interfaceForIP(ip string) (*net.Interface, error) {
-	if ip == "127.0.0.1" {
-		return nil, nil
-	}
 	listenIP := net.ParseIP(ip)
 	if listenIP == nil {
 		return nil, fmt.Errorf("invalid bind: %s", ip)
@@ -113,6 +110,46 @@ func interfaceForIP(ip string) (*net.Interface, error) {
 	}
 
 	return nil, fmt.Errorf("no interface found for IP %s", ip)
+}
+
+// getZeroconfInterfaces returns network interfaces for zeroconf based on bind address
+func getZeroconfInterfaces(bind string) []net.Interface {
+	if bind == "127.0.0.1" {
+		return nil
+	}
+
+	if bind == "0.0.0.0" {
+		return getAllActiveInterfaces()
+	}
+
+	iface, err := interfaceForIP(bind)
+	if err != nil {
+		logger.Warn("[config] failed to get interface for %s: %v (zeroconf disabled)", bind, err)
+		return nil
+	}
+
+	if iface == nil {
+		return nil
+	}
+
+	return []net.Interface{*iface}
+}
+
+// getAllActiveInterfaces returns all non-loopback, active network interfaces
+func getAllActiveInterfaces() []net.Interface {
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		logger.Warn("[config] failed to list interfaces: %v", err)
+		return nil
+	}
+
+	var result []net.Interface
+	for _, iface := range ifaces {
+		if iface.Flags&net.FlagLoopback == 0 && iface.Flags&net.FlagUp != 0 {
+			result = append(result, iface)
+		}
+	}
+	return result
 }
 
 func systemdHasUTMP() bool {
@@ -196,11 +233,7 @@ func New(cfgFile *string) (*Config, error) {
 	}
 
 	bind := viper.GetString("bind")
-	var interfaces []net.Interface
-	inet, err := interfaceForIP(bind)
-	if err == nil && inet != nil {
-		interfaces = append(interfaces, *inet)
-	}
+	interfaces := getZeroconfInterfaces(bind)
 
 	xdgRuntimeDir := os.Getenv("XDG_RUNTIME_DIR")
 	if xdgRuntimeDir == "" {
