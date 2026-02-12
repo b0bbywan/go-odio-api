@@ -131,18 +131,21 @@ func (b *BluetoothBackend) listDevices() ([]dbus.ObjectPath, error) {
 	devices := []dbus.ObjectPath{}
 
 	err := b.iterateAdapterDevices(func(path dbus.ObjectPath, props map[string]dbus.Variant) bool {
-		// Only keep non-trusted devices (for pairing)
-		if trustedVar, ok := props[BT_PROP_TRUSTED]; ok {
-			trusted, ok := trustedVar.Value().(bool)
-			if !ok {
-				logger.Warn("[bluetooth] invalid trusted value type for device %v", path)
-				return true
-			}
-			if trusted {
-				return true
-			}
+		// Make a live D-Bus call to check current trust state
+		// This ensures we don't use stale data from managed objects snapshot
+		trusted, ok := b.isDeviceTrusted(path)
+		if !ok {
+			// Can't determine trust state, skip this device
+			logger.Warn("[bluetooth] unable to determine trust state for device %v", path)
+			return true
 		}
 
+		if trusted {
+			// Device is already trusted, skip it
+			return true
+		}
+
+		// Device is not trusted, add it for pairing
 		devices = append(devices, path)
 		return true
 	})
