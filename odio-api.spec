@@ -1,5 +1,5 @@
 Name:           odio-api
-Version:        0.5.0
+Version:        0.4.0
 Release:        1%{?dist}
 Summary:        Web API for mpris, pulseaudio and systemd
 License:        BSD-2-Clause
