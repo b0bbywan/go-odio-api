@@ -22,9 +22,9 @@ const (
 
 type Config struct {
 	Api        *ApiConfig
-	Systemd    *SystemdConfig
-	Pulseaudio *PulseAudioConfig
 	MPRIS      *MPRISConfig
+	Pulseaudio *PulseAudioConfig
+	Systemd    *SystemdConfig
 	Zeroconf   *ZeroConfig
 	LogLevel   logger.Level
 }
@@ -281,9 +281,9 @@ func New(cfgFile *string) (*Config, error) {
 
 	cfg := Config{
 		Api:        &apiCfg,
-		Systemd:    &syscfg,
-		Pulseaudio: &pulsecfg,
 		MPRIS:      &mpriscfg,
+		Pulseaudio: &pulsecfg,
+		Systemd:    &syscfg,
 		Zeroconf:   &zerocfg,
 		LogLevel:   parseLogLevel(viper.GetString("LogLevel")),
 	}

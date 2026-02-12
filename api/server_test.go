@@ -56,11 +56,10 @@ func TestRoutesWithDisabledBackends(t *testing.T) {
 
 	// Backend with all backends disabled (nil)
 	backend := &backend.Backend{
-		Bluetooth: nil,
-		MPRIS:     nil,
-		Pulse:     nil,
-		Systemd:   nil,
-		Zeroconf:  nil,
+		MPRIS:    nil,
+		Pulse:    nil,
+		Systemd:  nil,
+		Zeroconf: nil,
 	}
 
 	server := NewServer(cfg, backend)
