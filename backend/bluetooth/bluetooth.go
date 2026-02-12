@@ -36,6 +36,7 @@ func New(ctx context.Context, cfg *config.BluetoothConfig) (*BluetoothBackend, e
 		return nil, nil
 	}
 
+	logger.Info("[bluetooth] backend started (powered off)")
 	return &backend, nil
 }
 
