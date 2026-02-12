@@ -3,30 +3,13 @@
 [![CI](https://github.com/b0bbywan/go-odio-api/actions/workflows/ci.yml/badge.svg)](https://github.com/b0bbywan/go-odio-api/actions/workflows/ci.yml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/b0bbywan/go-odio-api)](https://goreportcard.com/report/github.com/b0bbywan/go-odio-api)
 
-A lightweight REST API for controlling Linux audio and media players, built in Go. Provides unified interfaces for MPRIS media players, PulseAudio/PipeWire audio control, and systemd service management.
+A lightweight and reliable REST API for controlling Linux audio and media players, built in Go. Provides unified interfaces for MPRIS media players, PulseAudio/PipeWire audio control, and systemd service management.
 
-**Target Environment:** Designed for multimedia systems running with a user session (XDG_RUNTIME_DIR). Ideal for headless music servers, home audio systems, and dedicated media players.
+**Target Environment:** Designed for multimedia systems running with a user session (XDG_RUNTIME_DIR). Ideal for headless music servers, home audio systems dedicated media players and classic desktop sessions.
 
-**Headless systems:** On fully headless systems, lingering needs to be enabled:
-
-`loginctl enable-linger <username>`
-
-This ensures the Pulseaudio/Pipewire, user D-Bus session and XDG_RUNTIME_DIR are available even without an active login session.
+Tested and validated on Fedora 43 Gnome, Debian 13 KDE, Raspbian 13 Raspberry B and B+. Works without any system tweak.
 
 ## Features
-
-### API
-Lightweight and fast REST API (<50ms 95% response time, 0% CPU on idle mode, tested on Raspberry B and B+)
-enabled by default, listen on localhost by default. Change with your own IP according to your needs
-Port can also be configured
-
-```
-# config.yaml
-bind: 127.0.0.1
-api:
-  enabled: true
-  port: 8018
-```
 
 ### Media Player Control (MPRIS)
 - List and control MPRIS-compatible media players (Spotify, VLC, Firefox, etc.)
@@ -44,8 +27,8 @@ mpris:
 ```
 
 ### Audio Management (PulseAudio/PipeWire)
-- List audio sinks and sources
-- Volume control for sink-inputs only
+- List audio clients and server info with default output
+- Output and client volume control/mute
 - Real-time audio events via native PulseAudio monitoring
 - Limited PipeWire support with pipewire-pulse
 
@@ -57,26 +40,20 @@ pulseaudio:
 
 ### Service Management (systemd)
 - List and monitor systemd services
-- Enable, disable, and restart services
+- Start, Stop, Restart, Enable, Disable services
 - Real-time service state updates via D-Bus signals
 - Tracking via filesystem monitoring for systemd without utmp (/run/user/{uid}/systemd/units)
-- Disabled by default for obvious security reasons
+- Disabled by default
 
 ⚠️ **Security Notice**
 
-Yes, systemd control is controversial and potentially dangerous if misused. Odio mitigates risks with these deliberate security designs:
+Yes, systemd control is controversial and potentially dangerous if misused. But systemd units are really easy to setup and manage, and have great potential for features so I added it anyway, with a strong concern for security. Odio mitigates risks with these deliberate security designs:
 
 - **Disabled by default**: Systemd backend off unless explicitly enabled + units configured in `config.yaml` (empty config → auto-disabled, even with `systemd.enabled: true`).
-- **Localhost only**: API binds to `127.0.0.1` by default. Never expose to untrusted networks/Internet.
+- **Localhost only**: API binds to `lo` by default. Never expose to untrusted networks/Internet.
 - **No preconfigured units**: Nothing managed unless explicitly listed in config.
 - **User-only mutations**: All mutations (start/stop/restart/enable/disable) use the *user* D-Bus connection only. System units are strictly read-only. While properly configured systems enforce this via D-Bus policies, odio adds mandatory application-layer enforcement which should protect against misconfigured or compromised D-Bus setups.
-- **Hardened permission checks**: All public methods (`StartService`, `EnableService`, etc.) route through a unique code entrypoint called `Execute()` which **mandatorily** calls check actions are permitted in the configuration:
-  | Scope | Check | Error |
-  |-------|-------|-------|
-  | System | Always blocked | `PermissionSystemError` |
-  | User | Must be explicitly configured/watched | `PermissionUserError` |
-
-**Root/sudo is not supported by design**: Odio runs as an unprivileged user with a user D‑Bus session. Running it as root is strictly forbidden and will be refused by the program. It is not supported, will not work by default, and should never be attempted. Issues or requests related to this will not be accepted, unless they improve security.
+**Root/sudo is not supported by design**: Odio runs as an unprivileged user with a user D‑Bus session. Running it as root is strictly forbidden and will be refused by the program. Issues or requests related to this will not be accepted, unless they improve security.
 
 **You must knowingly enable this at your own risk.**
 Odio is free software and comes with no warranty. Enabling systemd integration is at your own risk.
@@ -105,26 +82,58 @@ systemd:
     - plex.service                      # see [5]
 ```
 [1] Install `mpd-mpris` or `mpDris2` for mpris support
-[2] Check my [article on medium to make Shairport Sync/Airplay with pulseaudio and mpris support](https://medium.com/@mathieu-requillart/set-up-a-b83d9c980e75)
-[3] Your spotifyd version [must be built with mpris support](https://docs.spotifyd.rs/advanced/dbus.html)
+[2] Check my [article on medium to use Shairport Sync/Airplay with pulseaudio and mpris support](https://medium.com/@mathieu-requillart/set-up-a-b83d9c980e75)
+[3] Default on desktop, on headless your spotifyd version [must be built with mpris support](https://docs.spotifyd.rs/advanced/dbus.html)
 [4] Install [Kodi Add-on:MPRIS D-Bus interface](https://github.com/wastis/MediaPlayerRemoteInterface#)
 [5] Maybe supported, untested
 
+### REST API
+
+Lightweight and fast REST API (<50ms 95% response time, 0% CPU on idle mode, tested on Raspberry Pi B and B+)
+
+Enabled by default, binds to localhost for security. Configure network interface binding and port as needed:
+
+```
+# config.yaml
+bind: lo
+# bind: enp2s0    # Specific network interface
+# bind: wlan0     # WiFi interface
+# bind: all       # All interfaces (Docker, remote access)
+api:
+  enabled: true
+  port: 8018
+```
+
+⚠️ **Security Notice:** No authentication mechanism is provided. **Never expose this API to untrusted networks or the Internet.** Designed for localhost or trusted LAN use only.
 
 ### Zeroconf / mDNS
-The API advertise itself using Zeroconf (mDNS). This allows users to discover the API without knowing the host IP or port. Disabled with default 127.0.0.1, enabled otherwise
+The API advertise itself using Zeroconf (mDNS). This allows users to discover the API without knowing the host IP or port. Disabled by default and with `lo` bind.
 
-Disable in configuration:
+Enable in configuration:
 ```
+bind: eno1
 zeroconf:
-  enabled: false
+  enabled: enable
 ```
 
 Developers can discover the API with any mDNS/Bonjour browser on the network. Look for the service type `_http._tcp.local.` and instance name `odio-api`.
 
-### Logs
-Different log levels, exhaustive info and debug logs to provide in issues.
+### Extensive and Safe Default Configuration
 
+Odio is designed with security and ease-of-use in mind through sensible defaults:
+
+- **Modular backends** - Each backend (MPRIS, PulseAudio, systemd, zeroconf) can be independently enabled or disabled. Run only what you need: media control without audio management, systemd without MPRIS, etc. Even the API can be disabled, though odio loses its interest then.
+- **Zero host configuration required** - Works out-of-the-box on any Linux system with a user session. No system-wide setup, daemon configuration, or special permissions needed for testing.
+- **Localhost binding by default** - API listens on localhost by default, preventing accidental exposure to untrusted networks
+- **Network interface binding** - Bind to network interfaces (`lo`, `eth0`, `wlan0`, `all`) instead of hardcoded IPs, surviving DHCP changes and making configurations portable across networks
+- **Systemd disabled by default** - Service control must be explicitly enabled and configured with a whitelist, no services managed by default
+- **Read-only Docker mounts** - All volume mounts are read-only by default in the `docker-compose.yml` provided, minimizing container's ability to modify the host system
+- **Zeroconf optin** - mDNS must be enabled and adapts based on network binding: disabled on localhost, enabled on specific interfaces, broadcasts on all interfaces when `bind: all`
+
+The default configuration requires no changes for local-only usage and provides clear, explicit opt-ins for remote access or privileged operations.
+
+### Logs
+Different log levels, exhaustive info and debug logs to provide in issues to help debugging.
 
 ## Installation
 
@@ -173,6 +182,12 @@ systemctl --user enable odio-api.service
 systemctl --user start odio-api.service
 ```
 
+**Headless systems:** On fully headless systems, lingering needs to be enabled:
+
+`sudo loginctl enable-linger <username>`
+
+This ensures the Pulseaudio/Pipewire, user D-Bus session and XDG_RUNTIME_DIR are available even without an active login session.
+
 ### Docker
 You can also run odio as a container!
 
@@ -203,7 +218,7 @@ Volumes:
 
 The container exposes port 8018 by default and is configured to automatically restart unless stopped. With this configuration, audio and DBus-dependent functionality works seamlessly inside Docker.
 
-**Note:** `bind` should be set to `0.0.0.0` in `config.yaml` for remote access with docker. Zeroconf won't work in bridge network mode. It's strongly advised against using host network mode.
+**Note:** `bind` should be set to `all` in `config.yaml` for remote access with docker. Zeroconf won't work in bridge network mode. It's strongly advised against using host network mode.
 
 All mounts are read-only, minimizing the container’s ability to modify the host system.
 
@@ -226,18 +241,18 @@ Disabling a backend will disable the backend and its routes !
 Example configuration:
 
 ```yaml
-bind: 127.0.0.1
-logLevel: warn
+bind: lo
+logLevel: info
 
 api:
   enabled: true
   port: 8018
 
 zeroconf:
-  enabled: true
+  enabled: false
 
 systemd:
-  enabled: true
+  enabled: false
   system:
     -
   user:
@@ -257,7 +272,7 @@ mpris:
 ### Server Informations
 
 ```
-GET    /server                             # {"hostname":"","os_platform":"","os_version":"","api_sw":"","api_version":"","backends":{"mpris":true,"pulseaudio":true,"systemd":true, "zeroconf": true}}
+GET    /server                             # {"hostname":"","os_platform":"","os_version":"","api_sw":"","api_version":"","backends":{"mpris":true,"pulseaudio":true,"systemd":false, "zeroconf": false}}
 ```
 
 ### MPRIS Media Players

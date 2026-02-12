@@ -188,7 +188,7 @@ func readConfig(cfgFile *string) error {
 func New(cfgFile *string) (*Config, error) {
 
 	viper.SetDefault("bind", "lo")
-	viper.SetDefault("LogLevel", "WARN")
+	viper.SetDefault("LogLevel", "INFO")
 
 	viper.SetDefault("api.enabled", true)
 	viper.SetDefault("api.port", 8018)

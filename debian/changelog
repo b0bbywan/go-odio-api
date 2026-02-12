@@ -1,16 +1,19 @@
 odio-api (0.4.0) trixie; urgency=high
 
-  Added design pattern and tests to prevent security issues on systemd mutating handlers
+  [ Major security and usability improvements ]
+  * systemd: enforce strict permission validation on mutating operations;
+    introduce safe handler patterns and comprehensive tests to mitigate
+    privilege escalation risks
+  * Introduce zeroconf (Avahi/mDNS) support for automatic discovery of the API
+    on local networks
+  * Change default listen port to 8018 to avoid privileged port issues and reduce conflict and
+    accidental exposure risks.
+  * Add new command-line flags: --config <path> and --version
+  * Correctly handle and report systemd configuration errors
+  * Disable systemd integration by default (must now be explicitly enabled in config)
 
-  Add zeroconf support
 
-  * zeroconf support
-  * change default port to 8018
-  * add config and version cli arguments
-  * fix systemd config
-  * disable systemd by default
-
- -- Mathieu Réquillart <mathieu.requillart@gmail.com>  Sat, 07 Feb 2026 15:30:00 +0000
+ -- Mathieu Réquillart <mathieu.requillart@gmail.com>  Fri, 13 Feb 2026 15:00:00 +0000
 
 
 odio-api (0.3.3) trixie; urgency=low

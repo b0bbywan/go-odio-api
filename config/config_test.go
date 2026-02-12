@@ -121,8 +121,8 @@ func TestNew_Defaults(t *testing.T) {
 	}
 
 	// Test default log level
-	if cfg.LogLevel != logger.WARN {
-		t.Errorf("LogLevel = %d, want %d (WARN)", cfg.LogLevel, logger.WARN)
+	if cfg.LogLevel != logger.INFO {
+		t.Errorf("LogLevel = %d, want %d (INFO)", cfg.LogLevel, logger.INFO)
 	}
 }
 

@@ -1,15 +1,15 @@
-bind: 127.0.0.1
-logLevel: warn
+bind: lo
+logLevel: info
 
 api:
   enabled: true
   port: 8018
 
 zeroconf:
-  enabled: true
+  enabled: false
 
 systemd:
-  enabled: true
+  enabled: false
   system:
     - bluetooth.service
     - upmpdcli.service
