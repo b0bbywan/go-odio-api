@@ -28,6 +28,7 @@ func NewBluetoothListener(
 		filter:    filter,
 		handler:   handler,
 		name:      name,
+		doneChan:  make(chan struct{}),
 	}
 }
 
@@ -61,6 +62,9 @@ func (l *BluetoothListener) listen() {
 		select {
 		case <-l.ctx.Done():
 			return
+		case <-l.doneChan:
+			logger.Info("[bluetooth] %s listener terminated early (success)", l.name)
+			return
 		case sig, ok := <-l.signals:
 			if !ok {
 				logger.Debug("[bluetooth] %s signal channel closed", l.name)
@@ -88,6 +92,16 @@ func (l *BluetoothListener) handleSignal(sig *dbus.Signal) {
 func (l *BluetoothListener) Stop() {
 	logger.Debug("[bluetooth] stopping %s listener", l.name)
 	l.cancel()
+}
+
+// Done signals the listener to terminate early (e.g., after successful pairing)
+func (l *BluetoothListener) Done() {
+	select {
+	case <-l.doneChan:
+		// Already closed
+	default:
+		close(l.doneChan)
+	}
 }
 
 // ============================================================================
@@ -129,6 +143,9 @@ func NewPairingListener(backend *BluetoothBackend, ctx context.Context) *Bluetoo
 		return ok && connected
 	}
 
+	// Create listener first so handler can reference it
+	var listener *BluetoothListener
+
 	handler := func(sig *dbus.Signal) {
 		devicePath := sig.Path
 		logger.Info("[bluetooth] device %v attempting connection, initiating pairing", devicePath)
@@ -155,13 +172,15 @@ func NewPairingListener(backend *BluetoothBackend, ctx context.Context) *Bluetoo
 		if ok := backend.trustDevice(devicePath); ok {
 			logger.Info("[bluetooth] device %v paired and trusted successfully", devicePath)
 			backend.refreshKnownDevices()
-			// Note: caller should stop the listener after successful pairing
+			// Signal listener to stop - pairing successful!
+			listener.Done()
 		} else {
 			logger.Warn("[bluetooth] device %v paired but failed to trust", devicePath)
 		}
 	}
 
-	return NewBluetoothListener(backend, ctx, matchRule, filter, handler, "pairing")
+	listener = NewBluetoothListener(backend, ctx, matchRule, filter, handler, "pairing")
+	return listener
 }
 
 // ============================================================================

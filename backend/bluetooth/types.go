@@ -72,5 +72,6 @@ type BluetoothListener struct {
 	matchRule string
 	filter    SignalFilter
 	handler   SignalHandler
-	name      string // For logging
+	name      string        // For logging
+	doneChan  chan struct{} // For early termination (e.g., after successful pairing)
 }
