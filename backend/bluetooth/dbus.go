@@ -2,53 +2,36 @@ package bluetooth
 
 import (
 	"context"
-	"time"
 
 	"github.com/godbus/dbus/v5"
 
 	"github.com/b0bbywan/go-odio-api/logger"
 )
 
-// callWithTimeout executes a D-Bus call with timeout
-func callWithTimeout(ctx context.Context, call *dbus.Call, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(ctx, timeout)
+// callWithContext executes a D-Bus method call with the backend's timeout context.
+// Unlike the previous callWithTimeout, this passes the context to the D-Bus call itself,
+// so the call is actually cancelled on timeout instead of just racing a post-hoc check.
+func (b *BluetoothBackend) callWithContext(obj dbus.BusObject, method string, args ...interface{}) *dbus.Call {
+	ctx, cancel := context.WithTimeout(b.ctx, b.timeout)
 	defer cancel()
-
-	done := make(chan error, 1)
-	go func() {
-		done <- call.Err
-	}()
-
-	select {
-	case err := <-done:
-		return err
-	case <-ctx.Done():
-		// Context cancelled or timeout
-		return &dbusTimeoutError{}
-	}
+	return obj.CallWithContext(ctx, method, 0, args...)
 }
 
-// callWithTimeout receiver method for BluetoothBackend
-func (b *BluetoothBackend) callWithTimeout(call *dbus.Call) error {
-	return callWithTimeout(b.ctx, call, b.timeout)
-}
-
-// callMethod calls a method on an object with timeout
+// callMethod calls a D-Bus method with timeout and returns the error
 func (b *BluetoothBackend) callMethod(obj dbus.BusObject, method string, args ...interface{}) error {
-	return b.callWithTimeout(obj.Call(method, 0, args...))
+	return b.callWithContext(obj, method, args...).Err
 }
 
 func (b *BluetoothBackend) setProperty(obj dbus.BusObject, iface, prop string, value interface{}) error {
-	call := obj.Call(DBUS_PROP_SET, 0, iface, prop, dbus.MakeVariant(value))
-	return b.callWithTimeout(call)
+	return b.callMethod(obj, DBUS_PROP_SET, iface, prop, dbus.MakeVariant(value))
 }
 
 // getProperty retrieves a property from D-Bus for a given busName
 func (b *BluetoothBackend) getProperty(obj dbus.BusObject, iface, prop string) (dbus.Variant, error) {
 	var v dbus.Variant
-	call := obj.Call(DBUS_PROP_GET, 0, iface, prop)
-	if err := b.callWithTimeout(call); err != nil {
-		return dbus.Variant{}, err
+	call := b.callWithContext(obj, DBUS_PROP_GET, iface, prop)
+	if call.Err != nil {
+		return dbus.Variant{}, call.Err
 	}
 	if err := call.Store(&v); err != nil {
 		return dbus.Variant{}, err
@@ -65,14 +48,7 @@ func (b *BluetoothBackend) adapter() dbus.BusObject {
 }
 
 func (b *BluetoothBackend) setAdapterProp(prop string, value interface{}) error {
-	call := b.adapter().Call(
-		DBUS_PROP_SET,
-		0,
-		BLUETOOTH_ADAPTER,
-		prop,
-		dbus.MakeVariant(value),
-	)
-	return b.callWithTimeout(call)
+	return b.callMethod(b.adapter(), DBUS_PROP_SET, BLUETOOTH_ADAPTER, prop, dbus.MakeVariant(value))
 }
 
 func extractBool(v dbus.Variant) (bool, bool) {
@@ -276,8 +252,13 @@ func (b *BluetoothBackend) SetTimeOut(prop string) error {
 func (b *BluetoothBackend) getManagedObjects() (map[dbus.ObjectPath]map[string]map[string]dbus.Variant, error) {
 	objManager := b.getObj(BLUETOOTH_PREFIX, "/")
 	var managedObjects map[dbus.ObjectPath]map[string]map[string]dbus.Variant
-	if err := objManager.Call(MANAGED_OBJECTS, 0).Store(&managedObjects); err != nil {
-		logger.Warn("[bluetooth] failed to query BlueZ managed objects: %v", err)
+	call := b.callWithContext(objManager, MANAGED_OBJECTS)
+	if call.Err != nil {
+		logger.Warn("[bluetooth] failed to query BlueZ managed objects: %v", call.Err)
+		return nil, call.Err
+	}
+	if err := call.Store(&managedObjects); err != nil {
+		logger.Warn("[bluetooth] failed to decode BlueZ managed objects: %v", err)
 		return nil, err
 	}
 	return managedObjects, nil
@@ -369,12 +350,10 @@ func (b *BluetoothBackend) StopDiscovery() error {
 
 // addMatchRule adds a D-Bus match rule to filter signals
 func (b *BluetoothBackend) addMatchRule(rule string) error {
-	call := b.conn.BusObject().Call(DBUS_ADD_MATCH_METHOD, 0, rule)
-	return b.callWithTimeout(call)
+	return b.callMethod(b.conn.BusObject(), DBUS_ADD_MATCH_METHOD, rule)
 }
 
 // removeMatchRule removes a D-Bus match rule
 func (b *BluetoothBackend) removeMatchRule(rule string) error {
-	call := b.conn.BusObject().Call(DBUS_REMOVE_MATCH_METHOD, 0, rule)
-	return b.callWithTimeout(call)
+	return b.callMethod(b.conn.BusObject(), DBUS_REMOVE_MATCH_METHOD, rule)
 }

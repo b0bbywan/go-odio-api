@@ -166,15 +166,17 @@ func (b *BluetoothBackend) waitPairing(ctx context.Context) {
 		b.pairingMu.Unlock()
 	}()
 
-	// Create and start pairing listener
-	listener := NewPairingListener(b, subCtx)
+	// Create and start pairing listener.
+	// Pass cancel so that successful pairing immediately unblocks <-subCtx.Done()
+	// instead of waiting for the full pairing timeout.
+	listener := NewPairingListener(b, subCtx, cancel)
 	if err := listener.Start(); err != nil {
 		logger.Warn("[bluetooth] failed to start pairing listener: %v", err)
 		return
 	}
 	defer listener.Stop()
 
-	// Wait for timeout or listener to stop
+	// Wait for timeout or successful pairing (cancel called by onPaired)
 	<-subCtx.Done()
 	logger.Info("[bluetooth] pairing stopped")
 }

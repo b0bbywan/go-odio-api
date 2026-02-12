@@ -132,7 +132,8 @@ func deviceConnectedFilter() SignalFilter {
 
 // NewPairingListener creates a listener that handles device pairing.
 // When a new untrusted device connects, it pairs and trusts it, then stops.
-func NewPairingListener(backend *BluetoothBackend, ctx context.Context) *BluetoothListener {
+// onPaired is called on successful pairing to signal completion (e.g. cancel a parent context).
+func NewPairingListener(backend *BluetoothBackend, ctx context.Context, onPaired func()) *BluetoothListener {
 	handler := func(sig *dbus.Signal) bool {
 		props := sig.Body[1].(map[string]dbus.Variant)
 
@@ -163,6 +164,9 @@ func NewPairingListener(backend *BluetoothBackend, ctx context.Context) *Bluetoo
 		if ok := backend.trustDevice(devicePath); ok {
 			logger.Info("[bluetooth] device %v paired and trusted successfully", devicePath)
 			backend.refreshKnownDevices()
+			if onPaired != nil {
+				onPaired()
+			}
 			return false // Stop listening - mission complete!
 		}
 

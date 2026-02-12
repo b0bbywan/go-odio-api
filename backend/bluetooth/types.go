@@ -23,12 +23,6 @@ type BluetoothBackend struct {
 	statusCache *cache.Cache[BluetoothStatus]
 }
 
-type dbusTimeoutError struct{}
-
-func (e *dbusTimeoutError) Error() string {
-	return "D-Bus call timeout"
-}
-
 type bluetoothUnsupportedError struct{}
 
 func (e *bluetoothUnsupportedError) Error() string {
