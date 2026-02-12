@@ -1,6 +1,7 @@
 package bluetooth
 
 import (
+	"context"
 	"time"
 
 	"github.com/godbus/dbus/v5"
@@ -9,9 +10,11 @@ import (
 )
 
 // callWithTimeout executes a D-Bus call with timeout
-func callWithTimeout(call *dbus.Call, timeout time.Duration) error {
-	done := make(chan error, 1)
+func callWithTimeout(ctx context.Context, call *dbus.Call, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
 
+	done := make(chan error, 1)
 	go func() {
 		done <- call.Err
 	}()
@@ -19,14 +22,15 @@ func callWithTimeout(call *dbus.Call, timeout time.Duration) error {
 	select {
 	case err := <-done:
 		return err
-	case <-time.After(timeout):
+	case <-ctx.Done():
+		// Context cancelled or timeout
 		return &dbusTimeoutError{}
 	}
 }
 
-// callWithTimeout receiver method for MPRISBackend
+// callWithTimeout receiver method for BluetoothBackend
 func (b *BluetoothBackend) callWithTimeout(call *dbus.Call) error {
-	return callWithTimeout(call, b.timeout)
+	return callWithTimeout(b.ctx, call, b.timeout)
 }
 
 // callMethod calls a method on an object with timeout
