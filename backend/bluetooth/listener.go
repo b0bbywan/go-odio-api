@@ -83,6 +83,8 @@ func (l *BluetoothListener) handleSignal(sig *dbus.Signal) bool {
 		return true // Continue
 	}
 
+	logger.Debug("[bluetooth] %s: signal matched filter (path=%v)", l.name, sig.Path)
+
 	// Execute handler - it returns true/false to control lifecycle
 	if l.handler != nil {
 		return l.handler(sig)
@@ -122,6 +124,16 @@ func deviceConnectedFilter() SignalFilter {
 			return false
 		}
 		_, hasConnected := props[BT_PROP_CONNECTED]
+		if !hasConnected {
+			for k, v := range props {
+				switch k {
+				case "RSSI", "TxPower", "ManufacturerData":
+					continue
+				default:
+					logger.Debug("[bluetooth] device %v: property %s=%v (filtered out, not Connected)", sig.Path, k, v.Value())
+				}
+			}
+		}
 		return hasConnected
 	}
 }
@@ -139,6 +151,7 @@ func NewPairingListener(backend *BluetoothBackend, ctx context.Context, onPaired
 
 		connected, ok := props[BT_PROP_CONNECTED].Value().(bool)
 		if !ok || !connected {
+			logger.Debug("[bluetooth] pairing: device %v Connected=%v (ignoring disconnect)", sig.Path, connected)
 			return true
 		}
 
@@ -193,6 +206,8 @@ func NewIdleListener(backend *BluetoothBackend, ctx context.Context, idleTimeout
 		if !ok {
 			return true
 		}
+
+		logger.Debug("[bluetooth] idle: device %v Connected=%v", sig.Path, connected)
 
 		if connected {
 			// A device connected - cancel idle timer
