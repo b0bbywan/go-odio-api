@@ -8,6 +8,8 @@ import (
 	"github.com/b0bbywan/go-odio-api/logger"
 )
 
+const maxRequestBodySize = 1 << 20 // 1 MB
+
 type setVolumeRequest struct {
 	Volume float32 `json:"volume"`
 }
@@ -38,8 +40,24 @@ func withBody[T any](
 			}
 		}()
 
+		// Check Content-Type header
+		contentType := r.Header.Get("Content-Type")
+		if contentType != "application/json" {
+			http.Error(w, "Content-Type must be application/json", http.StatusUnsupportedMediaType)
+			return
+		}
+
+		// Limit request body size to prevent DOS attacks
+		r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodySize)
+
 		var req T
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			// Check if error is due to body size limit
+			var maxBytesErr *http.MaxBytesError
+			if errors.As(err, &maxBytesErr) {
+				http.Error(w, "request body too large", http.StatusRequestEntityTooLarge)
+				return
+			}
 			http.Error(w, "invalid JSON payload", http.StatusBadRequest)
 			return
 		}

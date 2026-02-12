@@ -87,7 +87,7 @@ func (b *BluetoothBackend) NewPairing() error {
 	// Prevent concurrent pairing sessions
 	if !b.pairingMu.TryLock() {
 		logger.Info("[bluetooth] pairing already in progress")
-		return nil
+		return &PairingInProgressError{}
 	}
 
 	// RegisterAgent

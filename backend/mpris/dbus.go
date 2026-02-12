@@ -1,6 +1,7 @@
 package mpris
 
 import (
+	"context"
 	"strings"
 	"time"
 
@@ -23,9 +24,11 @@ func validateBusName(busName string) error {
 }
 
 // callWithTimeout executes a D-Bus call with timeout
-func callWithTimeout(call *dbus.Call, timeout time.Duration) error {
-	done := make(chan error, 1)
+func callWithTimeout(ctx context.Context, call *dbus.Call, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
 
+	done := make(chan error, 1)
 	go func() {
 		done <- call.Err
 	}()
@@ -33,14 +36,15 @@ func callWithTimeout(call *dbus.Call, timeout time.Duration) error {
 	select {
 	case err := <-done:
 		return err
-	case <-time.After(timeout):
+	case <-ctx.Done():
+		// Context cancelled or timeout
 		return &dbusTimeoutError{}
 	}
 }
 
 // callWithTimeout receiver method for MPRISBackend
 func (m *MPRISBackend) callWithTimeout(call *dbus.Call) error {
-	return callWithTimeout(call, m.timeout)
+	return callWithTimeout(m.ctx, call, m.timeout)
 }
 
 // callMethod calls an MPRIS method on a player with timeout
@@ -153,7 +157,7 @@ func extractMetadataMap(v dbus.Variant) (map[string]dbus.Variant, bool) {
 
 // callWithTimeout receiver method for Player
 func (p *Player) callWithTimeout(call *dbus.Call) error {
-	return callWithTimeout(call, p.timeout)
+	return callWithTimeout(p.backend.ctx, call, p.timeout)
 }
 
 // getAllProperties retrieves all properties of a D-Bus interface in a single call
