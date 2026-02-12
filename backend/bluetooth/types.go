@@ -33,6 +33,12 @@ func (e *bluetoothUnsupportedError) Error() string {
 	return "bluetooth not supported"
 }
 
+type PairingInProgressError struct{}
+
+func (e *PairingInProgressError) Error() string {
+	return "pairing already in progress"
+}
+
 // BluetoothDevice represents a known Bluetooth device
 type BluetoothDevice struct {
 	Address   string `json:"address"`
