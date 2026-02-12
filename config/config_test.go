@@ -1,6 +1,7 @@
 package config
 
 import (
+	"net"
 	"os"
 	"testing"
 
@@ -608,5 +609,106 @@ func TestNew_SecurityDefaults(t *testing.T) {
 				t.Errorf("%s: got %v, want %v", tt.errorMsg, tt.got, tt.want)
 			}
 		})
+	}
+}
+
+// Tests for network interface helpers
+
+func TestGetAllActiveInterfaces(t *testing.T) {
+	interfaces := getAllActiveInterfaces()
+
+	// Should return some interfaces (at least loopback exists on all systems)
+	// But getAllActiveInterfaces filters out loopback, so may return empty on minimal systems
+	for _, iface := range interfaces {
+		// Verify no loopback interfaces
+		if iface.Flags&net.FlagLoopback != 0 {
+			t.Errorf("getAllActiveInterfaces() returned loopback interface: %s", iface.Name)
+		}
+
+		// Verify all interfaces are UP
+		if iface.Flags&net.FlagUp == 0 {
+			t.Errorf("getAllActiveInterfaces() returned DOWN interface: %s", iface.Name)
+		}
+	}
+}
+
+func TestGetZeroconfInterfaces_Localhost(t *testing.T) {
+	// Localhost should return nil (no zeroconf on loopback)
+	interfaces := getZeroconfInterfaces("127.0.0.1")
+
+	if interfaces != nil {
+		t.Errorf("getZeroconfInterfaces(127.0.0.1) = %v, want nil (no zeroconf on localhost)", interfaces)
+	}
+}
+
+func TestGetZeroconfInterfaces_AllInterfaces(t *testing.T) {
+	// 0.0.0.0 should return all active non-loopback interfaces
+	interfaces := getZeroconfInterfaces("0.0.0.0")
+
+	// Should call getAllActiveInterfaces() which filters loopback
+	for _, iface := range interfaces {
+		if iface.Flags&net.FlagLoopback != 0 {
+			t.Errorf("getZeroconfInterfaces(0.0.0.0) returned loopback interface: %s", iface.Name)
+		}
+		if iface.Flags&net.FlagUp == 0 {
+			t.Errorf("getZeroconfInterfaces(0.0.0.0) returned DOWN interface: %s", iface.Name)
+		}
+	}
+}
+
+func TestGetZeroconfInterfaces_InvalidIP(t *testing.T) {
+	tests := []string{
+		"not-an-ip",
+		"999.999.999.999",
+		"192.168.1.999",
+		"",
+	}
+
+	for _, ip := range tests {
+		t.Run(ip, func(t *testing.T) {
+			interfaces := getZeroconfInterfaces(ip)
+
+			// Invalid IPs should return nil (with warning logged)
+			if interfaces != nil {
+				t.Errorf("getZeroconfInterfaces(%q) = %v, want nil for invalid IP", ip, interfaces)
+			}
+		})
+	}
+}
+
+func TestGetZeroconfInterfaces_NonexistentIP(t *testing.T) {
+	// IP that's valid but doesn't exist on this machine
+	nonexistentIP := "192.168.99.99"
+	interfaces := getZeroconfInterfaces(nonexistentIP)
+
+	// Should return nil since no interface has this IP
+	if interfaces != nil {
+		t.Errorf("getZeroconfInterfaces(%q) = %v, want nil for nonexistent IP", nonexistentIP, interfaces)
+	}
+}
+
+func TestNew_ZeroconfAllInterfaces(t *testing.T) {
+	viper.Reset()
+	viper.Set("bind", "0.0.0.0")
+
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
+
+	cfg, err := New(nil)
+	if err != nil {
+		t.Fatalf("New(nil) returned error: %v", err)
+	}
+
+	if !cfg.Zeroconf.Enabled {
+		t.Error("Zeroconf.Enabled should be true by default")
+	}
+
+	// With bind=0.0.0.0, should have interfaces populated
+	// (may be 0 on minimal test environments with no network)
+	// Main assertion: no loopback interfaces
+	for _, iface := range cfg.Zeroconf.Listen {
+		if iface.Flags&net.FlagLoopback != 0 {
+			t.Errorf("Zeroconf.Listen contains loopback interface: %s", iface.Name)
+		}
 	}
 }
