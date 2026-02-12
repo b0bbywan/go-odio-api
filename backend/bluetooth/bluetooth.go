@@ -162,54 +162,101 @@ func (b *BluetoothBackend) waitPairing(ctx context.Context) {
 		b.pairingMu.Unlock()
 	}()
 
-	ticker := time.NewTicker(2 * time.Second)
-	defer ticker.Stop()
+	// Setup D-Bus signal listener for device property changes
+	signals := make(chan *dbus.Signal, 10)
+	b.conn.Signal(signals)
+	defer b.conn.RemoveSignal(signals)
+
+	// Subscribe to PropertiesChanged signals for Bluetooth devices
+	matchRule := "type='signal',interface='" + DBUS_PROP_IFACE + "',member='PropertiesChanged',path_namespace='/org/bluez'"
+	if err := b.addMatchRule(matchRule); err != nil {
+		logger.Warn("[bluetooth] failed to add match rule: %v", err)
+		return
+	}
+	defer b.removeMatchRule(matchRule)
+
+	logger.Info("[bluetooth] listening for device connection attempts via D-Bus signals")
 
 	for {
 		select {
 		case <-subCtx.Done():
 			logger.Info("[bluetooth] pairing stopped")
 			return
-		case <-ticker.C:
-			logger.Debug("[bluetooth] polling for new devices to pair")
-			devices, err := b.listDevices()
-			if err != nil {
-				logger.Warn("[bluetooth] failed to list devices: %v", err)
-				continue
+		case sig, ok := <-signals:
+			if !ok {
+				logger.Info("[bluetooth] signal channel closed")
+				return
 			}
-
-			logger.Debug("[bluetooth] found %d devices available for pairing", len(devices))
-			for _, d := range devices {
-				logger.Debug("[bluetooth] checking device %v", d)
-				trusted, ok := b.isDeviceTrusted(d)
-				if !ok {
-					logger.Debug("[bluetooth] unable to check trust state for %v", d)
-					continue
-				}
-
-				if !trusted {
-					logger.Info("[bluetooth] new device detected %v, initiating pairing", d)
-					// Call Pair() to trigger actual pairing process with agent
-					if err := b.pairDevice(d); err != nil {
-						logger.Warn("[bluetooth] pairing failed for %v: %v", d, err)
-						continue
-					}
-
-					// After successful pairing, trust the device
-					if ok := b.trustDevice(d); ok {
-						logger.Info("[bluetooth] device %v paired and trusted successfully", d)
-						b.refreshKnownDevices()
-						return
-					} else {
-						logger.Warn("[bluetooth] device %v paired but failed to trust", d)
-					}
-				} else {
-					logger.Debug("[bluetooth] device %v is already trusted", d)
-				}
-			}
+			b.handlePairingSignal(sig, subCtx, cancel)
 		}
 	}
+}
 
+func (b *BluetoothBackend) handlePairingSignal(sig *dbus.Signal, ctx context.Context, cancel context.CancelFunc) {
+	// Only handle PropertiesChanged signals
+	if sig.Name != DBUS_PROP_CHANGED_SIGNAL {
+		return
+	}
+
+	// sig.Body[0] = interface name (should be "org.bluez.Device1")
+	// sig.Body[1] = changed properties map
+	// sig.Body[2] = invalidated properties (optional)
+	if len(sig.Body) < 2 {
+		return
+	}
+
+	iface, ok := sig.Body[0].(string)
+	if !ok || iface != BLUETOOTH_DEVICE {
+		return
+	}
+
+	props, ok := sig.Body[1].(map[string]dbus.Variant)
+	if !ok {
+		return
+	}
+
+	// Check if Connected property changed to true
+	connectedVar, hasConnected := props[BT_PROP_CONNECTED]
+	if !hasConnected {
+		return
+	}
+
+	connected, ok := connectedVar.Value().(bool)
+	if !ok || !connected {
+		return
+	}
+
+	// A device is trying to connect!
+	devicePath := sig.Path
+	logger.Info("[bluetooth] device %v attempting connection, initiating pairing", devicePath)
+
+	// Check if already trusted
+	trusted, ok := b.isDeviceTrusted(devicePath)
+	if !ok {
+		logger.Debug("[bluetooth] unable to check trust state for %v", devicePath)
+		return
+	}
+
+	if trusted {
+		logger.Debug("[bluetooth] device %v is already trusted", devicePath)
+		return
+	}
+
+	// Attempt pairing
+	if err := b.pairDevice(devicePath); err != nil {
+		logger.Warn("[bluetooth] pairing failed for %v: %v", devicePath, err)
+		return
+	}
+
+	// After successful pairing, trust the device
+	if ok := b.trustDevice(devicePath); ok {
+		logger.Info("[bluetooth] device %v paired and trusted successfully", devicePath)
+		b.refreshKnownDevices()
+		// Cancel context to stop pairing mode
+		cancel()
+	} else {
+		logger.Warn("[bluetooth] device %v paired but failed to trust", devicePath)
+	}
 }
 
 func (b *BluetoothBackend) Close() {

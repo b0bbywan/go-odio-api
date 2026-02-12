@@ -385,3 +385,15 @@ func (b *BluetoothBackend) StopDiscovery() error {
 	logger.Debug("[bluetooth] discovery scan stopped")
 	return nil
 }
+
+// addMatchRule adds a D-Bus match rule to filter signals
+func (b *BluetoothBackend) addMatchRule(rule string) error {
+	call := b.conn.BusObject().Call(DBUS_ADD_MATCH_METHOD, 0, rule)
+	return b.callWithTimeout(call)
+}
+
+// removeMatchRule removes a D-Bus match rule
+func (b *BluetoothBackend) removeMatchRule(rule string) error {
+	call := b.conn.BusObject().Call(DBUS_REMOVE_MATCH_METHOD, 0, rule)
+	return b.callWithTimeout(call)
+}
