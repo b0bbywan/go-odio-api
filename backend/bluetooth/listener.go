@@ -2,7 +2,6 @@ package bluetooth
 
 import (
 	"context"
-	"time"
 
 	"github.com/godbus/dbus/v5"
 
@@ -67,22 +66,28 @@ func (l *BluetoothListener) listen() {
 				logger.Debug("[bluetooth] %s signal channel closed", l.name)
 				return
 			}
-			l.handleSignal(sig)
+			// Handler returns true to continue, false to stop
+			if !l.handleSignal(sig) {
+				return
+			}
 		}
 	}
 }
 
-// handleSignal processes a D-Bus signal using the filter and handler
-func (l *BluetoothListener) handleSignal(sig *dbus.Signal) {
+// handleSignal processes a D-Bus signal using the filter and handler.
+// Returns true to continue listening, false to stop.
+func (l *BluetoothListener) handleSignal(sig *dbus.Signal) bool {
 	// Apply filter - skip if not interested
 	if l.filter != nil && !l.filter(sig) {
-		return
+		return true // Continue
 	}
 
-	// Execute handler
+	// Execute handler - it returns true/false to control lifecycle
 	if l.handler != nil {
-		l.handler(sig)
+		return l.handler(sig)
 	}
+
+	return true // Continue by default
 }
 
 // Stop stops the listener
@@ -92,10 +97,13 @@ func (l *BluetoothListener) Stop() {
 }
 
 // ============================================================================
-// Pairing Listener - Auto-managed lifecycle like MPRIS heartbeat
+// Pairing Listener - Simple event-driven, context-managed lifecycle
 // ============================================================================
 
-// PairingListener listens for device connections and auto-stops after pairing
+// PairingListener listens for device connections during pairing mode.
+// Lifecycle managed by context timeout - stops when:
+// 1. Device successfully paired (handler returns false)
+// 2. Context timeout expires (from waitPairing)
 type PairingListener struct {
 	backend *BluetoothBackend
 	ctx     context.Context
@@ -103,7 +111,7 @@ type PairingListener struct {
 	signals chan *dbus.Signal
 }
 
-// NewPairingListener creates a pairing listener with auto-managed lifecycle
+// NewPairingListener creates a pairing listener
 func NewPairingListener(backend *BluetoothBackend, ctx context.Context) *PairingListener {
 	listenerCtx, cancel := context.WithCancel(ctx)
 
@@ -131,7 +139,7 @@ func (l *PairingListener) Start() error {
 	return nil
 }
 
-// run is the main pairing loop (like MPRIS heartbeat)
+// run is the main pairing loop - simple event-driven
 func (l *PairingListener) run(matchRule string) {
 	defer func() {
 		if err := l.backend.removeMatchRule(matchRule); err != nil {
@@ -141,63 +149,58 @@ func (l *PairingListener) run(matchRule string) {
 		logger.Debug("[bluetooth] pairing listener stopped")
 	}()
 
-	ticker := time.NewTicker(1 * time.Second)
-	defer ticker.Stop()
-
 	for {
 		select {
 		case <-l.ctx.Done():
+			// Timeout or explicit stop
 			return
-
-		case <-ticker.C:
-			// Periodic check: did we pair a device?
-			hasPaired := l.checkPairingComplete()
-			if hasPaired {
-				logger.Info("[bluetooth] device paired, auto-stopping listener")
-				return // Auto-stop like MPRIS heartbeat ✓
-			}
 
 		case sig, ok := <-l.signals:
 			if !ok {
 				logger.Debug("[bluetooth] pairing signal channel closed")
 				return
 			}
-			l.handleSignal(sig)
+			// Handle signal - returns false if pairing successful (stop listening)
+			if !l.handleSignal(sig) {
+				logger.Info("[bluetooth] pairing successful, stopping listener")
+				return
+			}
 		}
 	}
 }
 
-// handleSignal processes PropertiesChanged signals for device connections
-func (l *PairingListener) handleSignal(sig *dbus.Signal) {
+// handleSignal processes PropertiesChanged signals for device connections.
+// Returns true to continue listening, false to stop (pairing successful).
+func (l *PairingListener) handleSignal(sig *dbus.Signal) bool {
 	// Only handle PropertiesChanged signals
 	if sig.Name != DBUS_PROP_CHANGED_SIGNAL {
-		return
+		return true
 	}
 
 	if len(sig.Body) < 2 {
-		return
+		return true
 	}
 
 	// Check interface is org.bluez.Device1
 	iface, ok := sig.Body[0].(string)
 	if !ok || iface != BLUETOOTH_DEVICE {
-		return
+		return true
 	}
 
 	props, ok := sig.Body[1].(map[string]dbus.Variant)
 	if !ok {
-		return
+		return true
 	}
 
 	// Check if Connected property changed to true
 	connectedVar, hasConnected := props[BT_PROP_CONNECTED]
 	if !hasConnected {
-		return
+		return true
 	}
 
 	connected, ok := connectedVar.Value().(bool)
 	if !ok || !connected {
-		return
+		return true
 	}
 
 	// Device attempting connection - try to pair
@@ -208,48 +211,29 @@ func (l *PairingListener) handleSignal(sig *dbus.Signal) {
 	trusted, ok := l.backend.isDeviceTrusted(devicePath)
 	if !ok {
 		logger.Debug("[bluetooth] unable to check trust state for %v", devicePath)
-		return
+		return true // Continue listening
 	}
 
 	if trusted {
 		logger.Debug("[bluetooth] device %v is already trusted", devicePath)
-		return
+		return true // Continue listening
 	}
 
 	// Attempt pairing
 	if err := l.backend.pairDevice(devicePath); err != nil {
 		logger.Warn("[bluetooth] pairing failed for %v: %v", devicePath, err)
-		return
+		return true // Continue listening for next device
 	}
 
 	// After successful pairing, trust the device
 	if ok := l.backend.trustDevice(devicePath); ok {
 		logger.Info("[bluetooth] device %v paired and trusted successfully", devicePath)
 		l.backend.refreshKnownDevices()
-		// Note: listener will auto-stop on next ticker check
-	} else {
-		logger.Warn("[bluetooth] device %v paired but failed to trust", devicePath)
-	}
-}
-
-// checkPairingComplete checks if any device has been successfully paired
-// Returns true if pairing is complete (should stop listening)
-func (l *PairingListener) checkPairingComplete() bool {
-	devices, err := l.backend.listKnownDevices()
-	if err != nil {
-		return false
+		return false // Stop listening - mission complete!
 	}
 
-	// Check if we have at least one trusted device that wasn't there before
-	// For simplicity, we check if ANY device is both Connected and Trusted
-	for _, device := range devices {
-		if device.Connected && device.Trusted {
-			logger.Debug("[bluetooth] found paired device: %s (%s)", device.Name, device.Address)
-			return true
-		}
-	}
-
-	return false
+	logger.Warn("[bluetooth] device %v paired but failed to trust", devicePath)
+	return true // Continue listening
 }
 
 // Stop stops the pairing listener
@@ -274,10 +258,11 @@ func (l *PairingListener) Stop() {
 //         ...
 //     }
 //
-//     handler := func(sig *dbus.Signal) {
+//     handler := func(sig *dbus.Signal) bool {
 //         // Track last activity time
 //         // If no devices connected for idleTimeout, power off
 //         ...
+//         return true // Continue
 //     }
 //
 //     return NewBluetoothListener(backend, ctx, matchRule, filter, handler, "idle")

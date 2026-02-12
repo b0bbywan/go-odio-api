@@ -60,8 +60,9 @@ type BluetoothStatus struct {
 // SignalFilter determines if a D-Bus signal should be processed
 type SignalFilter func(*dbus.Signal) bool
 
-// SignalHandler processes a D-Bus signal
-type SignalHandler func(*dbus.Signal)
+// SignalHandler processes a D-Bus signal.
+// Returns true to continue listening, false to stop the listener.
+type SignalHandler func(*dbus.Signal) bool
 
 // BluetoothListener is a generic D-Bus signal listener for Bluetooth events
 type BluetoothListener struct {
