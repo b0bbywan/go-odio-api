@@ -358,4 +358,3 @@ func (b *BluetoothBackend) unregisterAgent() {
 
 	b.agent = nil
 }
-
