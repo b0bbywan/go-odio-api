@@ -85,7 +85,6 @@ func New() (*Config, error) {
 
 	viper.SetDefault("pulseaudio.enabled", true)
 
-
 	viper.SetDefault("mpris.enabled", true)
 	viper.SetDefault("mpris.timeout", "5s")
 
