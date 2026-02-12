@@ -145,7 +145,15 @@ func (b *BluetoothBackend) listDevices() ([]dbus.ObjectPath, error) {
 			return true
 		}
 
-		// Device is not trusted, add it for pairing
+		// Only pair with devices that are actively trying to connect
+		// This avoids trying to pair with random nearby devices
+		connected := extractBoolProp(props, BT_PROP_CONNECTED)
+		if !connected {
+			// Device not currently connecting, skip it
+			return true
+		}
+
+		// Device is not trusted and actively connecting, add it for pairing
 		devices = append(devices, path)
 		return true
 	})
@@ -367,6 +375,9 @@ func (b *BluetoothBackend) StartDiscovery() error {
 
 // StopDiscovery stops scanning for nearby Bluetooth devices
 func (b *BluetoothBackend) StopDiscovery() error {
+	if b.conn == nil {
+		return nil // Connection already closed, nothing to do
+	}
 	adapter := b.getObj(BLUETOOTH_PREFIX, BLUETOOTH_PATH)
 	if err := b.callMethod(adapter, BLUETOOTH_ADAPTER+".StopDiscovery"); err != nil {
 		return err
