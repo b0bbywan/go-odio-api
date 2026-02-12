@@ -231,7 +231,7 @@ func (b *BluetoothBackend) registerAgent() error {
 		return nil
 	}
 
-	agent := bluezAgent{}
+	agent := bluezAgent{backend: b}
 	if err := b.exportAgent(&agent); err != nil {
 		return err
 	}
