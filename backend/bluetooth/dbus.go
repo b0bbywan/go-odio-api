@@ -127,40 +127,6 @@ func (b *BluetoothBackend) iterateAdapterDevices(fn func(path dbus.ObjectPath, p
 	return nil
 }
 
-func (b *BluetoothBackend) listDevices() ([]dbus.ObjectPath, error) {
-	devices := []dbus.ObjectPath{}
-
-	err := b.iterateAdapterDevices(func(path dbus.ObjectPath, props map[string]dbus.Variant) bool {
-		// Make a live D-Bus call to check current trust state
-		// This ensures we don't use stale data from managed objects snapshot
-		trusted, ok := b.isDeviceTrusted(path)
-		if !ok {
-			// Can't determine trust state, skip this device
-			logger.Warn("[bluetooth] unable to determine trust state for device %v", path)
-			return true
-		}
-
-		if trusted {
-			// Device is already trusted, skip it
-			return true
-		}
-
-		// Only pair with devices that are actively trying to connect
-		// This avoids trying to pair with random nearby devices
-		connected := extractBoolProp(props, BT_PROP_CONNECTED)
-		if !connected {
-			// Device not currently connecting, skip it
-			return true
-		}
-
-		// Device is not trusted and actively connecting, add it for pairing
-		devices = append(devices, path)
-		return true
-	})
-
-	return devices, err
-}
-
 func (b *BluetoothBackend) listKnownDevices() ([]BluetoothDevice, error) {
 	devices := []BluetoothDevice{}
 
@@ -231,7 +197,7 @@ func (b *BluetoothBackend) isDeviceTrusted(path dbus.ObjectPath) (bool, bool) {
 func (b *BluetoothBackend) pairDevice(path dbus.ObjectPath) error {
 	logger.Debug("[bluetooth] attempting to pair device %v", path)
 	obj := b.getObj(BLUETOOTH_PREFIX, string(path))
-	if err := b.callMethod(obj, "org.bluez.Device1.Pair"); err != nil {
+	if err := b.callMethod(obj, DEVICE_PAIR_METHOD); err != nil {
 		logger.Warn("[bluetooth] failed to pair device %v: %v", path, err)
 		return err
 	}

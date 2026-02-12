@@ -5,14 +5,14 @@ const (
 	BLUETOOTH_ADAPTER = BLUETOOTH_PREFIX + ".Adapter1"
 	BLUETOOTH_DEVICE  = BLUETOOTH_PREFIX + ".Device1"
 
-	DBUS_INTERFACE          = "org.freedesktop.DBus"
-	DBUS_PROP_IFACE         = DBUS_INTERFACE + ".Properties"
-	DBUS_PROP_SET           = DBUS_PROP_IFACE + ".Set"
-	DBUS_PROP_GET           = DBUS_PROP_IFACE + ".Get"
+	DBUS_INTERFACE           = "org.freedesktop.DBus"
+	DBUS_PROP_IFACE          = DBUS_INTERFACE + ".Properties"
+	DBUS_PROP_SET            = DBUS_PROP_IFACE + ".Set"
+	DBUS_PROP_GET            = DBUS_PROP_IFACE + ".Get"
 	DBUS_PROP_CHANGED_SIGNAL = DBUS_PROP_IFACE + ".PropertiesChanged"
-	DBUS_ADD_MATCH_METHOD   = DBUS_INTERFACE + ".AddMatch"
+	DBUS_ADD_MATCH_METHOD    = DBUS_INTERFACE + ".AddMatch"
 	DBUS_REMOVE_MATCH_METHOD = DBUS_INTERFACE + ".RemoveMatch"
-	MANAGED_OBJECTS         = DBUS_INTERFACE + ".ObjectManager.GetManagedObjects"
+	MANAGED_OBJECTS          = DBUS_INTERFACE + ".ObjectManager.GetManagedObjects"
 
 	AGENT_IFACE   = BLUETOOTH_PREFIX + ".Agent1"
 	AGENT_MANAGER = BLUETOOTH_PREFIX + ".AgentManager1"
@@ -20,6 +20,10 @@ const (
 	REGISTER_AGENT   = AGENT_MANAGER + ".RegisterAgent"
 	REQUEST_AGENT    = AGENT_MANAGER + ".RequestDefaultAgent"
 	UNREGISTER_AGENT = AGENT_MANAGER + ".UnregisterAgent"
+
+	DEVICE_PAIR_METHOD = BLUETOOTH_DEVICE + ".Pair"
+
+	BLUEZ_ERROR_ALREADY_EXISTS = BLUETOOTH_PREFIX + ".Error.AlreadyExists"
 
 	BLUEZ_PATH     = "/org/bluez"
 	BLUETOOTH_PATH = BLUEZ_PATH + "/hci0"

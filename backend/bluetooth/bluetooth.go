@@ -92,7 +92,7 @@ func (b *BluetoothBackend) NewPairing() error {
 
 	// RegisterAgent
 	if err := b.registerAgent(); err != nil {
-		if dbusErr, ok := err.(*dbus.Error); ok && dbusErr.Name == "org.bluez.Error.AlreadyExists" {
+		if dbusErr, ok := err.(*dbus.Error); ok && dbusErr.Name == BLUEZ_ERROR_ALREADY_EXISTS {
 			logger.Info("[bluetooth] agent already registered")
 		} else {
 			logger.Warn("[bluetooth] failed to register agent: %v", err)

@@ -50,7 +50,9 @@ func (l *BluetoothListener) Start() error {
 // listen continuously listens to D-Bus signals
 func (l *BluetoothListener) listen() {
 	defer func() {
-		l.backend.removeMatchRule(l.matchRule)
+		if err := l.backend.removeMatchRule(l.matchRule); err != nil {
+			logger.Warn("[bluetooth] failed to remove match rule for %s listener: %v", l.name, err)
+		}
 		l.backend.conn.RemoveSignal(l.signals)
 		logger.Debug("[bluetooth] %s listener stopped", l.name)
 	}()
