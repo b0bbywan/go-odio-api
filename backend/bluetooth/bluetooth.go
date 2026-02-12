@@ -121,6 +121,11 @@ func (b *BluetoothBackend) NewPairing() error {
 		return err
 	}
 
+	// Start discovery scan to find nearby devices
+	if err := b.StartDiscovery(); err != nil {
+		return err
+	}
+
 	// Track pairing state
 	pairingUntil := time.Now().Add(b.pairingTimeout)
 	b.updateStatus(func(s *BluetoothStatus) {
@@ -141,6 +146,9 @@ func (b *BluetoothBackend) waitPairing(ctx context.Context) {
 	subCtx, cancel := context.WithTimeout(ctx, b.pairingTimeout)
 	defer func() {
 		logger.Info("[bluetooth] resetting adapter state after pairing")
+		if err := b.StopDiscovery(); err != nil {
+			logger.Debug("[bluetooth] failed to stop discovery: %v", err)
+		}
 		if err := b.SetDiscoverableAndPairable(false); err != nil {
 			logger.Warn("[bluetooth] failed to reset adapter state after pairing: %v", err)
 		}

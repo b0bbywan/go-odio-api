@@ -354,3 +354,23 @@ func (b *BluetoothBackend) unregisterAgent() {
 
 	b.agent = nil
 }
+
+// StartDiscovery starts scanning for nearby Bluetooth devices
+func (b *BluetoothBackend) StartDiscovery() error {
+	adapter := b.getObj(BLUETOOTH_PREFIX, BLUETOOTH_PATH)
+	if err := b.callMethod(adapter, BLUETOOTH_ADAPTER+".StartDiscovery"); err != nil {
+		return err
+	}
+	logger.Debug("[bluetooth] discovery scan started")
+	return nil
+}
+
+// StopDiscovery stops scanning for nearby Bluetooth devices
+func (b *BluetoothBackend) StopDiscovery() error {
+	adapter := b.getObj(BLUETOOTH_PREFIX, BLUETOOTH_PATH)
+	if err := b.callMethod(adapter, BLUETOOTH_ADAPTER+".StopDiscovery"); err != nil {
+		return err
+	}
+	logger.Debug("[bluetooth] discovery scan stopped")
+	return nil
+}
