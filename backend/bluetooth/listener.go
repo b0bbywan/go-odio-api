@@ -43,6 +43,7 @@ func (l *BluetoothListener) Start() error {
 		return err
 	}
 
+	l.backend.wg.Add(1)
 	go l.listen()
 
 	logger.Info("[bluetooth] %s listener started", l.name)
@@ -51,6 +52,7 @@ func (l *BluetoothListener) Start() error {
 
 // listen continuously listens to D-Bus signals
 func (l *BluetoothListener) listen() {
+	defer l.backend.wg.Done()
 	defer func() {
 		if err := l.backend.removeMatchRule(l.matchRule); err != nil {
 			logger.Warn("[bluetooth] failed to remove match rule for %s listener: %v", l.name, err)

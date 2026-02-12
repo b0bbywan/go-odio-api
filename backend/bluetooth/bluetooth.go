@@ -140,6 +140,7 @@ func (b *BluetoothBackend) NewPairing() error {
 		s.PairingUntil = &pairingUntil
 	})
 
+	b.wg.Add(1)
 	go b.waitPairing(b.ctx)
 	logger.Info("[bluetooth] Bluetooth pairing mode enabled")
 
@@ -147,6 +148,7 @@ func (b *BluetoothBackend) NewPairing() error {
 }
 
 func (b *BluetoothBackend) waitPairing(ctx context.Context) {
+	defer b.wg.Done()
 	subCtx, cancel := context.WithTimeout(ctx, b.pairingTimeout)
 	defer func() {
 		logger.Info("[bluetooth] resetting adapter state after pairing")
@@ -186,6 +188,10 @@ func (b *BluetoothBackend) Close() {
 	if err := b.PowerDown(); err != nil {
 		logger.Warn("[bluetooth] Failed power off adapter at shutdown: %v", err)
 	}
+
+	// Wait for goroutines (listeners, waitPairing) to finish cleanup
+	// before closing the D-Bus connection they depend on.
+	b.wg.Wait()
 
 	if b.conn != nil {
 		if err := b.conn.Close(); err != nil {

@@ -18,6 +18,7 @@ type BluetoothBackend struct {
 	idleTimeout    time.Duration
 	agent          *bluezAgent
 	pairingMu      sync.Mutex
+	wg             sync.WaitGroup
 	idleListener   *BluetoothListener
 	// permanent cache (no expiration) for status tracking
 	statusCache *cache.Cache[BluetoothStatus]
