@@ -8,11 +8,11 @@ import (
 	"github.com/b0bbywan/go-odio-api/logger"
 )
 
-// callWithContext executes a D-Bus method call with the backend's timeout context.
-// Unlike the previous callWithTimeout, this passes the context to the D-Bus call itself,
-// so the call is actually cancelled on timeout instead of just racing a post-hoc check.
+// callWithContext executes a D-Bus method call with a standalone timeout.
+// Uses context.Background() so that calls still work during shutdown cleanup.
+// The timeout is the only safeguard needed against hanging calls.
 func (b *BluetoothBackend) callWithContext(obj dbus.BusObject, method string, args ...interface{}) *dbus.Call {
-	ctx, cancel := context.WithTimeout(b.ctx, b.timeout)
+	ctx, cancel := context.WithTimeout(context.Background(), b.timeout)
 	defer cancel()
 	return obj.CallWithContext(ctx, method, 0, args...)
 }
