@@ -11,31 +11,31 @@ import (
 )
 
 type Backend struct {
+	MPRIS    *mpris.MPRISBackend
 	Pulse    *pulseaudio.PulseAudioBackend
 	Systemd  *systemd.SystemdBackend
-	MPRIS    *mpris.MPRISBackend
 	Zeroconf *zeroconf.ZeroConfBackend
 }
 
 func New(
 	ctx context.Context,
-	syscfg *config.SystemdConfig,
-	pulscfg *config.PulseAudioConfig,
 	mpriscfg *config.MPRISConfig,
+	pulscfg *config.PulseAudioConfig,
+	syscfg *config.SystemdConfig,
 	zerocfg *config.ZeroConfig,
 ) (*Backend, error) {
 	var b Backend
 	var err error
+
+	if b.MPRIS, err = mpris.New(ctx, mpriscfg); err != nil {
+		return nil, err
+	}
 
 	if b.Pulse, err = pulseaudio.New(ctx, pulscfg); err != nil {
 		return nil, err
 	}
 
 	if b.Systemd, err = systemd.New(ctx, syscfg); err != nil {
-		return nil, err
-	}
-
-	if b.MPRIS, err = mpris.New(ctx, mpriscfg); err != nil {
 		return nil, err
 	}
 
@@ -47,6 +47,12 @@ func New(
 }
 
 func (b *Backend) Start() error {
+	if b.MPRIS != nil {
+		if err := b.MPRIS.Start(); err != nil {
+			return err
+		}
+	}
+
 	if b.Pulse != nil {
 		if err := b.Pulse.Start(); err != nil {
 			return err
@@ -55,12 +61,6 @@ func (b *Backend) Start() error {
 
 	if b.Systemd != nil {
 		if err := b.Systemd.Start(); err != nil {
-			return err
-		}
-	}
-
-	if b.MPRIS != nil {
-		if err := b.MPRIS.Start(); err != nil {
 			return err
 		}
 	}
@@ -75,14 +75,14 @@ func (b *Backend) Start() error {
 }
 
 func (b *Backend) Close() {
+	if b.MPRIS != nil {
+		b.MPRIS.Close()
+	}
 	if b.Pulse != nil {
 		b.Pulse.Close()
 	}
 	if b.Systemd != nil {
 		b.Systemd.Close()
-	}
-	if b.MPRIS != nil {
-		b.MPRIS.Close()
 	}
 	if b.Zeroconf != nil {
 		b.Zeroconf.Close()
