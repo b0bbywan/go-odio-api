@@ -235,7 +235,7 @@ func (b *BluetoothBackend) SetDiscoverableAndPairable(state bool) error {
 
 func (b *BluetoothBackend) PowerOnAdapter(state bool) error {
 	if err := b.setAdapterProp(BT_STATE_POWERED.toString(), state); err != nil {
-		logger.Warn("[bluetooth] failed to set adapter discoverable %v: %v", state, err)
+		logger.Warn("[bluetooth] failed to set adapter powered %v: %v", state, err)
 		return err
 	}
 	return nil
@@ -292,7 +292,7 @@ func (b *BluetoothBackend) RequestNoInputOutputAgent(manager dbus.BusObject) err
 		dbus.ObjectPath(AGENT_PATH),
 		AGENT_CAPABILITY,
 	); err != nil {
-		logger.Warn("[bluetooth] failed to set agent capability %s timeout: %v", AGENT_CAPABILITY, err)
+		logger.Warn("[bluetooth] failed to register agent with capability %s: %v", AGENT_CAPABILITY, err)
 		return err
 	}
 
@@ -337,9 +337,6 @@ func (b *BluetoothBackend) StartDiscovery() error {
 
 // StopDiscovery stops scanning for nearby Bluetooth devices
 func (b *BluetoothBackend) StopDiscovery() error {
-	if b.conn == nil {
-		return nil // Connection already closed, nothing to do
-	}
 	adapter := b.getObj(BLUETOOTH_PREFIX, BLUETOOTH_PATH)
 	if err := b.callMethod(adapter, BLUETOOTH_ADAPTER+".StopDiscovery"); err != nil {
 		return err

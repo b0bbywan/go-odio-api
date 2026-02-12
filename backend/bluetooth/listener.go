@@ -2,6 +2,7 @@ package bluetooth
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/godbus/dbus/v5"
@@ -96,9 +97,12 @@ func (l *BluetoothListener) handleSignal(sig *dbus.Signal) bool {
 	return true // Continue by default
 }
 
-// Stop stops the listener
+// Stop stops the listener and runs any additional cleanup (e.g. idle timer)
 func (l *BluetoothListener) Stop() {
 	logger.Debug("[bluetooth] stopping %s listener", l.name)
+	if l.onStop != nil {
+		l.onStop()
+	}
 	l.cancel()
 }
 
@@ -150,7 +154,10 @@ func deviceConnectedFilter() SignalFilter {
 // onPaired is called on successful pairing to signal completion (e.g. cancel a parent context).
 func NewPairingListener(backend *BluetoothBackend, ctx context.Context, onPaired func()) *BluetoothListener {
 	handler := func(sig *dbus.Signal) bool {
-		props := sig.Body[1].(map[string]dbus.Variant)
+		props, ok := sig.Body[1].(map[string]dbus.Variant)
+		if !ok {
+			return true
+		}
 
 		connected, ok := props[BT_PROP_CONNECTED].Value().(bool)
 		if !ok || !connected {
@@ -200,10 +207,16 @@ func NewPairingListener(backend *BluetoothBackend, ctx context.Context, onPaired
 // NewIdleListener creates a listener that monitors device connections.
 // When no devices are connected for the specified idle timeout, it powers down Bluetooth.
 func NewIdleListener(backend *BluetoothBackend, ctx context.Context, idleTimeout time.Duration) *BluetoothListener {
-	var idleTimer *time.Timer
+	var (
+		idleTimer *time.Timer
+		timerMu   sync.Mutex
+	)
 
 	handler := func(sig *dbus.Signal) bool {
-		props := sig.Body[1].(map[string]dbus.Variant)
+		props, ok := sig.Body[1].(map[string]dbus.Variant)
+		if !ok {
+			return true
+		}
 
 		connected, ok := props[BT_PROP_CONNECTED].Value().(bool)
 		if !ok {
@@ -214,11 +227,13 @@ func NewIdleListener(backend *BluetoothBackend, ctx context.Context, idleTimeout
 
 		if connected {
 			// A device connected - cancel idle timer
+			timerMu.Lock()
 			if idleTimer != nil {
 				idleTimer.Stop()
 				idleTimer = nil
 				logger.Debug("[bluetooth] idle timer cancelled - device connected")
 			}
+			timerMu.Unlock()
 			return true
 		}
 
@@ -229,19 +244,38 @@ func NewIdleListener(backend *BluetoothBackend, ctx context.Context, idleTimeout
 		}
 
 		// No devices connected - start/reset idle timer
+		timerMu.Lock()
 		if idleTimer != nil {
 			idleTimer.Stop()
 		}
 		logger.Info("[bluetooth] no connected devices, starting idle timer (%v)", idleTimeout)
 		idleTimer = time.AfterFunc(idleTimeout, func() {
+			// Guard: don't power down if the listener has been stopped (shutdown)
+			if ctx.Err() != nil {
+				return
+			}
 			logger.Info("[bluetooth] idle timeout reached, powering down")
 			if err := backend.PowerDown(); err != nil {
 				logger.Warn("[bluetooth] idle power down failed: %v", err)
 			}
 		})
+		timerMu.Unlock()
 
 		return true
 	}
 
-	return NewBluetoothListener(backend, ctx, devicePropertiesMatchRule(), deviceConnectedFilter(), handler, "idle")
+	listener := NewBluetoothListener(backend, ctx, devicePropertiesMatchRule(), deviceConnectedFilter(), handler, "idle")
+
+	// Register cleanup to stop the idle timer when the listener is stopped.
+	// This prevents a pending AfterFunc from firing during/after shutdown.
+	listener.onStop = func() {
+		timerMu.Lock()
+		defer timerMu.Unlock()
+		if idleTimer != nil {
+			idleTimer.Stop()
+			idleTimer = nil
+		}
+	}
+
+	return listener
 }

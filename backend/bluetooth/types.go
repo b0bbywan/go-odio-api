@@ -19,9 +19,10 @@ type BluetoothBackend struct {
 	agent          *bluezAgent
 	pairingMu      sync.Mutex
 	wg             sync.WaitGroup
+	idleMu         sync.Mutex           // protects idleListener
 	idleListener   *BluetoothListener
-	// permanent cache (no expiration) for status tracking
-	statusCache *cache.Cache[BluetoothStatus]
+	statusMu       sync.Mutex           // protects read-modify-write on statusCache
+	statusCache    *cache.Cache[BluetoothStatus]
 }
 
 type bluetoothUnsupportedError struct{}
@@ -71,5 +72,6 @@ type BluetoothListener struct {
 	matchRule string
 	filter    SignalFilter
 	handler   SignalHandler
-	name      string // For logging
+	name      string   // For logging
+	onStop    func()   // Optional cleanup (e.g. stop idle timer) called during Stop()
 }

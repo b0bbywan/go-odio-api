@@ -94,6 +94,14 @@ func (b *BluetoothBackend) NewPairing() error {
 		return &PairingInProgressError{}
 	}
 
+	// On error, we must unlock. On success, waitPairing's defer handles the unlock.
+	success := false
+	defer func() {
+		if !success {
+			b.pairingMu.Unlock()
+		}
+	}()
+
 	// RegisterAgent
 	if err := b.registerAgent(); err != nil {
 		if dbusErr, ok := err.(*dbus.Error); ok && dbusErr.Name == BLUEZ_ERROR_ALREADY_EXISTS {
@@ -140,6 +148,7 @@ func (b *BluetoothBackend) NewPairing() error {
 		s.PairingUntil = &pairingUntil
 	})
 
+	success = true
 	b.wg.Add(1)
 	go b.waitPairing(b.ctx)
 	logger.Info("[bluetooth] Bluetooth pairing mode enabled")
@@ -164,6 +173,10 @@ func (b *BluetoothBackend) waitPairing(ctx context.Context) {
 			s.PairingActive = false
 			s.PairingUntil = nil
 		})
+		// Restart idle listener if adapter is still on and we're not shutting down
+		if b.ctx.Err() == nil && b.isAdapterOn() {
+			b.startIdleListener()
+		}
 		cancel()
 		b.pairingMu.Unlock()
 	}()
@@ -212,6 +225,8 @@ func (b *BluetoothBackend) GetStatus() BluetoothStatus {
 
 func (b *BluetoothBackend) updateStatus(fn func(*BluetoothStatus)) {
 	const statusKey = "current"
+	b.statusMu.Lock()
+	defer b.statusMu.Unlock()
 	status, _ := b.statusCache.Get(statusKey)
 	fn(&status)
 	b.statusCache.Set(statusKey, status)
@@ -229,7 +244,10 @@ func (b *BluetoothBackend) refreshKnownDevices() {
 }
 
 func (b *BluetoothBackend) startIdleListener() {
-	b.stopIdleListener()
+	b.idleMu.Lock()
+	defer b.idleMu.Unlock()
+
+	b.stopIdleListenerLocked()
 
 	listener := NewIdleListener(b, b.ctx, b.idleTimeout)
 	if err := listener.Start(); err != nil {
@@ -240,6 +258,14 @@ func (b *BluetoothBackend) startIdleListener() {
 }
 
 func (b *BluetoothBackend) stopIdleListener() {
+	b.idleMu.Lock()
+	defer b.idleMu.Unlock()
+
+	b.stopIdleListenerLocked()
+}
+
+// stopIdleListenerLocked must be called with b.idleMu held.
+func (b *BluetoothBackend) stopIdleListenerLocked() {
 	if b.idleListener != nil {
 		b.idleListener.Stop()
 		b.idleListener = nil
