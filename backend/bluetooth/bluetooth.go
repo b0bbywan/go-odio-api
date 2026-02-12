@@ -154,7 +154,7 @@ func (b *BluetoothBackend) waitPairing(ctx context.Context) {
 		b.pairingMu.Unlock()
 	}()
 
-	ticker := time.NewTicker(500 * time.Millisecond)
+	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 
 	for {

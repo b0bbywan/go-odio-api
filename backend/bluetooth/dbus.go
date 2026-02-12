@@ -131,8 +131,6 @@ func (b *BluetoothBackend) listDevices() ([]dbus.ObjectPath, error) {
 	devices := []dbus.ObjectPath{}
 
 	err := b.iterateAdapterDevices(func(path dbus.ObjectPath, props map[string]dbus.Variant) bool {
-		logger.Debug("[bluetooth] testing managed object %v", path)
-
 		// Only keep non-trusted devices (for pairing)
 		if trustedVar, ok := props[BT_PROP_TRUSTED]; ok {
 			trusted, ok := trustedVar.Value().(bool)
@@ -146,7 +144,6 @@ func (b *BluetoothBackend) listDevices() ([]dbus.ObjectPath, error) {
 		}
 
 		devices = append(devices, path)
-		logger.Debug("[bluetooth] listed devices after pairing %v", devices)
 		return true
 	})
 
