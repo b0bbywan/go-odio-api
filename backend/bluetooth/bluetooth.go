@@ -36,6 +36,7 @@ func New(ctx context.Context, cfg *config.BluetoothConfig) (*BluetoothBackend, e
 		return nil, nil
 	}
 
+	logger.Info("[bluetooth] backend started (powered off)")
 	return &backend, nil
 }
 
@@ -231,7 +232,7 @@ func (b *BluetoothBackend) registerAgent() error {
 		return nil
 	}
 
-	agent := bluezAgent{}
+	agent := bluezAgent{backend: b}
 	if err := b.exportAgent(&agent); err != nil {
 		return err
 	}

@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/godbus/dbus/v5"
+	"github.com/godbus/dbus/v5/introspect"
 
 	"github.com/b0bbywan/go-odio-api/logger"
 )
@@ -77,10 +78,28 @@ func extractBool(v dbus.Variant) (bool, bool) {
 }
 
 func (b *BluetoothBackend) exportAgent(agent *bluezAgent) error {
+	path := agent.Path()
+	iface := agent.Interface()
+
+	// Export the agent object to D-Bus
+	if err := b.conn.Export(agent, path, iface); err != nil {
+		return err
+	}
+
+	// Export introspection data so BlueZ can discover the agent's methods
+	node := &introspect.Node{
+		Interfaces: []introspect.Interface{
+			introspect.IntrospectData,
+			{
+				Name:    iface,
+				Methods: introspect.Methods(agent),
+			},
+		},
+	}
 	return b.conn.Export(
-		agent,
-		dbus.ObjectPath(AGENT_PATH),
-		AGENT_IFACE,
+		introspect.NewIntrospectable(node),
+		path,
+		DBUS_INTROSPECTABLE,
 	)
 }
 
