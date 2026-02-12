@@ -63,6 +63,7 @@ type SignalHandler func(*dbus.Signal) bool
 // BluetoothListener is a generic D-Bus signal listener for Bluetooth events
 type BluetoothListener struct {
 	backend   *BluetoothBackend
+	conn      *dbus.Conn // snapshot at creation to avoid race with Close()
 	ctx       context.Context
 	cancel    context.CancelFunc
 	signals   chan *dbus.Signal

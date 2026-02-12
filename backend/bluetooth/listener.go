@@ -22,6 +22,7 @@ func NewBluetoothListener(
 
 	return &BluetoothListener{
 		backend:   backend,
+		conn:      backend.conn,
 		ctx:       listenerCtx,
 		cancel:    cancel,
 		signals:   make(chan *dbus.Signal, 10),
@@ -35,7 +36,7 @@ func NewBluetoothListener(
 // Start starts listening to D-Bus signals
 func (l *BluetoothListener) Start() error {
 	// Register signal channel
-	l.backend.conn.Signal(l.signals)
+	l.conn.Signal(l.signals)
 
 	// Subscribe to signals with the provided match rule
 	if err := l.backend.addMatchRule(l.matchRule); err != nil {
@@ -51,12 +52,10 @@ func (l *BluetoothListener) Start() error {
 // listen continuously listens to D-Bus signals
 func (l *BluetoothListener) listen() {
 	defer func() {
-		if l.backend.conn != nil {
-			if err := l.backend.removeMatchRule(l.matchRule); err != nil {
-				logger.Warn("[bluetooth] failed to remove match rule for %s listener: %v", l.name, err)
-			}
-			l.backend.conn.RemoveSignal(l.signals)
+		if err := l.backend.removeMatchRule(l.matchRule); err != nil {
+			logger.Warn("[bluetooth] failed to remove match rule for %s listener: %v", l.name, err)
 		}
+		l.conn.RemoveSignal(l.signals)
 		logger.Debug("[bluetooth] %s listener stopped", l.name)
 	}()
 
