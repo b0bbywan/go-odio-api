@@ -2,6 +2,7 @@ package bluetooth
 
 import (
 	"context"
+	"time"
 
 	"github.com/godbus/dbus/v5"
 
@@ -97,173 +98,128 @@ func (l *BluetoothListener) Stop() {
 }
 
 // ============================================================================
-// Pairing Listener - Simple event-driven, context-managed lifecycle
+// Shared helpers for listener construction
 // ============================================================================
 
-// PairingListener listens for device connections during pairing mode.
-// Lifecycle managed by context timeout - stops when:
-// 1. Device successfully paired (handler returns false)
-// 2. Context timeout expires (from waitPairing)
-type PairingListener struct {
-	backend *BluetoothBackend
-	ctx     context.Context
-	cancel  context.CancelFunc
-	signals chan *dbus.Signal
+// devicePropertiesMatchRule returns the D-Bus match rule for BlueZ device property changes
+func devicePropertiesMatchRule() string {
+	return "type='signal',interface='" + DBUS_PROP_IFACE + "',member='PropertiesChanged',path_namespace='/org/bluez'"
 }
 
-// NewPairingListener creates a pairing listener
-func NewPairingListener(backend *BluetoothBackend, ctx context.Context) *PairingListener {
-	listenerCtx, cancel := context.WithCancel(ctx)
-
-	return &PairingListener{
-		backend: backend,
-		ctx:     listenerCtx,
-		cancel:  cancel,
-		signals: make(chan *dbus.Signal, 10),
-	}
-}
-
-// Start starts the pairing listener
-func (l *PairingListener) Start() error {
-	matchRule := "type='signal',interface='" + DBUS_PROP_IFACE + "',member='PropertiesChanged',path_namespace='/org/bluez'"
-
-	l.backend.conn.Signal(l.signals)
-
-	if err := l.backend.addMatchRule(matchRule); err != nil {
-		return err
-	}
-
-	go l.run(matchRule)
-
-	logger.Info("[bluetooth] pairing listener started")
-	return nil
-}
-
-// run is the main pairing loop - simple event-driven
-func (l *PairingListener) run(matchRule string) {
-	defer func() {
-		if err := l.backend.removeMatchRule(matchRule); err != nil {
-			logger.Warn("[bluetooth] failed to remove pairing match rule: %v", err)
+// deviceConnectedFilter returns a SignalFilter that passes PropertiesChanged signals
+// for org.bluez.Device1 where the Connected property is present
+func deviceConnectedFilter() SignalFilter {
+	return func(sig *dbus.Signal) bool {
+		if sig.Name != DBUS_PROP_CHANGED_SIGNAL || len(sig.Body) < 2 {
+			return false
 		}
-		l.backend.conn.RemoveSignal(l.signals)
-		logger.Debug("[bluetooth] pairing listener stopped")
-	}()
-
-	for {
-		select {
-		case <-l.ctx.Done():
-			// Timeout or explicit stop
-			return
-
-		case sig, ok := <-l.signals:
-			if !ok {
-				logger.Debug("[bluetooth] pairing signal channel closed")
-				return
-			}
-			// Handle signal - returns false if pairing successful (stop listening)
-			if !l.handleSignal(sig) {
-				logger.Info("[bluetooth] pairing successful, stopping listener")
-				return
-			}
+		iface, ok := sig.Body[0].(string)
+		if !ok || iface != BLUETOOTH_DEVICE {
+			return false
 		}
+		props, ok := sig.Body[1].(map[string]dbus.Variant)
+		if !ok {
+			return false
+		}
+		_, hasConnected := props[BT_PROP_CONNECTED]
+		return hasConnected
 	}
-}
-
-// handleSignal processes PropertiesChanged signals for device connections.
-// Returns true to continue listening, false to stop (pairing successful).
-func (l *PairingListener) handleSignal(sig *dbus.Signal) bool {
-	// Only handle PropertiesChanged signals
-	if sig.Name != DBUS_PROP_CHANGED_SIGNAL {
-		return true
-	}
-
-	if len(sig.Body) < 2 {
-		return true
-	}
-
-	// Check interface is org.bluez.Device1
-	iface, ok := sig.Body[0].(string)
-	if !ok || iface != BLUETOOTH_DEVICE {
-		return true
-	}
-
-	props, ok := sig.Body[1].(map[string]dbus.Variant)
-	if !ok {
-		return true
-	}
-
-	// Check if Connected property changed to true
-	connectedVar, hasConnected := props[BT_PROP_CONNECTED]
-	if !hasConnected {
-		return true
-	}
-
-	connected, ok := connectedVar.Value().(bool)
-	if !ok || !connected {
-		return true
-	}
-
-	// Device attempting connection - try to pair
-	devicePath := sig.Path
-	logger.Info("[bluetooth] device %v attempting connection, initiating pairing", devicePath)
-
-	// Check if already trusted
-	trusted, ok := l.backend.isDeviceTrusted(devicePath)
-	if !ok {
-		logger.Debug("[bluetooth] unable to check trust state for %v", devicePath)
-		return true // Continue listening
-	}
-
-	if trusted {
-		logger.Debug("[bluetooth] device %v is already trusted", devicePath)
-		return true // Continue listening
-	}
-
-	// Attempt pairing
-	if err := l.backend.pairDevice(devicePath); err != nil {
-		logger.Warn("[bluetooth] pairing failed for %v: %v", devicePath, err)
-		return true // Continue listening for next device
-	}
-
-	// After successful pairing, trust the device
-	if ok := l.backend.trustDevice(devicePath); ok {
-		logger.Info("[bluetooth] device %v paired and trusted successfully", devicePath)
-		l.backend.refreshKnownDevices()
-		return false // Stop listening - mission complete!
-	}
-
-	logger.Warn("[bluetooth] device %v paired but failed to trust", devicePath)
-	return true // Continue listening
-}
-
-// Stop stops the pairing listener
-func (l *PairingListener) Stop() {
-	logger.Debug("[bluetooth] stopping pairing listener")
-	l.cancel()
 }
 
 // ============================================================================
-// Future: Idle Listener - Detects when no devices are connected for X time
+// Pairing Listener
 // ============================================================================
 
-// NewIdleListener creates a listener to detect Bluetooth inactivity
-// Useful for auto-powering off Bluetooth after 30 minutes of no connections
-//
-// Example usage (commented out for now):
-// func NewIdleListener(backend *BluetoothBackend, ctx context.Context, idleTimeout time.Duration) *BluetoothListener {
-//     matchRule := "type='signal',interface='" + DBUS_PROP_IFACE + "',member='PropertiesChanged',path_namespace='/org/bluez'"
-//
-//     filter := func(sig *dbus.Signal) bool {
-//         // Filter for Connected property changes
-//         ...
-//     }
-//
-//     handler := func(sig *dbus.Signal) bool {
-//         // Track last activity time
-//         // If no devices connected for idleTimeout, power off
-//         ...
-//         return true // Continue
-//     }
-//
-//     return NewBluetoothListener(backend, ctx, matchRule, filter, handler, "idle")
-// }
+// NewPairingListener creates a listener that handles device pairing.
+// When a new untrusted device connects, it pairs and trusts it, then stops.
+func NewPairingListener(backend *BluetoothBackend, ctx context.Context) *BluetoothListener {
+	handler := func(sig *dbus.Signal) bool {
+		props := sig.Body[1].(map[string]dbus.Variant)
+
+		connected, ok := props[BT_PROP_CONNECTED].Value().(bool)
+		if !ok || !connected {
+			return true
+		}
+
+		devicePath := sig.Path
+		logger.Info("[bluetooth] device %v attempting connection, initiating pairing", devicePath)
+
+		trusted, ok := backend.isDeviceTrusted(devicePath)
+		if !ok {
+			logger.Debug("[bluetooth] unable to check trust state for %v", devicePath)
+			return true
+		}
+
+		if trusted {
+			logger.Debug("[bluetooth] device %v is already trusted", devicePath)
+			return true
+		}
+
+		if err := backend.pairDevice(devicePath); err != nil {
+			logger.Warn("[bluetooth] pairing failed for %v: %v", devicePath, err)
+			return true
+		}
+
+		if ok := backend.trustDevice(devicePath); ok {
+			logger.Info("[bluetooth] device %v paired and trusted successfully", devicePath)
+			backend.refreshKnownDevices()
+			return false // Stop listening - mission complete!
+		}
+
+		logger.Warn("[bluetooth] device %v paired but failed to trust", devicePath)
+		return true
+	}
+
+	return NewBluetoothListener(backend, ctx, devicePropertiesMatchRule(), deviceConnectedFilter(), handler, "pairing")
+}
+
+// ============================================================================
+// Idle Listener - Powers down Bluetooth after prolonged inactivity
+// ============================================================================
+
+// NewIdleListener creates a listener that monitors device connections.
+// When no devices are connected for the specified idle timeout, it powers down Bluetooth.
+func NewIdleListener(backend *BluetoothBackend, ctx context.Context, idleTimeout time.Duration) *BluetoothListener {
+	var idleTimer *time.Timer
+
+	handler := func(sig *dbus.Signal) bool {
+		props := sig.Body[1].(map[string]dbus.Variant)
+
+		connected, ok := props[BT_PROP_CONNECTED].Value().(bool)
+		if !ok {
+			return true
+		}
+
+		if connected {
+			// A device connected - cancel idle timer
+			if idleTimer != nil {
+				idleTimer.Stop()
+				idleTimer = nil
+				logger.Debug("[bluetooth] idle timer cancelled - device connected")
+			}
+			return true
+		}
+
+		// A device disconnected - check if any device is still connected
+		if backend.hasConnectedDevices() {
+			logger.Debug("[bluetooth] device disconnected but other devices still connected")
+			return true
+		}
+
+		// No devices connected - start/reset idle timer
+		if idleTimer != nil {
+			idleTimer.Stop()
+		}
+		logger.Info("[bluetooth] no connected devices, starting idle timer (%v)", idleTimeout)
+		idleTimer = time.AfterFunc(idleTimeout, func() {
+			logger.Info("[bluetooth] idle timeout reached, powering down")
+			if err := backend.PowerDown(); err != nil {
+				logger.Warn("[bluetooth] idle power down failed: %v", err)
+			}
+		})
+
+		return true
+	}
+
+	return NewBluetoothListener(backend, ctx, devicePropertiesMatchRule(), deviceConnectedFilter(), handler, "idle")
+}

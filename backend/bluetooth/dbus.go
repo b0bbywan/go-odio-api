@@ -174,6 +174,21 @@ func extractBoolProp(props map[string]dbus.Variant, key string) bool {
 	return false
 }
 
+func (b *BluetoothBackend) hasConnectedDevices() bool {
+	connected := false
+	err := b.iterateAdapterDevices(func(path dbus.ObjectPath, props map[string]dbus.Variant) bool {
+		if extractBoolProp(props, BT_PROP_CONNECTED) {
+			connected = true
+			return false // stop iterating
+		}
+		return true
+	})
+	if err != nil {
+		logger.Warn("[bluetooth] failed to check connected devices: %v", err)
+	}
+	return connected
+}
+
 func (b *BluetoothBackend) isAdapterOn() bool {
 	v, err := b.getAdapterProp(BT_STATE_POWERED)
 	if err != nil {

@@ -27,6 +27,7 @@ func New(ctx context.Context, cfg *config.BluetoothConfig) (*BluetoothBackend, e
 		ctx:            ctx,
 		timeout:        cfg.Timeout,
 		pairingTimeout: cfg.PairingTimeout,
+		idleTimeout:    cfg.IdleTimeout,
 		statusCache:    cache.New[BluetoothStatus](0), // no expiration
 	}
 
@@ -58,12 +59,15 @@ func (b *BluetoothBackend) PowerUp() error {
 		s.Pairable = false
 	})
 	b.refreshKnownDevices()
+	b.startIdleListener()
 
 	logger.Info("[bluetooth] Bluetooth ready to connect to already known devices")
 	return nil
 }
 
 func (b *BluetoothBackend) PowerDown() error {
+	b.stopIdleListener()
+
 	if powered := b.isAdapterOn(); !powered {
 		return nil
 	}
@@ -214,6 +218,24 @@ func (b *BluetoothBackend) refreshKnownDevices() {
 	b.updateStatus(func(s *BluetoothStatus) {
 		s.KnownDevices = devices
 	})
+}
+
+func (b *BluetoothBackend) startIdleListener() {
+	b.stopIdleListener()
+
+	listener := NewIdleListener(b, b.ctx, b.idleTimeout)
+	if err := listener.Start(); err != nil {
+		logger.Warn("[bluetooth] failed to start idle listener: %v", err)
+		return
+	}
+	b.idleListener = listener
+}
+
+func (b *BluetoothBackend) stopIdleListener() {
+	if b.idleListener != nil {
+		b.idleListener.Stop()
+		b.idleListener = nil
+	}
 }
 
 func (b *BluetoothBackend) registerAgent() error {
