@@ -22,7 +22,7 @@ Port can also be configured
 
 ```
 # config.yaml
-listen: 127.0.0.1
+bind: 127.0.0.1
 api:
   enabled: true
   port: 8018
@@ -81,34 +81,35 @@ Yes, systemd control is controversial and potentially dangerous if misused. Odio
 **You must knowingly enable this at your own risk.**
 Odio is free software and comes with no warranty. Enabling systemd integration is at your own risk.
 
-```
-# config.yaml
-systemd:
-  enabled: false
-```
-
 Useful examples for audio servers or media centers, some are provided in `share/`:
 ```
 # config.yaml
 systemd:
+  enabled: true
   system:
     - bluetooth.service
     - upmpdcli.service
   user:
-    - mpd.service                       (use mpd-mpris and mpDris2 for mpris support)
     - pipewire-pulse.service
     - pulseaudio.service
-    - shairport-sync.service            (uncompatible with mpris but volume and mute can be controlled through pulseaudio)
-    - snapclient.service                (same)
-    - spotifyd.service                  (if mpris support available in spotifyd)
+    - mpd.service                       # see [1]
+    - shairport-sync.service            # see [2]
+    - snapclient.service                # incompatible with mpris
+    - spotifyd.service                  # see [3]
 
-    - firefox-kiosk@netflix.com.service (will be detected by mpris)
-    - firefox-kiosk@youtube.com.service (will be detected by mpris)
+    - firefox-kiosk@netflix.com.service # default suppport for mpris
+    - firefox-kiosk@youtube.com.service # default suppport for mpris
     - firefox-kiosk@my.home-assistant.io.service
-    - kodi.service                      (install Kodi Add-on:MPRIS D-Bus interface)
-    - vlc.service                       (will be detected by mpris)
-    - plex.service                      (maybe, untested)
+    - kodi.service                      # see [4]
+    - vlc.service                       # default suppport for mpris
+    - plex.service                      # see [5]
 ```
+[1] Install `mpd-mpris` or `mpDris2` for mpris support
+[2] Check my [article on medium to make Shairport Sync/Airplay with pulseaudio and mpris support](https://medium.com/@mathieu-requillart/set-up-a-b83d9c980e75)
+[3] Your spotifyd version [must be built with mpris support](https://docs.spotifyd.rs/advanced/dbus.html)
+[4] Install [Kodi Add-on:MPRIS D-Bus interface](https://github.com/wastis/MediaPlayerRemoteInterface#)
+[5] Maybe supported, untested
+
 
 ### Zeroconf / mDNS
 The API advertise itself using Zeroconf (mDNS). This allows users to discover the API without knowing the host IP or port. Disabled with default 127.0.0.1, enabled otherwise
@@ -192,17 +193,17 @@ Environment variables:
 - HOME=/home/odio                                           ensures `PulseAudio cookie` is found
 
 Volumes:
-- /run/user/1000/bus → user DBus session                    (read-only)
-- /run/user/1000/systemd → user systemd instance            (read-only)
-- /run/user/1000/pulse → PulseAudio socket                  (read-only)
-- /var/run/dbus/system_bus_socket → system DBus socket      (read-only)
-- /run/utmp → login sessions                                (read-only)
-- ./config.yaml → application configuration                 (read-only)
-- ./cookie → `PulseAudio cookie` ($HOME/.config/pulse/cookie) (read-only)
+-- ./config.yaml                    (odio configuration)       (read-only)
+-- /run/user/1000/bus               (user DBus session)        (read-only)
+-- /run/user/1000/systemd           (user systemd folder)      (read-only)
+-- /run/utmp                        (user systemd monitoring)  (read-only)
+-- /var/run/dbus/system_bus_socket  (system DBus socket)       (read-only)
+-- /run/user/1000/pulse             (PulseAudio socket)        (read-only)
+-- ./cookie    (`PulseAudio cookie`: $HOME/.config/pulse/cookie) (read-only)
 
 The container exposes port 8018 by default and is configured to automatically restart unless stopped. With this configuration, audio and DBus-dependent functionality works seamlessly inside Docker.
 
-**Note:** `listen` should be set to `0.0.0.0` in `config.yaml` for remote access with docker. Zeroconf won't work in bridge network mode. It's strongly advised against using host network mode.
+**Note:** `bind` should be set to `0.0.0.0` in `config.yaml` for remote access with docker. Zeroconf won't work in bridge network mode. It's strongly advised against using host network mode.
 
 All mounts are read-only, minimizing the container’s ability to modify the host system.
 
@@ -358,7 +359,7 @@ GOOS=linux GOARCH=amd64 go build -o odio-api-amd64
 GOOS=linux GOARCH=arm64 go build -o odio-api-arm64
 ```
 
-### Debian Package
+### Debian Packaging
 
 ```bash
 # Build Debian package
