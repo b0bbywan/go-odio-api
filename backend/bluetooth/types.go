@@ -57,10 +57,20 @@ type BluetoothStatus struct {
 	KnownDevices  []BluetoothDevice `json:"known_devices,omitempty"`
 }
 
-// PairingListener listens to Bluetooth device connection attempts during pairing mode
-type PairingListener struct {
-	backend *BluetoothBackend
-	ctx     context.Context
-	cancel  context.CancelFunc
-	signals chan *dbus.Signal
+// SignalFilter determines if a D-Bus signal should be processed
+type SignalFilter func(*dbus.Signal) bool
+
+// SignalHandler processes a D-Bus signal
+type SignalHandler func(*dbus.Signal)
+
+// BluetoothListener is a generic D-Bus signal listener for Bluetooth events
+type BluetoothListener struct {
+	backend   *BluetoothBackend
+	ctx       context.Context
+	cancel    context.CancelFunc
+	signals   chan *dbus.Signal
+	matchRule string
+	filter    SignalFilter
+	handler   SignalHandler
+	name      string // For logging
 }
