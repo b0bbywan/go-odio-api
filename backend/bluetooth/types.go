@@ -56,3 +56,11 @@ type BluetoothStatus struct {
 	PairingUntil  *time.Time        `json:"pairing_until,omitempty"`
 	KnownDevices  []BluetoothDevice `json:"known_devices,omitempty"`
 }
+
+// PairingListener listens to Bluetooth device connection attempts during pairing mode
+type PairingListener struct {
+	backend *BluetoothBackend
+	ctx     context.Context
+	cancel  context.CancelFunc
+	signals chan *dbus.Signal
+}
