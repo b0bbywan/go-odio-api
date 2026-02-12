@@ -25,6 +25,12 @@ const (
 	AGENT_CAPABILITY     = "NoInputNoOutput"
 	DISCOVERABLE_TIMEOUT = "DiscoverableTimeout"
 	PAIRABLE_TIMEOUT     = "PairableTimeout"
+
+	CapDisplayOnly     = "DisplayOnly"
+	CapDisplayYesNo    = "DisplayYesNo"
+	CapKeyboardOnly    = "KeyboardOnly"
+	CapNoInputNoOutput = "NoInputNoOutput"
+	CapKeyboardDisplay = "KeyboardDisplay"
 )
 
 type BluetoothState string
