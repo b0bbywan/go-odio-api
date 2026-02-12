@@ -220,6 +220,17 @@ func (b *BluetoothBackend) isDeviceTrusted(path dbus.ObjectPath) (bool, bool) {
 	return extractBool(v)
 }
 
+func (b *BluetoothBackend) pairDevice(path dbus.ObjectPath) error {
+	logger.Debug("[bluetooth] attempting to pair device %v", path)
+	obj := b.getObj(BLUETOOTH_PREFIX, string(path))
+	if err := b.callMethod(obj, "org.bluez.Device1.Pair"); err != nil {
+		logger.Warn("[bluetooth] failed to pair device %v: %v", path, err)
+		return err
+	}
+	logger.Debug("[bluetooth] device %v paired successfully", path)
+	return nil
+}
+
 func (b *BluetoothBackend) trustDevice(path dbus.ObjectPath) bool {
 	obj := b.getObj(BLUETOOTH_PREFIX, string(path))
 	if err := b.setProperty(obj, BLUETOOTH_DEVICE, BT_STATE_TRUSTED.toString(), true); err != nil {

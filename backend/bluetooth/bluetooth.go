@@ -163,21 +163,40 @@ func (b *BluetoothBackend) waitPairing(ctx context.Context) {
 			logger.Info("[bluetooth] pairing stopped")
 			return
 		case <-ticker.C:
+			logger.Debug("[bluetooth] polling for new devices to pair")
 			devices, err := b.listDevices()
 			if err != nil {
 				logger.Warn("[bluetooth] failed to list devices: %v", err)
+				continue
 			}
+
+			logger.Debug("[bluetooth] found %d devices available for pairing", len(devices))
 			for _, d := range devices {
+				logger.Debug("[bluetooth] checking device %v", d)
 				trusted, ok := b.isDeviceTrusted(d)
 				if !ok {
+					logger.Debug("[bluetooth] unable to check trust state for %v", d)
 					continue
 				}
+
 				if !trusted {
+					logger.Info("[bluetooth] new device detected %v, initiating pairing", d)
+					// Call Pair() to trigger actual pairing process with agent
+					if err := b.pairDevice(d); err != nil {
+						logger.Warn("[bluetooth] pairing failed for %v: %v", d, err)
+						continue
+					}
+
+					// After successful pairing, trust the device
 					if ok := b.trustDevice(d); ok {
-						logger.Info("[bluetooth] New device %v trusted", d)
+						logger.Info("[bluetooth] device %v paired and trusted successfully", d)
 						b.refreshKnownDevices()
 						return
+					} else {
+						logger.Warn("[bluetooth] device %v paired but failed to trust", d)
 					}
+				} else {
+					logger.Debug("[bluetooth] device %v is already trusted", d)
 				}
 			}
 		}
