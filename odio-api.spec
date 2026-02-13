@@ -1,6 +1,6 @@
 Name:           odio-api
-Version:        0.3.3
-Release:        2%{?dist}
+Version:        0.4.0
+Release:        1%{?dist}
 Summary:        Web API for mpris, pulseaudio and systemd
 License:        BSD-2-Clause
 URL:            https://github.com/b0bbywan/go-odio-api

@@ -1,3 +1,21 @@
+odio-api (0.4.0) trixie; urgency=high
+
+  [ Major security and usability improvements ]
+  * systemd: enforce strict permission validation on mutating operations;
+    introduce safe handler patterns and comprehensive tests to mitigate
+    privilege escalation risks
+  * Introduce zeroconf (Avahi/mDNS) support for automatic discovery of the API
+    on local networks
+  * Change default listen port to 8018 to avoid privileged port issues and reduce conflict and
+    accidental exposure risks.
+  * Add new command-line flags: --config <path> and --version
+  * Correctly handle and report systemd configuration errors
+  * Disable systemd integration by default (must now be explicitly enabled in config)
+
+
+ -- Mathieu Réquillart <mathieu.requillart@gmail.com>  Fri, 13 Feb 2026 15:00:00 +0000
+
+
 odio-api (0.3.3) trixie; urgency=low
 
   Fix "headless" mode
