@@ -53,7 +53,7 @@ Yes, systemd control is controversial and potentially dangerous if misused. But 
 - **Localhost only**: API binds to `lo` by default. Never expose to untrusted networks/Internet.
 - **No preconfigured units**: Nothing managed unless explicitly listed in config.
 - **User-only mutations**: All mutations (start/stop/restart/enable/disable) use the *user* D-Bus connection only. System units are strictly read-only. While properly configured systems enforce this via D-Bus policies, odio adds mandatory application-layer enforcement which should protect against misconfigured or compromised D-Bus setups.
-**Root/sudo is not supported by design**: Odio runs as an unprivileged user with a user D‑Bus session. Running it as root is strictly forbidden and will be refused by the program. Issues or requests related to this will not be accepted, unless they improve security.
+- **Root/sudo is not supported by design**: Odio runs as an unprivileged user with a user D‑Bus session. Running it as root is strictly forbidden and will be refused by the program. Issues or requests related to this will not be accepted, unless they improve security.
 
 **You must knowingly enable this at your own risk.**
 Odio is free software and comes with no warranty. Enabling systemd integration is at your own risk.
@@ -107,7 +107,7 @@ api:
 ⚠️ **Security Notice:** No authentication mechanism is provided. **Never expose this API to untrusted networks or the Internet.** Designed for localhost or trusted LAN use only.
 
 ### Zeroconf / mDNS
-The API advertise itself using Zeroconf (mDNS). This allows users to discover the API without knowing the host IP or port. Disabled by default and with `lo` bind.
+Odio-api advertises itself using Zeroconf (mDNS). This allows users to discover the API without knowing the host IP or port. Disabled by default and with `lo` bind.
 
 Enable in configuration:
 ```
@@ -208,13 +208,13 @@ Environment variables:
 - HOME=/home/odio                                           ensures `PulseAudio cookie` is found
 
 Volumes:
--- ./config.yaml                    (odio configuration)       (read-only)
--- /run/user/1000/bus               (user DBus session)        (read-only)
--- /run/user/1000/systemd           (user systemd folder)      (read-only)
--- /run/utmp                        (user systemd monitoring)  (read-only)
--- /var/run/dbus/system_bus_socket  (system DBus socket)       (read-only)
--- /run/user/1000/pulse             (PulseAudio socket)        (read-only)
--- ./cookie    (`PulseAudio cookie`: $HOME/.config/pulse/cookie) (read-only)
+- ./config.yaml                    (odio configuration)       (read-only)
+- /run/user/1000/bus               (user DBus session)        (read-only)
+- /run/user/1000/systemd           (user systemd folder)      (read-only)
+- /run/utmp                        (user systemd monitoring)  (read-only)
+- /var/run/dbus/system_bus_socket  (system DBus socket)       (read-only)
+- /run/user/1000/pulse             (PulseAudio socket)        (read-only)
+- ./cookie    (`PulseAudio cookie`: $HOME/.config/pulse/cookie) (read-only)
 
 The container exposes port 8018 by default and is configured to automatically restart unless stopped. With this configuration, audio and DBus-dependent functionality works seamlessly inside Docker.
 
