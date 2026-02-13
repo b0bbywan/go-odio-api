@@ -1,0 +1,16 @@
+[Unit]
+Description=VLC media player
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+Environment=WAYLAND_DISPLAY=wayland-1
+Environment=XDG_RUNTIME_DIR=/run/user/%U
+
+ExecStart=/usr/bin/vlc
+ExecStop=/usr/bin/pkill -TERM vlc
+Restart=no
+
+[Install]
+WantedBy=default.target

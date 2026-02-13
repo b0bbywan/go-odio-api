@@ -1,0 +1,16 @@
+[Unit]
+Description=Kodi
+After=graphical-session.target
+
+[Service]
+Type=simple
+Environment=WAYLAND_DISPLAY=wayland-1
+Environment=XDG_RUNTIME_DIR=/run/user/%U
+Environment=PULSE_SERVER=192.168.x.x:4713
+ExecStart=/usr/bin/kodi --standalone --audio-backend=pulseaudio
+ExecStop=/usr/bin/killall kodi.bin
+Restart=no
+TimeoutStopSec=20
+
+[Install]
+WantedBy=default.target

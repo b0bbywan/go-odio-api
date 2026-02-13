@@ -1,5 +1,15 @@
-systemd:
+bind: lo
+logLevel: info
+
+api:
   enabled: true
+  port: 8018
+
+zeroconf:
+  enabled: false
+
+systemd:
+  enabled: false
   system:
     - bluetooth.service
     - upmpdcli.service
@@ -17,9 +27,3 @@ pulseaudio:
 mpris:
   enabled: true
   timeout: 5s
-
-api:
-  enabled: true
-  port: 8080
-
-logLevel: warn
