@@ -78,6 +78,52 @@ func TestSystemdConfigStructFields(t *testing.T) {
 	}
 }
 
+func TestNew_UIConfig(t *testing.T) {
+	tests := []struct {
+		name      string
+		uiEnabled bool
+	}{
+		{"UI disabled by default", false},
+		{"UI enabled", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			viper.Reset()
+			viper.Set("api.ui.enabled", tt.uiEnabled)
+			t.Setenv("HOME", t.TempDir())
+
+			cfg, err := New()
+			if err != nil {
+				t.Fatalf("New() returned error: %v", err)
+			}
+
+			if cfg.Api.UI == nil {
+				t.Fatal("Api.UI should not be nil")
+			}
+			if cfg.Api.UI.Enabled != tt.uiEnabled {
+				t.Errorf("Api.UI.Enabled = %v, want %v", cfg.Api.UI.Enabled, tt.uiEnabled)
+			}
+		})
+	}
+}
+
+func TestNew_UIDisabledByDefault(t *testing.T) {
+	viper.Reset()
+	t.Setenv("HOME", t.TempDir())
+
+	cfg, err := New()
+	if err != nil {
+		t.Fatalf("New() returned error: %v", err)
+	}
+	if cfg.Api.UI == nil {
+		t.Fatal("Api.UI should not be nil")
+	}
+	if cfg.Api.UI.Enabled {
+		t.Error("Api.UI.Enabled should be false by default")
+	}
+}
+
 func BenchmarkParseLogLevel(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		parseLogLevel("DEBUG")
