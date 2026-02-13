@@ -15,7 +15,7 @@ button.htmx-request {
 /* Component utility classes */
 @layer components {
 	.section-card {
-		@apply rounded-xl bg-zinc-800 p-4 shadow-lg;
+		@apply rounded-xl bg-zinc-800 p-4 shadow-lg overflow-hidden;
 	}
 
 	.section-header {
