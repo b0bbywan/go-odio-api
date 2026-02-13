@@ -75,6 +75,8 @@ All Bluetooth operations are explicitly controlled through the Odio API.
 
 This behavior matches how most Bluetooth speakers and audio receivers work.
 
+Bonus: You get to control it through `/pulseaudio/clients` or `/players/`
+
 ## Installation
 
 ### From Source
