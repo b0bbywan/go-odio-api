@@ -7,6 +7,7 @@ import (
 	"github.com/b0bbywan/go-odio-api/backend/mpris"
 	"github.com/b0bbywan/go-odio-api/backend/pulseaudio"
 	"github.com/b0bbywan/go-odio-api/backend/systemd"
+	"github.com/b0bbywan/go-odio-api/backend/zeroconf"
 	"github.com/b0bbywan/go-odio-api/config"
 )
 
@@ -15,6 +16,7 @@ type Backend struct {
 	MPRIS     *mpris.MPRISBackend
 	Pulse     *pulseaudio.PulseAudioBackend
 	Systemd   *systemd.SystemdBackend
+	Zeroconf *zeroconf.ZeroConfBackend
 }
 
 func New(
@@ -23,6 +25,7 @@ func New(
 	mpriscfg *config.MPRISConfig,
 	pulscfg *config.PulseAudioConfig,
 	syscfg *config.SystemdConfig,
+	zerocfg *config.ZeroConfig,
 ) (*Backend, error) {
 	var b Backend
 	var err error
@@ -40,6 +43,10 @@ func New(
 	}
 
 	if b.Systemd, err = systemd.New(ctx, syscfg); err != nil {
+  	return nil, err
+	}
+  
+	if b.Zeroconf, err = zeroconf.New(ctx, zerocfg); err != nil {
 		return nil, err
 	}
 
@@ -47,6 +54,12 @@ func New(
 }
 
 func (b *Backend) Start() error {
+	if b.MPRIS != nil {
+		if err := b.MPRIS.Start(); err != nil {
+			return err
+		}
+	}
+
 	if b.Pulse != nil {
 		if err := b.Pulse.Start(); err != nil {
 			return err
@@ -59,8 +72,8 @@ func (b *Backend) Start() error {
 		}
 	}
 
-	if b.MPRIS != nil {
-		if err := b.MPRIS.Start(); err != nil {
+	if b.Zeroconf != nil {
+		if err := b.Zeroconf.Start(); err != nil {
 			return err
 		}
 	}
@@ -69,14 +82,17 @@ func (b *Backend) Start() error {
 }
 
 func (b *Backend) Close() {
+	if b.MPRIS != nil {
+		b.MPRIS.Close()
+	}
 	if b.Pulse != nil {
 		b.Pulse.Close()
 	}
 	if b.Systemd != nil {
 		b.Systemd.Close()
 	}
-	if b.MPRIS != nil {
-		b.MPRIS.Close()
+	if b.Zeroconf != nil {
+		b.Zeroconf.Close()
 	}
 	if b.Bluetooth != nil {
 		b.Bluetooth.Close()
