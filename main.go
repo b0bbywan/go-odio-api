@@ -47,7 +47,7 @@ func main() {
 	b, err := backend.New(
 		ctx,
 		cfg.Bluetooth,
-    cfg.MPRIS,
+		cfg.MPRIS,
 		cfg.Pulseaudio,
 		cfg.Systemd,
 		cfg.Zeroconf,

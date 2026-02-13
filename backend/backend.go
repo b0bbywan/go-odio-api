@@ -16,7 +16,7 @@ type Backend struct {
 	MPRIS     *mpris.MPRISBackend
 	Pulse     *pulseaudio.PulseAudioBackend
 	Systemd   *systemd.SystemdBackend
-	Zeroconf *zeroconf.ZeroConfBackend
+	Zeroconf  *zeroconf.ZeroConfBackend
 }
 
 func New(
@@ -43,9 +43,9 @@ func New(
 	}
 
 	if b.Systemd, err = systemd.New(ctx, syscfg); err != nil {
-  	return nil, err
+		return nil, err
 	}
-  
+
 	if b.Zeroconf, err = zeroconf.New(ctx, zerocfg); err != nil {
 		return nil, err
 	}

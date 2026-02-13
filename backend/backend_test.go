@@ -48,6 +48,7 @@ func TestBackendDisabled(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			bluetoothCfg := &config.BluetoothConfig{Enabled: tt.bluetoothEnabled}
 			mprisCfg := &config.MPRISConfig{Enabled: tt.mprisEnabled}
 			pulseCfg := &config.PulseAudioConfig{Enabled: tt.pulseEnabled}
 			// Add empty services for systemd to ensure it returns nil when enabled without services
@@ -58,7 +59,7 @@ func TestBackendDisabled(t *testing.T) {
 			}
 			zeroconfCfg := &config.ZeroConfig{Enabled: tt.zeroconfEnabled}
 
-			backend, err := New(ctx, mprisCfg, pulseCfg, systemdCfg, zeroconfCfg)
+			backend, err := New(ctx, bluetoothCfg, mprisCfg, pulseCfg, systemdCfg, zeroconfCfg)
 
 			// Bluetooth and other D-Bus backends may fail in test environment
 			// This is expected and we should skip the test
@@ -110,6 +111,7 @@ func TestSystemdWithEmptyConfig(t *testing.T) {
 
 	backend, err := New(
 		ctx,
+		&config.BluetoothConfig{Enabled: false},
 		&config.MPRISConfig{Enabled: false},
 		&config.PulseAudioConfig{Enabled: false},
 		systemdCfg,
@@ -136,6 +138,7 @@ func TestZeroconfWithLocalhostBind(t *testing.T) {
 
 	backend, err := New(
 		ctx,
+		&config.BluetoothConfig{Enabled: false},
 		&config.MPRISConfig{Enabled: false},
 		&config.PulseAudioConfig{Enabled: false},
 		&config.SystemdConfig{Enabled: false},
