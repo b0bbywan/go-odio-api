@@ -2,15 +2,21 @@
 <!-- Responsive grid: 1 col mobile, 2 col tablet, 3 col desktop -->
 <div class="grid-responsive">
 	{{ if .ServerInfo.Backends.MPRIS }}
+	<div hx-get="/ui/sections/mpris" hx-trigger="every 3s" hx-swap="innerHTML">
 		{{ template "section-mpris" .Players }}
+	</div>
 	{{ end }}
 
 	{{ if .ServerInfo.Backends.PulseAudio }}
+	<div hx-get="/ui/sections/audio" hx-trigger="every 3s" hx-swap="innerHTML">
 		{{ template "section-pulseaudio" . }}
+	</div>
 	{{ end }}
 
 	{{ if .ServerInfo.Backends.Systemd }}
+	<div hx-get="/ui/sections/systemd" hx-trigger="every 10s" hx-swap="innerHTML">
 		{{ template "section-systemd" .Services }}
+	</div>
 	{{ end }}
 </div>
 
