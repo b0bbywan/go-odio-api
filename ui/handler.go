@@ -2,6 +2,7 @@ package ui
 
 import (
 	"embed"
+	"fmt"
 	"html/template"
 	"net/http"
 	"strings"
@@ -19,6 +20,20 @@ func LoadTemplates() *template.Template {
 	funcMap := template.FuncMap{
 		"mul": func(a, b float64) float64 {
 			return a * b
+		},
+		"dict": func(values ...any) (map[string]any, error) {
+			if len(values)%2 != 0 {
+				return nil, fmt.Errorf("dict requires an even number of arguments")
+			}
+			d := make(map[string]any, len(values)/2)
+			for i := 0; i < len(values); i += 2 {
+				key, ok := values[i].(string)
+				if !ok {
+					return nil, fmt.Errorf("dict keys must be strings")
+				}
+				d[key] = values[i+1]
+			}
+			return d, nil
 		},
 	}
 	// Load all .gohtml templates recursively

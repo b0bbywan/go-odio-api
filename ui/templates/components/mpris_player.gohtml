@@ -18,16 +18,7 @@
 
 	<!-- Volume control -->
 	<div class="mb-3 px-2">
-		<div class="flex items-center gap-2">
-			<span class="text-xs text-zinc-400">🔊</span>
-			<input type="range"
-			       class="volume-slider flex-1"
-			       min="0"
-			       max="100"
-			       value="{{ printf "%.0f" (mul .Volume 100) }}"
-			       oninput="updateVolume(this, '{{ .Name }}', 'mpris')"
-			       title="Volume">
-		</div>
+		{{ template "volume-slider" (dict "Target" .Name "Type" "mpris" "Volume" .Volume "ShowMute" false) }}
 	</div>
 
 	<!-- Control buttons (centered) -->

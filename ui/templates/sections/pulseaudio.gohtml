@@ -23,18 +23,7 @@
 		<div class="truncate text-sm font-medium mb-3" title="{{ .AudioInfo.DefaultSink }}">{{ .AudioInfo.DefaultSink }}</div>
 
 		<!-- Volume control -->
-		<div class="flex items-center gap-2">
-			<button class="text-lg" onclick="toggleMute(this, '', 'audio-server')" title="Toggle mute">
-				{{ if .AudioInfo.Muted }}🔇{{ else }}🔊{{ end }}
-			</button>
-			<input type="range"
-			       class="volume-slider flex-1"
-			       min="0"
-			       max="100"
-			       value="{{ printf "%.0f" (mul .AudioInfo.Volume 100) }}"
-			       oninput="updateVolume(this, '', 'audio-server')"
-			       title="Master volume">
-		</div>
+		{{ template "volume-slider" (dict "Target" "" "Type" "audio-server" "Volume" .AudioInfo.Volume "Muted" .AudioInfo.Muted "ShowMute" true "Title" "Master volume") }}
 	</div>
 
 	<!-- Audio clients -->
