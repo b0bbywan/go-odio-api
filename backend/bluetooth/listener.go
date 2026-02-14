@@ -47,6 +47,8 @@ func (l *DBusListener) Listen() {
 }
 
 func (l *DBusListener) Stop() {
-	l.conn.RemoveSignal(l.signals)
+	if l.conn != nil {
+		l.conn.RemoveSignal(l.signals)
+	}
 	close(l.signals)
 }
