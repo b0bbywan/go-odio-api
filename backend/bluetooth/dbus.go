@@ -142,6 +142,7 @@ func (b *BluetoothBackend) iterateAdapterDevices(fn func(path dbus.ObjectPath, p
 	return nil
 }
 
+/*
 func (b *BluetoothBackend) listDevices() ([]dbus.ObjectPath, error) {
 	devices := []dbus.ObjectPath{}
 
@@ -167,6 +168,7 @@ func (b *BluetoothBackend) listDevices() ([]dbus.ObjectPath, error) {
 
 	return devices, err
 }
+*/
 
 func (b *BluetoothBackend) listKnownDevices() ([]BluetoothDevice, error) {
 	devices := []BluetoothDevice{}
@@ -225,6 +227,7 @@ func (b *BluetoothBackend) isAdapterOn() bool {
 	return powered
 }
 
+/*
 func (b *BluetoothBackend) isDeviceTrusted(path dbus.ObjectPath) (bool, bool) {
 	obj := b.getObj(BLUETOOTH_PREFIX, string(path))
 	v, err := b.getProperty(obj, BLUETOOTH_DEVICE, BT_STATE_TRUSTED.toString())
@@ -234,6 +237,7 @@ func (b *BluetoothBackend) isDeviceTrusted(path dbus.ObjectPath) (bool, bool) {
 	}
 	return extractBool(v)
 }
+*/
 
 func (b *BluetoothBackend) trustDevice(path dbus.ObjectPath) bool {
 	obj := b.getObj(BLUETOOTH_PREFIX, string(path))
