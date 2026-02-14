@@ -32,6 +32,12 @@ const (
 	CapKeyboardOnly    = "KeyboardOnly"
 	CapNoInputNoOutput = "NoInputNoOutput"
 	CapKeyboardDisplay = "KeyboardDisplay"
+
+	BT_PROP_ADAPTER   = "Adapter"
+	BT_PROP_ADDRESS   = "Address"
+	BT_PROP_NAME      = "Name"
+	BT_PROP_CONNECTED = "Connected"
+	BT_PROP_TRUSTED   = "Trusted"
 )
 
 type BluetoothState string
@@ -41,15 +47,6 @@ const (
 	BT_STATE_DISCOVERABLE BluetoothState = "Discoverable"
 	BT_STATE_PAIRABLE     BluetoothState = "Pairable"
 	BT_STATE_TRUSTED      BluetoothState = "Trusted"
-)
-
-// Device properties
-const (
-	BT_PROP_ADAPTER   = "Adapter"
-	BT_PROP_ADDRESS   = "Address"
-	BT_PROP_NAME      = "Name"
-	BT_PROP_CONNECTED = "Connected"
-	BT_PROP_TRUSTED   = "Trusted"
 )
 
 func (b BluetoothState) toString() string {

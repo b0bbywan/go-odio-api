@@ -1,7 +1,9 @@
 package bluetooth
 
 import (
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/godbus/dbus/v5"
 )
@@ -210,4 +212,215 @@ func TestBluetoothStateToString(t *testing.T) {
 			}
 		})
 	}
+}
+
+// onDevicePaired tests — only the signal-parsing paths that don't touch D-Bus
+func TestOnDevicePaired(t *testing.T) {
+	b := &BluetoothBackend{}
+
+	tests := []struct {
+		name     string
+		signal   *dbus.Signal
+		expected bool
+	}{
+		{
+			name:     "empty body",
+			signal:   &dbus.Signal{Path: "/dev/1", Body: []interface{}{}},
+			expected: false,
+		},
+		{
+			name:     "body too short",
+			signal:   &dbus.Signal{Path: "/dev/1", Body: []interface{}{"org.bluez.Device1"}},
+			expected: false,
+		},
+		{
+			name: "body[1] wrong type",
+			signal: &dbus.Signal{
+				Path: "/dev/1",
+				Body: []interface{}{"org.bluez.Device1", "not a map"},
+			},
+			expected: false,
+		},
+		{
+			name: "no Paired key",
+			signal: &dbus.Signal{
+				Path: "/dev/1",
+				Body: []interface{}{
+					"org.bluez.Device1",
+					map[string]dbus.Variant{
+						"Name": dbus.MakeVariant("Speaker"),
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "Paired wrong type",
+			signal: &dbus.Signal{
+				Path: "/dev/1",
+				Body: []interface{}{
+					"org.bluez.Device1",
+					map[string]dbus.Variant{
+						"Paired": dbus.MakeVariant("yes"),
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "Paired false",
+			signal: &dbus.Signal{
+				Path: "/dev/1",
+				Body: []interface{}{
+					"org.bluez.Device1",
+					map[string]dbus.Variant{
+						"Paired": dbus.MakeVariant(false),
+					},
+				},
+			},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := b.onDevicePaired(tt.signal)
+			if result != tt.expected {
+				t.Errorf("onDevicePaired() = %v, want %v", result, tt.expected)
+			}
+		})
+	}
+}
+
+// onDeviceConnectionChange tests — signal parsing + idle timer paths
+func TestOnDeviceConnectionChange(t *testing.T) {
+	b := &BluetoothBackend{}
+
+	tests := []struct {
+		name     string
+		signal   *dbus.Signal
+		expected bool
+	}{
+		{
+			name:     "empty body",
+			signal:   &dbus.Signal{Path: "/dev/1", Body: []interface{}{}},
+			expected: false,
+		},
+		{
+			name:     "body too short",
+			signal:   &dbus.Signal{Path: "/dev/1", Body: []interface{}{"org.bluez.Device1"}},
+			expected: false,
+		},
+		{
+			name: "body[1] wrong type",
+			signal: &dbus.Signal{
+				Path: "/dev/1",
+				Body: []interface{}{"org.bluez.Device1", 42},
+			},
+			expected: false,
+		},
+		{
+			name: "no Connected key",
+			signal: &dbus.Signal{
+				Path: "/dev/1",
+				Body: []interface{}{
+					"org.bluez.Device1",
+					map[string]dbus.Variant{
+						"Name": dbus.MakeVariant("Speaker"),
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "Connected wrong type",
+			signal: &dbus.Signal{
+				Path: "/dev/1",
+				Body: []interface{}{
+					"org.bluez.Device1",
+					map[string]dbus.Variant{
+						"Connected": dbus.MakeVariant("yes"),
+					},
+				},
+			},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := b.onDeviceConnectionChange(tt.signal)
+			if result != tt.expected {
+				t.Errorf("onDeviceConnectionChange() = %v, want %v", result, tt.expected)
+			}
+		})
+	}
+}
+
+// onDeviceConnectionChange always returns false (never stops the listener)
+func TestOnDeviceConnectionChangeNeverStops(t *testing.T) {
+	b := &BluetoothBackend{}
+
+	sig := &dbus.Signal{
+		Path: "/dev/1",
+		Body: []interface{}{
+			"org.bluez.Device1",
+			map[string]dbus.Variant{
+				"Connected": dbus.MakeVariant(true),
+			},
+		},
+	}
+
+	result := b.onDeviceConnectionChange(sig)
+	if result != false {
+		t.Errorf("onDeviceConnectionChange(connected=true) = %v, want false", result)
+	}
+}
+
+func TestCancelIdleTimer(t *testing.T) {
+	t.Run("cancels running timer", func(t *testing.T) {
+		b := &BluetoothBackend{}
+		b.idleTimer = time.AfterFunc(time.Hour, func() {
+			t.Error("timer should have been cancelled")
+		})
+
+		b.cancelIdleTimer()
+
+		if b.idleTimer != nil {
+			t.Error("idleTimer should be nil after cancel")
+		}
+	})
+
+	t.Run("noop when no timer", func(t *testing.T) {
+		b := &BluetoothBackend{}
+		b.cancelIdleTimer() // should not panic
+		if b.idleTimer != nil {
+			t.Error("idleTimer should remain nil")
+		}
+	})
+
+	t.Run("connected signal cancels idle timer", func(t *testing.T) {
+		b := &BluetoothBackend{
+			idleTimerMu: sync.Mutex{},
+		}
+		b.idleTimer = time.AfterFunc(time.Hour, func() {
+			t.Error("timer should have been cancelled by connected signal")
+		})
+
+		sig := &dbus.Signal{
+			Path: "/dev/1",
+			Body: []interface{}{
+				"org.bluez.Device1",
+				map[string]dbus.Variant{
+					"Connected": dbus.MakeVariant(true),
+				},
+			},
+		}
+
+		b.onDeviceConnectionChange(sig)
+
+		if b.idleTimer != nil {
+			t.Error("idleTimer should be nil after connected=true signal")
+		}
+	})
 }

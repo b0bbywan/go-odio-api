@@ -59,6 +59,7 @@ type BluetoothConfig struct {
 	Enabled        bool
 	PairingTimeout time.Duration
 	Timeout        time.Duration
+	IdleTimeout    time.Duration
 }
 
 type ZeroConfig struct {
@@ -203,6 +204,7 @@ func New(cfgFile *string) (*Config, error) {
 	viper.SetDefault("bluetooth.enabled", true)
 	viper.SetDefault("bluetooth.timeout", "5s")
 	viper.SetDefault("bluetooth.pairingtimeout", "60s")
+	viper.SetDefault("bluetooth.idletimeout", "30m")
 
 	viper.SetDefault("mpris.enabled", true)
 	viper.SetDefault("mpris.timeout", "5s")
@@ -283,10 +285,16 @@ func New(cfgFile *string) (*Config, error) {
 		bluetoothPairingTimeout = 60 * time.Second
 	}
 
+	bluetoothIdleTimeout := viper.GetDuration("bluetooth.idletimeout")
+	if bluetoothIdleTimeout <= 0 {
+		bluetoothIdleTimeout = 30 * time.Minute
+	}
+
 	bluetoothcfg := BluetoothConfig{
 		Enabled:        viper.GetBool("bluetooth.enabled"),
 		Timeout:        bluetoothTimeout,
 		PairingTimeout: bluetoothPairingTimeout,
+		IdleTimeout:    bluetoothIdleTimeout,
 	}
 
 	interfaces := getZeroconfInterfaces(bind)
