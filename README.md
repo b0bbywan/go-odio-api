@@ -113,7 +113,7 @@ Enable in configuration:
 ```
 bind: eno1
 zeroconf:
-  enabled: enable
+  enabled: true
 ```
 
 Developers can discover the API with any mDNS/Bonjour browser on the network. Look for the service type `_http._tcp.local.` and instance name `odio-api`.
