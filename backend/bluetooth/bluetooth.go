@@ -90,6 +90,13 @@ func (b *BluetoothBackend) NewPairing() error {
 		logger.Info("[bluetooth] pairing already in progress")
 		return nil
 	}
+	// Unlock in NewPairing on error only
+	unlocked := false
+	defer func() {
+		if !unlocked {
+			b.pairingMu.Unlock()
+		}
+	}()
 
 	// RegisterAgent
 	if err := b.registerAgent(); err != nil {
@@ -132,6 +139,8 @@ func (b *BluetoothBackend) NewPairing() error {
 		s.PairingUntil = &pairingUntil
 	})
 
+	// Unlock in waitPairing
+	unlocked = true
 	go b.waitPairing(b.ctx)
 	logger.Info("[bluetooth] Bluetooth pairing mode enabled")
 
@@ -190,14 +199,15 @@ func (b *BluetoothBackend) onDevicePaired(sig *dbus.Signal) bool {
 
 	logger.Info("[bluetooth] device %s paired successfully", sig.Path)
 
-	if b.trustDevice(sig.Path) {
-		logger.Info("[bluetooth] device %s trusted", sig.Path)
-		b.refreshKnownDevices()
-		return true
+	if !b.trustDevice(sig.Path) {
+		logger.Warn("[bluetooth] failed to trust device %s", sig.Path)
+		return false
 	}
 
-	logger.Warn("[bluetooth] failed to trust device %s", sig.Path)
-	return false
+	logger.Info("[bluetooth] device %s trusted", sig.Path)
+	b.refreshKnownDevices()
+	return true
+
 }
 
 func (b *BluetoothBackend) Close() {
