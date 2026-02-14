@@ -2,6 +2,7 @@ package bluetooth
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/godbus/dbus/v5"
@@ -163,12 +164,49 @@ func (b *BluetoothBackend) waitPairing(ctx context.Context) {
 	}
 	defer listener.Stop()
 
-	select {
-	case <-subCtx.Done():
-		logger.Info("[bluetooth] pairing timeout reached")
-	case <-listener.Done():
-		logger.Info("[bluetooth] pairing completed successfully")
+	<-subCtx.Done()
+	logger.Info("[bluetooth] pairing ended")
+}
+
+// onDevicePaired handles a D-Bus PropertiesChanged signal during pairing.
+// When Paired becomes true, trusts the device and refreshes known devices.
+func (b *BluetoothBackend) onDevicePaired(sig *dbus.Signal) error {
+	if sig.Name != DBUS_PROP_CHANGED_SIGNAL || len(sig.Body) < 2 {
+		return nil
 	}
+
+	iface, ok := sig.Body[0].(string)
+	if !ok || iface != BLUETOOTH_DEVICE {
+		return nil
+	}
+
+	changed, ok := sig.Body[1].(map[string]dbus.Variant)
+	if !ok {
+		return nil
+	}
+
+	if !strings.HasPrefix(string(sig.Path), BLUETOOTH_PATH+"/") {
+		return nil
+	}
+
+	pairedVar, hasPaired := changed["Paired"]
+	if !hasPaired {
+		return nil
+	}
+
+	paired, ok := extractBool(pairedVar)
+	if !ok || !paired {
+		return nil
+	}
+
+	logger.Info("[bluetooth] device %s paired via D-Bus signal", sig.Path)
+
+	if b.trustDevice(sig.Path) {
+		logger.Info("[bluetooth] device %s trusted", sig.Path)
+		b.refreshKnownDevices()
+	}
+
+	return nil
 }
 
 func (b *BluetoothBackend) Close() {
