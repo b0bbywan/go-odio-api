@@ -155,7 +155,8 @@ func (b *BluetoothBackend) waitPairing(ctx context.Context) {
 		b.pairingMu.Unlock()
 	}()
 
-	listener := NewBluetoothListener(b, subCtx)
+	matchRule := "type='signal',interface='" + DBUS_PROP_IFACE + "',member='PropertiesChanged',arg0='" + BLUETOOTH_DEVICE + "'"
+	listener := NewDBusListener(b.conn, subCtx, matchRule, b.onDevicePaired)
 	if err := listener.Start(); err != nil {
 		logger.Warn("[bluetooth] failed to start pairing listener: %v", err)
 		return
