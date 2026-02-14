@@ -155,35 +155,49 @@ func (b *BluetoothBackend) waitPairing(ctx context.Context) {
 		b.pairingMu.Unlock()
 	}()
 
-	ticker := time.NewTicker(500 * time.Millisecond)
-	defer ticker.Stop()
+	matchRule := "type='signal',interface='org.freedesktop.DBus.Properties',member='PropertiesChanged',arg0='org.bluez.Device1'"
 
-	for {
-		select {
-		case <-subCtx.Done():
-			logger.Info("[bluetooth] pairing stopped")
-			return
-		case <-ticker.C:
-			devices, err := b.listDevices()
-			if err != nil {
-				logger.Warn("[bluetooth] failed to list devices: %v", err)
-			}
-			for _, d := range devices {
-				trusted, ok := b.isDeviceTrusted(d)
-				if !ok {
-					continue
-				}
-				if !trusted {
-					if ok := b.trustDevice(d); ok {
-						logger.Info("[bluetooth] New device %v trusted", d)
-						b.refreshKnownDevices()
-						return
-					}
-				}
-			}
-		}
+	listener := NewDBusListener(b.conn, subCtx, matchRule, b.onDevicePaired)
+	if err := listener.Start(); err != nil {
+		logger.Warn("[bluetooth] failed to start listener: %v", err)
+		return
+	}
+	defer listener.Stop()
+
+	listener.Listen()
+	logger.Info("[bluetooth] pairing listener stopped")
+}
+
+func (b *BluetoothBackend) onDevicePaired(sig *dbus.Signal) bool {
+	if len(sig.Body) < 2 {
+		return false
 	}
 
+	changed, ok := sig.Body[1].(map[string]dbus.Variant)
+	if !ok {
+		return false
+	}
+
+	pairedVar, ok := changed["Paired"]
+	if !ok {
+		return false
+	}
+
+	paired, ok := pairedVar.Value().(bool)
+	if !ok || !paired {
+		return false
+	}
+
+	logger.Info("[bluetooth] device %s paired successfully", sig.Path)
+
+	if b.trustDevice(sig.Path) {
+		logger.Info("[bluetooth] device %s trusted", sig.Path)
+		b.refreshKnownDevices()
+		return true
+	}
+
+	logger.Warn("[bluetooth] failed to trust device %s", sig.Path)
+	return false
 }
 
 func (b *BluetoothBackend) Close() {
