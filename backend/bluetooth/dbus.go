@@ -342,6 +342,10 @@ func (b *BluetoothBackend) RequestNoInputOutputAgent(manager dbus.BusObject) err
 	return nil
 }
 
+func (b *BluetoothBackend) addMatchRule(rule string) error {
+	return b.conn.BusObject().Call(DBUS_ADD_MATCH_METHOD, 0, rule).Err
+}
+
 func (b *BluetoothBackend) unregisterAgent() {
 	if b.agent == nil {
 		return

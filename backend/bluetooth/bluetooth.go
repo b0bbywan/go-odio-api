@@ -155,35 +155,19 @@ func (b *BluetoothBackend) waitPairing(ctx context.Context) {
 		b.pairingMu.Unlock()
 	}()
 
-	ticker := time.NewTicker(500 * time.Millisecond)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-subCtx.Done():
-			logger.Info("[bluetooth] pairing stopped")
-			return
-		case <-ticker.C:
-			devices, err := b.listDevices()
-			if err != nil {
-				logger.Warn("[bluetooth] failed to list devices: %v", err)
-			}
-			for _, d := range devices {
-				trusted, ok := b.isDeviceTrusted(d)
-				if !ok {
-					continue
-				}
-				if !trusted {
-					if ok := b.trustDevice(d); ok {
-						logger.Info("[bluetooth] New device %v trusted", d)
-						b.refreshKnownDevices()
-						return
-					}
-				}
-			}
-		}
+	listener := NewBluetoothListener(b, subCtx)
+	if err := listener.Start(); err != nil {
+		logger.Warn("[bluetooth] failed to start pairing listener: %v", err)
+		return
 	}
+	defer listener.Stop()
 
+	select {
+	case <-subCtx.Done():
+		logger.Info("[bluetooth] pairing timeout reached")
+	case <-listener.Done():
+		logger.Info("[bluetooth] pairing completed successfully")
+	}
 }
 
 func (b *BluetoothBackend) Close() {
