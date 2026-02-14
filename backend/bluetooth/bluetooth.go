@@ -27,6 +27,7 @@ func New(ctx context.Context, cfg *config.BluetoothConfig) (*BluetoothBackend, e
 		ctx:            ctx,
 		timeout:        cfg.Timeout,
 		pairingTimeout: cfg.PairingTimeout,
+		idleTimeout:    cfg.IdleTimeout,
 		statusCache:    cache.New[BluetoothStatus](0), // no expiration
 	}
 
@@ -60,8 +61,23 @@ func (b *BluetoothBackend) PowerUp() error {
 	})
 	b.refreshKnownDevices()
 
+	b.startIdleListener()
+
 	logger.Info("[bluetooth] Bluetooth ready to connect to already known devices")
 	return nil
+}
+
+func (b *BluetoothBackend) startIdleListener() {
+	if b.idleTimeout == 0 {
+		return
+	}
+	matchRule := "type='signal',interface='org.freedesktop.DBus.Properties',member='PropertiesChanged',arg0='org.bluez.Device1'"
+	listener := NewDBusListener(b.conn, b.ctx, matchRule, b.onDeviceConnectionChange)
+	if err := listener.Start(); err != nil {
+		logger.Warn("[bluetooth] failed to start idle timeout: %v", err)
+		return
+	}
+	go listener.Listen()
 }
 
 func (b *BluetoothBackend) PowerDown() error {
@@ -208,6 +224,70 @@ func (b *BluetoothBackend) onDevicePaired(sig *dbus.Signal) bool {
 	b.refreshKnownDevices()
 	return true
 
+}
+
+func (b *BluetoothBackend) onDeviceConnectionChange(sig *dbus.Signal) bool {
+	if len(sig.Body) < 2 {
+		return false
+	}
+
+	changed, ok := sig.Body[1].(map[string]dbus.Variant)
+	if !ok {
+		return false
+	}
+
+	connectedVar, ok := changed["Connected"]
+	if !ok {
+		return false // Pas un changement de connexion
+	}
+
+	connected, ok := connectedVar.Value().(bool)
+	if !ok {
+		return false
+	}
+
+	if connected {
+		b.cancelIdleTimer()
+	} else {
+		b.checkAndStartIdleTimer()
+	}
+
+	return false // Continue à écouter
+}
+
+func (b *BluetoothBackend) cancelIdleTimer() {
+	b.idleTimerMu.Lock()
+	defer b.idleTimerMu.Unlock()
+
+	if b.idleTimer != nil {
+		b.idleTimer.Stop()
+		b.idleTimer = nil
+		logger.Info("[bluetooth] idle timer cancelled")
+	}
+}
+
+func (b *BluetoothBackend) checkAndStartIdleTimer() {
+	// Vérifier s'il reste des devices connectés
+	if b.hasConnectedDevices() {
+		return // Encore des devices connectés
+	}
+
+	// Plus aucun device : démarrer le timer
+	b.idleTimerMu.Lock()
+	defer b.idleTimerMu.Unlock()
+
+	if b.idleTimer == nil {
+		b.idleTimer = time.AfterFunc(b.idleTimeout, func() {
+			logger.Info("[bluetooth] idle timeout, powering down")
+			if err := b.PowerOnAdapter(false); err != nil {
+				logger.Warn("[bluetooth] failed to power down: %v", err)
+			}
+			b.idleTimerMu.Lock()
+			b.idleTimer = nil
+			b.idleTimerMu.Unlock()
+		})
+		logger.Info("[bluetooth] idle timer started")
+	}
 }
 
 func (b *BluetoothBackend) Close() {

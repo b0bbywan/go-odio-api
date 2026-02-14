@@ -142,34 +142,6 @@ func (b *BluetoothBackend) iterateAdapterDevices(fn func(path dbus.ObjectPath, p
 	return nil
 }
 
-/*
-func (b *BluetoothBackend) listDevices() ([]dbus.ObjectPath, error) {
-	devices := []dbus.ObjectPath{}
-
-	err := b.iterateAdapterDevices(func(path dbus.ObjectPath, props map[string]dbus.Variant) bool {
-		logger.Debug("[bluetooth] testing managed object %v", path)
-
-		// Only keep non-trusted devices (for pairing)
-		if trustedVar, ok := props[BT_PROP_TRUSTED]; ok {
-			trusted, ok := trustedVar.Value().(bool)
-			if !ok {
-				logger.Warn("[bluetooth] invalid trusted value type for device %v", path)
-				return true
-			}
-			if trusted {
-				return true
-			}
-		}
-
-		devices = append(devices, path)
-		logger.Debug("[bluetooth] listed devices after pairing %v", devices)
-		return true
-	})
-
-	return devices, err
-}
-*/
-
 func (b *BluetoothBackend) listKnownDevices() ([]BluetoothDevice, error) {
 	devices := []BluetoothDevice{}
 
@@ -227,17 +199,20 @@ func (b *BluetoothBackend) isAdapterOn() bool {
 	return powered
 }
 
-/*
-func (b *BluetoothBackend) isDeviceTrusted(path dbus.ObjectPath) (bool, bool) {
-	obj := b.getObj(BLUETOOTH_PREFIX, string(path))
-	v, err := b.getProperty(obj, BLUETOOTH_DEVICE, BT_STATE_TRUSTED.toString())
+func (b *BluetoothBackend) hasConnectedDevices() bool {
+	connected := false
+	err := b.iterateAdapterDevices(func(path dbus.ObjectPath, props map[string]dbus.Variant) bool {
+		if extractBoolProp(props, BT_PROP_CONNECTED) {
+			connected = true
+			return false // stop iterating
+		}
+		return true
+	})
 	if err != nil {
-		logger.Warn("[bluetooth] failed to get %s trust state: %v", path, err)
-		return false, false
+		logger.Warn("[bluetooth] failed to check connected devices: %v", err)
 	}
-	return extractBool(v)
+	return connected
 }
-*/
 
 func (b *BluetoothBackend) trustDevice(path dbus.ObjectPath) bool {
 	obj := b.getObj(BLUETOOTH_PREFIX, string(path))
