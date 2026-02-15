@@ -98,7 +98,7 @@ func (s *Server) register(b *backend.Backend) {
 }
 
 func (s *Server) registerUIRoutes() {
-	uiHandler := ui.NewHandler(s.config.Port)
+	uiHandler := ui.NewHandler(s.config.Listen)
 	uiHandler.RegisterRoutes(s.mux)
 	logger.Info("[api] UI routes registered at /ui")
 }

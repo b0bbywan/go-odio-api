@@ -15,10 +15,10 @@ type APIClient struct {
 	client  *http.Client
 }
 
-// NewAPIClient creates a new internal API client
-func NewAPIClient(port int) *APIClient {
+// NewAPIClient creates a new internal API client using the server's listen address.
+func NewAPIClient(listenAddr string) *APIClient {
 	return &APIClient{
-		baseURL: fmt.Sprintf("http://localhost:%d", port),
+		baseURL: "http://" + listenAddr,
 		client: &http.Client{
 			Timeout: 5 * time.Second,
 		},
