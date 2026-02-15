@@ -2,6 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Remove native <details> disclosure marker */
+details > summary {
+	list-style: none;
+}
+details > summary::-webkit-details-marker {
+	display: none;
+}
+
 /* Custom animations */
 @keyframes pulse-opacity {
 	0%, 100% { opacity: 0.6; }
@@ -20,6 +28,22 @@ button.htmx-request {
 
 	.section-header {
 		@apply mb-4 flex items-center justify-between;
+	}
+
+	/* <summary> used as section-header: suppress mb when collapsed */
+	details > summary.section-header {
+		@apply mb-0 cursor-pointer;
+	}
+	details[open] > summary.section-header {
+		@apply mb-4;
+	}
+
+	/* Collapse chevron — mobile only */
+	.section-toggle {
+		@apply text-zinc-500 transition-transform duration-200 sm:hidden;
+	}
+	details[open] > summary .section-toggle {
+		@apply rotate-180;
 	}
 
 	.section-title {

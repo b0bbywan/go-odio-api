@@ -1,11 +1,14 @@
 {{ define "section-bluetooth" }}
-<section class="section-card">
-    <div class="section-header">
+<details id="section-bluetooth" open class="section-card">
+    <summary class="section-header">
         <h2 class="section-title">🔵 Bluetooth</h2>
-        {{ if and . .ConnectedCount }}
-        <span class="badge badge-blue">{{ .ConnectedCount }} connected</span>
-        {{ end }}
-    </div>
+        <div class="flex items-center gap-2">
+            {{ if and . .ConnectedCount }}
+            <span class="badge badge-blue">{{ .ConnectedCount }} connected</span>
+            {{ end }}
+            <span class="section-toggle">▾</span>
+        </div>
+    </summary>
 
     <div class="space-y-2">
 
@@ -47,5 +50,5 @@
         </div>
 
     </div>
-</section>
+</details>
 {{ end }}
