@@ -4,13 +4,13 @@
 {{- $g3 := or .ServerInfo.Backends.Bluetooth .ServerInfo.Backends.Systemd -}}
 <div class="grid gap-4{{ if or (and $g1 $g2) (and $g1 $g3) (and $g2 $g3) }} sm:grid-cols-2{{ end }}{{ if and $g1 $g2 $g3 }} lg:grid-cols-3{{ end }}">
 	{{ if .ServerInfo.Backends.PulseAudio }}
-	<div class="min-w-0" hx-get="/ui/sections/audio" hx-trigger="every 3s [document.visibilityState === 'visible' && this.querySelector('details[open]')]" hx-swap="innerHTML">
+	<div class="min-w-0" hx-get="/ui/sections/audio" hx-trigger="every 3s [document.visibilityState === 'visible' && !!this.querySelector('details[open]')]" hx-swap="innerHTML">
 		{{ template "section-pulseaudio" . }}
 	</div>
 	{{ end }}
 
 	{{ if .ServerInfo.Backends.MPRIS }}
-	<div class="min-w-0" hx-get="/ui/sections/mpris" hx-trigger="every 3s [document.visibilityState === 'visible' && this.querySelector('details[open]')]" hx-swap="innerHTML">
+	<div class="min-w-0" hx-get="/ui/sections/mpris" hx-trigger="every 3s [document.visibilityState === 'visible' && !!this.querySelector('details[open]')]" hx-swap="innerHTML">
 		{{ template "section-mpris" .Players }}
 	</div>
 	{{ end }}
@@ -18,12 +18,12 @@
 	{{ if or .ServerInfo.Backends.Bluetooth .ServerInfo.Backends.Systemd }}
 	<div class="min-w-0 flex flex-col gap-4">
 		{{ if .ServerInfo.Backends.Bluetooth }}
-		<div hx-get="/ui/sections/bluetooth" hx-trigger="every 3s [document.visibilityState === 'visible' && this.querySelector('details[open]')]" hx-swap="innerHTML">
+		<div hx-get="/ui/sections/bluetooth" hx-trigger="every 3s [document.visibilityState === 'visible' && !!this.querySelector('details[open]')]" hx-swap="innerHTML">
 			{{ template "section-bluetooth" .Bluetooth }}
 		</div>
 		{{ end }}
 		{{ if .ServerInfo.Backends.Systemd }}
-		<div hx-get="/ui/sections/systemd" hx-trigger="every 10s [document.visibilityState === 'visible' && this.querySelector('details[open]')]" hx-swap="innerHTML">
+		<div hx-get="/ui/sections/systemd" hx-trigger="every 10s [document.visibilityState === 'visible' && !!this.querySelector('details[open]')]" hx-swap="innerHTML">
 			{{ template "section-systemd" .Services }}
 		</div>
 		{{ end }}
