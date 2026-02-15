@@ -24,13 +24,21 @@
 		{{ template "volume-slider" (dict "Target" .Name "Type" "mpris" "Volume" .Volume "ShowMute" false) }}
 	</div>
 
-	<!-- Control buttons (centered) -->
+	<!-- Control buttons (centered) — hidden when no capability is available -->
+	{{ if or .CanPrev (or .CanPlay .CanPause) .CanNext }}
 	<div class="flex justify-center gap-2">
+		{{ if .CanPrev }}
 		<button class="btn" hx-post="/players/{{ .Name }}/previous" hx-swap="none" title="Previous track">⏮</button>
+		{{ end }}
+		{{ if or .CanPlay .CanPause }}
 		<button class="btn" onclick="togglePlayPause(this, '{{ .Name }}')" title="{{ if eq .State "Playing" }}Pause{{ else }}Play{{ end }}">
 			{{ if eq .State "Playing" }}⏸{{ else }}▶{{ end }}
 		</button>
+		{{ end }}
+		{{ if .CanNext }}
 		<button class="btn" hx-post="/players/{{ .Name }}/next" hx-swap="none" title="Next track">⏭</button>
+		{{ end }}
 	</div>
+	{{ end }}
 </div>
 {{ end }}

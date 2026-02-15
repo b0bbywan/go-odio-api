@@ -60,6 +60,10 @@ func convertPlayers(raw []Player) []PlayerView {
 			ArtUrl:      artUrl,
 			State:       p.Status,
 			Volume:      p.Volume,
+			CanPlay:     p.Capabilities.CanPlay,
+			CanPause:    p.Capabilities.CanPause,
+			CanNext:     p.Capabilities.CanGoNext,
+			CanPrev:     p.Capabilities.CanGoPrevious,
 		})
 	}
 	return views

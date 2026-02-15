@@ -25,13 +25,24 @@ type Backends struct {
 	Zeroconf   bool `json:"zeroconf"`
 }
 
+// PlayerCapabilities represents what transport actions a player supports
+type PlayerCapabilities struct {
+	CanPlay       bool `json:"can_play"`
+	CanPause      bool `json:"can_pause"`
+	CanGoNext     bool `json:"can_go_next"`
+	CanGoPrevious bool `json:"can_go_previous"`
+	CanSeek       bool `json:"can_seek"`
+	CanControl    bool `json:"can_control"`
+}
+
 // Player represents an MPRIS player from /players
 type Player struct {
-	Name     string            `json:"bus_name"` // API returns "bus_name", not "name"
-	Metadata map[string]string `json:"metadata"`
-	Status   string            `json:"playback_status"` // API returns "playback_status", not "status"
-	Position int64             `json:"position"`
-	Volume   float64           `json:"volume"`
+	Name         string             `json:"bus_name"` // API returns "bus_name", not "name"
+	Metadata     map[string]string  `json:"metadata"`
+	Status       string             `json:"playback_status"` // API returns "playback_status", not "status"
+	Position     int64              `json:"position"`
+	Volume       float64            `json:"volume"`
+	Capabilities PlayerCapabilities `json:"capabilities"`
 }
 
 // AudioInfo represents PulseAudio server info from /audio/server
@@ -105,6 +116,10 @@ type PlayerView struct {
 	ArtUrl      string  // Cover art URL (http/https only, empty if unavailable)
 	State       string  // "playing", "paused", "stopped"
 	Volume      float64 // Volume level 0.0-1.0
+	CanPlay     bool
+	CanPause    bool
+	CanNext     bool
+	CanPrev     bool
 }
 
 // ServiceView is a view-optimized version of Service for templates
