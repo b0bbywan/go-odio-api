@@ -1,6 +1,8 @@
 {{ define "content" }}
-<!-- Responsive grid: 1 col mobile, 2 col tablet, 3 col desktop -->
-<div class="grid-responsive">
+{{- $g1 := .ServerInfo.Backends.PulseAudio -}}
+{{- $g2 := .ServerInfo.Backends.MPRIS -}}
+{{- $g3 := or .ServerInfo.Backends.Bluetooth .ServerInfo.Backends.Systemd -}}
+<div class="grid gap-4{{ if or (and $g1 $g2) (and $g1 $g3) (and $g2 $g3) }} sm:grid-cols-2{{ end }}{{ if and $g1 $g2 $g3 }} lg:grid-cols-3{{ end }}">
 	{{ if .ServerInfo.Backends.PulseAudio }}
 	<div class="min-w-0" hx-get="/ui/sections/audio" hx-trigger="every 3s [document.visibilityState === 'visible' && this.querySelector('details[open]')]" hx-swap="innerHTML">
 		{{ template "section-pulseaudio" . }}
