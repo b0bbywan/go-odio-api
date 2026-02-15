@@ -10,6 +10,28 @@ details > summary::-webkit-details-marker {
 	display: none;
 }
 
+/* Custom scrollbar for dark theme */
+::-webkit-scrollbar {
+	width: 8px;
+	height: 8px;
+}
+::-webkit-scrollbar-track {
+	background: #18181b;
+}
+::-webkit-scrollbar-thumb {
+	background: #3f3f46;
+	border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+	background: #52525b;
+}
+
+/* HTMX request indicator */
+button.htmx-request {
+	opacity: 0.6;
+	pointer-events: none;
+}
+
 /* Custom animations */
 @keyframes pulse-opacity {
 	0%, 100% { opacity: 0.6; }
@@ -18,6 +40,40 @@ details > summary::-webkit-details-marker {
 
 button.htmx-request {
 	animation: pulse-opacity 1s ease-in-out infinite;
+}
+
+/* Volume slider */
+.volume-slider {
+	width: 100%;
+	height: 4px;
+	border-radius: 2px;
+	background: #3f3f46;
+	outline: none;
+	opacity: 0.9;
+	transition: opacity 0.2s;
+}
+
+.volume-slider:hover {
+	opacity: 1;
+}
+
+.volume-slider::-webkit-slider-thumb {
+	-webkit-appearance: none;
+	appearance: none;
+	width: 14px;
+	height: 14px;
+	border-radius: 50%;
+	background: #3b82f6;
+	cursor: pointer;
+}
+
+.volume-slider::-moz-range-thumb {
+	width: 14px;
+	height: 14px;
+	border-radius: 50%;
+	background: #3b82f6;
+	cursor: pointer;
+	border: none;
 }
 
 /* Component utility classes */
