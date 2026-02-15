@@ -25,75 +25,70 @@ func NewAPIClient(port int) *APIClient {
 	}
 }
 
-// GetServerInfo fetches server information from /server
 func (c *APIClient) GetServerInfo() (*ServerInfo, error) {
-	var info ServerInfo
-	err := c.get("/server", &info)
-	return &info, err
+	var v ServerInfo
+	if err := c.get("/server", &v); err != nil {
+		return nil, err
+	}
+	return &v, nil
 }
 
-// GetPlayers fetches MPRIS players from /players
 func (c *APIClient) GetPlayers() ([]Player, error) {
-	var players []Player
-	err := c.get("/players", &players)
-	if err != nil {
+	var v []Player
+	if err := c.get("/players", &v); err != nil {
 		return nil, err
 	}
-	return players, nil
+	return v, nil
 }
 
-// GetAudioInfo fetches PulseAudio server info from /audio/server
 func (c *APIClient) GetAudioInfo() (*AudioInfo, error) {
-	var info AudioInfo
-	err := c.get("/audio/server", &info)
-	return &info, err
+	var v AudioInfo
+	if err := c.get("/audio/server", &v); err != nil {
+		return nil, err
+	}
+	return &v, nil
 }
 
-// GetAudioClients fetches PulseAudio clients from /audio/clients
 func (c *APIClient) GetAudioClients() ([]AudioClient, error) {
-	var clients []AudioClient
-	err := c.get("/audio/clients", &clients)
-	if err != nil {
+	var v []AudioClient
+	if err := c.get("/audio/clients", &v); err != nil {
 		return nil, err
 	}
-	return clients, nil
+	return v, nil
 }
 
-// GetBluetoothStatus fetches Bluetooth state from /bluetooth
 func (c *APIClient) GetBluetoothStatus() (*BluetoothStatus, error) {
-	var status BluetoothStatus
-	err := c.get("/bluetooth", &status)
-	return &status, err
-}
-
-// GetServices fetches systemd services from /services
-func (c *APIClient) GetServices() ([]Service, error) {
-	var services []Service
-	err := c.get("/services", &services)
-	if err != nil {
+	var v BluetoothStatus
+	if err := c.get("/bluetooth", &v); err != nil {
 		return nil, err
 	}
-	return services, nil
+	return &v, nil
 }
 
-// get is a helper method for GET requests
-func (c *APIClient) get(path string, dest interface{}) error {
+func (c *APIClient) GetServices() ([]Service, error) {
+	var v []Service
+	if err := c.get("/services", &v); err != nil {
+		return nil, err
+	}
+	return v, nil
+}
+
+// get performs a GET request and decodes the JSON response into dest.
+func (c *APIClient) get(path string, dest any) error {
 	resp, err := c.client.Get(c.baseURL + path)
 	if err != nil {
-		return fmt.Errorf("API call failed: %w", err)
+		return fmt.Errorf("%s: %w", path, err)
 	}
 	defer func() {
 		if err := resp.Body.Close(); err != nil {
-			logger.Warn("failed to close body during get call")
+			logger.Warn("failed to close response body for %s", path)
 		}
 	}()
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("API returned status %d", resp.StatusCode)
+		return fmt.Errorf("%s: unexpected status %d", path, resp.StatusCode)
 	}
-
 	if err := json.NewDecoder(resp.Body).Decode(dest); err != nil {
-		return fmt.Errorf("failed to decode response: %w", err)
+		return fmt.Errorf("%s: decode failed: %w", path, err)
 	}
-
 	return nil
 }
