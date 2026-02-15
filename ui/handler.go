@@ -222,12 +222,17 @@ func convertPlayers(players []Player) []PlayerView {
 	for _, p := range players {
 		// Keep full bus_name for API endpoints, truncate for display
 		displayName := strings.TrimPrefix(p.Name, "org.mpris.MediaPlayer2.")
+		artUrl := p.Metadata["mpris:artUrl"]
+		if !strings.HasPrefix(artUrl, "http://") && !strings.HasPrefix(artUrl, "https://") {
+			artUrl = ""
+		}
 		views = append(views, PlayerView{
 			Name:        p.Name, // Full bus_name for endpoints
 			DisplayName: displayName,
 			Artist:      p.Metadata["xesam:artist"],
 			Title:       p.Metadata["xesam:title"],
 			Album:       p.Metadata["xesam:album"],
+			ArtUrl:      artUrl,
 			State:       p.Status,
 			Volume:      p.Volume,
 		})

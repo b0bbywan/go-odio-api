@@ -102,6 +102,7 @@ type PlayerView struct {
 	Artist      string
 	Title       string
 	Album       string
+	ArtUrl      string  // Cover art URL (http/https only, empty if unavailable)
 	State       string  // "playing", "paused", "stopped"
 	Volume      float64 // Volume level 0.0-1.0
 }

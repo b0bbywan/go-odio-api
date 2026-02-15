@@ -74,6 +74,10 @@ button.htmx-request {
 		@apply flex flex-col gap-3 rounded-lg bg-zinc-700/50 p-3 transition-colors hover:bg-zinc-700;
 	}
 
+	.player-art {
+		@apply w-full aspect-square object-cover rounded-md mb-2;
+	}
+
 	.btn {
 		@apply rounded-lg bg-zinc-600/50 px-3 py-2 text-sm transition-colors hover:bg-zinc-600 active:scale-95;
 	}

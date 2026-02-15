@@ -4,6 +4,9 @@
 	<!-- Player info (centered) -->
 	<div class="text-center mb-3">
 		<div class="player-name mb-1">{{ .DisplayName }}</div>
+		{{ if .ArtUrl }}
+		<img src="{{ .ArtUrl }}" alt="cover" class="player-art">
+		{{ end }}
 		{{ if or .Artist .Title }}
 		<div class="player-meta" title="{{ if .Artist }}{{ .Artist }}{{ end }}{{ if and .Artist .Title }} – {{ end }}{{ if .Title }}{{ .Title }}{{ end }}">
 			{{ if .Artist }}{{ .Artist }}{{ end }}{{ if and .Artist .Title }} – {{ end }}{{ if .Title }}{{ .Title }}{{ end }}
