@@ -35,19 +35,15 @@
         {{/* Pairing row */}}
         <div class="service-card">
             <div class="content-area">
+                {{ if .PairingActive }}
+                <span class="text-xs text-blue-400 animate-pulse">⏱ {{ .PairingSecondsLeft }}s</span>
+                {{ else }}
                 <button class="btn text-xs"
                         hx-post="/bluetooth/pairing_mode"
                         hx-swap="none"
-                        {{ if .PairingActive }}disabled{{ end }}
-                        title="Enable pairing mode for 60s">
-                    {{ if .PairingActive }}Pairing…{{ else }}Enable Pairing{{ end }}
-                </button>
+                        title="Enable pairing mode for 60s">Enable Pairing</button>
+                {{ end }}
             </div>
-            {{ if .PairingActive }}
-            <div class="meta-area">
-                <span class="text-xs text-blue-400">⏱ {{ .PairingSecondsLeft }}s</span>
-            </div>
-            {{ end }}
         </div>
 
     </div>
