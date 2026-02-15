@@ -40,6 +40,10 @@ func (c *APIClient) GetPlayers() ([]PlayerView, error) {
 	if err := c.get("/players", &raw); err != nil {
 		return nil, err
 	}
+	return convertPlayers(raw), nil
+}
+
+func convertPlayers(raw []Player) []PlayerView {
 	views := make([]PlayerView, 0, len(raw))
 	for _, p := range raw {
 		displayName := strings.TrimPrefix(p.Name, "org.mpris.MediaPlayer2.")
@@ -58,7 +62,7 @@ func (c *APIClient) GetPlayers() ([]PlayerView, error) {
 			Volume:      p.Volume,
 		})
 	}
-	return views, nil
+	return views
 }
 
 func (c *APIClient) GetAudioInfo() (*AudioInfo, error) {
@@ -82,6 +86,13 @@ func (c *APIClient) GetBluetoothStatus() (*BluetoothView, error) {
 	if err := c.get("/bluetooth", &raw); err != nil {
 		return nil, err
 	}
+	return convertBluetooth(&raw), nil
+}
+
+func convertBluetooth(raw *BluetoothStatus) *BluetoothView {
+	if raw == nil {
+		return nil
+	}
 	connected := 0
 	for _, d := range raw.KnownDevices {
 		if d.Connected {
@@ -99,7 +110,7 @@ func (c *APIClient) GetBluetoothStatus() (*BluetoothView, error) {
 		PairingActive:      raw.PairingActive,
 		PairingSecondsLeft: secsLeft,
 		ConnectedCount:     connected,
-	}, nil
+	}
 }
 
 func (c *APIClient) GetServices() ([]ServiceView, error) {
@@ -107,6 +118,10 @@ func (c *APIClient) GetServices() ([]ServiceView, error) {
 	if err := c.get("/services", &raw); err != nil {
 		return nil, err
 	}
+	return convertServices(raw), nil
+}
+
+func convertServices(raw []Service) []ServiceView {
 	views := make([]ServiceView, 0, len(raw))
 	for _, s := range raw {
 		views = append(views, ServiceView{
@@ -117,7 +132,7 @@ func (c *APIClient) GetServices() ([]ServiceView, error) {
 			IsUser:      s.Scope == "user",
 		})
 	}
-	return views, nil
+	return views
 }
 
 // get performs a GET request and decodes the JSON response into dest.
