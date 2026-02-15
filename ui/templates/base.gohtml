@@ -80,65 +80,7 @@
 	</footer>
 	{{ end }}
 
-	<script>
-	function togglePlayPause(button, playerName) {
-		// Get current state from button content
-		const currentIcon = button.textContent.trim();
-		const isPlaying = currentIcon === '⏸';
-
-		// Toggle icon immediately for instant feedback
-		const newIcon = isPlaying ? '▶' : '⏸';
-		const newTitle = isPlaying ? 'Play' : 'Pause';
-
-		button.textContent = newIcon;
-		button.title = newTitle;
-
-		// Send POST to API
-		fetch(`/players/${playerName}/play_pause`, {
-			method: 'POST'
-		}).catch(() => {
-			// Revert on error
-			button.textContent = currentIcon;
-			button.title = isPlaying ? 'Pause' : 'Play';
-			console.error('Failed to toggle play/pause');
-		});
-	}
-
-	function updateVolume(slider, target, type) {
-		const volume = slider.value / 100; // Convert 0-100 to 0.0-1.0
-
-		let url;
-		if (type === 'mpris') {
-			url = `/players/${target}/volume`;
-		} else if (type === 'audio-server') {
-			url = '/audio/server/volume';
-		} else if (type === 'audio-client') {
-			url = `/audio/clients/${target}/volume`;
-		}
-
-		fetch(url, {
-			method: 'POST',
-			headers: {'Content-Type': 'application/json'},
-			body: JSON.stringify({volume: volume})
-		}).catch(err => console.error('Failed to set volume:', err));
-	}
-
-	function toggleMute(button, target, type) {
-		let url;
-		if (type === 'audio-server') {
-			url = '/audio/server/mute';
-		} else if (type === 'audio-client') {
-			url = `/audio/clients/${target}/mute`;
-		}
-
-		fetch(url, {method: 'POST'})
-			.then(() => {
-				// Toggle mute icon
-				button.textContent = button.textContent === '🔇' ? '🔊' : '🔇';
-			})
-			.catch(err => console.error('Failed to toggle mute:', err));
-	}
-	</script>
+	<script src="/ui/static/odio.js"></script>
 </body>
 </html>
 {{ end }}
