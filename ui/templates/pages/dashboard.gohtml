@@ -13,15 +13,18 @@
 	</div>
 	{{ end }}
 
-	{{ if .ServerInfo.Backends.Bluetooth }}
-	<div class="min-w-0" hx-get="/ui/sections/bluetooth" hx-trigger="every 3s [document.visibilityState === 'visible']" hx-swap="innerHTML">
-		{{ template "section-bluetooth" .Bluetooth }}
-	</div>
-	{{ end }}
-
-	{{ if .ServerInfo.Backends.Systemd }}
-	<div class="min-w-0" hx-get="/ui/sections/systemd" hx-trigger="every 10s [document.visibilityState === 'visible']" hx-swap="innerHTML">
-		{{ template "section-systemd" .Services }}
+	{{ if or .ServerInfo.Backends.Bluetooth .ServerInfo.Backends.Systemd }}
+	<div class="min-w-0 flex flex-col gap-4">
+		{{ if .ServerInfo.Backends.Bluetooth }}
+		<div hx-get="/ui/sections/bluetooth" hx-trigger="every 3s [document.visibilityState === 'visible']" hx-swap="innerHTML">
+			{{ template "section-bluetooth" .Bluetooth }}
+		</div>
+		{{ end }}
+		{{ if .ServerInfo.Backends.Systemd }}
+		<div hx-get="/ui/sections/systemd" hx-trigger="every 10s [document.visibilityState === 'visible']" hx-swap="innerHTML">
+			{{ template "section-systemd" .Services }}
+		</div>
+		{{ end }}
 	</div>
 	{{ end }}
 </div>
