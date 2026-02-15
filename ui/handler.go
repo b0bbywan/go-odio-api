@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
-	"strings"
-	"time"
 
 	"github.com/b0bbywan/go-odio-api/logger"
 )
@@ -88,7 +86,7 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 	if serverInfo.Backends.MPRIS {
 		logger.Debug("[ui] → API GET /players")
 		if players, err := h.client.GetPlayers(); err == nil {
-			data.Players = convertPlayers(players)
+			data.Players = players
 			logger.Debug("[ui] ← API /players: %d players", len(players))
 		} else {
 			logger.Warn("[ui] Failed to fetch players: %v", err)
@@ -115,9 +113,9 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 
 	if serverInfo.Backends.Bluetooth {
 		logger.Debug("[ui] → API GET /bluetooth")
-		if btStatus, err := h.client.GetBluetoothStatus(); err == nil {
-			data.Bluetooth = convertBluetooth(btStatus)
-			logger.Debug("[ui] ← API /bluetooth: powered=%v pairing=%v", btStatus.Powered, btStatus.PairingActive)
+		if bt, err := h.client.GetBluetoothStatus(); err == nil {
+			data.Bluetooth = bt
+			logger.Debug("[ui] ← API /bluetooth: powered=%v pairing=%v", bt.Powered, bt.PairingActive)
 		} else {
 			logger.Warn("[ui] Failed to fetch bluetooth status: %v", err)
 		}
@@ -126,7 +124,7 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 	if serverInfo.Backends.Systemd {
 		logger.Debug("[ui] → API GET /services")
 		if services, err := h.client.GetServices(); err == nil {
-			data.Services = convertServices(services)
+			data.Services = services
 			logger.Debug("[ui] ← API /services: %d services", len(services))
 		} else {
 			logger.Warn("[ui] Failed to fetch services: %v", err)
@@ -153,8 +151,7 @@ func (h *Handler) MPRISSection(w http.ResponseWriter, r *http.Request) {
 	}
 	logger.Debug("[ui] ← API /players: %d players", len(players))
 
-	playerViews := convertPlayers(players)
-	if err := h.tmpl.ExecuteTemplate(w, "section-mpris", playerViews); err != nil {
+	if err := h.tmpl.ExecuteTemplate(w, "section-mpris", players); err != nil {
 		logger.Error("[ui] Template execution failed: %v", err)
 		http.Error(w, "Failed to render section", http.StatusInternalServerError)
 	}
@@ -209,50 +206,10 @@ func (h *Handler) SystemdSection(w http.ResponseWriter, r *http.Request) {
 	}
 	logger.Debug("[ui] ← API /services: %d services", len(services))
 
-	serviceViews := convertServices(services)
-	if err := h.tmpl.ExecuteTemplate(w, "section-systemd", serviceViews); err != nil {
+	if err := h.tmpl.ExecuteTemplate(w, "section-systemd", services); err != nil {
 		logger.Error("[ui] Template execution failed: %v", err)
 		http.Error(w, "Failed to render section", http.StatusInternalServerError)
 	}
-}
-
-// convertPlayers converts API Player types to view-optimized PlayerView
-func convertPlayers(players []Player) []PlayerView {
-	views := make([]PlayerView, 0, len(players))
-	for _, p := range players {
-		// Keep full bus_name for API endpoints, truncate for display
-		displayName := strings.TrimPrefix(p.Name, "org.mpris.MediaPlayer2.")
-		artUrl := p.Metadata["mpris:artUrl"]
-		if !strings.HasPrefix(artUrl, "http://") && !strings.HasPrefix(artUrl, "https://") {
-			artUrl = ""
-		}
-		views = append(views, PlayerView{
-			Name:        p.Name, // Full bus_name for endpoints
-			DisplayName: displayName,
-			Artist:      p.Metadata["xesam:artist"],
-			Title:       p.Metadata["xesam:title"],
-			Album:       p.Metadata["xesam:album"],
-			ArtUrl:      artUrl,
-			State:       p.Status,
-			Volume:      p.Volume,
-		})
-	}
-	return views
-}
-
-// convertServices converts API Service types to view-optimized ServiceView
-func convertServices(services []Service) []ServiceView {
-	views := make([]ServiceView, 0, len(services))
-	for _, s := range services {
-		views = append(views, ServiceView{
-			Name:        s.Name,
-			Description: s.Description,
-			Active:      s.ActiveState == "active",
-			State:       s.SubState,
-			IsUser:      s.Scope == "user",
-		})
-	}
-	return views
 }
 
 // BluetoothSection renders just the Bluetooth section (for HTMX updates)
@@ -268,35 +225,9 @@ func (h *Handler) BluetoothSection(w http.ResponseWriter, r *http.Request) {
 	}
 	logger.Debug("[ui] ← API /bluetooth: powered=%v pairing=%v", btStatus.Powered, btStatus.PairingActive)
 
-	btView := convertBluetooth(btStatus)
-	if err := h.tmpl.ExecuteTemplate(w, "section-bluetooth", btView); err != nil {
+	if err := h.tmpl.ExecuteTemplate(w, "section-bluetooth", btStatus); err != nil {
 		logger.Error("[ui] Template execution failed: %v", err)
 		http.Error(w, "Failed to render section", http.StatusInternalServerError)
-	}
-}
-
-// convertBluetooth converts a BluetoothStatus to a view-optimized BluetoothView
-func convertBluetooth(status *BluetoothStatus) *BluetoothView {
-	if status == nil {
-		return nil
-	}
-	connected := 0
-	for _, d := range status.KnownDevices {
-		if d.Connected {
-			connected++
-		}
-	}
-	secsLeft := 0
-	if status.PairingActive && status.PairingUntil != nil {
-		if d := time.Until(*status.PairingUntil); d > 0 {
-			secsLeft = int(d.Seconds())
-		}
-	}
-	return &BluetoothView{
-		Powered:            status.Powered,
-		PairingActive:      status.PairingActive,
-		PairingSecondsLeft: secsLeft,
-		ConnectedCount:     connected,
 	}
 }
 

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/b0bbywan/go-odio-api/logger"
@@ -34,12 +35,30 @@ func (c *APIClient) GetServerInfo() (*ServerInfo, error) {
 	return &v, nil
 }
 
-func (c *APIClient) GetPlayers() ([]Player, error) {
-	var v []Player
-	if err := c.get("/players", &v); err != nil {
+func (c *APIClient) GetPlayers() ([]PlayerView, error) {
+	var raw []Player
+	if err := c.get("/players", &raw); err != nil {
 		return nil, err
 	}
-	return v, nil
+	views := make([]PlayerView, 0, len(raw))
+	for _, p := range raw {
+		displayName := strings.TrimPrefix(p.Name, "org.mpris.MediaPlayer2.")
+		artUrl := p.Metadata["mpris:artUrl"]
+		if !strings.HasPrefix(artUrl, "http://") && !strings.HasPrefix(artUrl, "https://") {
+			artUrl = ""
+		}
+		views = append(views, PlayerView{
+			Name:        p.Name,
+			DisplayName: displayName,
+			Artist:      p.Metadata["xesam:artist"],
+			Title:       p.Metadata["xesam:title"],
+			Album:       p.Metadata["xesam:album"],
+			ArtUrl:      artUrl,
+			State:       p.Status,
+			Volume:      p.Volume,
+		})
+	}
+	return views, nil
 }
 
 func (c *APIClient) GetAudioInfo() (*AudioInfo, error) {
@@ -58,20 +77,47 @@ func (c *APIClient) GetAudioClients() ([]AudioClient, error) {
 	return v, nil
 }
 
-func (c *APIClient) GetBluetoothStatus() (*BluetoothStatus, error) {
-	var v BluetoothStatus
-	if err := c.get("/bluetooth", &v); err != nil {
+func (c *APIClient) GetBluetoothStatus() (*BluetoothView, error) {
+	var raw BluetoothStatus
+	if err := c.get("/bluetooth", &raw); err != nil {
 		return nil, err
 	}
-	return &v, nil
+	connected := 0
+	for _, d := range raw.KnownDevices {
+		if d.Connected {
+			connected++
+		}
+	}
+	secsLeft := 0
+	if raw.PairingActive && raw.PairingUntil != nil {
+		if d := time.Until(*raw.PairingUntil); d > 0 {
+			secsLeft = int(d.Seconds())
+		}
+	}
+	return &BluetoothView{
+		Powered:            raw.Powered,
+		PairingActive:      raw.PairingActive,
+		PairingSecondsLeft: secsLeft,
+		ConnectedCount:     connected,
+	}, nil
 }
 
-func (c *APIClient) GetServices() ([]Service, error) {
-	var v []Service
-	if err := c.get("/services", &v); err != nil {
+func (c *APIClient) GetServices() ([]ServiceView, error) {
+	var raw []Service
+	if err := c.get("/services", &raw); err != nil {
 		return nil, err
 	}
-	return v, nil
+	views := make([]ServiceView, 0, len(raw))
+	for _, s := range raw {
+		views = append(views, ServiceView{
+			Name:        s.Name,
+			Description: s.Description,
+			Active:      s.ActiveState == "active",
+			State:       s.SubState,
+			IsUser:      s.Scope == "user",
+		})
+	}
+	return views, nil
 }
 
 // get performs a GET request and decodes the JSON response into dest.
