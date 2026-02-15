@@ -75,7 +75,7 @@ button.htmx-request {
 	}
 
 	.player-art {
-		@apply w-full aspect-square object-cover rounded-md mb-2;
+		@apply w-3/4 mx-auto aspect-square object-cover rounded-md mb-2;
 	}
 
 	.btn {
