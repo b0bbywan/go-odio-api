@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/b0bbywan/go-odio-api/backend"
@@ -33,29 +34,40 @@ func NewServer(cfg *config.ApiConfig, b *backend.Backend) *Server {
 }
 
 func (s *Server) Run(ctx context.Context) error {
-	srv := &http.Server{
-		Addr:    s.config.Listen,
-		Handler: s.mux,
+	servers := make([]*http.Server, len(s.config.Listens))
+	for i, addr := range s.config.Listens {
+		servers[i] = &http.Server{Addr: addr, Handler: s.mux}
 	}
 
-	// Goroutine for signal handling
+	// Shutdown all servers on context cancellation
 	go func() {
 		<-ctx.Done()
-		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer shutdownCancel()
-
-		if err := srv.Shutdown(shutdownCtx); err != nil {
-			logger.Info("[api] Server shutdown error: %v", err)
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		for _, srv := range servers {
+			if err := srv.Shutdown(shutdownCtx); err != nil {
+				logger.Info("[api] server %s shutdown error: %v", srv.Addr, err)
+			}
 		}
 	}()
 
-	logger.Info("[api] http server running on %s", s.config.Listen)
-	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		return fmt.Errorf("Server error: %w", err)
+	// Start one goroutine per listen address
+	errCh := make(chan error, len(servers))
+	var wg sync.WaitGroup
+	for _, srv := range servers {
+		wg.Add(1)
+		go func(srv *http.Server) {
+			defer wg.Done()
+			logger.Info("[api] http server running on %s", srv.Addr)
+			if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				errCh <- fmt.Errorf("server %s: %w", srv.Addr, err)
+			}
+		}(srv)
 	}
 
-	return nil
-
+	wg.Wait()
+	close(errCh)
+	return <-errCh
 }
 
 func (s *Server) register(b *backend.Backend) {
@@ -98,7 +110,7 @@ func (s *Server) register(b *backend.Backend) {
 }
 
 func (s *Server) registerUIRoutes() {
-	uiHandler := ui.NewHandler(s.config.Listen)
+	uiHandler := ui.NewHandler(s.config.Port)
 	uiHandler.RegisterRoutes(s.mux)
 	logger.Info("[api] UI routes registered at /ui")
 }

@@ -131,7 +131,7 @@ func TestServerDisabled(t *testing.T) {
 	cfg := &config.ApiConfig{
 		Enabled: false,
 		Port:    8018,
-		Listen:  "127.0.0.1:8018",
+		Listens: []string{"127.0.0.1:8018"},
 	}
 
 	backend := &backend.Backend{}
@@ -147,7 +147,7 @@ func TestServerEnabled(t *testing.T) {
 	cfg := &config.ApiConfig{
 		Enabled: true,
 		Port:    8018,
-		Listen:  "127.0.0.1:8018",
+		Listens: []string{"127.0.0.1:8018"},
 	}
 
 	backend := &backend.Backend{}
@@ -168,7 +168,7 @@ func TestRoutesWithDisabledBackends(t *testing.T) {
 	cfg := &config.ApiConfig{
 		Enabled: true,
 		Port:    8018,
-		Listen:  "127.0.0.1:8018",
+		Listens: []string{"127.0.0.1:8018"},
 	}
 
 	// Backend with all backends disabled (nil)
@@ -282,7 +282,7 @@ func TestRoutesWithEnabledSystemdBackend(t *testing.T) {
 	cfg := &config.ApiConfig{
 		Enabled: true,
 		Port:    8018,
-		Listen:  "127.0.0.1:8018",
+		Listens: []string{"127.0.0.1:8018"},
 	}
 
 	// Create a mock systemd backend (we can't create a real one without D-Bus)
@@ -313,7 +313,7 @@ func TestNilBackendHandling(t *testing.T) {
 	cfg := &config.ApiConfig{
 		Enabled: true,
 		Port:    8018,
-		Listen:  "127.0.0.1:8018",
+		Listens: []string{"127.0.0.1:8018"},
 	}
 
 	// Nil backend
@@ -339,7 +339,7 @@ func TestServerRouteAlwaysRegistered(t *testing.T) {
 	cfg := &config.ApiConfig{
 		Enabled: true,
 		Port:    8018,
-		Listen:  "127.0.0.1:8018",
+		Listens: []string{"127.0.0.1:8018"},
 	}
 
 	// Backend with no sub-backends but should still have server info
@@ -365,7 +365,7 @@ func TestRouteMethodRestrictions(t *testing.T) {
 	cfg := &config.ApiConfig{
 		Enabled: true,
 		Port:    8018,
-		Listen:  "127.0.0.1:8018",
+		Listens: []string{"127.0.0.1:8018"},
 	}
 
 	backend := &backend.Backend{}

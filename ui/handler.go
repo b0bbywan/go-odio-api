@@ -54,10 +54,10 @@ type Handler struct {
 }
 
 // NewHandler creates a new UI handler with API client
-func NewHandler(apiListenAddr string) *Handler {
+func NewHandler(apiPort int) *Handler {
 	return &Handler{
 		tmpl:   LoadTemplates(),
-		client: NewAPIClient(apiListenAddr),
+		client: NewAPIClient(apiPort),
 	}
 }
 

@@ -3,7 +3,6 @@ package ui
 import (
 	"encoding/json"
 	"fmt"
-	"net"
 	"net/http"
 	"time"
 
@@ -16,15 +15,11 @@ type APIClient struct {
 	client  *http.Client
 }
 
-// NewAPIClient creates a new internal API client using the server's listen address.
-// If the host is 0.0.0.0 (all interfaces), 127.0.0.1 is used instead.
-func NewAPIClient(listenAddr string) *APIClient {
-	host, port, err := net.SplitHostPort(listenAddr)
-	if err != nil || host == "" || host == "0.0.0.0" {
-		host = "127.0.0.1"
-	}
+// NewAPIClient creates a new internal API client.
+// It always connects to 127.0.0.1, which is guaranteed to be in the server's listen list.
+func NewAPIClient(port int) *APIClient {
 	return &APIClient{
-		baseURL: "http://" + net.JoinHostPort(host, port),
+		baseURL: fmt.Sprintf("http://127.0.0.1:%d", port),
 		client: &http.Client{
 			Timeout: 5 * time.Second,
 		},
