@@ -113,6 +113,16 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if serverInfo.Backends.Bluetooth {
+		logger.Debug("[ui] → API GET /bluetooth")
+		if btStatus, err := h.client.GetBluetoothStatus(); err == nil {
+			data.Bluetooth = convertBluetooth(btStatus)
+			logger.Debug("[ui] ← API /bluetooth: powered=%v pairing=%v", btStatus.Powered, btStatus.PairingActive)
+		} else {
+			logger.Warn("[ui] Failed to fetch bluetooth status: %v", err)
+		}
+	}
+
 	if serverInfo.Backends.Systemd {
 		logger.Debug("[ui] → API GET /services")
 		if services, err := h.client.GetServices(); err == nil {

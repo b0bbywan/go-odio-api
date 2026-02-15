@@ -13,6 +13,12 @@
 	</div>
 	{{ end }}
 
+	{{ if .ServerInfo.Backends.Bluetooth }}
+	<div class="min-w-0" hx-get="/ui/sections/bluetooth" hx-trigger="every 3s [document.visibilityState === 'visible']" hx-swap="innerHTML">
+		{{ template "section-bluetooth" .Bluetooth }}
+	</div>
+	{{ end }}
+
 	{{ if .ServerInfo.Backends.Systemd }}
 	<div class="min-w-0" hx-get="/ui/sections/systemd" hx-trigger="every 10s [document.visibilityState === 'visible']" hx-swap="innerHTML">
 		{{ template "section-systemd" .Services }}
@@ -20,7 +26,7 @@
 	{{ end }}
 </div>
 
-{{ if not (or .ServerInfo.Backends.MPRIS .ServerInfo.Backends.PulseAudio .ServerInfo.Backends.Systemd) }}
+{{ if not (or .ServerInfo.Backends.MPRIS .ServerInfo.Backends.PulseAudio .ServerInfo.Backends.Bluetooth .ServerInfo.Backends.Systemd) }}
 <!-- Empty state when no backends are enabled -->
 <div class="empty-state-large">
 	<div class="text-center">

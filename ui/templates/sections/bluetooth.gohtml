@@ -7,12 +7,6 @@
         {{ end }}
     </div>
 
-    {{ if not . }}
-    <div class="empty-state">
-        <div class="empty-state-icon">🔵</div>
-        <p class="text-sm text-muted">Bluetooth unavailable</p>
-    </div>
-    {{ else }}
     <div class="space-y-2">
 
         {{/* Power row */}}
@@ -59,6 +53,5 @@
         {{ end }}
 
     </div>
-    {{ end }}
 </section>
 {{ end }}
