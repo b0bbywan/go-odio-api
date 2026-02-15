@@ -22,6 +22,7 @@ type Backends struct {
 	MPRIS      bool `json:"mpris"`
 	PulseAudio bool `json:"pulseaudio"`
 	Systemd    bool `json:"systemd"`
+	Zeroconf   bool `json:"zeroconf"`
 }
 
 // Player represents an MPRIS player from /players
