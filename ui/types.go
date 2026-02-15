@@ -1,5 +1,7 @@
 package ui
 
+import "time"
+
 // ============================================================================
 // API Response Types (matching JSON API responses)
 // ============================================================================
@@ -59,6 +61,24 @@ type Service struct {
 	Scope       string `json:"scope"` // "system" or "user"
 }
 
+// BluetoothDevice represents a known Bluetooth device from /bluetooth
+type BluetoothDevice struct {
+	Address   string `json:"address"`
+	Name      string `json:"name"`
+	Trusted   bool   `json:"trusted"`
+	Connected bool   `json:"connected"`
+}
+
+// BluetoothStatus represents the current Bluetooth state from /bluetooth
+type BluetoothStatus struct {
+	Powered       bool              `json:"powered"`
+	Discoverable  bool              `json:"discoverable"`
+	Pairable      bool              `json:"pairable"`
+	PairingActive bool              `json:"pairing_active"`
+	PairingUntil  *time.Time        `json:"pairing_until,omitempty"`
+	KnownDevices  []BluetoothDevice `json:"known_devices,omitempty"`
+}
+
 // ============================================================================
 // View Models (for template rendering)
 // ============================================================================
@@ -71,6 +91,7 @@ type DashboardView struct {
 	AudioInfo    *AudioInfo
 	AudioClients []AudioClient
 	Services     []ServiceView
+	Bluetooth    *BluetoothView
 }
 
 // PlayerView is a view-optimized version of Player for templates
@@ -91,4 +112,12 @@ type ServiceView struct {
 	Active      bool
 	State       string
 	IsUser      bool // true if scope is "user", false if "system"
+}
+
+// BluetoothView is the view model for the bluetooth section
+type BluetoothView struct {
+	Powered            bool
+	PairingActive      bool
+	PairingSecondsLeft int
+	ConnectedCount     int
 }

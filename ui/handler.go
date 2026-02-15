@@ -6,6 +6,7 @@ import (
 	"html/template"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/b0bbywan/go-odio-api/logger"
 )
@@ -237,6 +238,51 @@ func convertServices(services []Service) []ServiceView {
 		})
 	}
 	return views
+}
+
+// BluetoothSection renders just the Bluetooth section (for HTMX updates)
+func (h *Handler) BluetoothSection(w http.ResponseWriter, r *http.Request) {
+	logger.Debug("[ui] %s %s (HTMX section refresh)", r.Method, r.URL.Path)
+
+	logger.Debug("[ui] → API GET /bluetooth")
+	btStatus, err := h.client.GetBluetoothStatus()
+	if err != nil {
+		logger.Error("[ui] Failed to fetch bluetooth status: %v", err)
+		http.Error(w, "Failed to load bluetooth status", http.StatusInternalServerError)
+		return
+	}
+	logger.Debug("[ui] ← API /bluetooth: powered=%v pairing=%v", btStatus.Powered, btStatus.PairingActive)
+
+	btView := convertBluetooth(btStatus)
+	if err := h.tmpl.ExecuteTemplate(w, "section-bluetooth", btView); err != nil {
+		logger.Error("[ui] Template execution failed: %v", err)
+		http.Error(w, "Failed to render section", http.StatusInternalServerError)
+	}
+}
+
+// convertBluetooth converts a BluetoothStatus to a view-optimized BluetoothView
+func convertBluetooth(status *BluetoothStatus) *BluetoothView {
+	if status == nil {
+		return nil
+	}
+	connected := 0
+	for _, d := range status.KnownDevices {
+		if d.Connected {
+			connected++
+		}
+	}
+	secsLeft := 0
+	if status.PairingActive && status.PairingUntil != nil {
+		if d := time.Until(*status.PairingUntil); d > 0 {
+			secsLeft = int(d.Seconds())
+		}
+	}
+	return &BluetoothView{
+		Powered:            status.Powered,
+		PairingActive:      status.PairingActive,
+		PairingSecondsLeft: secsLeft,
+		ConnectedCount:     connected,
+	}
 }
 
 // boolToInt converts bool to int for counting

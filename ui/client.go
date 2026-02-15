@@ -59,6 +59,13 @@ func (c *APIClient) GetAudioClients() ([]AudioClient, error) {
 	return clients, nil
 }
 
+// GetBluetoothStatus fetches Bluetooth state from /bluetooth
+func (c *APIClient) GetBluetoothStatus() (*BluetoothStatus, error) {
+	var status BluetoothStatus
+	err := c.get("/bluetooth", &status)
+	return &status, err
+}
+
 // GetServices fetches systemd services from /services
 func (c *APIClient) GetServices() ([]Service, error) {
 	var services []Service
