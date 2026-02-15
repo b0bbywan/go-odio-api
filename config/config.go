@@ -117,8 +117,7 @@ func resolveIfaceToIP(bind string) (string, error) {
 }
 
 // resolveBindsToListens converts a list of bind names to host:port listen addresses.
-// "all" expands to 0.0.0.0 (which covers loopback too).
-// Otherwise 127.0.0.1 is always prepended if not already present.
+// "all" expands to 0.0.0.0. No implicit addresses are added.
 func resolveBindsToListens(binds []string, port string) ([]string, error) {
 	for _, b := range binds {
 		if b == "all" {
@@ -141,12 +140,19 @@ func resolveBindsToListens(binds []string, port string) ([]string, error) {
 		}
 	}
 
-	loopback := net.JoinHostPort("127.0.0.1", port)
-	if !seen[loopback] {
-		addrs = append([]string{loopback}, addrs...)
-	}
-
 	return addrs, nil
+}
+
+// hasLoopback returns true if listens contains 127.0.0.1:port or 0.0.0.0:port.
+func hasLoopback(listens []string, port string) bool {
+	loopback := net.JoinHostPort("127.0.0.1", port)
+	wildcard := net.JoinHostPort("0.0.0.0", port)
+	for _, l := range listens {
+		if l == loopback || l == wildcard {
+			return true
+		}
+	}
+	return false
 }
 
 // getZeroconfInterfaces returns the network interfaces on which mDNS should be announced.
@@ -283,6 +289,10 @@ func New(cfgFile *string) (*Config, error) {
 
 	uiCfg := UIConfig{
 		Enabled: viper.GetBool("api.ui.enabled"),
+	}
+
+	if uiCfg.Enabled && !hasLoopback(listens, portStr) {
+		logger.Error("[config] UI is enabled but 'lo' is not in bind list — UI will fail to reach the API (add 'lo' to bind)")
 	}
 
 	apiCfg := ApiConfig{
