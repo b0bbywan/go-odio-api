@@ -3,6 +3,7 @@ package ui
 import (
 	"bytes"
 	"testing"
+	"time"
 )
 
 // TestLoadTemplates verifies that all templates load without panic
@@ -27,6 +28,7 @@ func TestLoadTemplates(t *testing.T) {
 		"section-mpris",
 		"section-pulseaudio",
 		"section-systemd",
+		"section-bluetooth",
 		"mpris-player",
 		"pulseaudio-sink",
 		"systemd-unit",
@@ -86,6 +88,21 @@ func TestSectionTemplates(t *testing.T) {
 			data: []ServiceView{
 				{Name: "test.service", Active: true, State: "running"},
 			},
+		},
+		{
+			name:     "Bluetooth section powered off",
+			template: "section-bluetooth",
+			data:     &BluetoothView{Powered: false},
+		},
+		{
+			name:     "Bluetooth section powered on",
+			template: "section-bluetooth",
+			data:     &BluetoothView{Powered: true, ConnectedCount: 2},
+		},
+		{
+			name:     "Bluetooth section pairing active",
+			template: "section-bluetooth",
+			data:     &BluetoothView{Powered: true, PairingActive: true, PairingSecondsLeft: 42},
 		},
 	}
 
@@ -257,6 +274,64 @@ func TestConvertPlayers(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestConvertBluetooth verifies bluetooth conversion logic
+func TestConvertBluetooth(t *testing.T) {
+	t.Run("nil status returns nil", func(t *testing.T) {
+		if got := convertBluetooth(nil); got != nil {
+			t.Errorf("expected nil, got %+v", got)
+		}
+	})
+
+	t.Run("powered off no devices", func(t *testing.T) {
+		got := convertBluetooth(&BluetoothStatus{Powered: false})
+		if got.Powered {
+			t.Error("expected Powered=false")
+		}
+		if got.ConnectedCount != 0 {
+			t.Errorf("expected ConnectedCount=0, got %d", got.ConnectedCount)
+		}
+	})
+
+	t.Run("counts only connected devices", func(t *testing.T) {
+		got := convertBluetooth(&BluetoothStatus{
+			Powered: true,
+			KnownDevices: []BluetoothDevice{
+				{Address: "AA:BB:CC:DD:EE:01", Connected: true},
+				{Address: "AA:BB:CC:DD:EE:02", Connected: false},
+				{Address: "AA:BB:CC:DD:EE:03", Connected: true},
+			},
+		})
+		if got.ConnectedCount != 2 {
+			t.Errorf("expected ConnectedCount=2, got %d", got.ConnectedCount)
+		}
+	})
+
+	t.Run("pairing active with future deadline", func(t *testing.T) {
+		until := time.Now().Add(45 * time.Second)
+		got := convertBluetooth(&BluetoothStatus{
+			PairingActive: true,
+			PairingUntil:  &until,
+		})
+		if !got.PairingActive {
+			t.Error("expected PairingActive=true")
+		}
+		if got.PairingSecondsLeft <= 0 || got.PairingSecondsLeft > 45 {
+			t.Errorf("expected PairingSecondsLeft in (0,45], got %d", got.PairingSecondsLeft)
+		}
+	})
+
+	t.Run("pairing active with expired deadline", func(t *testing.T) {
+		until := time.Now().Add(-5 * time.Second)
+		got := convertBluetooth(&BluetoothStatus{
+			PairingActive: true,
+			PairingUntil:  &until,
+		})
+		if got.PairingSecondsLeft != 0 {
+			t.Errorf("expected PairingSecondsLeft=0, got %d", got.PairingSecondsLeft)
+		}
+	})
 }
 
 // TestConvertServices verifies service conversion logic
