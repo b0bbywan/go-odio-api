@@ -380,24 +380,24 @@ logLevel: DEBUG
 
 func TestLogin1ConfigStructFields(t *testing.T) {
 	cfg := &Login1Config{
-		Enabled:    true,
-		Capacities: &Login1Capacities{CanReboot: true, CanPoweroff: false},
+		Enabled:      true,
+		Capabilities: &Login1Capabilities{CanReboot: true, CanPoweroff: false},
 	}
 	if !cfg.Enabled {
 		t.Error("Login1Config.Enabled should be true")
 	}
-	if cfg.Capacities == nil {
-		t.Fatal("Login1Config.Capacities should not be nil")
+	if cfg.Capabilities == nil {
+		t.Fatal("Login1Config.Capabilities should not be nil")
 	}
-	if !cfg.Capacities.CanReboot {
-		t.Error("Login1Capacities.CanReboot should be true")
+	if !cfg.Capabilities.CanReboot {
+		t.Error("Login1Capabilities.CanReboot should be true")
 	}
-	if cfg.Capacities.CanPoweroff {
-		t.Error("Login1Capacities.CanPoweroff should be false")
+	if cfg.Capabilities.CanPoweroff {
+		t.Error("Login1Capabilities.CanPoweroff should be false")
 	}
 }
 
-func TestLogin1CapacitiesStructFields(t *testing.T) {
+func TestLogin1CapabilitiesStructFields(t *testing.T) {
 	tests := []struct {
 		name        string
 		canReboot   bool
@@ -410,7 +410,7 @@ func TestLogin1CapacitiesStructFields(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			caps := Login1Capacities{CanReboot: tt.canReboot, CanPoweroff: tt.canPoweroff}
+			caps := Login1Capabilities{CanReboot: tt.canReboot, CanPoweroff: tt.canPoweroff}
 			if caps.CanReboot != tt.canReboot {
 				t.Errorf("CanReboot = %v, want %v", caps.CanReboot, tt.canReboot)
 			}
@@ -441,7 +441,7 @@ func TestNew_Login1DisabledByDefault(t *testing.T) {
 	}
 }
 
-func TestNew_Login1CapacitiesDisabledByDefault(t *testing.T) {
+func TestNew_Login1CapabilitiesDisabledByDefault(t *testing.T) {
 	viper.Reset()
 
 	t.Setenv("HOME", t.TempDir())
@@ -452,14 +452,14 @@ func TestNew_Login1CapacitiesDisabledByDefault(t *testing.T) {
 		t.Fatalf("New(nil) returned error: %v", err)
 	}
 
-	if cfg.Login1.Capacities == nil {
-		t.Fatal("Login1.Capacities should not be nil")
+	if cfg.Login1.Capabilities == nil {
+		t.Fatal("Login1.Capabilities should not be nil")
 	}
-	if cfg.Login1.Capacities.CanReboot {
-		t.Error("Login1.Capacities.CanReboot should be false by default")
+	if cfg.Login1.Capabilities.CanReboot {
+		t.Error("Login1.Capabilities.CanReboot should be false by default")
 	}
-	if cfg.Login1.Capacities.CanPoweroff {
-		t.Error("Login1.Capacities.CanPoweroff should be false by default")
+	if cfg.Login1.Capabilities.CanPoweroff {
+		t.Error("Login1.Capabilities.CanPoweroff should be false by default")
 	}
 }
 
@@ -480,7 +480,7 @@ func TestNew_Login1ExplicitlyEnabled(t *testing.T) {
 	}
 }
 
-func TestNew_Login1CapacitiesFromViper(t *testing.T) {
+func TestNew_Login1CapabilitiesFromViper(t *testing.T) {
 	tests := []struct {
 		name     string
 		reboot   bool
@@ -488,16 +488,16 @@ func TestNew_Login1CapacitiesFromViper(t *testing.T) {
 	}{
 		{"reboot only", true, false},
 		{"poweroff only", false, true},
-		{"both capacities", true, true},
-		{"no capacity", false, false},
+		{"both capabilities", true, true},
+		{"no capability", false, false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			viper.Reset()
 			viper.Set("power.enabled", true)
-			viper.Set("power.capacities.reboot", tt.reboot)
-			viper.Set("power.capacities.poweroff", tt.poweroff)
+			viper.Set("power.capabilities.reboot", tt.reboot)
+			viper.Set("power.capabilities.poweroff", tt.poweroff)
 
 			t.Setenv("HOME", t.TempDir())
 			t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
@@ -507,11 +507,11 @@ func TestNew_Login1CapacitiesFromViper(t *testing.T) {
 				t.Fatalf("New(nil) returned error: %v", err)
 			}
 
-			if cfg.Login1.Capacities.CanReboot != tt.reboot {
-				t.Errorf("CanReboot = %v, want %v", cfg.Login1.Capacities.CanReboot, tt.reboot)
+			if cfg.Login1.Capabilities.CanReboot != tt.reboot {
+				t.Errorf("CanReboot = %v, want %v", cfg.Login1.Capabilities.CanReboot, tt.reboot)
 			}
-			if cfg.Login1.Capacities.CanPoweroff != tt.poweroff {
-				t.Errorf("CanPoweroff = %v, want %v", cfg.Login1.Capacities.CanPoweroff, tt.poweroff)
+			if cfg.Login1.Capabilities.CanPoweroff != tt.poweroff {
+				t.Errorf("CanPoweroff = %v, want %v", cfg.Login1.Capabilities.CanPoweroff, tt.poweroff)
 			}
 		})
 	}
@@ -525,7 +525,7 @@ func TestNew_Login1FromConfigFile(t *testing.T) {
 	configContent := `
 power:
   enabled: true
-  capacities:
+  capabilities:
     reboot: true
     poweroff: false
 `
@@ -544,14 +544,14 @@ power:
 	if !cfg.Login1.Enabled {
 		t.Error("Login1.Enabled should be true from config file")
 	}
-	if cfg.Login1.Capacities == nil {
-		t.Fatal("Login1.Capacities should not be nil")
+	if cfg.Login1.Capabilities == nil {
+		t.Fatal("Login1.Capabilities should not be nil")
 	}
-	if !cfg.Login1.Capacities.CanReboot {
-		t.Error("Login1.Capacities.CanReboot should be true from config file")
+	if !cfg.Login1.Capabilities.CanReboot {
+		t.Error("Login1.Capabilities.CanReboot should be true from config file")
 	}
-	if cfg.Login1.Capacities.CanPoweroff {
-		t.Error("Login1.Capacities.CanPoweroff should be false from config file")
+	if cfg.Login1.Capabilities.CanPoweroff {
+		t.Error("Login1.Capabilities.CanPoweroff should be false from config file")
 	}
 }
 
@@ -581,13 +581,13 @@ func TestNew_Login1SecurityDefaults(t *testing.T) {
 		},
 		{
 			name:     "reboot disabled",
-			got:      cfg.Login1.Capacities.CanReboot,
+			got:      cfg.Login1.Capabilities.CanReboot,
 			want:     false,
 			errorMsg: "Login1 CanReboot should be disabled by default for security",
 		},
 		{
 			name:     "poweroff disabled",
-			got:      cfg.Login1.Capacities.CanPoweroff,
+			got:      cfg.Login1.Capabilities.CanPoweroff,
 			want:     false,
 			errorMsg: "Login1 CanPoweroff should be disabled by default for security",
 		},
