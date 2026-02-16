@@ -11,65 +11,9 @@
 	<link rel="stylesheet" href="/ui/static/output.css">
 
 	<!-- HTMX -->
-	<script src="https://unpkg.com/htmx.org@1.9.10"></script>
+	<script src="/ui/static/htmx.v1.9.10.min.js"></script>
 
-	<style>
-		/* Custom scrollbar for dark theme */
-		::-webkit-scrollbar {
-			width: 8px;
-			height: 8px;
-		}
-		::-webkit-scrollbar-track {
-			background: #18181b;
-		}
-		::-webkit-scrollbar-thumb {
-			background: #3f3f46;
-			border-radius: 4px;
-		}
-		::-webkit-scrollbar-thumb:hover {
-			background: #52525b;
-		}
 
-		/* HTMX request indicator - disable pointer events during requests */
-		button.htmx-request {
-			opacity: 0.6;
-			pointer-events: none;
-		}
-
-		/* Volume slider styling */
-		.volume-slider {
-			width: 100%;
-			height: 4px;
-			border-radius: 2px;
-			background: #3f3f46; /* zinc-700 */
-			outline: none;
-			opacity: 0.9;
-			transition: opacity 0.2s;
-		}
-
-		.volume-slider:hover {
-			opacity: 1;
-		}
-
-		.volume-slider::-webkit-slider-thumb {
-			-webkit-appearance: none;
-			appearance: none;
-			width: 14px;
-			height: 14px;
-			border-radius: 50%;
-			background: #3b82f6; /* blue-500 */
-			cursor: pointer;
-		}
-
-		.volume-slider::-moz-range-thumb {
-			width: 14px;
-			height: 14px;
-			border-radius: 50%;
-			background: #3b82f6;
-			cursor: pointer;
-			border: none;
-		}
-	</style>
 </head>
 
 <body class="min-h-screen bg-zinc-900 text-zinc-100">
@@ -89,22 +33,45 @@
 				</div>
 
 				{{ if .ServerInfo }}
-				<!-- Backend status badges (hidden on mobile) -->
-				<div class="hidden gap-2 sm:flex">
-					{{ if .ServerInfo.Backends.MPRIS }}
-					<span class="rounded-full bg-green-500/10 px-2 py-1 text-xs text-green-400">
-						MPRIS
-					</span>
-					{{ end }}
-					{{ if .ServerInfo.Backends.PulseAudio }}
-					<span class="rounded-full bg-blue-500/10 px-2 py-1 text-xs text-blue-400">
-						Audio
-					</span>
-					{{ end }}
-					{{ if .ServerInfo.Backends.Systemd }}
-					<span class="rounded-full bg-purple-500/10 px-2 py-1 text-xs text-purple-400">
-						Systemd
-					</span>
+				<div class="flex items-center gap-3">
+					<!-- Backend status badges (hidden on mobile) -->
+					<div class="hidden gap-2 sm:flex">
+						{{ if .ServerInfo.Backends.PulseAudio }}
+						<span class="rounded-full bg-blue-500/10 px-2 py-1 text-xs text-blue-400">
+							Audio
+						</span>
+						{{ end }}
+						{{ if .ServerInfo.Backends.MPRIS }}
+						<span class="rounded-full bg-green-500/10 px-2 py-1 text-xs text-green-400">
+							MPRIS
+						</span>
+						{{ end }}
+						{{ if .ServerInfo.Backends.Systemd }}
+						<span class="rounded-full bg-purple-500/10 px-2 py-1 text-xs text-purple-400">
+							Systemd
+						</span>
+						{{ end }}
+					</div>
+					<!-- Power buttons -->
+					{{ if .ServerInfo.Power }}
+					<div class="flex items-center gap-1">
+						{{ if .ServerInfo.Power.PowerOff }}
+						<button class="text-lg hover:scale-110 transition-transform"
+						        hx-post="/power/power_off"
+						        hx-swap="none"
+						        hx-confirm="Power off the system?"
+						        title="Power off"> 🔌 </button>
+						{{ end }}
+
+
+						{{ if .ServerInfo.Power.Reboot }}
+						<button class="text-lg hover:scale-110 transition-transform"
+						        hx-post="/power/reboot"
+						        hx-swap="none"
+						        hx-confirm="Reboot the system?"
+						        title="Reboot"> 🔄 </button>
+						{{ end }}
+					</div>
 					{{ end }}
 				</div>
 				{{ end }}
@@ -122,76 +89,21 @@
 	<footer class="mt-8 border-t border-zinc-800 py-4">
 		<div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
 			<div class="flex flex-col items-center justify-between gap-2 text-xs text-zinc-500 sm:flex-row">
-				<div>
+				<div class="flex items-center gap-2">
 					{{ .ServerInfo.APISW }} {{ .ServerInfo.APIVersion }}
+					{{ if .ServerInfo.Backends.Zeroconf }}
+					<span class="rounded-full bg-zinc-700/40 px-2 py-0.5 text-zinc-500">📡 zeroconf</span>
+					{{ end }}
 				</div>
 				<div>
-					{{ .ServerInfo.OSPlatform }}
+					{{ .ServerInfo.OSPlatform }} 🐧
 				</div>
 			</div>
 		</div>
 	</footer>
 	{{ end }}
 
-	<script>
-	function togglePlayPause(button, playerName) {
-		// Get current state from button content
-		const currentIcon = button.textContent.trim();
-		const isPlaying = currentIcon === '⏸';
-
-		// Toggle icon immediately for instant feedback
-		const newIcon = isPlaying ? '▶' : '⏸';
-		const newTitle = isPlaying ? 'Play' : 'Pause';
-
-		button.textContent = newIcon;
-		button.title = newTitle;
-
-		// Send POST to API
-		fetch(`/players/${playerName}/play_pause`, {
-			method: 'POST'
-		}).catch(() => {
-			// Revert on error
-			button.textContent = currentIcon;
-			button.title = isPlaying ? 'Pause' : 'Play';
-			console.error('Failed to toggle play/pause');
-		});
-	}
-
-	function updateVolume(slider, target, type) {
-		const volume = slider.value / 100; // Convert 0-100 to 0.0-1.0
-
-		let url;
-		if (type === 'mpris') {
-			url = `/players/${target}/volume`;
-		} else if (type === 'audio-server') {
-			url = '/audio/server/volume';
-		} else if (type === 'audio-client') {
-			url = `/audio/clients/${target}/volume`;
-		}
-
-		fetch(url, {
-			method: 'POST',
-			headers: {'Content-Type': 'application/json'},
-			body: JSON.stringify({volume: volume})
-		}).catch(err => console.error('Failed to set volume:', err));
-	}
-
-	function toggleMute(button, target, type) {
-		let url;
-		if (type === 'audio-server') {
-			url = '/audio/server/mute';
-		} else if (type === 'audio-client') {
-			url = `/audio/clients/${target}/mute`;
-		}
-
-		fetch(url, {method: 'POST'})
-			.then(() => {
-				// Toggle mute icon
-				button.textContent = button.textContent === '🔇' ? '🔊' : '🔇';
-			})
-			.catch(err => console.error('Failed to toggle mute:', err));
-	}
-	</script>
+	<script src="/ui/static/odio.js"></script>
 </body>
 </html>
 {{ end }}

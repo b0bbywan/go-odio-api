@@ -12,6 +12,8 @@ on:
 jobs:
   init-css:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
 
@@ -27,19 +29,6 @@ jobs:
         run: |
           BRANCH=${GITHUB_REF#refs/heads/}
           REMOTE_PATH_LATEST="${BASE_PATH}${BRANCH}/latest.css"
-
-          echo "🔍 Checking if CSS exists for branch ${BRANCH}..."
-
-          # Check si latest.css existe pour cette branche
-          if lftp -c "
-            set sftp:auto-confirm yes
-            open -u ${SFTP_USER},${SFTP_PASS} sftp://${SFTP_HOST}
-            ls ${REMOTE_PATH_LATEST}
-            bye
-          " 2>/dev/null; then
-            echo "✅ CSS already exists for ${BRANCH}, skipping"
-            exit 0
-          fi
 
           echo "📦 New branch detected, initializing CSS..."
 

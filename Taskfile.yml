@@ -71,14 +71,14 @@ tasks:
       - |
         # Essayer d'abord le commit spécifique
         echo "📥 Downloading CSS for {{.BRANCH}}/{{.COMMIT_HASH}}..."
-        if curl -fsSL {{.CSS_URL_COMMIT}} -o {{.CSS_OUTPUT}}; then
+        if curl -fsSL -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36" {{.CSS_URL_COMMIT}} -o {{.CSS_OUTPUT}}; then
           echo "✅ CSS downloaded from {{.BRANCH}}/{{.COMMIT_HASH}}.css"
           exit 0
         fi
 
         # Fallback sur latest.css
         echo "⚠️  Commit-specific CSS not found, trying latest..."
-        if curl -fsSL {{.CSS_URL_LATEST}} -o {{.CSS_OUTPUT}}; then
+        if curl -fsSL -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36" {{.CSS_URL_LATEST}} -o {{.CSS_OUTPUT}}; then
           echo "✅ CSS downloaded from {{.BRANCH}}/latest.css"
         else
           echo "❌ No CSS found for {{.BRANCH}}"
@@ -113,6 +113,8 @@ tasks:
       - "**/*.go"
       - go.mod
       - go.sum
+      - ui/templates/**/*.gohtml
+      - ui/static/**
     generates:
       - "{{.BIN_DIR}}/go-odio-api"
 

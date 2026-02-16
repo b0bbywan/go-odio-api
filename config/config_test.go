@@ -422,6 +422,232 @@ logLevel: DEBUG
 	}
 }
 
+// --- Tests Login1Config ---
+
+func TestLogin1ConfigStructFields(t *testing.T) {
+	cfg := &Login1Config{
+		Enabled:      true,
+		Capabilities: &Login1Capabilities{CanReboot: true, CanPoweroff: false},
+	}
+	if !cfg.Enabled {
+		t.Error("Login1Config.Enabled should be true")
+	}
+	if cfg.Capabilities == nil {
+		t.Fatal("Login1Config.Capabilities should not be nil")
+	}
+	if !cfg.Capabilities.CanReboot {
+		t.Error("Login1Capabilities.CanReboot should be true")
+	}
+	if cfg.Capabilities.CanPoweroff {
+		t.Error("Login1Capabilities.CanPoweroff should be false")
+	}
+}
+
+func TestLogin1CapabilitiesStructFields(t *testing.T) {
+	tests := []struct {
+		name        string
+		canReboot   bool
+		canPoweroff bool
+	}{
+		{"both disabled", false, false},
+		{"reboot only", true, false},
+		{"poweroff only", false, true},
+		{"both enabled", true, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			caps := Login1Capabilities{CanReboot: tt.canReboot, CanPoweroff: tt.canPoweroff}
+			if caps.CanReboot != tt.canReboot {
+				t.Errorf("CanReboot = %v, want %v", caps.CanReboot, tt.canReboot)
+			}
+			if caps.CanPoweroff != tt.canPoweroff {
+				t.Errorf("CanPoweroff = %v, want %v", caps.CanPoweroff, tt.canPoweroff)
+			}
+		})
+	}
+}
+
+func TestNew_Login1DisabledByDefault(t *testing.T) {
+	viper.Reset()
+
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
+
+	cfg, err := New(nil)
+	if err != nil {
+		t.Fatalf("New(nil) returned error: %v", err)
+	}
+
+	if cfg.Login1 == nil {
+		t.Fatal("Login1 config should not be nil")
+	}
+	// Power/login1 must be DISABLED by default for security
+	if cfg.Login1.Enabled {
+		t.Error("Login1.Enabled should be false by default for security")
+	}
+}
+
+func TestNew_Login1CapabilitiesDisabledByDefault(t *testing.T) {
+	viper.Reset()
+
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
+
+	cfg, err := New(nil)
+	if err != nil {
+		t.Fatalf("New(nil) returned error: %v", err)
+	}
+
+	if cfg.Login1.Capabilities == nil {
+		t.Fatal("Login1.Capabilities should not be nil")
+	}
+	if cfg.Login1.Capabilities.CanReboot {
+		t.Error("Login1.Capabilities.CanReboot should be false by default")
+	}
+	if cfg.Login1.Capabilities.CanPoweroff {
+		t.Error("Login1.Capabilities.CanPoweroff should be false by default")
+	}
+}
+
+func TestNew_Login1ExplicitlyEnabled(t *testing.T) {
+	viper.Reset()
+	viper.Set("power.enabled", true)
+
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
+
+	cfg, err := New(nil)
+	if err != nil {
+		t.Fatalf("New(nil) returned error: %v", err)
+	}
+
+	if !cfg.Login1.Enabled {
+		t.Error("Login1.Enabled should be true when explicitly enabled")
+	}
+}
+
+func TestNew_Login1CapabilitiesFromViper(t *testing.T) {
+	tests := []struct {
+		name     string
+		reboot   bool
+		poweroff bool
+	}{
+		{"reboot only", true, false},
+		{"poweroff only", false, true},
+		{"both capabilities", true, true},
+		{"no capability", false, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			viper.Reset()
+			viper.Set("power.enabled", true)
+			viper.Set("power.capabilities.reboot", tt.reboot)
+			viper.Set("power.capabilities.poweroff", tt.poweroff)
+
+			t.Setenv("HOME", t.TempDir())
+			t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
+
+			cfg, err := New(nil)
+			if err != nil {
+				t.Fatalf("New(nil) returned error: %v", err)
+			}
+
+			if cfg.Login1.Capabilities.CanReboot != tt.reboot {
+				t.Errorf("CanReboot = %v, want %v", cfg.Login1.Capabilities.CanReboot, tt.reboot)
+			}
+			if cfg.Login1.Capabilities.CanPoweroff != tt.poweroff {
+				t.Errorf("CanPoweroff = %v, want %v", cfg.Login1.Capabilities.CanPoweroff, tt.poweroff)
+			}
+		})
+	}
+}
+
+func TestNew_Login1FromConfigFile(t *testing.T) {
+	viper.Reset()
+
+	tmpDir := t.TempDir()
+	configFile := tmpDir + "/config.yaml"
+	configContent := `
+power:
+  enabled: true
+  capabilities:
+    reboot: true
+    poweroff: false
+`
+	if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
+		t.Fatalf("Failed to create test config file: %v", err)
+	}
+
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
+
+	cfg, err := New(&configFile)
+	if err != nil {
+		t.Fatalf("New() returned error: %v", err)
+	}
+
+	if !cfg.Login1.Enabled {
+		t.Error("Login1.Enabled should be true from config file")
+	}
+	if cfg.Login1.Capabilities == nil {
+		t.Fatal("Login1.Capabilities should not be nil")
+	}
+	if !cfg.Login1.Capabilities.CanReboot {
+		t.Error("Login1.Capabilities.CanReboot should be true from config file")
+	}
+	if cfg.Login1.Capabilities.CanPoweroff {
+		t.Error("Login1.Capabilities.CanPoweroff should be false from config file")
+	}
+}
+
+func TestNew_Login1SecurityDefaults(t *testing.T) {
+	viper.Reset()
+
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
+
+	cfg, err := New(nil)
+	if err != nil {
+		t.Fatalf("New(nil) returned error: %v", err)
+	}
+
+	// Verify all login1 security defaults
+	securityTests := []struct {
+		name     string
+		got      interface{}
+		want     interface{}
+		errorMsg string
+	}{
+		{
+			name:     "power disabled",
+			got:      cfg.Login1.Enabled,
+			want:     false,
+			errorMsg: "Login1 (power management) should be disabled by default for security",
+		},
+		{
+			name:     "reboot disabled",
+			got:      cfg.Login1.Capabilities.CanReboot,
+			want:     false,
+			errorMsg: "Login1 CanReboot should be disabled by default for security",
+		},
+		{
+			name:     "poweroff disabled",
+			got:      cfg.Login1.Capabilities.CanPoweroff,
+			want:     false,
+			errorMsg: "Login1 CanPoweroff should be disabled by default for security",
+		},
+	}
+
+	for _, tt := range securityTests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.got != tt.want {
+				t.Errorf("%s: got %v, want %v", tt.errorMsg, tt.got, tt.want)
+			}
+		})
+	}
+}
+
 // Security-focused API and Zeroconf tests
 
 func TestNew_DefaultBindLocalhost(t *testing.T) {
@@ -435,31 +661,38 @@ func TestNew_DefaultBindLocalhost(t *testing.T) {
 		t.Fatalf("New(nil) returned error: %v", err)
 	}
 
-	// Should bind to localhost by default for security
-	expectedListen := "127.0.0.1:8018"
-	if cfg.Api.Listen != expectedListen {
-		t.Errorf("Api.Listen = %q, want %q (localhost by default)", cfg.Api.Listen, expectedListen)
+	// Should always include localhost for security
+	loopback := "127.0.0.1:8018"
+	found := false
+	for _, l := range cfg.Api.Listens {
+		if l == loopback {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("Api.Listens = %v, want to contain %q (localhost by default)", cfg.Api.Listens, loopback)
 	}
 }
 
 func TestNew_CustomBindAddress(t *testing.T) {
 	tests := []struct {
-		name         string
-		bind         string
-		port         int
-		expectListen string
+		name          string
+		bind          string
+		port          int
+		expectContain string // address that must appear in Listens
 	}{
 		{
-			name:         "explicit localhost",
-			bind:         "lo",
-			port:         8080,
-			expectListen: "127.0.0.1:8080",
+			name:          "explicit localhost",
+			bind:          "lo",
+			port:          8080,
+			expectContain: "127.0.0.1:8080",
 		},
 		{
-			name:         "all interfaces",
-			bind:         "all",
-			port:         8018,
-			expectListen: "0.0.0.0:8018",
+			name:          "all interfaces",
+			bind:          "all",
+			port:          8018,
+			expectContain: "0.0.0.0:8018",
 		},
 	}
 
@@ -477,8 +710,15 @@ func TestNew_CustomBindAddress(t *testing.T) {
 				t.Fatalf("New(nil) returned error: %v", err)
 			}
 
-			if cfg.Api.Listen != tt.expectListen {
-				t.Errorf("Api.Listen = %q, want %q", cfg.Api.Listen, tt.expectListen)
+			found := false
+			for _, l := range cfg.Api.Listens {
+				if l == tt.expectContain {
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Errorf("Api.Listens = %v, want to contain %q", cfg.Api.Listens, tt.expectContain)
 			}
 		})
 	}
@@ -591,9 +831,9 @@ func TestNew_SecurityDefaults(t *testing.T) {
 	}{
 		{
 			name:     "bind localhost",
-			got:      cfg.Api.Listen,
+			got:      cfg.Api.Listens[0],
 			want:     "127.0.0.1:8018",
-			errorMsg: "API should bind to localhost by default",
+			errorMsg: "API should include localhost first by default",
 		},
 		{
 			name:     "systemd disabled",
@@ -633,7 +873,7 @@ func TestNew_SecurityDefaults(t *testing.T) {
 // Tests for network interface helpers
 func TestGetZeroconfInterfaces_Localhost(t *testing.T) {
 	// Localhost should return nil (no zeroconf on loopback)
-	interfaces := getZeroconfInterfaces("lo")
+	interfaces := getZeroconfInterfaces([]string{"lo"})
 
 	if interfaces != nil {
 		t.Errorf("getZeroconfInterfaces(lo) = %v, want nil (no zeroconf on localhost)", interfaces)
@@ -642,7 +882,7 @@ func TestGetZeroconfInterfaces_Localhost(t *testing.T) {
 
 func TestGetZeroconfInterfaces_AllInterfaces(t *testing.T) {
 	// 0.0.0.0 should return all active non-loopback interfaces
-	interfaces := getZeroconfInterfaces("all")
+	interfaces := getZeroconfInterfaces([]string{"all"})
 
 	// Should call getAllActiveInterfaces() which filters loopback
 	for _, iface := range interfaces {
@@ -665,7 +905,7 @@ func TestGetZeroconfInterfaces_InvalidIP(t *testing.T) {
 
 	for _, ip := range tests {
 		t.Run(ip, func(t *testing.T) {
-			interfaces := getZeroconfInterfaces(ip)
+			interfaces := getZeroconfInterfaces([]string{ip})
 
 			// Invalid IPs should return nil (with warning logged)
 			if interfaces != nil {
@@ -678,7 +918,7 @@ func TestGetZeroconfInterfaces_InvalidIP(t *testing.T) {
 func TestGetZeroconfInterfaces_NonexistentIP(t *testing.T) {
 	// IP that's valid but doesn't exist on this machine
 	nonexistentIP := "192.168.99.99"
-	interfaces := getZeroconfInterfaces(nonexistentIP)
+	interfaces := getZeroconfInterfaces([]string{nonexistentIP})
 
 	// Should return nil since no interface has this IP
 	if interfaces != nil {

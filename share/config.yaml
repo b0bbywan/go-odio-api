@@ -1,3 +1,7 @@
+# bind accepts a single interface name, a list, or "all"
+# bind: lo                    # loopback only (default)
+# bind: [enp2s0, wlan0]       # multiple interfaces
+# bind: all                   # all active interfaces (0.0.0.0)
 bind: lo
 logLevel: info
 
@@ -20,6 +24,12 @@ systemd:
     - shairport-sync.service
     - snapclient.service
     - spotifyd.service
+
+power:
+  enabled: false
+  capabilities:
+    poweroff: true
+    reboot: true
 
 pulseaudio:
   enabled: true
