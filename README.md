@@ -20,7 +20,7 @@ Tested and validated on Fedora 43 Gnome, Debian 13 KDE, Raspbian 13 Raspberry B 
 - Smart caching with automatic cache invalidation
 - Position heartbeat for accurate playback tracking
 
-```
+```yaml
 # config.yaml
 mpris:
   enabled: true
@@ -32,7 +32,7 @@ mpris:
 - Real-time audio events via native PulseAudio monitoring
 - Limited PipeWire support with pipewire-pulse
 
-```
+```yaml
 # config.yaml
 pulseaudio:
   enabled: true
@@ -59,7 +59,8 @@ Yes, systemd control is controversial and potentially dangerous if misused. But 
 Odio is free software and comes with no warranty. Enabling systemd integration is at your own risk.
 
 Useful examples for audio servers or media centers, some are provided in `share/`:
-```
+
+```yaml
 # config.yaml
 systemd:
   enabled: true
@@ -87,13 +88,35 @@ systemd:
 [4] Install [Kodi Add-on:MPRIS D-Bus interface](https://github.com/wastis/MediaPlayerRemoteInterface#)
 [5] Maybe supported, untested
 
+### Power Management / Login1
+
+This feature allows remote power-off or reboot of your appliance via the REST API — eliminating the need for SSH in most day-to-day scenarios.
+
+The feature is **disabled by default** and only becomes active when:
+- `power.enabled = true` in the configuration
+- **at least one** capability is enabled (`reboot` and/or `power_off`)
+- only power off and reboot available.
+
+It uses D-Bus **org.freedesktop.login1** interface, like when you power off from your desktop session.
+
+Backend validates declared capabilities at startup and fails fast if mismatched.
+
+```yaml
+# config.yaml
+power:
+  enabled: true
+  capabilities:
+    poweroff: true
+    reboot: true
+```
+
 ### REST API
 
 Lightweight and fast REST API (<50ms 95% response time, 0% CPU on idle mode, tested on Raspberry Pi B and B+)
 
 Enabled by default, binds to localhost for security. Configure network interface binding and port as needed:
 
-```
+```yaml
 # config.yaml
 bind: lo
 # bind: enp2s0    # Specific network interface
@@ -110,7 +133,8 @@ api:
 Odio-api advertises itself using Zeroconf (mDNS). This allows users to discover the API without knowing the host IP or port. Disabled by default and with `lo` bind.
 
 Enable in configuration:
-```
+
+```yaml
 bind: eno1
 zeroconf:
   enabled: true
@@ -312,6 +336,14 @@ POST   /services/{scope}/{unit}/stop      # Stop service (scope: system|user)
 POST   /services/{scope}/{unit}/restart   # Restart service
 POST   /services/{scope}/{unit}/enable    # Enable service (scope: system|user)
 POST   /services/{scope}/{unit}/disable   # Disable service
+```
+
+### Power Management
+
+```
+GET    /power/                             # Power capabilites {"reboot": true, "power_off": false}
+POST   /power/power_off                    # Poweroff (403 if not declared in capabilities)
+POST   /power/reboot                       # Reboot (403 if not declared in capabilities)
 ```
 
 ## Architecture
