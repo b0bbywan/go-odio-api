@@ -37,7 +37,7 @@ type UIConfig struct {
 
 type ApiConfig struct {
 	Enabled bool
-	Listens []string // one entry per bind address, always includes 127.0.0.1
+	Listens []string
 	Port    int
 
 	UI *UIConfig
