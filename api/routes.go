@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/b0bbywan/go-odio-api/backend"
+	"github.com/b0bbywan/go-odio-api/backend/login1"
 	"github.com/b0bbywan/go-odio-api/backend/mpris"
 	"github.com/b0bbywan/go-odio-api/backend/pulseaudio"
 	"github.com/b0bbywan/go-odio-api/backend/systemd"
@@ -16,6 +17,10 @@ func (s *Server) registerServerRoutes(b *backend.Backend) {
 			return b.GetServerDeviceInfo()
 		}),
 	)
+}
+
+func (s *Server) registerLogin1Routes(b *login1.Login1Backend) {
+	return
 }
 
 func (s *Server) registerPulseRoutes(b *pulseaudio.PulseAudioBackend) {
