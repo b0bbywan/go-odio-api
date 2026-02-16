@@ -36,14 +36,14 @@
 				<div class="flex items-center gap-3">
 					<!-- Backend status badges (hidden on mobile) -->
 					<div class="hidden gap-2 sm:flex">
-						{{ if .ServerInfo.Backends.MPRIS }}
-						<span class="rounded-full bg-green-500/10 px-2 py-1 text-xs text-green-400">
-							MPRIS
-						</span>
-						{{ end }}
 						{{ if .ServerInfo.Backends.PulseAudio }}
 						<span class="rounded-full bg-blue-500/10 px-2 py-1 text-xs text-blue-400">
 							Audio
+						</span>
+						{{ end }}
+						{{ if .ServerInfo.Backends.MPRIS }}
+						<span class="rounded-full bg-green-500/10 px-2 py-1 text-xs text-green-400">
+							MPRIS
 						</span>
 						{{ end }}
 						{{ if .ServerInfo.Backends.Systemd }}
@@ -96,7 +96,7 @@
 					{{ end }}
 				</div>
 				<div>
-					{{ .ServerInfo.OSPlatform }}
+					{{ .ServerInfo.OSPlatform }} 🐧
 				</div>
 			</div>
 		</div>

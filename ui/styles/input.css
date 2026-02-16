@@ -76,6 +76,12 @@ button.htmx-request {
 	border: none;
 }
 
+.volume-slider::-moz-range-progress {
+	background: #3b82f6;
+	height: 4px;
+	border-radius: 2px;
+}
+
 /* Component utility classes */
 @layer components {
 	.section-card {
