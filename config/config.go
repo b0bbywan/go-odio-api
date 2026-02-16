@@ -23,6 +23,7 @@ const (
 
 type Config struct {
 	Api        *ApiConfig
+	Login1     *Login1Config
 	MPRIS      *MPRISConfig
 	Pulseaudio *PulseAudioConfig
 	Systemd    *SystemdConfig
@@ -42,12 +43,19 @@ type ApiConfig struct {
 	UI *UIConfig
 }
 
-type SystemdConfig struct {
-	Enabled        bool
-	SystemServices []string
-	UserServices   []string
-	SupportsUTMP   bool
-	XDGRuntimeDir  string
+type Login1Capabilities struct {
+	CanPoweroff bool
+	CanReboot   bool
+}
+
+type Login1Config struct {
+	Enabled      bool
+	Capabilities *Login1Capabilities
+}
+
+type MPRISConfig struct {
+	Enabled bool
+	Timeout time.Duration
 }
 
 type PulseAudioConfig struct {
@@ -55,9 +63,12 @@ type PulseAudioConfig struct {
 	XDGRuntimeDir string
 }
 
-type MPRISConfig struct {
-	Enabled bool
-	Timeout time.Duration
+type SystemdConfig struct {
+	Enabled        bool
+	SystemServices []string
+	UserServices   []string
+	SupportsUTMP   bool
+	XDGRuntimeDir  string
 }
 
 type ZeroConfig struct {
@@ -249,6 +260,10 @@ func New(cfgFile *string) (*Config, error) {
 	viper.SetDefault("api.port", 8018)
 	viper.SetDefault("api.ui.enabled", false)
 
+	viper.SetDefault("power.enabled", false)
+	viper.SetDefault("power.capabilities.reboot", false)
+	viper.SetDefault("power.capabilities.poweroff", false)
+
 	viper.SetDefault("mpris.enabled", true)
 	viper.SetDefault("mpris.timeout", "5s")
 
@@ -272,6 +287,11 @@ func New(cfgFile *string) (*Config, error) {
 		if _, isNotFound := err.(viper.ConfigFileNotFoundError); !isNotFound {
 			logger.Warn("failed to read config: %v", err)
 		}
+	}
+
+	xdgRuntimeDir := os.Getenv("XDG_RUNTIME_DIR")
+	if xdgRuntimeDir == "" {
+		xdgRuntimeDir = fmt.Sprintf("/run/user/%d", os.Getuid())
 	}
 
 	port := viper.GetInt("api.port")
@@ -303,22 +323,14 @@ func New(cfgFile *string) (*Config, error) {
 		UI:      &uiCfg,
 	}
 
-	xdgRuntimeDir := os.Getenv("XDG_RUNTIME_DIR")
-	if xdgRuntimeDir == "" {
-		xdgRuntimeDir = fmt.Sprintf("/run/user/%d", os.Getuid())
+	loginCapabilities := Login1Capabilities{
+		CanReboot:   viper.GetBool("power.capabilities.reboot"),
+		CanPoweroff: viper.GetBool("power.capabilities.poweroff"),
 	}
 
-	syscfg := SystemdConfig{
-		Enabled:        viper.GetBool("systemd.enabled"),
-		SystemServices: viper.GetStringSlice("systemd.system"),
-		UserServices:   viper.GetStringSlice("systemd.user"),
-		SupportsUTMP:   systemdHasUTMP(),
-		XDGRuntimeDir:  xdgRuntimeDir,
-	}
-
-	pulsecfg := PulseAudioConfig{
-		Enabled:       viper.GetBool("pulseaudio.enabled"),
-		XDGRuntimeDir: xdgRuntimeDir,
+	logincfg := Login1Config{
+		Enabled:      viper.GetBool("power.enabled"),
+		Capabilities: &loginCapabilities,
 	}
 
 	mprisTimeout := viper.GetDuration("mpris.timeout")
@@ -329,6 +341,19 @@ func New(cfgFile *string) (*Config, error) {
 	mpriscfg := MPRISConfig{
 		Enabled: viper.GetBool("mpris.enabled"),
 		Timeout: mprisTimeout,
+	}
+
+	pulsecfg := PulseAudioConfig{
+		Enabled:       viper.GetBool("pulseaudio.enabled"),
+		XDGRuntimeDir: xdgRuntimeDir,
+	}
+
+	syscfg := SystemdConfig{
+		Enabled:        viper.GetBool("systemd.enabled"),
+		SystemServices: viper.GetStringSlice("systemd.system"),
+		UserServices:   viper.GetStringSlice("systemd.user"),
+		SupportsUTMP:   systemdHasUTMP(),
+		XDGRuntimeDir:  xdgRuntimeDir,
 	}
 
 	interfaces := getZeroconfInterfaces(binds)
@@ -344,6 +369,7 @@ func New(cfgFile *string) (*Config, error) {
 
 	cfg := Config{
 		Api:        &apiCfg,
+		Login1:     &logincfg,
 		MPRIS:      &mpriscfg,
 		Pulseaudio: &pulsecfg,
 		Systemd:    &syscfg,

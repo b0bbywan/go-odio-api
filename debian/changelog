@@ -1,4 +1,4 @@
-odio-api (0.5.0) trixie; urgency=low
+odio-api (0.6.0) trixie; urgency=low
 
   [Dashboard Integrated & Responsive]
 
@@ -14,6 +14,17 @@ odio-api (0.5.0) trixie; urgency=low
 
 
  -- Mathieu Réquillart <mathieu.requillart@gmail.com>  Fri, 13 Feb 2026 15:00:00 +0000
+
+
+odio-api (0.5.0) trixie; urgency=high
+
+
+  * Add power managment backend via login1 dbus interface
+  * Manage reboot and poweroff
+  * fully configurable, disabled by default
+
+
+ -- Mathieu Réquillart <mathieu.requillart@gmail.com>  Mon, 16 Feb 2026 18:00:00 +0000
 
 
 odio-api (0.4.0) trixie; urgency=high
