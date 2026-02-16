@@ -15,6 +15,7 @@ func TestBackendDisabled(t *testing.T) {
 	tests := []struct {
 		name             string
 		bluetoothEnabled bool
+		login1Enabled    bool
 		mprisEnabled     bool
 		pulseEnabled     bool
 		systemdEnabled   bool
@@ -23,6 +24,7 @@ func TestBackendDisabled(t *testing.T) {
 		{
 			name:             "all backends disabled",
 			bluetoothEnabled: false,
+			login1Enabled:    false,
 			mprisEnabled:     false,
 			pulseEnabled:     false,
 			systemdEnabled:   false,
@@ -31,6 +33,7 @@ func TestBackendDisabled(t *testing.T) {
 		{
 			name:             "only bluetooth enabled",
 			bluetoothEnabled: true,
+			login1Enabled:    false,
 			mprisEnabled:     false,
 			pulseEnabled:     false,
 			systemdEnabled:   false,
@@ -39,6 +42,7 @@ func TestBackendDisabled(t *testing.T) {
 		{
 			name:             "only systemd enabled",
 			bluetoothEnabled: false,
+			login1Enabled:    false,
 			mprisEnabled:     false,
 			pulseEnabled:     false,
 			systemdEnabled:   true,
@@ -48,6 +52,7 @@ func TestBackendDisabled(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			login1Cfg := &config.Login1Config{Enabled: tt.login1Enabled}
 			mprisCfg := &config.MPRISConfig{Enabled: tt.mprisEnabled}
 			pulseCfg := &config.PulseAudioConfig{Enabled: tt.pulseEnabled}
 			// Add empty services for systemd to ensure it returns nil when enabled without services
@@ -58,7 +63,7 @@ func TestBackendDisabled(t *testing.T) {
 			}
 			zeroconfCfg := &config.ZeroConfig{Enabled: tt.zeroconfEnabled}
 
-			backend, err := New(ctx, mprisCfg, pulseCfg, systemdCfg, zeroconfCfg)
+			backend, err := New(ctx, login1Cfg, mprisCfg, pulseCfg, systemdCfg, zeroconfCfg)
 
 			// Bluetooth and other D-Bus backends may fail in test environment
 			// This is expected and we should skip the test
@@ -110,6 +115,7 @@ func TestSystemdWithEmptyConfig(t *testing.T) {
 
 	backend, err := New(
 		ctx,
+		&config.Login1Config{Enabled: false},
 		&config.MPRISConfig{Enabled: false},
 		&config.PulseAudioConfig{Enabled: false},
 		systemdCfg,
@@ -136,6 +142,7 @@ func TestZeroconfWithLocalhostBind(t *testing.T) {
 
 	backend, err := New(
 		ctx,
+		&config.Login1Config{Enabled: false},
 		&config.MPRISConfig{Enabled: false},
 		&config.PulseAudioConfig{Enabled: false},
 		&config.SystemdConfig{Enabled: false},
