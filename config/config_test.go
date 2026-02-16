@@ -435,31 +435,38 @@ func TestNew_DefaultBindLocalhost(t *testing.T) {
 		t.Fatalf("New(nil) returned error: %v", err)
 	}
 
-	// Should bind to localhost by default for security
-	expectedListen := "127.0.0.1:8018"
-	if cfg.Api.Listen != expectedListen {
-		t.Errorf("Api.Listen = %q, want %q (localhost by default)", cfg.Api.Listen, expectedListen)
+	// Should always include localhost for security
+	loopback := "127.0.0.1:8018"
+	found := false
+	for _, l := range cfg.Api.Listens {
+		if l == loopback {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("Api.Listens = %v, want to contain %q (localhost by default)", cfg.Api.Listens, loopback)
 	}
 }
 
 func TestNew_CustomBindAddress(t *testing.T) {
 	tests := []struct {
-		name         string
-		bind         string
-		port         int
-		expectListen string
+		name          string
+		bind          string
+		port          int
+		expectContain string // address that must appear in Listens
 	}{
 		{
-			name:         "explicit localhost",
-			bind:         "lo",
-			port:         8080,
-			expectListen: "127.0.0.1:8080",
+			name:          "explicit localhost",
+			bind:          "lo",
+			port:          8080,
+			expectContain: "127.0.0.1:8080",
 		},
 		{
-			name:         "all interfaces",
-			bind:         "all",
-			port:         8018,
-			expectListen: "0.0.0.0:8018",
+			name:          "all interfaces",
+			bind:          "all",
+			port:          8018,
+			expectContain: "0.0.0.0:8018",
 		},
 	}
 
@@ -477,8 +484,15 @@ func TestNew_CustomBindAddress(t *testing.T) {
 				t.Fatalf("New(nil) returned error: %v", err)
 			}
 
-			if cfg.Api.Listen != tt.expectListen {
-				t.Errorf("Api.Listen = %q, want %q", cfg.Api.Listen, tt.expectListen)
+			found := false
+			for _, l := range cfg.Api.Listens {
+				if l == tt.expectContain {
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Errorf("Api.Listens = %v, want to contain %q", cfg.Api.Listens, tt.expectContain)
 			}
 		})
 	}
@@ -591,9 +605,9 @@ func TestNew_SecurityDefaults(t *testing.T) {
 	}{
 		{
 			name:     "bind localhost",
-			got:      cfg.Api.Listen,
+			got:      cfg.Api.Listens[0],
 			want:     "127.0.0.1:8018",
-			errorMsg: "API should bind to localhost by default",
+			errorMsg: "API should include localhost first by default",
 		},
 		{
 			name:     "systemd disabled",
@@ -633,7 +647,7 @@ func TestNew_SecurityDefaults(t *testing.T) {
 // Tests for network interface helpers
 func TestGetZeroconfInterfaces_Localhost(t *testing.T) {
 	// Localhost should return nil (no zeroconf on loopback)
-	interfaces := getZeroconfInterfaces("lo")
+	interfaces := getZeroconfInterfaces([]string{"lo"})
 
 	if interfaces != nil {
 		t.Errorf("getZeroconfInterfaces(lo) = %v, want nil (no zeroconf on localhost)", interfaces)
@@ -642,7 +656,7 @@ func TestGetZeroconfInterfaces_Localhost(t *testing.T) {
 
 func TestGetZeroconfInterfaces_AllInterfaces(t *testing.T) {
 	// 0.0.0.0 should return all active non-loopback interfaces
-	interfaces := getZeroconfInterfaces("all")
+	interfaces := getZeroconfInterfaces([]string{"all"})
 
 	// Should call getAllActiveInterfaces() which filters loopback
 	for _, iface := range interfaces {
@@ -665,7 +679,7 @@ func TestGetZeroconfInterfaces_InvalidIP(t *testing.T) {
 
 	for _, ip := range tests {
 		t.Run(ip, func(t *testing.T) {
-			interfaces := getZeroconfInterfaces(ip)
+			interfaces := getZeroconfInterfaces([]string{ip})
 
 			// Invalid IPs should return nil (with warning logged)
 			if interfaces != nil {
@@ -678,7 +692,7 @@ func TestGetZeroconfInterfaces_InvalidIP(t *testing.T) {
 func TestGetZeroconfInterfaces_NonexistentIP(t *testing.T) {
 	// IP that's valid but doesn't exist on this machine
 	nonexistentIP := "192.168.99.99"
-	interfaces := getZeroconfInterfaces(nonexistentIP)
+	interfaces := getZeroconfInterfaces([]string{nonexistentIP})
 
 	// Should return nil since no interface has this IP
 	if interfaces != nil {

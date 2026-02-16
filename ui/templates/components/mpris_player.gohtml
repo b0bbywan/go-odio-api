@@ -4,10 +4,15 @@
 	<!-- Player info (centered) -->
 	<div class="text-center mb-3">
 		<div class="player-name mb-1">{{ .DisplayName }}</div>
+		{{ if .ArtUrl }}
+		<img src="{{ .ArtUrl }}" alt="cover" class="player-art">
+		{{ end }}
 		{{ if or .Artist .Title }}
 		<div class="player-meta" title="{{ if .Artist }}{{ .Artist }}{{ end }}{{ if and .Artist .Title }} – {{ end }}{{ if .Title }}{{ .Title }}{{ end }}">
 			{{ if .Artist }}{{ .Artist }}{{ end }}{{ if and .Artist .Title }} – {{ end }}{{ if .Title }}{{ .Title }}{{ end }}
 		</div>
+		{{ else if or (eq .State "Playing") (eq .State "Paused") }}
+		<div class="text-sm text-subtle">Unknown track</div>
 		{{ else }}
 		<div class="text-sm text-subtle">No media playing</div>
 		{{ end }}
@@ -21,13 +26,21 @@
 		{{ template "volume-slider" (dict "Target" .Name "Type" "mpris" "Volume" .Volume "ShowMute" false) }}
 	</div>
 
-	<!-- Control buttons (centered) -->
+	<!-- Control buttons (centered) — hidden when no capability is available -->
+	{{ if or .CanPrev (or .CanPlay .CanPause) .CanNext }}
 	<div class="flex justify-center gap-2">
+		{{ if .CanPrev }}
 		<button class="btn" hx-post="/players/{{ .Name }}/previous" hx-swap="none" title="Previous track">⏮</button>
+		{{ end }}
+		{{ if or .CanPlay .CanPause }}
 		<button class="btn" onclick="togglePlayPause(this, '{{ .Name }}')" title="{{ if eq .State "Playing" }}Pause{{ else }}Play{{ end }}">
 			{{ if eq .State "Playing" }}⏸{{ else }}▶{{ end }}
 		</button>
+		{{ end }}
+		{{ if .CanNext }}
 		<button class="btn" hx-post="/players/{{ .Name }}/next" hx-swap="none" title="Next track">⏭</button>
+		{{ end }}
 	</div>
+	{{ end }}
 </div>
 {{ end }}

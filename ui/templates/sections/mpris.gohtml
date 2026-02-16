@@ -1,9 +1,12 @@
 {{ define "section-mpris" }}
-<section class="section-card">
-	<div class="section-header">
+<details id="section-mpris" open class="section-card">
+	<summary class="section-header">
 		<h2 class="section-title">🎵 Media Players</h2>
-		<span class="badge badge-green">{{ len . }} active</span>
-	</div>
+		<div class="flex items-center gap-2">
+			<span class="badge badge-green">{{ len . }} active</span>
+			<span class="section-toggle">▾</span>
+		</div>
+	</summary>
 
 	<div class="space-y-3">
 		{{ range . }}
@@ -15,5 +18,5 @@
 			</div>
 		{{ end }}
 	</div>
-</section>
+</details>
 {{ end }}

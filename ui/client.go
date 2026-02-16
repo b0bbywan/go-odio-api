@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/b0bbywan/go-odio-api/logger"
@@ -15,78 +16,145 @@ type APIClient struct {
 	client  *http.Client
 }
 
-// NewAPIClient creates a new internal API client
+// NewAPIClient creates a new internal API client.
+// It always connects to 127.0.0.1, which is guaranteed to be in the server's listen list.
 func NewAPIClient(port int) *APIClient {
 	return &APIClient{
-		baseURL: fmt.Sprintf("http://localhost:%d", port),
+		baseURL: fmt.Sprintf("http://127.0.0.1:%d", port),
 		client: &http.Client{
 			Timeout: 5 * time.Second,
 		},
 	}
 }
 
-// GetServerInfo fetches server information from /server
 func (c *APIClient) GetServerInfo() (*ServerInfo, error) {
-	var info ServerInfo
-	err := c.get("/server", &info)
-	return &info, err
-}
-
-// GetPlayers fetches MPRIS players from /players
-func (c *APIClient) GetPlayers() ([]Player, error) {
-	var players []Player
-	err := c.get("/players", &players)
-	if err != nil {
+	var v ServerInfo
+	if err := c.get("/server", &v); err != nil {
 		return nil, err
 	}
-	return players, nil
+	return &v, nil
 }
 
-// GetAudioInfo fetches PulseAudio server info from /audio/server
+func (c *APIClient) GetPlayers() ([]PlayerView, error) {
+	var raw []Player
+	if err := c.get("/players", &raw); err != nil {
+		return nil, err
+	}
+	return convertPlayers(raw), nil
+}
+
+func convertPlayers(raw []Player) []PlayerView {
+	views := make([]PlayerView, 0, len(raw))
+	for _, p := range raw {
+		displayName := strings.TrimPrefix(p.Name, "org.mpris.MediaPlayer2.")
+		artUrl := p.Metadata["mpris:artUrl"]
+		if !strings.HasPrefix(artUrl, "http://") && !strings.HasPrefix(artUrl, "https://") {
+			artUrl = ""
+		}
+		views = append(views, PlayerView{
+			Name:        p.Name,
+			DisplayName: displayName,
+			Artist:      p.Metadata["xesam:artist"],
+			Title:       p.Metadata["xesam:title"],
+			Album:       p.Metadata["xesam:album"],
+			ArtUrl:      artUrl,
+			State:       p.Status,
+			Volume:      p.Volume,
+			CanPlay:     p.Capabilities.CanPlay,
+			CanPause:    p.Capabilities.CanPause,
+			CanNext:     p.Capabilities.CanGoNext,
+			CanPrev:     p.Capabilities.CanGoPrevious,
+		})
+	}
+	return views
+}
+
 func (c *APIClient) GetAudioInfo() (*AudioInfo, error) {
-	var info AudioInfo
-	err := c.get("/audio/server", &info)
-	return &info, err
+	var v AudioInfo
+	if err := c.get("/audio/server", &v); err != nil {
+		return nil, err
+	}
+	return &v, nil
 }
 
-// GetAudioClients fetches PulseAudio clients from /audio/clients
 func (c *APIClient) GetAudioClients() ([]AudioClient, error) {
-	var clients []AudioClient
-	err := c.get("/audio/clients", &clients)
-	if err != nil {
+	var v []AudioClient
+	if err := c.get("/audio/clients", &v); err != nil {
 		return nil, err
 	}
-	return clients, nil
+	return v, nil
 }
 
-// GetServices fetches systemd services from /services
-func (c *APIClient) GetServices() ([]Service, error) {
-	var services []Service
-	err := c.get("/services", &services)
-	if err != nil {
+func (c *APIClient) GetBluetoothStatus() (*BluetoothView, error) {
+	var raw BluetoothStatus
+	if err := c.get("/bluetooth", &raw); err != nil {
 		return nil, err
 	}
-	return services, nil
+	return convertBluetooth(&raw), nil
 }
 
-// get is a helper method for GET requests
-func (c *APIClient) get(path string, dest interface{}) error {
+func convertBluetooth(raw *BluetoothStatus) *BluetoothView {
+	if raw == nil {
+		return nil
+	}
+	connected := 0
+	for _, d := range raw.KnownDevices {
+		if d.Connected {
+			connected++
+		}
+	}
+	secsLeft := 0
+	if raw.PairingActive && raw.PairingUntil != nil {
+		if d := time.Until(*raw.PairingUntil); d > 0 {
+			secsLeft = int(d.Seconds())
+		}
+	}
+	return &BluetoothView{
+		Powered:            raw.Powered,
+		PairingActive:      raw.PairingActive,
+		PairingSecondsLeft: secsLeft,
+		ConnectedCount:     connected,
+	}
+}
+
+func (c *APIClient) GetServices() ([]ServiceView, error) {
+	var raw []Service
+	if err := c.get("/services", &raw); err != nil {
+		return nil, err
+	}
+	return convertServices(raw), nil
+}
+
+func convertServices(raw []Service) []ServiceView {
+	views := make([]ServiceView, 0, len(raw))
+	for _, s := range raw {
+		views = append(views, ServiceView{
+			Name:        s.Name,
+			Description: s.Description,
+			Active:      s.ActiveState == "active",
+			State:       s.SubState,
+			IsUser:      s.Scope == "user",
+		})
+	}
+	return views
+}
+
+// get performs a GET request and decodes the JSON response into dest.
+func (c *APIClient) get(path string, dest any) error {
 	resp, err := c.client.Get(c.baseURL + path)
 	if err != nil {
-		return fmt.Errorf("API call failed: %w", err)
+		return fmt.Errorf("%s: %w", path, err)
 	}
 	defer func() {
 		if err := resp.Body.Close(); err != nil {
-			logger.Warn("failed to close body during get call")
+			logger.Warn("failed to close response body for %s", path)
 		}
 	}()
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("API returned status %d", resp.StatusCode)
+		return fmt.Errorf("%s: unexpected status %d", path, resp.StatusCode)
 	}
-
 	if err := json.NewDecoder(resp.Body).Decode(dest); err != nil {
-		return fmt.Errorf("failed to decode response: %w", err)
+		return fmt.Errorf("%s: decode failed: %w", path, err)
 	}
-
 	return nil
 }

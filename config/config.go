@@ -16,7 +16,7 @@ import (
 
 const (
 	AppName     = "odio-api"
-	AppVersion  = "0.4.0"
+	AppVersion  = "0.5.0"
 	serviceType = "_http._tcp"
 	domain      = "local."
 )
@@ -36,7 +36,7 @@ type UIConfig struct {
 
 type ApiConfig struct {
 	Enabled bool
-	Listen  string
+	Listens []string // one entry per bind address, always includes 127.0.0.1
 	Port    int
 
 	UI *UIConfig
@@ -88,10 +88,11 @@ func parseLogLevel(levelStr string) logger.Level {
 	}
 }
 
-// resolveBindToIP convertit bind (interface name ou "all") en IP pour l'API
-func resolveBindToIP(bind string) (string, error) {
-	if bind == "all" {
-		return "0.0.0.0", nil
+// resolveIfaceToIP returns the IPv4 address of a single named interface.
+// "lo" resolves to "127.0.0.1" without querying the OS interface list.
+func resolveIfaceToIP(bind string) (string, error) {
+	if bind == "lo" {
+		return "127.0.0.1", nil
 	}
 
 	iface, err := net.InterfaceByName(bind)
@@ -115,21 +116,69 @@ func resolveBindToIP(bind string) (string, error) {
 	return "", fmt.Errorf("no IPv4 on interface %s", bind)
 }
 
-// getZeroconfInterfaces retourne les interfaces pour zeroconf
-func getZeroconfInterfaces(bind string) []net.Interface {
-	if bind == "all" {
-		return getAllActiveNonLoopback()
+// resolveBindsToListens converts a list of bind names to host:port listen addresses.
+// "all" expands to 0.0.0.0. No implicit addresses are added.
+func resolveBindsToListens(binds []string, port string) ([]string, error) {
+	for _, b := range binds {
+		if b == "all" {
+			return []string{net.JoinHostPort("0.0.0.0", port)}, nil
+		}
 	}
 
-	iface, err := net.InterfaceByName(bind)
-	if err != nil {
-		logger.Warn("[config] interface %q not found: %v", bind, err)
-		return nil
+	seen := map[string]bool{}
+	var addrs []string
+
+	for _, bind := range binds {
+		ip, err := resolveIfaceToIP(bind)
+		if err != nil {
+			return nil, err
+		}
+		addr := net.JoinHostPort(ip, port)
+		if !seen[addr] {
+			seen[addr] = true
+			addrs = append(addrs, addr)
+		}
 	}
-	if iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagLoopback != 0 {
-		return nil
+
+	return addrs, nil
+}
+
+// hasLoopback returns true if listens contains 127.0.0.1:port or 0.0.0.0:port.
+func hasLoopback(listens []string, port string) bool {
+	loopback := net.JoinHostPort("127.0.0.1", port)
+	wildcard := net.JoinHostPort("0.0.0.0", port)
+	for _, l := range listens {
+		if l == loopback || l == wildcard {
+			return true
+		}
 	}
-	return []net.Interface{*iface}
+	return false
+}
+
+// getZeroconfInterfaces returns the network interfaces on which mDNS should be announced.
+func getZeroconfInterfaces(binds []string) []net.Interface {
+	for _, b := range binds {
+		if b == "all" {
+			return getAllActiveNonLoopback()
+		}
+	}
+
+	var result []net.Interface
+	for _, bind := range binds {
+		if bind == "lo" {
+			continue
+		}
+		iface, err := net.InterfaceByName(bind)
+		if err != nil {
+			logger.Warn("[config] interface %q not found: %v", bind, err)
+			continue
+		}
+		if iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagLoopback != 0 {
+			continue
+		}
+		result = append(result, *iface)
+	}
+	return result
 }
 
 // getAllActiveNonLoopback retourne toutes interfaces UP sauf loopback
@@ -229,8 +278,11 @@ func New(cfgFile *string) (*Config, error) {
 	if port <= 0 || port > 65535 {
 		return nil, fmt.Errorf("invalid port: %d", port)
 	}
-	bind := viper.GetString("bind")
-	listenIP, err := resolveBindToIP(bind)
+
+	// bind accepts a single interface name or a list: "enp2s0", ["enp2s0","wlan0"], "all"
+	binds := viper.GetStringSlice("bind")
+	portStr := strconv.Itoa(port)
+	listens, err := resolveBindsToListens(binds, portStr)
 	if err != nil {
 		return nil, err
 	}
@@ -239,9 +291,14 @@ func New(cfgFile *string) (*Config, error) {
 		Enabled: viper.GetBool("api.ui.enabled"),
 	}
 
+	if uiCfg.Enabled && !hasLoopback(listens, portStr) {
+		logger.Error("[config] UI is enabled but 'lo' is not in bind config — UI disabled")
+		uiCfg.Enabled = false
+	}
+
 	apiCfg := ApiConfig{
 		Enabled: viper.GetBool("api.enabled"),
-		Listen:  net.JoinHostPort(listenIP, strconv.Itoa(port)),
+		Listens: listens,
 		Port:    port,
 		UI:      &uiCfg,
 	}
@@ -274,7 +331,7 @@ func New(cfgFile *string) (*Config, error) {
 		Timeout: mprisTimeout,
 	}
 
-	interfaces := getZeroconfInterfaces(bind)
+	interfaces := getZeroconfInterfaces(binds)
 	zerocfg := ZeroConfig{
 		Enabled:      viper.GetBool("zeroconf.enabled"),
 		InstanceName: AppName,

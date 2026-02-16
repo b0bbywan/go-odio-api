@@ -2,6 +2,36 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Remove native <details> disclosure marker */
+details > summary {
+	list-style: none;
+}
+details > summary::-webkit-details-marker {
+	display: none;
+}
+
+/* Custom scrollbar for dark theme */
+::-webkit-scrollbar {
+	width: 8px;
+	height: 8px;
+}
+::-webkit-scrollbar-track {
+	background: #18181b;
+}
+::-webkit-scrollbar-thumb {
+	background: #3f3f46;
+	border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+	background: #52525b;
+}
+
+/* HTMX request indicator */
+button.htmx-request {
+	opacity: 0.6;
+	pointer-events: none;
+}
+
 /* Custom animations */
 @keyframes pulse-opacity {
 	0%, 100% { opacity: 0.6; }
@@ -12,6 +42,40 @@ button.htmx-request {
 	animation: pulse-opacity 1s ease-in-out infinite;
 }
 
+/* Volume slider */
+.volume-slider {
+	width: 100%;
+	height: 4px;
+	border-radius: 2px;
+	background: #3f3f46;
+	outline: none;
+	opacity: 0.9;
+	transition: opacity 0.2s;
+}
+
+.volume-slider:hover {
+	opacity: 1;
+}
+
+.volume-slider::-webkit-slider-thumb {
+	-webkit-appearance: none;
+	appearance: none;
+	width: 14px;
+	height: 14px;
+	border-radius: 50%;
+	background: #3b82f6;
+	cursor: pointer;
+}
+
+.volume-slider::-moz-range-thumb {
+	width: 14px;
+	height: 14px;
+	border-radius: 50%;
+	background: #3b82f6;
+	cursor: pointer;
+	border: none;
+}
+
 /* Component utility classes */
 @layer components {
 	.section-card {
@@ -20,6 +84,22 @@ button.htmx-request {
 
 	.section-header {
 		@apply mb-4 flex items-center justify-between;
+	}
+
+	/* <summary> used as section-header: suppress mb when collapsed */
+	details > summary.section-header {
+		@apply mb-0 cursor-pointer;
+	}
+	details[open] > summary.section-header {
+		@apply mb-4;
+	}
+
+	/* Collapse chevron — mobile only */
+	.section-toggle {
+		@apply text-zinc-500 transition-transform duration-200 sm:hidden;
+	}
+	details[open] > summary .section-toggle {
+		@apply rotate-180;
 	}
 
 	.section-title {
@@ -48,6 +128,10 @@ button.htmx-request {
 
 	.player-card {
 		@apply flex flex-col gap-3 rounded-lg bg-zinc-700/50 p-3 transition-colors hover:bg-zinc-700;
+	}
+
+	.player-art {
+		@apply w-3/4 mx-auto aspect-square object-cover rounded-md mb-2;
 	}
 
 	.btn {

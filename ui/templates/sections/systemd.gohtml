@@ -1,11 +1,12 @@
 {{ define "section-systemd" }}
-<section class="section-card">
-	<div class="section-header">
+<details id="section-systemd" open class="section-card">
+	<summary class="section-header">
 		<h2 class="section-title">⚙️ Services</h2>
-		<span class="badge badge-purple">
-			{{ len . }} configured
-		</span>
-	</div>
+		<div class="flex items-center gap-2">
+			<span class="badge badge-purple">{{ len . }} configured</span>
+			<span class="section-toggle">▾</span>
+		</div>
+	</summary>
 
 	<div class="space-y-2">
 		{{ range . }}
@@ -17,5 +18,5 @@
 			</div>
 		{{ end }}
 	</div>
-</section>
+</details>
 {{ end }}

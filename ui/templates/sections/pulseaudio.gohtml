@@ -1,20 +1,23 @@
 {{ define "section-pulseaudio" }}
-<section class="section-card">
-	<div class="section-header">
-                <div class="flex items-center gap-2">
-                        <h2 class="section-title">🔊 Audio Server</h2>
-                        {{ if .AudioInfo }}
-                        {{ if .AudioInfo.Kind }}
-                        <span class="badge badge-blue text-xs">{{ .AudioInfo.Kind }}</span>
-                        {{ end }}
-                        {{ end }}
-                </div>
-		{{ if .AudioInfo }}
-		<span class="badge {{ if .AudioInfo.Muted }}badge-red{{ else }}badge-blue{{ end }}">
-			{{ if .AudioInfo.Muted }}Muted{{ else }}{{ printf "%.0f%%" (mul .AudioInfo.Volume 100) }}{{ end }}
-		</span>
-		{{ end }}
-	</div>
+<details id="section-audio" open class="section-card">
+	<summary class="section-header">
+		<div class="flex items-center gap-2">
+			<h2 class="section-title">🔊 Audio Server</h2>
+			{{ if .AudioInfo }}
+			{{ if .AudioInfo.Kind }}
+			<span class="badge badge-blue text-xs">{{ .AudioInfo.Kind }}</span>
+			{{ end }}
+			{{ end }}
+		</div>
+		<div class="flex items-center gap-2">
+			{{ if .AudioInfo }}
+			<span class="badge {{ if .AudioInfo.Muted }}badge-red{{ else }}badge-blue{{ end }}">
+				{{ if .AudioInfo.Muted }}Muted{{ else }}{{ printf "%.0f%%" (mul .AudioInfo.Volume 100) }}{{ end }}
+			</span>
+			{{ end }}
+			<span class="section-toggle">▾</span>
+		</div>
+	</summary>
 
 	{{ if .AudioInfo }}
 	<!-- Server info -->
@@ -47,5 +50,5 @@
 		<p class="text-sm text-muted">Audio info unavailable</p>
 	</div>
 	{{ end }}
-</section>
+</details>
 {{ end }}
