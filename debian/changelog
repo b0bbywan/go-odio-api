@@ -1,3 +1,17 @@
+odio-api (0.4.0) trixie; urgency=low
+
+  v0.5.0 – Dashboard Integrated & Responsive
+
+  * Built-in web UI at /ui (localhost:8018/ui)
+  * 100% local, no external depedency
+  * Responsive design
+  * Auto-refresh only when tab visible and section uncollapsed
+  * Dynamic columns based on backend capabilities
+  * Cover art support for MPRIS metadata
+  * Per-player & per-client volume controls
+  * Tested on amd64 (HTPC) and armhf (RPi Model B 2012)
+  * Zeroconf discovery (odio-api.local:8018 on LAN)
+
 odio-api (0.4.0) trixie; urgency=high
 
   [ Major security and usability improvements ]
