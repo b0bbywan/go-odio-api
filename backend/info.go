@@ -30,6 +30,7 @@ type ServerDeviceInfo struct {
 type Backends struct {
 	Bluetooth  bool `json:"bluetooth"`
 	MPRIS      bool `json:"mpris"`
+	Power      bool `json:"power"`
 	PulseAudio bool `json:"pulseaudio"`
 	Systemd    bool `json:"systemd"`
 	Zeroconf   bool `json:"zeroconf"`
@@ -99,6 +100,7 @@ func (b *Backend) GetServerDeviceInfo() (ServerDeviceInfo, error) {
 		Backends: Backends{
 			Bluetooth:  b.Bluetooth != nil,
 			MPRIS:      b.MPRIS != nil,
+			Power:      b.Login1 != nil,
 			PulseAudio: b.Pulse != nil,
 			Systemd:    b.Systemd != nil,
 			Zeroconf:   b.Zeroconf != nil,

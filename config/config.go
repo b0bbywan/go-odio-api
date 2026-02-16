@@ -16,7 +16,7 @@ import (
 
 const (
 	AppName     = "odio-api"
-	AppVersion  = "0.4.0"
+	AppVersion  = "0.5.0"
 	serviceType = "_http._tcp"
 	domain      = "local."
 )
@@ -24,6 +24,7 @@ const (
 type Config struct {
 	Api        *ApiConfig
 	Bluetooth  *BluetoothConfig
+	Login1     *Login1Config
 	MPRIS      *MPRISConfig
 	Pulseaudio *PulseAudioConfig
 	Systemd    *SystemdConfig
@@ -37,12 +38,19 @@ type ApiConfig struct {
 	Listen  string
 }
 
-type SystemdConfig struct {
-	Enabled        bool
-	SystemServices []string
-	UserServices   []string
-	SupportsUTMP   bool
-	XDGRuntimeDir  string
+type Login1Capabilities struct {
+	CanPoweroff bool
+	CanReboot   bool
+}
+
+type Login1Config struct {
+	Enabled      bool
+	Capabilities *Login1Capabilities
+}
+
+type MPRISConfig struct {
+	Enabled bool
+	Timeout time.Duration
 }
 
 type PulseAudioConfig struct {
@@ -50,9 +58,12 @@ type PulseAudioConfig struct {
 	XDGRuntimeDir string
 }
 
-type MPRISConfig struct {
-	Enabled bool
-	Timeout time.Duration
+type SystemdConfig struct {
+	Enabled        bool
+	SystemServices []string
+	UserServices   []string
+	SupportsUTMP   bool
+	XDGRuntimeDir  string
 }
 
 type BluetoothConfig struct {
@@ -206,6 +217,10 @@ func New(cfgFile *string) (*Config, error) {
 	viper.SetDefault("bluetooth.pairingtimeout", "60s")
 	viper.SetDefault("bluetooth.idletimeout", "30m")
 
+	viper.SetDefault("power.enabled", false)
+	viper.SetDefault("power.capabilities.reboot", false)
+	viper.SetDefault("power.capabilities.poweroff", false)
+
 	viper.SetDefault("mpris.enabled", true)
 	viper.SetDefault("mpris.timeout", "5s")
 
@@ -231,6 +246,11 @@ func New(cfgFile *string) (*Config, error) {
 		}
 	}
 
+	xdgRuntimeDir := os.Getenv("XDG_RUNTIME_DIR")
+	if xdgRuntimeDir == "" {
+		xdgRuntimeDir = fmt.Sprintf("/run/user/%d", os.Getuid())
+	}
+
 	port := viper.GetInt("api.port")
 	if port <= 0 || port > 65535 {
 		return nil, fmt.Errorf("invalid port: %d", port)
@@ -247,22 +267,14 @@ func New(cfgFile *string) (*Config, error) {
 		Port:    port,
 	}
 
-	xdgRuntimeDir := os.Getenv("XDG_RUNTIME_DIR")
-	if xdgRuntimeDir == "" {
-		xdgRuntimeDir = fmt.Sprintf("/run/user/%d", os.Getuid())
+	loginCapabilities := Login1Capabilities{
+		CanReboot:   viper.GetBool("power.capabilities.reboot"),
+		CanPoweroff: viper.GetBool("power.capabilities.poweroff"),
 	}
 
-	syscfg := SystemdConfig{
-		Enabled:        viper.GetBool("systemd.enabled"),
-		SystemServices: viper.GetStringSlice("systemd.system"),
-		UserServices:   viper.GetStringSlice("systemd.user"),
-		SupportsUTMP:   systemdHasUTMP(),
-		XDGRuntimeDir:  xdgRuntimeDir,
-	}
-
-	pulsecfg := PulseAudioConfig{
-		Enabled:       viper.GetBool("pulseaudio.enabled"),
-		XDGRuntimeDir: xdgRuntimeDir,
+	logincfg := Login1Config{
+		Enabled:      viper.GetBool("power.enabled"),
+		Capabilities: &loginCapabilities,
 	}
 
 	mprisTimeout := viper.GetDuration("mpris.timeout")
@@ -297,6 +309,19 @@ func New(cfgFile *string) (*Config, error) {
 		IdleTimeout:    bluetoothIdleTimeout,
 	}
 
+	pulsecfg := PulseAudioConfig{
+		Enabled:       viper.GetBool("pulseaudio.enabled"),
+		XDGRuntimeDir: xdgRuntimeDir,
+	}
+
+	syscfg := SystemdConfig{
+		Enabled:        viper.GetBool("systemd.enabled"),
+		SystemServices: viper.GetStringSlice("systemd.system"),
+		UserServices:   viper.GetStringSlice("systemd.user"),
+		SupportsUTMP:   systemdHasUTMP(),
+		XDGRuntimeDir:  xdgRuntimeDir,
+	}
+
 	interfaces := getZeroconfInterfaces(bind)
 	zerocfg := ZeroConfig{
 		Enabled:      viper.GetBool("zeroconf.enabled"),
@@ -311,6 +336,7 @@ func New(cfgFile *string) (*Config, error) {
 	cfg := Config{
 		Api:        &apiCfg,
 		Bluetooth:  &bluetoothcfg,
+		Login1:     &logincfg,
 		MPRIS:      &mpriscfg,
 		Pulseaudio: &pulsecfg,
 		Systemd:    &syscfg,

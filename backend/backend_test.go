@@ -5,6 +5,7 @@ import (
 	"net"
 	"testing"
 
+	"github.com/b0bbywan/go-odio-api/backend/login1"
 	"github.com/b0bbywan/go-odio-api/config"
 )
 
@@ -15,6 +16,7 @@ func TestBackendDisabled(t *testing.T) {
 	tests := []struct {
 		name             string
 		bluetoothEnabled bool
+		login1Enabled    bool
 		mprisEnabled     bool
 		pulseEnabled     bool
 		systemdEnabled   bool
@@ -23,6 +25,7 @@ func TestBackendDisabled(t *testing.T) {
 		{
 			name:             "all backends disabled",
 			bluetoothEnabled: false,
+			login1Enabled:    false,
 			mprisEnabled:     false,
 			pulseEnabled:     false,
 			systemdEnabled:   false,
@@ -31,6 +34,7 @@ func TestBackendDisabled(t *testing.T) {
 		{
 			name:             "only bluetooth enabled",
 			bluetoothEnabled: true,
+			login1Enabled:    false,
 			mprisEnabled:     false,
 			pulseEnabled:     false,
 			systemdEnabled:   false,
@@ -39,6 +43,7 @@ func TestBackendDisabled(t *testing.T) {
 		{
 			name:             "only systemd enabled",
 			bluetoothEnabled: false,
+			login1Enabled:    false,
 			mprisEnabled:     false,
 			pulseEnabled:     false,
 			systemdEnabled:   true,
@@ -49,6 +54,7 @@ func TestBackendDisabled(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			bluetoothCfg := &config.BluetoothConfig{Enabled: tt.bluetoothEnabled}
+			login1Cfg := &config.Login1Config{Enabled: tt.login1Enabled}
 			mprisCfg := &config.MPRISConfig{Enabled: tt.mprisEnabled}
 			pulseCfg := &config.PulseAudioConfig{Enabled: tt.pulseEnabled}
 			// Add empty services for systemd to ensure it returns nil when enabled without services
@@ -59,7 +65,7 @@ func TestBackendDisabled(t *testing.T) {
 			}
 			zeroconfCfg := &config.ZeroConfig{Enabled: tt.zeroconfEnabled}
 
-			backend, err := New(ctx, bluetoothCfg, mprisCfg, pulseCfg, systemdCfg, zeroconfCfg)
+			backend, err := New(ctx, bluetoothCfg, login1Cfg, mprisCfg, pulseCfg, systemdCfg, zeroconfCfg)
 
 			// Bluetooth and other D-Bus backends may fail in test environment
 			// This is expected and we should skip the test
@@ -112,6 +118,7 @@ func TestSystemdWithEmptyConfig(t *testing.T) {
 	backend, err := New(
 		ctx,
 		&config.BluetoothConfig{Enabled: false},
+		&config.Login1Config{Enabled: false},
 		&config.MPRISConfig{Enabled: false},
 		&config.PulseAudioConfig{Enabled: false},
 		systemdCfg,
@@ -139,6 +146,7 @@ func TestZeroconfWithLocalhostBind(t *testing.T) {
 	backend, err := New(
 		ctx,
 		&config.BluetoothConfig{Enabled: false},
+		&config.Login1Config{Enabled: false},
 		&config.MPRISConfig{Enabled: false},
 		&config.PulseAudioConfig{Enabled: false},
 		&config.SystemdConfig{Enabled: false},
@@ -181,4 +189,148 @@ func TestBackendCloseWithNilBackends(t *testing.T) {
 
 	// Should not panic
 	backend.Close()
+}
+
+// --- Tests Login1 ---
+
+// TestLogin1DisabledInBackend verifies that Login1 field stays nil when disabled
+func TestLogin1DisabledInBackend(t *testing.T) {
+	ctx := context.Background()
+
+	login1Cfg := &config.Login1Config{Enabled: false}
+
+	backend, err := New(
+		ctx,
+		&config.BluetoothConfig{Enabled: false},
+		login1Cfg,
+		&config.MPRISConfig{Enabled: false},
+		&config.PulseAudioConfig{Enabled: false},
+		&config.SystemdConfig{Enabled: false},
+		&config.ZeroConfig{Enabled: false},
+	)
+	if err != nil {
+		t.Fatalf("New() unexpected error: %v", err)
+	}
+
+	// Login1 is not initialised by backend.New(), the field must remain nil
+	if backend.Login1 != nil {
+		t.Error("Login1 should be nil when disabled")
+	}
+}
+
+// TestLogin1DisabledWithCapabilities verifies Login1 stays nil even when capabilities are set but backend is disabled
+func TestLogin1DisabledWithCapabilities(t *testing.T) {
+	ctx := context.Background()
+
+	login1Cfg := &config.Login1Config{
+		Enabled: false,
+		Capabilities: &config.Login1Capabilities{
+			CanReboot:   true,
+			CanPoweroff: true,
+		},
+	}
+
+	backend, err := New(
+		ctx,
+		&config.BluetoothConfig{Enabled: false},
+		login1Cfg,
+		&config.MPRISConfig{Enabled: false},
+		&config.PulseAudioConfig{Enabled: false},
+		&config.SystemdConfig{Enabled: false},
+		&config.ZeroConfig{Enabled: false},
+	)
+	if err != nil {
+		t.Fatalf("New() unexpected error: %v", err)
+	}
+
+	if backend.Login1 != nil {
+		t.Error("Login1 should be nil even with capabilities when disabled")
+	}
+}
+
+// TestBackendClose_WithLogin1Nil verifies Close() doesn't panic when Login1 is nil
+func TestBackendClose_WithLogin1Nil(t *testing.T) {
+	backend := &Backend{
+		Login1:   nil,
+		MPRIS:    nil,
+		Pulse:    nil,
+		Systemd:  nil,
+		Zeroconf: nil,
+	}
+
+	// Should not panic
+	backend.Close()
+}
+
+// TestBackendNew_Login1FieldInitialisedToNil verifies the Login1 field is nil after New() with disabled config
+func TestBackendNew_Login1FieldInitialisedToNil(t *testing.T) {
+	ctx := context.Background()
+
+	backend, err := New(
+		ctx,
+		&config.BluetoothConfig{Enabled: false},
+		&config.Login1Config{Enabled: false},
+		&config.MPRISConfig{Enabled: false},
+		&config.PulseAudioConfig{Enabled: false},
+		&config.SystemdConfig{Enabled: false, SystemServices: []string{}, UserServices: []string{}},
+		&config.ZeroConfig{Enabled: false},
+	)
+	if err != nil {
+		t.Fatalf("New() returned error: %v", err)
+	}
+	if backend == nil {
+		t.Fatal("New() should return a non-nil Backend")
+	}
+	if backend.Login1 != nil {
+		t.Error("Backend.Login1 should be nil when Login1 is not initialised by New()")
+	}
+}
+
+// TestGetServerDeviceInfo_PowerField tests that the Power flag in Backends reflects Login1 presence
+func TestGetServerDeviceInfo_PowerField(t *testing.T) {
+	tests := []struct {
+		name      string
+		login1    *login1.Login1Backend
+		wantPower bool
+	}{
+		{
+			name:      "Login1 nil → Power false",
+			login1:    nil,
+			wantPower: false,
+		},
+		{
+			name:      "Login1 set (reboot only) → Power true",
+			login1:    &login1.Login1Backend{CanReboot: true},
+			wantPower: true,
+		},
+		{
+			name:      "Login1 set (poweroff only) → Power true",
+			login1:    &login1.Login1Backend{CanPoweroff: true},
+			wantPower: true,
+		},
+		{
+			name:      "Login1 set (both) → Power true",
+			login1:    &login1.Login1Backend{CanReboot: true, CanPoweroff: true},
+			wantPower: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b := &Backend{Login1: tt.login1}
+			info, err := b.GetServerDeviceInfo()
+			if err != nil {
+				t.Fatalf("GetServerDeviceInfo() returned error: %v", err)
+			}
+			if info.Backends.Power != tt.wantPower {
+				t.Errorf("Backends.Power = %v, want %v", info.Backends.Power, tt.wantPower)
+			}
+		})
+	}
+}
+
+// TestNew_Login1NoCapabilityEnabled_RequiresDbus documents that New() returns nil when
+// all capabilities are disabled, even if the backend is enabled (requires D-Bus to reach that path).
+func TestNew_Login1NoCapabilityEnabled_RequiresDbus(t *testing.T) {
+	t.Skip("reaching the 'no capability enabled' early-return requires a live D-Bus system connection; tested via integration tests")
 }

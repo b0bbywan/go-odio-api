@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/b0bbywan/go-odio-api/backend/bluetooth"
+	"github.com/b0bbywan/go-odio-api/backend/login1"
 	"github.com/b0bbywan/go-odio-api/backend/mpris"
 	"github.com/b0bbywan/go-odio-api/backend/pulseaudio"
 	"github.com/b0bbywan/go-odio-api/backend/systemd"
@@ -13,6 +14,7 @@ import (
 
 type Backend struct {
 	Bluetooth *bluetooth.BluetoothBackend
+	Login1    *login1.Login1Backend
 	MPRIS     *mpris.MPRISBackend
 	Pulse     *pulseaudio.PulseAudioBackend
 	Systemd   *systemd.SystemdBackend
@@ -22,6 +24,7 @@ type Backend struct {
 func New(
 	ctx context.Context,
 	btcfg *config.BluetoothConfig,
+	login1cfg *config.Login1Config,
 	mpriscfg *config.MPRISConfig,
 	pulscfg *config.PulseAudioConfig,
 	syscfg *config.SystemdConfig,
@@ -31,6 +34,10 @@ func New(
 	var err error
 
 	if b.Bluetooth, err = bluetooth.New(ctx, btcfg); err != nil {
+		return nil, err
+	}
+
+	if b.Login1, err = login1.New(ctx, login1cfg); err != nil {
 		return nil, err
 	}
 
@@ -82,6 +89,12 @@ func (b *Backend) Start() error {
 }
 
 func (b *Backend) Close() {
+	if b.Bluetooth != nil {
+		b.Bluetooth.Close()
+	}
+	if b.Login1 != nil {
+		b.Login1.Close()
+	}
 	if b.MPRIS != nil {
 		b.MPRIS.Close()
 	}
@@ -93,8 +106,5 @@ func (b *Backend) Close() {
 	}
 	if b.Zeroconf != nil {
 		b.Zeroconf.Close()
-	}
-	if b.Bluetooth != nil {
-		b.Bluetooth.Close()
 	}
 }
