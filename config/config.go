@@ -100,12 +100,7 @@ func parseLogLevel(levelStr string) logger.Level {
 }
 
 // resolveIfaceToIP returns the IPv4 address of a single named interface.
-// "lo" resolves to "127.0.0.1" without querying the OS interface list.
 func resolveIfaceToIP(bind string) (string, error) {
-	if bind == "lo" {
-		return "127.0.0.1", nil
-	}
-
 	iface, err := net.InterfaceByName(bind)
 	if err != nil {
 		return "", fmt.Errorf("interface %q not found", bind)
