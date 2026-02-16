@@ -11,6 +11,8 @@
 		<div class="player-meta" title="{{ if .Artist }}{{ .Artist }}{{ end }}{{ if and .Artist .Title }} – {{ end }}{{ if .Title }}{{ .Title }}{{ end }}">
 			{{ if .Artist }}{{ .Artist }}{{ end }}{{ if and .Artist .Title }} – {{ end }}{{ if .Title }}{{ .Title }}{{ end }}
 		</div>
+		{{ else if or (eq .State "Playing") (eq .State "Paused") }}
+		<div class="text-sm text-subtle">Unknown track</div>
 		{{ else }}
 		<div class="text-sm text-subtle">No media playing</div>
 		{{ end }}
