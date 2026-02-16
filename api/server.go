@@ -63,6 +63,10 @@ func (s *Server) register(b *backend.Backend) {
 	// server routes
 	s.registerServerRoutes(b)
 
+	if b.Login1 != nil {
+		s.registerLogin1Routes(b.Login1)
+	}
+
 	// pulse routes
 	if b.Pulse != nil {
 		s.registerPulseRoutes(b.Pulse)
