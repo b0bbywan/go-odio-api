@@ -8,6 +8,7 @@ odio-api (0.6.0) trixie; urgency=low
   * Responsive design
   * Auto-refresh only when tab visible and section uncollapsed
   * Dynamic columns based on backend capabilities
+  * Power buttons with confirmation popup if power backend enabled
   * Cover art support for MPRIS metadata
   * Per-player & per-client volume controls
   * Tested on amd64 (HTPC) and armhf (RPi Model B 2012)

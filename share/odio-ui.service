@@ -1,12 +1,12 @@
 [Unit]
-Description=%i
+Description=OdioUI
 After=graphical-session.target
 
 [Service]
 Type=simple
 Environment=WAYLAND_DISPLAY=wayland-1
 Environment=XDG_RUNTIME_DIR=/run/user/%U
-ExecStart=/usr/bin/firefox -P %i --no-remote --new-window --kiosk https://%i
+ExecStart=/usr/bin/firefox -P odio --no-remote --new-window --kiosk http://localhost:8018/ui
 ExecStop=/bin/kill $MAINPID
 Restart=no
 KillMode=mixed
