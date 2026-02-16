@@ -31,20 +31,20 @@ func TestNew_DisabledConfig(t *testing.T) {
 	}
 }
 
-func TestNew_DisabledConfig_WithCapacities(t *testing.T) {
+func TestNew_DisabledConfig_WithCapabilities(t *testing.T) {
 	cfg := &config.Login1Config{
 		Enabled: false,
-		Capacities: &config.Login1Capacities{
+		Capabilities: &config.Login1Capabilities{
 			CanReboot:   true,
 			CanPoweroff: true,
 		},
 	}
 	b, err := New(context.Background(), cfg)
 	if err != nil {
-		t.Errorf("New(disabled with capacities) should return nil error, got: %v", err)
+		t.Errorf("New(disabled with capabilities) should return nil error, got: %v", err)
 	}
 	if b != nil {
-		t.Errorf("New(disabled with capacities) should return nil backend, got: %v", b)
+		t.Errorf("New(disabled with capabilities) should return nil backend, got: %v", b)
 	}
 }
 
@@ -63,7 +63,7 @@ func TestClose_IdempotentAfterClose(t *testing.T) {
 	b.Close()
 }
 
-// --- Tests pour Reboot() et PowerOff() avec capacités désactivées ---
+// --- Tests pour Reboot() et PowerOff() avec capabilities désactivées ---
 
 func TestReboot_CapabilityDisabled(t *testing.T) {
 	b := &Login1Backend{CanReboot: false}
@@ -117,7 +117,7 @@ func TestPowerOff_CapabilityDisabled_ErrorMessage(t *testing.T) {
 
 func TestValidateCapabilities_AllDisabled(t *testing.T) {
 	b := &Login1Backend{}
-	caps := config.Login1Capacities{
+	caps := config.Login1Capabilities{
 		CanReboot:   false,
 		CanPoweroff: false,
 	}
@@ -126,10 +126,10 @@ func TestValidateCapabilities_AllDisabled(t *testing.T) {
 		t.Errorf("validateCapabilities(all false) should return nil, got: %v", err)
 	}
 	if b.CanReboot {
-		t.Error("CanReboot should remain false when capacity is disabled")
+		t.Error("CanReboot should remain false when capability is disabled")
 	}
 	if b.CanPoweroff {
-		t.Error("CanPoweroff should remain false when capacity is disabled")
+		t.Error("CanPoweroff should remain false when capability is disabled")
 	}
 }
 

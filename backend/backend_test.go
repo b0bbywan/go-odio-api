@@ -5,6 +5,7 @@ import (
 	"net"
 	"testing"
 
+	"github.com/b0bbywan/go-odio-api/backend/login1"
 	"github.com/b0bbywan/go-odio-api/config"
 )
 
@@ -213,13 +214,13 @@ func TestLogin1DisabledInBackend(t *testing.T) {
 	}
 }
 
-// TestLogin1DisabledWithCapacities verifies Login1 stays nil even when capacities are set but backend is disabled
-func TestLogin1DisabledWithCapacities(t *testing.T) {
+// TestLogin1DisabledWithCapabilities verifies Login1 stays nil even when capabilities are set but backend is disabled
+func TestLogin1DisabledWithCapabilities(t *testing.T) {
 	ctx := context.Background()
 
 	login1Cfg := &config.Login1Config{
 		Enabled: false,
-		Capacities: &config.Login1Capacities{
+		Capabilities: &config.Login1Capabilities{
 			CanReboot:   true,
 			CanPoweroff: true,
 		},
@@ -238,7 +239,7 @@ func TestLogin1DisabledWithCapacities(t *testing.T) {
 	}
 
 	if backend.Login1 != nil {
-		t.Error("Login1 should be nil even with capacities when disabled")
+		t.Error("Login1 should be nil even with capabilities when disabled")
 	}
 }
 
@@ -277,4 +278,53 @@ func TestBackendNew_Login1FieldInitialisedToNil(t *testing.T) {
 	if backend.Login1 != nil {
 		t.Error("Backend.Login1 should be nil when Login1 is not initialised by New()")
 	}
+}
+
+// TestGetServerDeviceInfo_PowerField tests that the Power flag in Backends reflects Login1 presence
+func TestGetServerDeviceInfo_PowerField(t *testing.T) {
+	tests := []struct {
+		name      string
+		login1    *login1.Login1Backend
+		wantPower bool
+	}{
+		{
+			name:      "Login1 nil → Power false",
+			login1:    nil,
+			wantPower: false,
+		},
+		{
+			name:      "Login1 set (reboot only) → Power true",
+			login1:    &login1.Login1Backend{CanReboot: true},
+			wantPower: true,
+		},
+		{
+			name:      "Login1 set (poweroff only) → Power true",
+			login1:    &login1.Login1Backend{CanPoweroff: true},
+			wantPower: true,
+		},
+		{
+			name:      "Login1 set (both) → Power true",
+			login1:    &login1.Login1Backend{CanReboot: true, CanPoweroff: true},
+			wantPower: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b := &Backend{Login1: tt.login1}
+			info, err := b.GetServerDeviceInfo()
+			if err != nil {
+				t.Fatalf("GetServerDeviceInfo() returned error: %v", err)
+			}
+			if info.Backends.Power != tt.wantPower {
+				t.Errorf("Backends.Power = %v, want %v", info.Backends.Power, tt.wantPower)
+			}
+		})
+	}
+}
+
+// TestNew_Login1NoCapabilityEnabled_RequiresDbus documents that New() returns nil when
+// all capabilities are disabled, even if the backend is enabled (requires D-Bus to reach that path).
+func TestNew_Login1NoCapabilityEnabled_RequiresDbus(t *testing.T) {
+	t.Skip("reaching the 'no capability enabled' early-return requires a live D-Bus system connection; tested via integration tests")
 }

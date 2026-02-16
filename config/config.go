@@ -37,14 +37,14 @@ type ApiConfig struct {
 	Listen  string
 }
 
-type Login1Capacities struct {
+type Login1Capabilities struct {
 	CanPoweroff bool
 	CanReboot   bool
 }
 
 type Login1Config struct {
-	Enabled    bool
-	Capacities *Login1Capacities
+	Enabled      bool
+	Capabilities *Login1Capabilities
 }
 
 type MPRISConfig struct {
@@ -205,8 +205,8 @@ func New(cfgFile *string) (*Config, error) {
 	viper.SetDefault("api.port", 8018)
 
 	viper.SetDefault("power.enabled", false)
-	viper.SetDefault("power.capacities.reboot", false)
-	viper.SetDefault("power.capacities.poweroff", false)
+	viper.SetDefault("power.capabilities.reboot", false)
+	viper.SetDefault("power.capabilities.poweroff", false)
 
 	viper.SetDefault("mpris.enabled", true)
 	viper.SetDefault("mpris.timeout", "5s")
@@ -254,14 +254,14 @@ func New(cfgFile *string) (*Config, error) {
 		Port:    port,
 	}
 
-	loginCapacities := Login1Capacities{
-		CanReboot:   viper.GetBool("power.capacities.reboot"),
-		CanPoweroff: viper.GetBool("power.capacities.poweroff"),
+	loginCapabilities := Login1Capabilities{
+		CanReboot:   viper.GetBool("power.capabilities.reboot"),
+		CanPoweroff: viper.GetBool("power.capabilities.poweroff"),
 	}
 
 	logincfg := Login1Config{
-		Enabled:    viper.GetBool("power.enabled"),
-		Capacities: &loginCapacities,
+		Enabled:      viper.GetBool("power.enabled"),
+		Capabilities: &loginCapabilities,
 	}
 
 	mprisTimeout := viper.GetDuration("mpris.timeout")

@@ -28,14 +28,19 @@ func New(ctx context.Context, cfg *config.Login1Config) (*Login1Backend, error) 
 		timeout: 10 * time.Second,
 	}
 
-	if cfg.Capacities != nil {
-		if err := backend.validateCapabilities(*cfg.Capacities); err != nil {
-			logger.Error("[login1] failed to validate capacities: %v", err)
+	if cfg.Capabilities != nil {
+		if !cfg.Capabilities.CanReboot && !cfg.Capabilities.CanPoweroff {
+			logger.Warn("[login1] no capability enabled, disabling backend")
+			return nil, nil
+		}
+		if err := backend.validateCapabilities(*cfg.Capabilities); err != nil {
+			logger.Error("[login1] failed to validate capabilities: %v", err)
 			backend.Close()
 			return nil, err
 		}
 	}
 
+	logger.Info("[login1] backend initialized")
 	return backend, nil
 }
 
@@ -65,16 +70,16 @@ func (l *Login1Backend) PowerOff() error {
 	return l.callMethod(LOGIN1_PREFIX, LOGIN1_METHOD_POWEROFF, true)
 }
 
-func (l *Login1Backend) validateCapabilities(capacities config.Login1Capacities) error {
-	// test valid capacities or return nil
-	if capacities.CanReboot {
+func (l *Login1Backend) validateCapabilities(capabilities config.Login1Capabilities) error {
+	// test valid capabilities or return nil
+	if capabilities.CanReboot {
 		if err := l.validateCapability(LOGIN1_CAPABILITY_REBOOT); err != nil {
 			return err
 		}
 		l.CanReboot = true
 	}
 
-	if capacities.CanPoweroff {
+	if capabilities.CanPoweroff {
 		if err := l.validateCapability(LOGIN1_CAPABILITY_POWEROFF); err != nil {
 			return err
 		}
