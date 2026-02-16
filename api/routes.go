@@ -20,7 +20,23 @@ func (s *Server) registerServerRoutes(b *backend.Backend) {
 }
 
 func (s *Server) registerLogin1Routes(b *login1.Login1Backend) {
-	return
+	s.mux.HandleFunc(
+		"/power",
+		JSONHandler(func(w http.ResponseWriter, r *http.Request) (any, error) {
+			return map[string]bool{
+				"reboot":    b.CanReboot,
+				"power_off": b.CanPoweroff,
+			}, nil
+		}),
+	)
+	s.mux.HandleFunc(
+		"POST /power/reboot",
+		withLogin1(b.Reboot),
+	)
+	s.mux.HandleFunc(
+		"POST /power/power_off",
+		withLogin1(b.PowerOff),
+	)
 }
 
 func (s *Server) registerPulseRoutes(b *pulseaudio.PulseAudioBackend) {
