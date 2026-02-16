@@ -46,6 +46,7 @@ func main() {
 	// Initialize backends
 	b, err := backend.New(
 		ctx,
+		cfg.Login1,
 		cfg.MPRIS,
 		cfg.Pulseaudio,
 		cfg.Systemd,
