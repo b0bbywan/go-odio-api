@@ -134,10 +134,12 @@ button.htmx-request {
 
 	.player-card {
 		@apply flex flex-col gap-3 rounded-lg bg-zinc-700/50 p-3 transition-colors hover:bg-zinc-700;
+		container-type: inline-size;
 	}
 
 	.player-art {
-		@apply w-3/4 mx-auto aspect-square object-cover rounded-md mb-2;
+		@apply mx-auto max-w-[75%] rounded-md mb-2;
+		max-height: 75cqw;
 	}
 
 	.btn {
