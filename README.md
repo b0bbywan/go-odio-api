@@ -289,6 +289,11 @@ mpris:
   enabled: true
   timeout: 5s
 
+power:
+  enabled: false
+  capabilities:
+    poweroff: true
+    reboot: true
 ```
 
 ## API Endpoints
