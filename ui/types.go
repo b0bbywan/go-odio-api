@@ -6,20 +6,28 @@ import "time"
 // API Response Types (matching JSON API responses)
 // ============================================================================
 
+// PowerCapabilities represents what power actions are available from /power
+type PowerCapabilities struct {
+	Reboot   bool `json:"reboot"`
+	PowerOff bool `json:"power_off"`
+}
+
 // ServerInfo represents the response from /server
 type ServerInfo struct {
-	Hostname   string   `json:"hostname"`
-	OSPlatform string   `json:"os_platform"`
-	OSVersion  string   `json:"os_version"`
-	APISW      string   `json:"api_sw"`
-	APIVersion string   `json:"api_version"`
-	Backends   Backends `json:"backends"`
+	Hostname   string             `json:"hostname"`
+	OSPlatform string             `json:"os_platform"`
+	OSVersion  string             `json:"os_version"`
+	APISW      string             `json:"api_sw"`
+	APIVersion string             `json:"api_version"`
+	Backends   Backends           `json:"backends"`
+	Power      *PowerCapabilities `json:"-"`
 }
 
 // Backends indicates which backends are enabled
 type Backends struct {
 	Bluetooth  bool `json:"bluetooth"`
 	MPRIS      bool `json:"mpris"`
+	Power      bool `json:"power"`
 	PulseAudio bool `json:"pulseaudio"`
 	Systemd    bool `json:"systemd"`
 	Zeroconf   bool `json:"zeroconf"`

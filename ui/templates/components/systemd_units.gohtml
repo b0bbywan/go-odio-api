@@ -12,6 +12,12 @@
 			        hx-post="/services/user/{{ .Name }}/restart"
 			        hx-swap="none"
 			        title="Restart service">🔄</button>
+			{{ if .Active }}
+			<button class="text-sm hover:scale-110 transition-transform"
+			        hx-post="/services/user/{{ .Name }}/stop"
+			        hx-swap="none"
+			        title="Stop service">🛑</button>
+			{{ end }}
 			{{ end }}
 		</div>
 	</div>

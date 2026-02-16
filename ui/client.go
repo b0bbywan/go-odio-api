@@ -32,6 +32,12 @@ func (c *APIClient) GetServerInfo() (*ServerInfo, error) {
 	if err := c.get("/server", &v); err != nil {
 		return nil, err
 	}
+	if v.Backends.Power {
+		var power PowerCapabilities
+		if err := c.get("/power", &power); err == nil {
+			v.Power = &power
+		}
+	}
 	return &v, nil
 }
 
