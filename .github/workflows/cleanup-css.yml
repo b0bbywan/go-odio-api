@@ -8,6 +8,8 @@ on:
 jobs:
   cleanup:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     if: github.event.ref_type == 'branch'
     steps:
       - name: Install lftp
