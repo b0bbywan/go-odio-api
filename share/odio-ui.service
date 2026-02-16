@@ -1,6 +1,9 @@
 [Unit]
-Description=OdioUI
-After=graphical-session.target
+Description=Odio Dashboard UI
+After=plasma-workspace-wayland.target
+PartOf=graphical-session.target
+StartLimitBurst=15
+StartLimitIntervalSec=30
 
 [Service]
 Type=simple
@@ -8,9 +11,10 @@ Environment=WAYLAND_DISPLAY=wayland-1
 Environment=XDG_RUNTIME_DIR=/run/user/%U
 ExecStart=/usr/bin/firefox -P odio --no-remote --new-window --kiosk http://localhost:8018/ui
 ExecStop=/bin/kill $MAINPID
-Restart=no
+Restart=on-failure
+RestartSec=2
 KillMode=mixed
 TimeoutStopSec=5
 
 [Install]
-WantedBy=default.target
+WantedBy=graphical-session.target
