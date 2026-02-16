@@ -186,3 +186,95 @@ func TestBackendCloseWithNilBackends(t *testing.T) {
 	// Should not panic
 	backend.Close()
 }
+
+// --- Tests Login1 ---
+
+// TestLogin1DisabledInBackend verifies that Login1 field stays nil when disabled
+func TestLogin1DisabledInBackend(t *testing.T) {
+	ctx := context.Background()
+
+	login1Cfg := &config.Login1Config{Enabled: false}
+
+	backend, err := New(
+		ctx,
+		login1Cfg,
+		&config.MPRISConfig{Enabled: false},
+		&config.PulseAudioConfig{Enabled: false},
+		&config.SystemdConfig{Enabled: false},
+		&config.ZeroConfig{Enabled: false},
+	)
+	if err != nil {
+		t.Fatalf("New() unexpected error: %v", err)
+	}
+
+	// Login1 is not initialised by backend.New(), the field must remain nil
+	if backend.Login1 != nil {
+		t.Error("Login1 should be nil when disabled")
+	}
+}
+
+// TestLogin1DisabledWithCapacities verifies Login1 stays nil even when capacities are set but backend is disabled
+func TestLogin1DisabledWithCapacities(t *testing.T) {
+	ctx := context.Background()
+
+	login1Cfg := &config.Login1Config{
+		Enabled: false,
+		Capacities: &config.Login1Capacities{
+			CanReboot:   true,
+			CanPoweroff: true,
+		},
+	}
+
+	backend, err := New(
+		ctx,
+		login1Cfg,
+		&config.MPRISConfig{Enabled: false},
+		&config.PulseAudioConfig{Enabled: false},
+		&config.SystemdConfig{Enabled: false},
+		&config.ZeroConfig{Enabled: false},
+	)
+	if err != nil {
+		t.Fatalf("New() unexpected error: %v", err)
+	}
+
+	if backend.Login1 != nil {
+		t.Error("Login1 should be nil even with capacities when disabled")
+	}
+}
+
+// TestBackendClose_WithLogin1Nil verifies Close() doesn't panic when Login1 is nil
+func TestBackendClose_WithLogin1Nil(t *testing.T) {
+	backend := &Backend{
+		Login1:   nil,
+		MPRIS:    nil,
+		Pulse:    nil,
+		Systemd:  nil,
+		Zeroconf: nil,
+	}
+
+	// Should not panic
+	backend.Close()
+}
+
+// TestBackendNew_Login1FieldInitialisedToNil verifies the Login1 field is nil after New() with disabled config
+func TestBackendNew_Login1FieldInitialisedToNil(t *testing.T) {
+	ctx := context.Background()
+
+	backend, err := New(
+		ctx,
+		&config.Login1Config{Enabled: false},
+		&config.MPRISConfig{Enabled: false},
+		&config.PulseAudioConfig{Enabled: false},
+		&config.SystemdConfig{Enabled: false, SystemServices: []string{}, UserServices: []string{}},
+		&config.ZeroConfig{Enabled: false},
+	)
+	if err != nil {
+		t.Fatalf("New() returned error: %v", err)
+	}
+	if backend == nil {
+		t.Fatal("New() should return a non-nil Backend")
+	}
+	if backend.Login1 != nil {
+		t.Error("Backend.Login1 should be nil when Login1 is not initialised by New()")
+	}
+}
