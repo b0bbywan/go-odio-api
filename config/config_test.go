@@ -376,6 +376,232 @@ logLevel: DEBUG
 	}
 }
 
+// --- Tests Login1Config ---
+
+func TestLogin1ConfigStructFields(t *testing.T) {
+	cfg := &Login1Config{
+		Enabled:    true,
+		Capacities: &Login1Capacities{CanReboot: true, CanPoweroff: false},
+	}
+	if !cfg.Enabled {
+		t.Error("Login1Config.Enabled should be true")
+	}
+	if cfg.Capacities == nil {
+		t.Fatal("Login1Config.Capacities should not be nil")
+	}
+	if !cfg.Capacities.CanReboot {
+		t.Error("Login1Capacities.CanReboot should be true")
+	}
+	if cfg.Capacities.CanPoweroff {
+		t.Error("Login1Capacities.CanPoweroff should be false")
+	}
+}
+
+func TestLogin1CapacitiesStructFields(t *testing.T) {
+	tests := []struct {
+		name        string
+		canReboot   bool
+		canPoweroff bool
+	}{
+		{"both disabled", false, false},
+		{"reboot only", true, false},
+		{"poweroff only", false, true},
+		{"both enabled", true, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			caps := Login1Capacities{CanReboot: tt.canReboot, CanPoweroff: tt.canPoweroff}
+			if caps.CanReboot != tt.canReboot {
+				t.Errorf("CanReboot = %v, want %v", caps.CanReboot, tt.canReboot)
+			}
+			if caps.CanPoweroff != tt.canPoweroff {
+				t.Errorf("CanPoweroff = %v, want %v", caps.CanPoweroff, tt.canPoweroff)
+			}
+		})
+	}
+}
+
+func TestNew_Login1DisabledByDefault(t *testing.T) {
+	viper.Reset()
+
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
+
+	cfg, err := New(nil)
+	if err != nil {
+		t.Fatalf("New(nil) returned error: %v", err)
+	}
+
+	if cfg.Login1 == nil {
+		t.Fatal("Login1 config should not be nil")
+	}
+	// Power/login1 must be DISABLED by default for security
+	if cfg.Login1.Enabled {
+		t.Error("Login1.Enabled should be false by default for security")
+	}
+}
+
+func TestNew_Login1CapacitiesDisabledByDefault(t *testing.T) {
+	viper.Reset()
+
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
+
+	cfg, err := New(nil)
+	if err != nil {
+		t.Fatalf("New(nil) returned error: %v", err)
+	}
+
+	if cfg.Login1.Capacities == nil {
+		t.Fatal("Login1.Capacities should not be nil")
+	}
+	if cfg.Login1.Capacities.CanReboot {
+		t.Error("Login1.Capacities.CanReboot should be false by default")
+	}
+	if cfg.Login1.Capacities.CanPoweroff {
+		t.Error("Login1.Capacities.CanPoweroff should be false by default")
+	}
+}
+
+func TestNew_Login1ExplicitlyEnabled(t *testing.T) {
+	viper.Reset()
+	viper.Set("power.enabled", true)
+
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
+
+	cfg, err := New(nil)
+	if err != nil {
+		t.Fatalf("New(nil) returned error: %v", err)
+	}
+
+	if !cfg.Login1.Enabled {
+		t.Error("Login1.Enabled should be true when explicitly enabled")
+	}
+}
+
+func TestNew_Login1CapacitiesFromViper(t *testing.T) {
+	tests := []struct {
+		name     string
+		reboot   bool
+		poweroff bool
+	}{
+		{"reboot only", true, false},
+		{"poweroff only", false, true},
+		{"both capacities", true, true},
+		{"no capacity", false, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			viper.Reset()
+			viper.Set("power.enabled", true)
+			viper.Set("power.capacities.reboot", tt.reboot)
+			viper.Set("power.capacities.poweroff", tt.poweroff)
+
+			t.Setenv("HOME", t.TempDir())
+			t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
+
+			cfg, err := New(nil)
+			if err != nil {
+				t.Fatalf("New(nil) returned error: %v", err)
+			}
+
+			if cfg.Login1.Capacities.CanReboot != tt.reboot {
+				t.Errorf("CanReboot = %v, want %v", cfg.Login1.Capacities.CanReboot, tt.reboot)
+			}
+			if cfg.Login1.Capacities.CanPoweroff != tt.poweroff {
+				t.Errorf("CanPoweroff = %v, want %v", cfg.Login1.Capacities.CanPoweroff, tt.poweroff)
+			}
+		})
+	}
+}
+
+func TestNew_Login1FromConfigFile(t *testing.T) {
+	viper.Reset()
+
+	tmpDir := t.TempDir()
+	configFile := tmpDir + "/config.yaml"
+	configContent := `
+power:
+  enabled: true
+  capacities:
+    reboot: true
+    poweroff: false
+`
+	if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
+		t.Fatalf("Failed to create test config file: %v", err)
+	}
+
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
+
+	cfg, err := New(&configFile)
+	if err != nil {
+		t.Fatalf("New() returned error: %v", err)
+	}
+
+	if !cfg.Login1.Enabled {
+		t.Error("Login1.Enabled should be true from config file")
+	}
+	if cfg.Login1.Capacities == nil {
+		t.Fatal("Login1.Capacities should not be nil")
+	}
+	if !cfg.Login1.Capacities.CanReboot {
+		t.Error("Login1.Capacities.CanReboot should be true from config file")
+	}
+	if cfg.Login1.Capacities.CanPoweroff {
+		t.Error("Login1.Capacities.CanPoweroff should be false from config file")
+	}
+}
+
+func TestNew_Login1SecurityDefaults(t *testing.T) {
+	viper.Reset()
+
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
+
+	cfg, err := New(nil)
+	if err != nil {
+		t.Fatalf("New(nil) returned error: %v", err)
+	}
+
+	// Verify all login1 security defaults
+	securityTests := []struct {
+		name     string
+		got      interface{}
+		want     interface{}
+		errorMsg string
+	}{
+		{
+			name:     "power disabled",
+			got:      cfg.Login1.Enabled,
+			want:     false,
+			errorMsg: "Login1 (power management) should be disabled by default for security",
+		},
+		{
+			name:     "reboot disabled",
+			got:      cfg.Login1.Capacities.CanReboot,
+			want:     false,
+			errorMsg: "Login1 CanReboot should be disabled by default for security",
+		},
+		{
+			name:     "poweroff disabled",
+			got:      cfg.Login1.Capacities.CanPoweroff,
+			want:     false,
+			errorMsg: "Login1 CanPoweroff should be disabled by default for security",
+		},
+	}
+
+	for _, tt := range securityTests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.got != tt.want {
+				t.Errorf("%s: got %v, want %v", tt.errorMsg, tt.got, tt.want)
+			}
+		})
+	}
+}
+
 // Security-focused API and Zeroconf tests
 
 func TestNew_DefaultBindLocalhost(t *testing.T) {
