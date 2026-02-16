@@ -292,7 +292,8 @@ func New(cfgFile *string) (*Config, error) {
 	}
 
 	if uiCfg.Enabled && !hasLoopback(listens, portStr) {
-		logger.Error("[config] UI is enabled but 'lo' is not in bind list — UI will fail to reach the API (add 'lo' to bind)")
+		logger.Error("[config] UI is enabled but 'lo' is not in bind config — UI disabled")
+		uiCfg.Enabled = false
 	}
 
 	apiCfg := ApiConfig{
