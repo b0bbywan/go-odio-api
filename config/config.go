@@ -16,7 +16,7 @@ import (
 
 const (
 	AppName     = "odio-api"
-	AppVersion  = "0.5.0"
+	AppVersion  = "0.5.1"
 	serviceType = "_http._tcp"
 	domain      = "local."
 )
