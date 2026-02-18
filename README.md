@@ -103,7 +103,7 @@ Remote reboot and power-off via the REST API — no SSH needed for day-to-day op
 | armv7hf | deb, rpm | Raspberry Pi 2/3 (32-bit) |
 | **armhf (ARMv6)** | deb, rpm | **Raspberry Pi B / B+ / Zero** |
 
-Pre-built packages and a multi-arch Docker image (amd64, arm64, arm/v6, arm/v7) are available on every build.
+Pre-built packages (amd64, arm64, armv7hf, armhf/ARMv6) and a multi-arch Docker image (amd64, arm64, arm/v7) are available on every build. Docker does not target arm/v6 — Pi B/Zero users should use the armhf package.
 
 ## Roadmap
 
@@ -222,7 +222,9 @@ Volumes mounted (all read-only):
 
 To build locally instead:
 ```bash
+task css                    # generate ui/static/output.css (required by go:embed)
 docker build -t odio-api .
+# or simply: task docker:build
 ```
 
 #### Command-line Flags
