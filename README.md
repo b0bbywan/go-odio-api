@@ -316,11 +316,14 @@ power:
 #### Network binding
 
 ```yaml
-bind: lo
-# bind: enp2s0    # Specific network interface
-# bind: wlan0     # WiFi interface
-# bind: all       # All interfaces (Docker, remote access)
+bind: lo                      # loopback only (default)
+# bind: enp2s0                # single LAN interface
+# bind: [lo, enp2s0]          # loopback + LAN (required for UI access from the network)
+# bind: [lo, enp2s0, wlan0]   # loopback + ethernet + wifi
+# bind: all                   # all interfaces — 0.0.0.0 (Docker, remote access)
 ```
+
+**Note:** The built-in web UI requires `lo` to be in the bind list. If `lo` is absent, the UI is automatically disabled.
 
 #### Zeroconf / mDNS
 
