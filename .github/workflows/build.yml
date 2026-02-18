@@ -3,6 +3,7 @@ name: Build
 on:
   push:
     branches: [main, master]
+    tags: ['v*']
   pull_request:
   workflow_dispatch:
 
@@ -87,8 +88,10 @@ jobs:
       - name: Compute version and Docker tags
         id: version
         run: |
+          IMAGE="ghcr.io/${{ github.repository }}"
           if git describe --tags --exact-match HEAD 2>/dev/null; then
             VERSION=$(git describe --tags --exact-match HEAD)
+            TAGS="${IMAGE}:${VERSION},${IMAGE}:latest"
           else
             BASE_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "dev")
             BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
@@ -98,15 +101,9 @@ jobs:
             else
               VERSION=$(git describe --tags --always 2>/dev/null || echo "dev")
             fi
+            TAGS="${IMAGE}:${VERSION}"
           fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-
-          IMAGE="ghcr.io/${{ github.repository }}"
-          BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
-          TAGS="${IMAGE}:${VERSION}"
-          if [[ "$BRANCH" == "main" || "$BRANCH" == "master" ]]; then
-            TAGS="${TAGS},${IMAGE}:latest"
-          fi
           echo "tags=$TAGS" >> "$GITHUB_OUTPUT"
 
       - name: Set up QEMU
