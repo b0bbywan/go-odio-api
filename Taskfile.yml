@@ -29,6 +29,7 @@ tasks:
 
   install-tailwind:
     desc: Download Tailwind CLI (only on supported architectures)
+    run: once
     vars:
       TAILWIND_BINARY:
         sh: |

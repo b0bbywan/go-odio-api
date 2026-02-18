@@ -2,6 +2,7 @@ name: Build
 
 on:
   pull_request:
+  workflow_dispatch:
 
 jobs:
   build-artifacts:
@@ -45,7 +46,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: binaries-${{ github.sha }}
-          path: dist/odio-api-*
+          path: dist/odio-api-linux-*
           retention-days: 7
 
       - name: Upload packages
