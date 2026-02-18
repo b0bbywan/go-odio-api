@@ -133,6 +133,64 @@ tasks:
     generates:
       - "{{.BIN_DIR}}/odio-api"
 
+  build:linux-amd64:
+    desc: Cross-compile for Linux amd64
+    deps: [css]
+    env:
+      GOOS: linux
+      GOARCH: amd64
+      CGO_ENABLED: "0"
+    cmds:
+      - mkdir -p dist
+      - go build -ldflags="{{.LDFLAGS}}" -o dist/odio-api-linux-amd64 .
+      - echo "✓ dist/odio-api-linux-amd64 ({{.VERSION}})"
+
+  build:linux-arm6hf:
+    desc: Cross-compile for Linux armv6hf (RPi Zero/1)
+    deps: [css]
+    env:
+      GOOS: linux
+      GOARCH: arm
+      GOARM: "6"
+      CGO_ENABLED: "0"
+    cmds:
+      - mkdir -p dist
+      - go build -ldflags="{{.LDFLAGS}}" -o dist/odio-api-linux-arm6hf .
+      - echo "✓ dist/odio-api-linux-arm6hf ({{.VERSION}})"
+
+  build:linux-arm7hf:
+    desc: Cross-compile for Linux armv7hf (RPi 2/3 32-bit)
+    deps: [css]
+    env:
+      GOOS: linux
+      GOARCH: arm
+      GOARM: "7"
+      CGO_ENABLED: "0"
+    cmds:
+      - mkdir -p dist
+      - go build -ldflags="{{.LDFLAGS}}" -o dist/odio-api-linux-arm7hf .
+      - echo "✓ dist/odio-api-linux-arm7hf ({{.VERSION}})"
+
+  build:linux-arm64:
+    desc: Cross-compile for Linux arm64/aarch64 (RPi 3/4/5 64-bit)
+    deps: [css]
+    env:
+      GOOS: linux
+      GOARCH: arm64
+      CGO_ENABLED: "0"
+    cmds:
+      - mkdir -p dist
+      - go build -ldflags="{{.LDFLAGS}}" -o dist/odio-api-linux-arm64 .
+      - echo "✓ dist/odio-api-linux-arm64 ({{.VERSION}})"
+
+  build:all-arch:
+    desc: Cross-compile for all supported architectures
+    deps:
+      - build:linux-amd64
+      - build:linux-arm6hf
+      - build:linux-arm7hf
+      - build:linux-arm64
+
   test:
     desc: Run all tests
     deps: [css]
