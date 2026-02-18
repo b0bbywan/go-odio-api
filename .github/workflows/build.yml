@@ -11,6 +11,8 @@ jobs:
   build-artifacts:
     name: Build binaries and packages
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout code
