@@ -6,11 +6,14 @@
 [![Build](https://github.com/b0bbywan/go-odio-api/actions/workflows/build.yml/badge.svg)](https://github.com/b0bbywan/go-odio-api/actions/workflows/build.yml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/b0bbywan/go-odio-api)](https://goreportcard.com/report/github.com/b0bbywan/go-odio-api)
 
-Building a Linux multimedia setup is easy. Integrating it cleanly into Home Assistant always felt hacky — scattered integrations, SSH scripts, and fragile glue.
-
 Odio is an ultra-lightweight Go daemon that exposes a single clean REST API over your Linux user session's D-Bus: MPRIS players (Spotify, VLC, Firefox, MPD, Kodi), PulseAudio/PipeWire, systemd user services, and power management. No root. No hacks. Just Linux primitives.
 
-Tested on Fedora 43 Gnome, Debian 13 KDE, Raspbian 13 — Raspberry Pi B through Pi 5. Works without any system tweak.
+Building a Linux multimedia setup is easy. Integrating it cleanly into Home Assistant always felt hacky, scattered integrations, SSH scripts, and fragile glue.
+
+
+Tested on Fedora 43 Gnome, Debian 13 KDE, Raspbian 13, Openmediavault 8
+Raspberry Pi B through Pi 5.
+Works without any system tweak.
 
 ## Quick Start
 
@@ -49,7 +52,7 @@ Odio becomes the hub that makes all your HA integrations point to the correct ma
 |---|---|
 | RPi music server (MPD + shairport-sync) | MPRIS control + restart services from HA |
 | HTPC / Kodi | Start/stop Kodi, MPRIS control via odio-ha |
-| Firefox kiosk (Netflix, YouTube) | Launch/kill kiosks from HA automations |
+| Firefox kiosk (Netflix, YouTube) | Start/stop fake Netflix and Youtube app, MPRIS control via odio-ha |
 | Headless Spotify (spotifyd) | MPRIS playback + service lifecycle |
 | Any PulseAudio/PipeWire setup | Per-client and global volume/mute control |
 
@@ -115,7 +118,7 @@ Pre-built packages (amd64, arm64, armv7hf, armhf/ARMv6) and a multi-arch Docker 
 
 ### Packages (deb / rpm)
 
-Pre-built packages for amd64, arm64, armhf (ARMv6), and armv7hf are available as artifacts on each [build workflow run](https://github.com/b0bbywan/go-odio-api/actions/workflows/build.yml).
+Pre-built packages for amd64, arm64, armv7hf, and armhf (ARMv6) are available as artifacts on each [build workflow run](https://github.com/b0bbywan/go-odio-api/actions/workflows/build.yml).
 
 ```bash
 # Debian/Ubuntu/Raspberry Pi OS
@@ -216,9 +219,9 @@ Volumes mounted (all read-only):
 | `/run/utmp` | user systemd monitoring (utmp available) |
 | `/var/run/dbus/system_bus_socket` | system D-Bus socket |
 | `$XDG_RUNTIME_DIR/pulse` | PulseAudio socket |
-| `./cookie` → `$HOME/.config/pulse/cookie` | PulseAudio cookie |
+| `$HOME/.config/pulse/cookie` | PulseAudio cookie |
 
-**Note:** `bind` must be set to `all` in `config.yaml` for Docker (bridge network). Zeroconf won't work in bridge network mode. Host network mode is strongly discouraged.
+**Note:** `bind` must be set to `all` in `config.yaml` for Docker remote access (bridge network). Zeroconf won't work in bridge network mode. Host network mode is strongly discouraged.
 
 To build locally instead:
 ```bash
@@ -250,29 +253,8 @@ logLevel: info
 api:
   enabled: true
   port: 8018
-
-zeroconf:
-  enabled: false
-
-mpris:
-  enabled: true
-  timeout: 5s
-
-pulseaudio:
-  enabled: true
-
-systemd:
-  enabled: false
-  system:
-    -
-  user:
-    -
-
-power:
-  enabled: false
-  capabilities:
-    poweroff: false
-    reboot: false
+  ui:
+    enabled: true
 ```
 
 ### Backend configuration examples
@@ -342,7 +324,7 @@ Odio advertises itself via mDNS. Look for `_http._tcp.local.` → instance `odio
 - **Localhost binding by default** — prevents accidental network exposure
 - **Systemd disabled by default** — service control must be explicitly enabled and configured
 - **Read-only Docker mounts** — all volume mounts are read-only in the provided `docker-compose.yml`
-- **Zeroconf opt-in** — mDNS adapts to `bind`: disabled on `lo`, enabled on specific interfaces
+- **Zeroconf opt-in** — must be enabled, then mDNS adapts to `bind`: disabled on `lo`, enabled on specific interfaces, or all interfaces without `lo`
 
 ## API Endpoints
 
