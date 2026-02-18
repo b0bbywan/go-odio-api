@@ -222,10 +222,10 @@ Volumes mounted (all read-only):
 
 To build locally instead:
 ```bash
-task css                    # generate ui/static/output.css (required by go:embed)
 docker build -t odio-api .
 # or simply: task docker:build
 ```
+The Docker build is fully self-contained — Tailwind CSS is downloaded and compiled inside the builder stage.
 
 #### Command-line Flags
 

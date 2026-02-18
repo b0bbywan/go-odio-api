@@ -7,6 +7,8 @@ ARG VERSION=dev
 ARG TARGETOS
 ARG TARGETARCH
 ARG TARGETVARIANT
+ARG BUILDARCH
+ARG TAILWIND_VERSION=v3.4.17
 
 WORKDIR /app
 
@@ -17,11 +19,21 @@ RUN go mod download
 # Copy source code and config
 COPY . .
 
+# Build CSS using Tailwind CLI (runs natively on build platform, not target platform).
+# The generated output.css is embedded in the Go binary via go:embed.
+RUN case "${BUILDARCH}" in \
+      amd64) TW_BIN="tailwindcss-linux-x64" ;; \
+      arm64) TW_BIN="tailwindcss-linux-arm64" ;; \
+      arm)   TW_BIN="tailwindcss-linux-armv7" ;; \
+      *)     echo "Unsupported BUILDARCH: ${BUILDARCH}"; exit 1 ;; \
+    esac && \
+    curl -fsSL "https://github.com/tailwindlabs/tailwindcss/releases/download/${TAILWIND_VERSION}/${TW_BIN}" \
+      -o /usr/local/bin/tailwindcss && \
+    chmod +x /usr/local/bin/tailwindcss && \
+    tailwindcss -i ui/styles/input.css -o ui/static/output.css --minify
+
 # Cross-compile using TARGETOS/TARGETARCH/TARGETVARIANT passed by docker buildx.
 # CGO_ENABLED=0: pure Go, no cgo needed (dbus/systemd/pulseaudio via godbus).
-# CSS is embedded at compile time and must be present; use pre-built output.css
-# if available, otherwise the build will fail (run task css first or ensure
-# ui/static/output.css is committed / available from CDN).
 RUN GOOS=${TARGETOS} \
     GOARCH=${TARGETARCH} \
     GOARM=$(echo "${TARGETVARIANT}" | sed 's/^v//') \

@@ -334,7 +334,6 @@ tasks:
 
   docker:build:
     desc: Build Docker image for local architecture
-    deps: [css]
     cmds:
       - docker build --build-arg VERSION={{.VERSION}} -t odio-api:{{.VERSION}} .
       - echo "✓ Image odio-api:{{.VERSION}} built"
