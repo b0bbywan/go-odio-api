@@ -173,4 +173,4 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build Docker image
-        run: docker build -t odio:latest .
+        run: docker build --build-arg VERSION=dev -t odio-api:dev .

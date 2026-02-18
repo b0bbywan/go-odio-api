@@ -145,19 +145,6 @@ tasks:
       - go build -ldflags="{{.LDFLAGS}}" -o dist/odio-api-linux-amd64 .
       - echo "✓ dist/odio-api-linux-amd64 ({{.VERSION}})"
 
-  build:linux-arm6hf:
-    desc: Cross-compile for Linux armv6hf (RPi Zero/1)
-    deps: [css]
-    env:
-      GOOS: linux
-      GOARCH: arm
-      GOARM: "6"
-      CGO_ENABLED: "0"
-    cmds:
-      - mkdir -p dist
-      - go build -ldflags="{{.LDFLAGS}}" -o dist/odio-api-linux-arm6hf .
-      - echo "✓ dist/odio-api-linux-arm6hf ({{.VERSION}})"
-
   build:linux-arm7hf:
     desc: Cross-compile for Linux armv7hf (RPi 2/3 32-bit)
     deps: [css]
@@ -187,7 +174,6 @@ tasks:
     desc: Cross-compile for all supported architectures
     deps:
       - build:linux-amd64
-      - build:linux-arm6hf
       - build:linux-arm7hf
       - build:linux-arm64
 
@@ -202,18 +188,6 @@ tasks:
       - mkdir -p dist
       - nfpm package --config nfpm.yaml --packager deb --target dist/
       - echo "✓ .deb amd64 ready in dist/"
-
-  package:deb:linux-arm6hf:
-    desc: Build .deb package for armv6hf (RPi Zero/1)
-    deps: [build:linux-arm6hf]
-    env:
-      VERSION: "{{.VERSION}}"
-      NFPM_ARCH: armel
-      BINARY_PATH: dist/odio-api-linux-arm6hf
-    cmds:
-      - mkdir -p dist
-      - nfpm package --config nfpm.yaml --packager deb --target dist/
-      - echo "✓ .deb armel ready in dist/"
 
   package:deb:linux-arm7hf:
     desc: Build .deb package for armv7hf (RPi 2/3 32-bit)
@@ -251,6 +225,18 @@ tasks:
       - nfpm package --config nfpm.yaml --packager rpm --target dist/
       - echo "✓ .rpm x86_64 ready in dist/"
 
+  package:rpm:linux-arm7hf:
+    desc: Build .rpm package for armv7hf
+    deps: [build:linux-arm7hf]
+    env:
+      VERSION: "{{.VERSION}}"
+      NFPM_ARCH: armv7hl
+      BINARY_PATH: dist/odio-api-linux-arm7hf
+    cmds:
+      - mkdir -p dist
+      - nfpm package --config nfpm.yaml --packager rpm --target dist/
+      - echo "✓ .rpm armv7hl ready in dist/"
+
   package:rpm:linux-arm64:
     desc: Build .rpm package for arm64
     deps: [build:linux-arm64]
@@ -267,11 +253,28 @@ tasks:
     desc: Build all deb and rpm packages for all architectures
     deps:
       - package:deb:linux-amd64
-      - package:deb:linux-arm6hf
       - package:deb:linux-arm7hf
       - package:deb:linux-arm64
       - package:rpm:linux-amd64
+      - package:rpm:linux-arm7hf
       - package:rpm:linux-arm64
+
+  docker:build:
+    desc: Build Docker image for local architecture
+    cmds:
+      - docker build --build-arg VERSION={{.VERSION}} -t odio-api:{{.VERSION}} .
+      - echo "✓ Image odio-api:{{.VERSION}} built"
+
+  docker:build:multi:
+    desc: Build and push multi-arch Docker image (amd64, arm/v7, arm64)
+    cmds:
+      - |
+        docker buildx build \
+          --platform linux/amd64,linux/arm/v7,linux/arm64 \
+          --build-arg VERSION={{.VERSION}} \
+          -t ghcr.io/b0bbywan/go-odio-api:{{.VERSION}} \
+          -t ghcr.io/b0bbywan/go-odio-api:latest \
+          --push .
 
   test:
     desc: Run all tests
