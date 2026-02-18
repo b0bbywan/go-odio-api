@@ -5,6 +5,21 @@ vars:
   BIN_DIR: bin
   CSS_INPUT: ui/styles/input.css
   CSS_OUTPUT: ui/static/output.css
+  VERSION:
+    sh: |
+      if git describe --tags --exact-match HEAD 2>/dev/null; then
+        :
+      else
+        BASE_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "dev")
+        BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
+        if [ -n "$BRANCH" ] && [ "$BRANCH" != "HEAD" ]; then
+          CLEAN_BRANCH=$(echo "$BRANCH" | sed 's/[^a-zA-Z0-9._-]/-/g')
+          echo "${BASE_TAG}-${CLEAN_BRANCH}"
+        else
+          git describe --tags --always 2>/dev/null || echo "dev"
+        fi
+      fi
+  LDFLAGS: "-X 'github.com/b0bbywan/go-odio-api/config.AppVersion={{.VERSION}}'"
 
 tasks:
   default:
@@ -107,8 +122,8 @@ tasks:
     desc: Build the application (includes CSS compilation)
     deps: [css]
     cmds:
-      - go build -o {{.BIN_DIR}}/go-odio-api
-      - echo "✓ Built to {{.BIN_DIR}}/go-odio-api"
+      - go build -ldflags="{{.LDFLAGS}}" -o {{.BIN_DIR}}/odio-api .
+      - echo "✓ Built {{.BIN_DIR}}/odio-api (version {{.VERSION}})"
     sources:
       - "**/*.go"
       - go.mod
@@ -116,7 +131,7 @@ tasks:
       - ui/templates/**/*.gohtml
       - ui/static/**
     generates:
-      - "{{.BIN_DIR}}/go-odio-api"
+      - "{{.BIN_DIR}}/odio-api"
 
   test:
     desc: Run all tests
@@ -146,7 +161,7 @@ tasks:
   clean:
     desc: Clean build artifacts
     cmds:
-      - rm -rf {{.BIN_DIR}}/go-odio-api
+      - rm -rf {{.BIN_DIR}}/odio-api
       - rm -f {{.CSS_OUTPUT}}
       - echo "✓ Cleaned build artifacts"
 
