@@ -339,11 +339,11 @@ tasks:
       - echo "✓ Image odio-api:{{.VERSION}} built"
 
   docker:build:multi:
-    desc: Build and push multi-arch Docker image (amd64, arm/v6, arm/v7, arm64)
+    desc: Build and push multi-arch Docker image (amd64, arm/v7, arm64)
     cmds:
       - |
         docker buildx build \
-          --platform linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64 \
+          --platform linux/amd64,linux/arm/v7,linux/arm64 \
           --build-arg VERSION={{.VERSION}} \
           -t ghcr.io/b0bbywan/go-odio-api:{{.VERSION}} \
           -t ghcr.io/b0bbywan/go-odio-api:latest \
