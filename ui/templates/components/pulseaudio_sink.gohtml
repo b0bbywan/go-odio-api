@@ -10,7 +10,7 @@
 		{{ end }}
 
 		<!-- Volume control -->
-		{{ template "volume-slider" (dict "Target" .Index "Type" "audio-client" "Volume" .Volume "Muted" .Muted "ShowMute" true) }}
+		{{ template "volume-slider" (dict "Target" .Name "Type" "audio-client" "Volume" .Volume "Muted" .Muted "ShowMute" true) }}
 	</div>
 </div>
 {{ end }}
