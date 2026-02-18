@@ -1,7 +1,7 @@
 # =========================
 # Stage 1: build
 # =========================
-FROM golang:1.24-bookworm AS builder
+FROM --platform=$BUILDPLATFORM golang:1.24-bookworm AS builder
 
 ARG VERSION=dev
 ARG TARGETOS=linux

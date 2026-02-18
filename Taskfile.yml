@@ -200,7 +200,11 @@ tasks:
       BINARY_PATH: dist/odio-api-linux-amd64
     cmds:
       - mkdir -p dist
-      - nfpm package --config nfpm.yaml --packager deb --target dist/
+      - |
+        tmpfile=$(mktemp --suffix=.yaml)
+        envsubst < nfpm.yaml > "$tmpfile"
+        nfpm package --config "$tmpfile" --packager deb --target dist/
+        rm -f "$tmpfile"
       - echo "✓ .deb amd64 ready in dist/"
 
   package:deb:linux-armhf:
@@ -212,7 +216,11 @@ tasks:
       BINARY_PATH: dist/odio-api-linux-armhf
     cmds:
       - mkdir -p dist
-      - nfpm package --config nfpm.yaml --packager deb --target dist/
+      - |
+        tmpfile=$(mktemp --suffix=.yaml)
+        envsubst < nfpm.yaml > "$tmpfile"
+        nfpm package --config "$tmpfile" --packager deb --target dist/
+        rm -f "$tmpfile"
       - echo "✓ .deb armhf ready in dist/"
 
   package:deb:linux-armv7hf:
@@ -224,7 +232,11 @@ tasks:
       BINARY_PATH: dist/odio-api-linux-armv7hf
     cmds:
       - mkdir -p dist
-      - nfpm package --config nfpm.yaml --packager deb --target dist/
+      - |
+        tmpfile=$(mktemp --suffix=.yaml)
+        envsubst < nfpm.yaml > "$tmpfile"
+        nfpm package --config "$tmpfile" --packager deb --target dist/
+        rm -f "$tmpfile"
       - echo "✓ .deb armv7hf ready in dist/"
 
   package:deb:linux-arm64:
@@ -236,7 +248,11 @@ tasks:
       BINARY_PATH: dist/odio-api-linux-arm64
     cmds:
       - mkdir -p dist
-      - nfpm package --config nfpm.yaml --packager deb --target dist/
+      - |
+        tmpfile=$(mktemp --suffix=.yaml)
+        envsubst < nfpm.yaml > "$tmpfile"
+        nfpm package --config "$tmpfile" --packager deb --target dist/
+        rm -f "$tmpfile"
       - echo "✓ .deb arm64 ready in dist/"
 
   package:rpm:linux-amd64:
@@ -248,7 +264,11 @@ tasks:
       BINARY_PATH: dist/odio-api-linux-amd64
     cmds:
       - mkdir -p dist
-      - nfpm package --config nfpm.yaml --packager rpm --target dist/
+      - |
+        tmpfile=$(mktemp --suffix=.yaml)
+        envsubst < nfpm.yaml > "$tmpfile"
+        nfpm package --config "$tmpfile" --packager rpm --target dist/
+        rm -f "$tmpfile"
       - echo "✓ .rpm x86_64 ready in dist/"
 
   package:rpm:linux-armv7hf:
@@ -260,7 +280,11 @@ tasks:
       BINARY_PATH: dist/odio-api-linux-armv7hf
     cmds:
       - mkdir -p dist
-      - nfpm package --config nfpm.yaml --packager rpm --target dist/
+      - |
+        tmpfile=$(mktemp --suffix=.yaml)
+        envsubst < nfpm.yaml > "$tmpfile"
+        nfpm package --config "$tmpfile" --packager rpm --target dist/
+        rm -f "$tmpfile"
       - echo "✓ .rpm armv7hl ready in dist/"
 
   package:rpm:linux-armhf:
@@ -272,7 +296,11 @@ tasks:
       BINARY_PATH: dist/odio-api-linux-armhf
     cmds:
       - mkdir -p dist
-      - nfpm package --config nfpm.yaml --packager rpm --target dist/
+      - |
+        tmpfile=$(mktemp --suffix=.yaml)
+        envsubst < nfpm.yaml > "$tmpfile"
+        nfpm package --config "$tmpfile" --packager rpm --target dist/
+        rm -f "$tmpfile"
       - echo "✓ .rpm armv6hl ready in dist/"
 
   package:rpm:linux-arm64:
@@ -284,7 +312,11 @@ tasks:
       BINARY_PATH: dist/odio-api-linux-arm64
     cmds:
       - mkdir -p dist
-      - nfpm package --config nfpm.yaml --packager rpm --target dist/
+      - |
+        tmpfile=$(mktemp --suffix=.yaml)
+        envsubst < nfpm.yaml > "$tmpfile"
+        nfpm package --config "$tmpfile" --packager rpm --target dist/
+        rm -f "$tmpfile"
       - echo "✓ .rpm aarch64 ready in dist/"
 
   package:all:
