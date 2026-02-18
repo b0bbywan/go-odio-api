@@ -6,6 +6,14 @@ odio-api (0.7.0) trixie; urgency=low
   * During pairing, a NoInputNoOutput agent is activated for 60 seconds.
 
  -- Mathieu Réquillart <mathieu.requillart@gmail.com>  Tue, 08 Feb 2026 00:00:00 +0000
+ 
+ 
+odio-api (0.5.1) trixie; urgency=low
+
+  Fix systemd backend when only one of user/system scope is configured
+
+
+ -- Mathieu Réquillart <mathieu.requillart@gmail.com>  Tue, 16 Feb 2026 15:00:00 +0000
 
 
 odio-api (0.5.0) trixie; urgency=low
@@ -15,7 +23,7 @@ odio-api (0.5.0) trixie; urgency=low
   * fully configurable, disabled by default
 
 
- -- Mathieu Réquillart <mathieu.requillart@gmail.com>  Fri, 16 Feb 2026 18:00:00 +0000
+ -- Mathieu Réquillart <mathieu.requillart@gmail.com>  Mon, 16 Feb 2026 18:00:00 +0000
 
 
 odio-api (0.4.0) trixie; urgency=high

@@ -218,6 +218,9 @@ func (s *SystemdBackend) listServices(
 	scope UnitScope,
 	names []string,
 ) ([]Service, error) {
+	if conn == nil {
+		return nil, nil
+	}
 	services := make([]Service, 0, len(names))
 	units, err := conn.ListUnitsByNamesContext(ctx, names)
 	if err != nil {

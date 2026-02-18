@@ -341,6 +341,11 @@ bluetooth:
   timeout: 5s
   pairingTimeout: 60s
 
+power:
+  enabled: false
+  capabilities:
+    poweroff: true
+    reboot: true
 ```
 
 ## API Endpoints
