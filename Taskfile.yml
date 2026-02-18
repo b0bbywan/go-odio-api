@@ -191,6 +191,88 @@ tasks:
       - build:linux-arm7hf
       - build:linux-arm64
 
+  package:deb:linux-amd64:
+    desc: Build .deb package for amd64
+    deps: [build:linux-amd64]
+    env:
+      VERSION: "{{.VERSION}}"
+      NFPM_ARCH: amd64
+      BINARY_PATH: dist/odio-api-linux-amd64
+    cmds:
+      - mkdir -p dist
+      - nfpm package --config nfpm.yaml --packager deb --target dist/
+      - echo "✓ .deb amd64 ready in dist/"
+
+  package:deb:linux-arm6hf:
+    desc: Build .deb package for armv6hf (RPi Zero/1)
+    deps: [build:linux-arm6hf]
+    env:
+      VERSION: "{{.VERSION}}"
+      NFPM_ARCH: armel
+      BINARY_PATH: dist/odio-api-linux-arm6hf
+    cmds:
+      - mkdir -p dist
+      - nfpm package --config nfpm.yaml --packager deb --target dist/
+      - echo "✓ .deb armel ready in dist/"
+
+  package:deb:linux-arm7hf:
+    desc: Build .deb package for armv7hf (RPi 2/3 32-bit)
+    deps: [build:linux-arm7hf]
+    env:
+      VERSION: "{{.VERSION}}"
+      NFPM_ARCH: armhf
+      BINARY_PATH: dist/odio-api-linux-arm7hf
+    cmds:
+      - mkdir -p dist
+      - nfpm package --config nfpm.yaml --packager deb --target dist/
+      - echo "✓ .deb armhf ready in dist/"
+
+  package:deb:linux-arm64:
+    desc: Build .deb package for arm64
+    deps: [build:linux-arm64]
+    env:
+      VERSION: "{{.VERSION}}"
+      NFPM_ARCH: arm64
+      BINARY_PATH: dist/odio-api-linux-arm64
+    cmds:
+      - mkdir -p dist
+      - nfpm package --config nfpm.yaml --packager deb --target dist/
+      - echo "✓ .deb arm64 ready in dist/"
+
+  package:rpm:linux-amd64:
+    desc: Build .rpm package for amd64
+    deps: [build:linux-amd64]
+    env:
+      VERSION: "{{.VERSION}}"
+      NFPM_ARCH: x86_64
+      BINARY_PATH: dist/odio-api-linux-amd64
+    cmds:
+      - mkdir -p dist
+      - nfpm package --config nfpm.yaml --packager rpm --target dist/
+      - echo "✓ .rpm x86_64 ready in dist/"
+
+  package:rpm:linux-arm64:
+    desc: Build .rpm package for arm64
+    deps: [build:linux-arm64]
+    env:
+      VERSION: "{{.VERSION}}"
+      NFPM_ARCH: aarch64
+      BINARY_PATH: dist/odio-api-linux-arm64
+    cmds:
+      - mkdir -p dist
+      - nfpm package --config nfpm.yaml --packager rpm --target dist/
+      - echo "✓ .rpm aarch64 ready in dist/"
+
+  package:all:
+    desc: Build all deb and rpm packages for all architectures
+    deps:
+      - package:deb:linux-amd64
+      - package:deb:linux-arm6hf
+      - package:deb:linux-arm7hf
+      - package:deb:linux-arm64
+      - package:rpm:linux-amd64
+      - package:rpm:linux-arm64
+
   test:
     desc: Run all tests
     deps: [css]
