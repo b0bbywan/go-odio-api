@@ -1,6 +1,7 @@
 # go-odio-api
 
 [![CI](https://github.com/b0bbywan/go-odio-api/actions/workflows/ci.yml/badge.svg)](https://github.com/b0bbywan/go-odio-api/actions/workflows/ci.yml)
+[![Build](https://github.com/b0bbywan/go-odio-api/actions/workflows/build.yml/badge.svg)](https://github.com/b0bbywan/go-odio-api/actions/workflows/build.yml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/b0bbywan/go-odio-api)](https://goreportcard.com/report/github.com/b0bbywan/go-odio-api)
 
 A lightweight and reliable REST API for controlling Linux audio and media players, built in Go. Provides unified interfaces for MPRIS media players, PulseAudio/PipeWire audio control, and systemd service management.
@@ -161,18 +162,25 @@ Different log levels, exhaustive info and debug logs to provide in issues to hel
 
 ## Installation
 
+### Packages (deb / rpm)
+
+Pre-built packages for amd64, arm64, armhf (ARMv6) and armv7hf are available as artifacts on each [build workflow run](https://github.com/b0bbywan/go-odio-api/actions/workflows/build.yml).
+
+```bash
+# Debian/Ubuntu/Raspberry Pi OS
+sudo dpkg -i odio-api_<version>_amd64.deb
+
+# Fedora/RHEL
+sudo rpm -i odio-api-<version>.x86_64.rpm
+```
+
 ### From Source
 
 ```bash
-# Clone the repository
 git clone https://github.com/b0bbywan/go-odio-api.git
 cd go-odio-api
-
-# Build
-go build -o odio-api
-
-# Run
-./odio-api
+task build    # builds CSS + Go binary with version from git
+./bin/odio-api
 ```
 
 ### systemd User Service
@@ -397,7 +405,7 @@ The application uses a modular backend architecture:
 
 ### Prerequisites
 
-- Go 1.21 or higher
+- Go 1.24 or higher
 
 ### Running Tests
 
@@ -422,27 +430,25 @@ The project uses [Task](https://taskfile.dev) for build automation.
 # Install Task (once)
 go install github.com/go-task/task/v3/cmd/task@latest
 
-# Build everything (CSS + Go binary)
+# Build for the current host (CSS + Go binary, version from git)
 task build
 
-# Or build components separately
-task css              # Ensure CSS is available (generate or download)
-task css-local        # Compile CSS locally (requires Tailwind CLI)
+# Cross-compile for all supported architectures (output: dist/)
+task build:all-arch
+
+# Individual targets
+task build:linux-amd64     # x86_64
+task build:linux-arm64     # RPi 3/4/5 64-bit
+task build:linux-armv7hf   # RPi 2/3 32-bit (ARMv7)
+task build:linux-armhf     # RPi B/B+/Zero (ARMv6, RPi OS armhf)
+
+# CSS only
+task css              # Ensure CSS is available (compile or download from CDN)
+task css-local        # Compile locally (requires Tailwind CLI)
 task css:watch        # Watch mode for development
-
-# Standard Go build (without Task)
-go build -o bin/go-odio-api
-
-# Build with optimizations
-go build -ldflags="-s -w" -o bin/go-odio-api
-
-# Cross-compile for different architectures
-GOOS=linux GOARCH=amd64 go build -o bin/go-odio-api-amd64
-GOOS=linux GOARCH=arm64 go build -o bin/go-odio-api-arm64
-GOOS=linux GOARCH=arm GOARM=6 go build -o bin/go-odio-api-armv6
 ```
 
-**Note:** `task build` automatically compiles Tailwind CSS before building the Go binary. For manual builds without Task, compile CSS first with `task css` or use the equivalent commands.
+**Note:** `task build` injects the version via `-ldflags` from `git describe`. The version is visible via `./bin/odio-api --version`.
 
 #### CSS Build Strategy
 
@@ -476,18 +482,26 @@ https://bobbywan.me/odio-css/
 
 **Note:** CSS files are NOT committed to the repository. They're generated locally or downloaded from CDN.
 
-### Debian Packaging
+### Packaging (deb / rpm)
+
+Packages are built with [nfpm](https://nfpm.goreleaser.com/) via Task. Requires the binary to be built first (handled automatically via task dependencies).
 
 ```bash
-# Build Debian package
-cd debian
-dpkg-buildpackage -us -uc -b
-```
+# Install nfpm (once)
+go install github.com/goreleaser/nfpm/v2/cmd/nfpm@latest
 
-### RPM Packaging
-```bash
-mkdir -p ~/rpmbuild/RPMS/
-rpmbuild -ba odio-api.spec
+# Build all packages for all architectures (output: dist/)
+task package:all
+
+# Individual targets
+task package:deb:linux-amd64     # .deb amd64
+task package:deb:linux-arm64     # .deb arm64
+task package:deb:linux-armv7hf   # .deb armv7hf
+task package:deb:linux-armhf     # .deb armhf (ARMv6, RPi OS)
+task package:rpm:linux-amd64     # .rpm x86_64
+task package:rpm:linux-arm64     # .rpm aarch64
+task package:rpm:linux-armv7hf   # .rpm armv7hl
+task package:rpm:linux-armhf     # .rpm armv6hl
 ```
 
 ## Dependencies
