@@ -213,38 +213,60 @@ systemctl --user start odio-api.service
 This ensures the Pulseaudio/Pipewire, user D-Bus session and XDG_RUNTIME_DIR are available even without an active login session.
 
 ### Docker
-You can also run odio as a container!
 
-#### Build
-Build the Go binary and Docker image
-```bash
-docker build -t odio:latest .
+A pre-built multi-arch image is available on GHCR (amd64, arm64, arm/v6, arm/v7):
+
 ```
-The Dockerfile uses a multi-stage build to compile the Go binary and copy it into a minimal runtime image.
-**Note**: the image includes DBus so that DBus-dependent functionality works correctly inside the container.
+ghcr.io/b0bbywan/go-odio-api:latest
+```
 
-#### Run
-A docker-compose.yml is provided in the repository for the most common use cases. It runs the container as a non-root user (UID 1000) and mounts the necessary host directories for DBus, systemd, and PulseAudio. You can adapt it for more specific setups if needed
+To build locally instead:
+```bash
+docker build -t odio-api .
+```
 
-Environment variables:
-- XDG_RUNTIME_DIR=/run/user/1000                            DBus and Pulse runtime directory
-- DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus     user DBus session
-- HOME=/home/odio                                           ensures `PulseAudio cookie` is found
+#### Quick start
 
-Volumes:
-- ./config.yaml                    (odio configuration)       (read-only)
-- /run/user/1000/bus               (user DBus session)        (read-only)
-- /run/user/1000/systemd           (user systemd folder)      (read-only)
-- /run/utmp                        (user systemd monitoring)  (read-only)
-- /var/run/dbus/system_bus_socket  (system DBus socket)       (read-only)
-- /run/user/1000/pulse             (PulseAudio socket)        (read-only)
-- ./cookie    (`PulseAudio cookie`: $HOME/.config/pulse/cookie) (read-only)
+```bash
+# 1. Prepare configuration (bind: all required for Docker)
+cp share/config.yaml config.yaml
+# Edit config.yaml: set bind: all
 
-The container exposes port 8018 by default and is configured to automatically restart unless stopped. With this configuration, audio and DBus-dependent functionality works seamlessly inside Docker.
+# 2. (Optional) Provide your PulseAudio cookie
+cp ~/.config/pulse/cookie ./cookie
 
-**Note:** `bind` should be set to `all` in `config.yaml` for remote access with docker. Zeroconf won't work in bridge network mode. It's strongly advised against using host network mode.
+# 3. (Optional) Only needed if docker compose config shows wrong paths
+cp .env.example .env
 
-All mounts are read-only, minimizing the container’s ability to modify the host system.
+# 4. Start
+docker compose up -d
+```
+
+The `docker-compose.yml` reads `UID`, `XDG_RUNTIME_DIR`, `HOME` and `DBUS_SESSION_BUS_ADDRESS`
+directly from your shell environment — no configuration needed for a standard Linux setup.
+See `.env.example` if your shell doesn't export these automatically (e.g. fish).
+
+Environment variables passed to the container:
+
+| Variable | Source | Purpose |
+|---|---|---|
+| `XDG_RUNTIME_DIR` | host env → fallback `/run/user/$UID` | D-Bus and PulseAudio runtime directory |
+| `DBUS_SESSION_BUS_ADDRESS` | host env → fallback derived from `XDG_RUNTIME_DIR` | User D-Bus session socket |
+| `HOME` | host env → fallback `/home/odio` | PulseAudio cookie lookup path |
+
+Volumes mounted (all read-only):
+
+| Volume | Purpose |
+|---|---|
+| `./config.yaml` | odio configuration |
+| `$XDG_RUNTIME_DIR/bus` | user D-Bus session socket |
+| `$XDG_RUNTIME_DIR/systemd` | user systemd folder (utmp unavailable) |
+| `/run/utmp` | user systemd monitoring (utmp available) |
+| `/var/run/dbus/system_bus_socket` | system D-Bus socket |
+| `$XDG_RUNTIME_DIR/pulse` | PulseAudio socket |
+| `./cookie` → `$HOME/.config/pulse/cookie` | PulseAudio cookie |
+
+**Note:** `bind` must be set to `all` in `config.yaml` for Docker (bridge network). Zeroconf won't work in bridge network mode. Host network mode is strongly discouraged.
 
 #### Command-line Flags
 
