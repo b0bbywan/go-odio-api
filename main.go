@@ -38,6 +38,7 @@ func main() {
 
 	// Set log level from config
 	logger.SetLevel(cfg.LogLevel)
+	logger.SetPackageLevels(cfg.LogLevels)
 
 	// Global context for the entire application
 	ctx, cancel := context.WithCancel(context.Background())

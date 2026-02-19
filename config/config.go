@@ -31,16 +31,19 @@ type Config struct {
 	Systemd    *SystemdConfig
 	Zeroconf   *ZeroConfig
 	LogLevel   logger.Level
+	LogLevels  map[string]logger.Level
 }
 
 type UIConfig struct {
-	Enabled bool
+	Enabled  bool
+	LogLevel *logger.Level
 }
 
 type ApiConfig struct {
-	Enabled bool
-	Listens []string
-	Port    int
+	Enabled  bool
+	Listens  []string
+	Port     int
+	LogLevel *logger.Level
 
 	UI *UIConfig
 }
@@ -56,13 +59,15 @@ type Login1Config struct {
 }
 
 type MPRISConfig struct {
-	Enabled bool
-	Timeout time.Duration
+	Enabled  bool
+	Timeout  time.Duration
+	LogLevel *logger.Level
 }
 
 type PulseAudioConfig struct {
 	Enabled       bool
 	XDGRuntimeDir string
+	LogLevel      *logger.Level
 }
 
 type SystemdConfig struct {
@@ -71,6 +76,7 @@ type SystemdConfig struct {
 	UserServices   []string
 	SupportsUTMP   bool
 	XDGRuntimeDir  string
+	LogLevel       *logger.Level
 }
 
 type ZeroConfig struct {
@@ -81,6 +87,15 @@ type ZeroConfig struct {
 	Port         int
 	TxtRecords   []string
 	Listen       []net.Interface
+}
+
+// parseOptionalLogLevel returns a pointer to the parsed level if the viper key is set, or nil.
+func parseOptionalLogLevel(key string) *logger.Level {
+	if !viper.IsSet(key) {
+		return nil
+	}
+	l := parseLogLevel(viper.GetString(key))
+	return &l
 }
 
 // parseLogLevel converts a string to a logger.Level
@@ -305,7 +320,8 @@ func New(cfgFile *string) (*Config, error) {
 	}
 
 	uiCfg := UIConfig{
-		Enabled: viper.GetBool("api.ui.enabled"),
+		Enabled:  viper.GetBool("api.ui.enabled"),
+		LogLevel: parseOptionalLogLevel("api.ui.log_level"),
 	}
 
 	if uiCfg.Enabled && !hasLoopback(listens, portStr) {
@@ -314,10 +330,11 @@ func New(cfgFile *string) (*Config, error) {
 	}
 
 	apiCfg := ApiConfig{
-		Enabled: viper.GetBool("api.enabled"),
-		Listens: listens,
-		Port:    port,
-		UI:      &uiCfg,
+		Enabled:  viper.GetBool("api.enabled"),
+		Listens:  listens,
+		Port:     port,
+		LogLevel: parseOptionalLogLevel("api.log_level"),
+		UI:       &uiCfg,
 	}
 
 	loginCapabilities := Login1Capabilities{
@@ -336,13 +353,15 @@ func New(cfgFile *string) (*Config, error) {
 	}
 
 	mpriscfg := MPRISConfig{
-		Enabled: viper.GetBool("mpris.enabled"),
-		Timeout: mprisTimeout,
+		Enabled:  viper.GetBool("mpris.enabled"),
+		Timeout:  mprisTimeout,
+		LogLevel: parseOptionalLogLevel("mpris.log_level"),
 	}
 
 	pulsecfg := PulseAudioConfig{
 		Enabled:       viper.GetBool("pulseaudio.enabled"),
 		XDGRuntimeDir: xdgRuntimeDir,
+		LogLevel:      parseOptionalLogLevel("pulseaudio.log_level"),
 	}
 
 	syscfg := SystemdConfig{
@@ -351,6 +370,7 @@ func New(cfgFile *string) (*Config, error) {
 		UserServices:   viper.GetStringSlice("systemd.user"),
 		SupportsUTMP:   systemdHasUTMP(),
 		XDGRuntimeDir:  xdgRuntimeDir,
+		LogLevel:       parseOptionalLogLevel("systemd.log_level"),
 	}
 
 	interfaces := getZeroconfInterfaces(binds)
@@ -364,6 +384,19 @@ func New(cfgFile *string) (*Config, error) {
 		Listen:       interfaces,
 	}
 
+	logLevels := map[string]logger.Level{}
+	for pkg, lvl := range map[string]*logger.Level{
+		"mpris":      mpriscfg.LogLevel,
+		"pulseaudio": pulsecfg.LogLevel,
+		"systemd":    syscfg.LogLevel,
+		"api":        apiCfg.LogLevel,
+		"ui":         uiCfg.LogLevel,
+	} {
+		if lvl != nil {
+			logLevels[pkg] = *lvl
+		}
+	}
+
 	cfg := Config{
 		Api:        &apiCfg,
 		Login1:     &logincfg,
@@ -372,6 +405,7 @@ func New(cfgFile *string) (*Config, error) {
 		Systemd:    &syscfg,
 		Zeroconf:   &zerocfg,
 		LogLevel:   parseLogLevel(viper.GetString("LogLevel")),
+		LogLevels:  logLevels,
 	}
 
 	return &cfg, nil

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 )
 
 type Level int
@@ -25,8 +26,9 @@ var levelNames = map[Level]string{
 }
 
 type Logger struct {
-	level  Level
-	logger *log.Logger
+	level         Level
+	packageLevels map[string]Level
+	logger        *log.Logger
 }
 
 // Global logger instance
@@ -39,8 +41,9 @@ func init() {
 // New creates a new logger with the specified level
 func New(level Level) *Logger {
 	return &Logger{
-		level:  level,
-		logger: log.New(os.Stderr, "", log.LstdFlags),
+		level:         level,
+		packageLevels: map[string]Level{},
+		logger:        log.New(os.Stderr, "", log.LstdFlags),
 	}
 }
 
@@ -49,8 +52,32 @@ func SetLevel(level Level) {
 	defaultLogger.level = level
 }
 
-// shouldLog checks if a message at this level should be logged
-func (l *Logger) shouldLog(level Level) bool {
+// SetPackageLevels sets per-package level overrides.
+// Keys match the [component] prefix used in log messages (e.g. "mpris", "api", "ui").
+func SetPackageLevels(levels map[string]Level) {
+	defaultLogger.packageLevels = levels
+}
+
+// extractComponent returns the component name from a "[component] ..." message, or "".
+func extractComponent(msg string) string {
+	if len(msg) < 3 || msg[0] != '[' {
+		return ""
+	}
+	end := strings.IndexByte(msg[1:], ']')
+	if end < 0 {
+		return ""
+	}
+	return msg[1 : end+1]
+}
+
+// shouldLog checks if a message at this level should be logged,
+// applying a package-specific override when the message carries a [component] prefix.
+func (l *Logger) shouldLog(level Level, msg string) bool {
+	if pkg := extractComponent(msg); pkg != "" {
+		if pkgLevel, ok := l.packageLevels[pkg]; ok {
+			return level >= pkgLevel
+		}
+	}
 	return level >= l.level
 }
 
@@ -61,7 +88,7 @@ func (l *Logger) format(level Level, msg string) string {
 
 // Debug logs a debug message
 func Debug(msg string, args ...interface{}) {
-	if defaultLogger.shouldLog(DEBUG) {
+	if defaultLogger.shouldLog(DEBUG, msg) {
 		formatted := fmt.Sprintf(msg, args...)
 		defaultLogger.logger.Println(defaultLogger.format(DEBUG, formatted))
 	}
@@ -69,7 +96,7 @@ func Debug(msg string, args ...interface{}) {
 
 // Info logs an info message
 func Info(msg string, args ...interface{}) {
-	if defaultLogger.shouldLog(INFO) {
+	if defaultLogger.shouldLog(INFO, msg) {
 		formatted := fmt.Sprintf(msg, args...)
 		defaultLogger.logger.Println(defaultLogger.format(INFO, formatted))
 	}
@@ -77,7 +104,7 @@ func Info(msg string, args ...interface{}) {
 
 // Warn logs a warning message
 func Warn(msg string, args ...interface{}) {
-	if defaultLogger.shouldLog(WARN) {
+	if defaultLogger.shouldLog(WARN, msg) {
 		formatted := fmt.Sprintf(msg, args...)
 		defaultLogger.logger.Println(defaultLogger.format(WARN, formatted))
 	}
@@ -85,7 +112,7 @@ func Warn(msg string, args ...interface{}) {
 
 // Error logs an error message
 func Error(msg string, args ...interface{}) {
-	if defaultLogger.shouldLog(ERROR) {
+	if defaultLogger.shouldLog(ERROR, msg) {
 		formatted := fmt.Sprintf(msg, args...)
 		defaultLogger.logger.Println(defaultLogger.format(ERROR, formatted))
 	}
