@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"slices"
 	"sync"
 	"time"
 
@@ -34,9 +35,14 @@ func NewServer(cfg *config.ApiConfig, b *backend.Backend) *Server {
 }
 
 func (s *Server) Run(ctx context.Context) error {
+	var handler http.Handler = s.mux
+	if s.config.CORS != nil {
+		handler = corsMiddleware(s.config.CORS)(handler)
+	}
+
 	servers := make([]*http.Server, len(s.config.Listens))
 	for i, addr := range s.config.Listens {
-		servers[i] = &http.Server{Addr: addr, Handler: s.mux}
+		servers[i] = &http.Server{Addr: addr, Handler: handler}
 	}
 
 	// Shutdown all servers on context cancellation
@@ -117,4 +123,32 @@ func (s *Server) registerUIRoutes() {
 	uiHandler := ui.NewHandler(s.config.Port)
 	uiHandler.RegisterRoutes(s.mux)
 	logger.Info("[api] UI routes registered at /ui")
+}
+
+func corsMiddleware(cfg *config.CORSConfig) func(http.Handler) http.Handler {
+	wildcard := slices.Contains(cfg.Origins, "*")
+	logger.Info("[api] CORS enabled, origins: %v", cfg.Origins)
+
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			origin := r.Header.Get("Origin")
+			if origin != "" {
+				if wildcard {
+					w.Header().Set("Access-Control-Allow-Origin", "*")
+				} else if slices.Contains(cfg.Origins, origin) {
+					w.Header().Set("Access-Control-Allow-Origin", origin)
+					w.Header().Add("Vary", "Origin")
+				}
+			}
+
+			if r.Method == http.MethodOptions {
+				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+				w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+				w.WriteHeader(http.StatusNoContent)
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		})
+	}
 }

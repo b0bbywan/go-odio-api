@@ -37,12 +37,17 @@ type UIConfig struct {
 	Enabled bool
 }
 
+type CORSConfig struct {
+	Origins []string // allowed origins; ["*"] for wildcard
+}
+
 type ApiConfig struct {
 	Enabled bool
 	Listens []string
 	Port    int
 
-	UI *UIConfig
+	UI   *UIConfig
+	CORS *CORSConfig // nil = CORS disabled
 }
 
 type Login1Capabilities struct {
@@ -255,6 +260,7 @@ func New(cfgFile *string) (*Config, error) {
 
 	viper.SetDefault("api.enabled", true)
 	viper.SetDefault("api.port", 8018)
+	viper.SetDefault("api.cors.origins", "https://odio-pwa.vercel.app")
 	viper.SetDefault("api.ui.enabled", false)
 
 	viper.SetDefault("power.enabled", false)
@@ -318,6 +324,10 @@ func New(cfgFile *string) (*Config, error) {
 		Listens: listens,
 		Port:    port,
 		UI:      &uiCfg,
+	}
+
+	if origins := viper.GetStringSlice("api.cors.origins"); len(origins) > 0 {
+		apiCfg.CORS = &CORSConfig{Origins: origins}
 	}
 
 	loginCapabilities := Login1Capabilities{

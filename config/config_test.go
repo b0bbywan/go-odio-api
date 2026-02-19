@@ -951,3 +951,106 @@ func TestNew_ZeroconfAllInterfaces(t *testing.T) {
 		}
 	}
 }
+
+// --- Tests CORSConfig ---
+
+func TestNew_CORSDefaultOrigin(t *testing.T) {
+	viper.Reset()
+	t.Setenv("HOME", t.TempDir())
+
+	cfg, err := New(nil)
+	if err != nil {
+		t.Fatalf("New(nil) returned error: %v", err)
+	}
+	if cfg.Api.CORS == nil {
+		t.Fatal("Api.CORS should not be nil with default origin")
+	}
+	want := []string{"https://odio-pwa.vercel.app"}
+	if len(cfg.Api.CORS.Origins) != 1 || cfg.Api.CORS.Origins[0] != want[0] {
+		t.Errorf("Api.CORS.Origins = %v, want %v", cfg.Api.CORS.Origins, want)
+	}
+}
+
+func TestNew_CORSWildcard(t *testing.T) {
+	viper.Reset()
+	viper.Set("api.cors.origins", []string{"*"})
+	t.Setenv("HOME", t.TempDir())
+
+	cfg, err := New(nil)
+	if err != nil {
+		t.Fatalf("New(nil) returned error: %v", err)
+	}
+	if cfg.Api.CORS == nil {
+		t.Fatal("Api.CORS should not be nil when origins are configured")
+	}
+	if len(cfg.Api.CORS.Origins) != 1 || cfg.Api.CORS.Origins[0] != "*" {
+		t.Errorf("Api.CORS.Origins = %v, want [*]", cfg.Api.CORS.Origins)
+	}
+}
+
+func TestNew_CORSSpecificOrigins(t *testing.T) {
+	viper.Reset()
+	origins := []string{"https://app.example.com", "https://other.example.com"}
+	viper.Set("api.cors.origins", origins)
+	t.Setenv("HOME", t.TempDir())
+
+	cfg, err := New(nil)
+	if err != nil {
+		t.Fatalf("New(nil) returned error: %v", err)
+	}
+	if cfg.Api.CORS == nil {
+		t.Fatal("Api.CORS should not be nil when origins are configured")
+	}
+	if len(cfg.Api.CORS.Origins) != len(origins) {
+		t.Fatalf("Api.CORS.Origins len = %d, want %d", len(cfg.Api.CORS.Origins), len(origins))
+	}
+	for i, o := range origins {
+		if cfg.Api.CORS.Origins[i] != o {
+			t.Errorf("Api.CORS.Origins[%d] = %q, want %q", i, cfg.Api.CORS.Origins[i], o)
+		}
+	}
+}
+
+func TestNew_CORSFromConfigFile(t *testing.T) {
+	viper.Reset()
+
+	tmpDir := t.TempDir()
+	configFile := tmpDir + "/config.yaml"
+	configContent := `
+api:
+  cors:
+    origins:
+      - "*"
+`
+	if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
+		t.Fatalf("Failed to create test config file: %v", err)
+	}
+
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
+
+	cfg, err := New(&configFile)
+	if err != nil {
+		t.Fatalf("New() returned error: %v", err)
+	}
+	if cfg.Api.CORS == nil {
+		t.Fatal("Api.CORS should not be nil when loaded from config file")
+	}
+	if len(cfg.Api.CORS.Origins) != 1 || cfg.Api.CORS.Origins[0] != "*" {
+		t.Errorf("Api.CORS.Origins = %v, want [*]", cfg.Api.CORS.Origins)
+	}
+}
+
+func TestNew_CORSEmptyOriginsStaysNil(t *testing.T) {
+	viper.Reset()
+	viper.Set("api.cors.origins", []string{})
+	t.Setenv("HOME", t.TempDir())
+
+	cfg, err := New(nil)
+	if err != nil {
+		t.Fatalf("New(nil) returned error: %v", err)
+	}
+	if cfg.Api.CORS != nil {
+		t.Errorf("Api.CORS should be nil for empty origins list, got %+v", cfg.Api.CORS)
+	}
+}
