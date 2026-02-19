@@ -56,9 +56,7 @@ func (s *Server) registerPulseRoutes(b *pulseaudio.PulseAudioBackend) {
 	)
 	s.mux.HandleFunc(
 		"/audio/clients",
-		JSONHandler(func(w http.ResponseWriter, r *http.Request) (any, error) {
-			return b.ListClients()
-		}),
+		listHandler(b.ListClients, b.CacheUpdatedAt),
 	)
 	s.mux.HandleFunc(
 		"POST /audio/clients/{sink}/mute",
@@ -73,9 +71,7 @@ func (s *Server) registerPulseRoutes(b *pulseaudio.PulseAudioBackend) {
 func (s *Server) registerSystemdRoutes(b *systemd.SystemdBackend) {
 	s.mux.HandleFunc(
 		"/services",
-		JSONHandler(func(w http.ResponseWriter, r *http.Request) (any, error) {
-			return b.ListServices()
-		}),
+		listHandler(b.ListServices, b.CacheUpdatedAt),
 	)
 	s.mux.HandleFunc(
 		"POST /services/{scope}/{unit}/enable",
@@ -102,7 +98,7 @@ func (s *Server) registerSystemdRoutes(b *systemd.SystemdBackend) {
 func (s *Server) registerMPRISRoutes(b *mpris.MPRISBackend) {
 	s.mux.HandleFunc(
 		"/players",
-		ListPlayersHandler(b),
+		listHandler(b.ListPlayers, b.CacheUpdatedAt),
 	)
 	s.mux.HandleFunc(
 		"POST /players/{player}/play",

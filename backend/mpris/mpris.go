@@ -458,6 +458,11 @@ func (m *MPRISBackend) SetShuffle(busName string, shuffle bool) error {
 	return m.setProperty(busName, "Shuffle", shuffle)
 }
 
+// CacheUpdatedAt returns the last time the player cache was written to.
+func (m *MPRISBackend) CacheUpdatedAt() time.Time {
+	return m.cache.UpdatedAt()
+}
+
 // InvalidateCache invalidates the entire cache
 func (m *MPRISBackend) InvalidateCache() {
 	m.cache.Delete(CACHE_KEY)
