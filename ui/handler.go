@@ -20,6 +20,10 @@ func LoadTemplates() *template.Template {
 		"mul": func(a, b float64) float64 {
 			return a * b
 		},
+		"fmtMicros": func(us int64) string {
+			total := int(us / 1_000_000)
+			return fmt.Sprintf("%d:%02d", total/60, total%60)
+		},
 		"dict": func(values ...any) (map[string]any, error) {
 			if len(values)%2 != 0 {
 				return nil, fmt.Errorf("dict requires an even number of arguments")

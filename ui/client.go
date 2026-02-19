@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -42,14 +43,26 @@ func (c *APIClient) GetServerInfo() (*ServerInfo, error) {
 }
 
 func (c *APIClient) GetPlayers() ([]PlayerView, error) {
-	var raw []Player
-	if err := c.get("/players", &raw); err != nil {
-		return nil, err
+	resp, err := c.client.Get(c.baseURL + "/players")
+	if err != nil {
+		return nil, fmt.Errorf("/players: %w", err)
 	}
-	return convertPlayers(raw), nil
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			logger.Warn("failed to close response body for /players")
+		}
+	}()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("/players: unexpected status %d", resp.StatusCode)
+	}
+	var raw []Player
+	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
+		return nil, fmt.Errorf("/players: decode failed: %w", err)
+	}
+	return convertPlayers(raw, resp.Header.Get("X-Cache-Updated-At")), nil
 }
 
-func convertPlayers(raw []Player) []PlayerView {
+func convertPlayers(raw []Player, cacheUpdatedAt string) []PlayerView {
 	views := make([]PlayerView, 0, len(raw))
 	for _, p := range raw {
 		displayName := strings.TrimPrefix(p.Name, "org.mpris.MediaPlayer2.")
@@ -58,21 +71,32 @@ func convertPlayers(raw []Player) []PlayerView {
 			artUrl = ""
 		}
 		views = append(views, PlayerView{
-			Name:        p.Name,
-			DisplayName: displayName,
-			Artist:      p.Metadata["xesam:artist"],
-			Title:       p.Metadata["xesam:title"],
-			Album:       p.Metadata["xesam:album"],
-			ArtUrl:      artUrl,
-			State:       p.Status,
-			Volume:      p.Volume,
-			CanPlay:     p.Capabilities.CanPlay,
-			CanPause:    p.Capabilities.CanPause,
-			CanNext:     p.Capabilities.CanGoNext,
-			CanPrev:     p.Capabilities.CanGoPrevious,
+			Name:           p.Name,
+			DisplayName:    displayName,
+			Artist:         p.Metadata["xesam:artist"],
+			Title:          p.Metadata["xesam:title"],
+			Album:          p.Metadata["xesam:album"],
+			ArtUrl:         artUrl,
+			State:          p.Status,
+			Volume:         p.Volume,
+			CanPlay:        p.Capabilities.CanPlay,
+			CanPause:       p.Capabilities.CanPause,
+			CanNext:        p.Capabilities.CanGoNext,
+			CanPrev:        p.Capabilities.CanGoPrevious,
+			Position:       p.Position,
+			Duration:       parseMicros(p.Metadata["mpris:length"]),
+			Rate:           p.Rate,
+			CanSeek:        p.Capabilities.CanSeek,
+			CacheUpdatedAt: cacheUpdatedAt,
 		})
 	}
 	return views
+}
+
+// parseMicros parses a microsecond string from MPRIS metadata (e.g. mpris:length).
+func parseMicros(s string) int64 {
+	v, _ := strconv.ParseInt(s, 10, 64)
+	return v
 }
 
 func (c *APIClient) GetAudioInfo() (*AudioInfo, error) {

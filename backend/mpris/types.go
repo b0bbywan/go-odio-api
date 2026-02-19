@@ -80,7 +80,7 @@ type SeekRequest struct {
 }
 
 type PositionRequest struct {
-	TrackID  string `json:"track_id"`
+	TrackID  string `json:"track_id,omitempty"` // optional; resolved from cache if empty
 	Position int64  `json:"position"`
 }
 

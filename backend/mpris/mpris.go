@@ -387,18 +387,28 @@ func (m *MPRISBackend) Seek(busName string, offset int64) error {
 	return m.callMethod(busName, MPRIS_METHOD_SEEK, offset)
 }
 
-// SetPosition sets the playback position
+// SetPosition seeks to an absolute position in microseconds.
+// trackID may be empty; if so it is resolved from the cached player metadata.
+// Falls back to a relative Seek when no valid track ID is available.
 func (m *MPRISBackend) SetPosition(busName, trackID string, position int64) error {
-	if trackID == "" {
-		return &ValidationError{Field: "track_id", Message: "cannot be empty"}
-	}
-
 	player, err := m.GetPlayerFromCache(busName)
 	if err != nil {
 		return err
 	}
 	if !player.CanSeek() {
 		return &CapabilityError{Required: "CanSeek"}
+	}
+
+	if trackID == "" {
+		trackID = player.Metadata["mpris:trackid"]
+	}
+
+	if trackID == "" || trackID == MPRIS_NO_TRACK {
+		// Player doesn't expose a usable track ID; fall back to relative seek
+		// using the cached position as the reference point.
+		offset := position - player.Position
+		logger.Debug("[mpris] seek fallback (no trackid): offset=%d for %s", offset, busName)
+		return m.callMethod(busName, MPRIS_METHOD_SEEK, offset)
 	}
 
 	logger.Debug("[mpris] setting position to %d for %s", position, busName)

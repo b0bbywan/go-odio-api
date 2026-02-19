@@ -34,6 +34,10 @@ const (
 	MPRIS_METHOD_SET_POSITION = MPRIS_PLAYER_IFACE + ".SetPosition"
 )
 
+// MPRIS_NO_TRACK is the well-known track ID meaning "no current track".
+// SetPosition is a no-op for this value, so we fall back to relative Seek.
+const MPRIS_NO_TRACK = "/org/mpris/MediaPlayer2/TrackList/NoTrack"
+
 const (
 	StatusPlaying PlaybackStatus = "Playing"
 	StatusPaused  PlaybackStatus = "Paused"
