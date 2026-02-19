@@ -42,9 +42,9 @@ button.htmx-request {
 	animation: pulse-opacity 1s ease-in-out infinite;
 }
 
-/* Volume slider */
-.volume-slider {
-	width: 100%;
+/* Volume & seek sliders */
+.volume-slider,
+.seek-slider {
 	height: 4px;
 	border-radius: 2px;
 	background: #3f3f46;
@@ -53,11 +53,21 @@ button.htmx-request {
 	transition: opacity 0.2s;
 }
 
-.volume-slider:hover {
+.volume-slider {
+	width: 100%;
+}
+
+.seek-slider {
+	flex: 1;
+}
+
+.volume-slider:hover,
+.seek-slider:hover {
 	opacity: 1;
 }
 
-.volume-slider::-webkit-slider-thumb {
+.volume-slider::-webkit-slider-thumb,
+.seek-slider::-webkit-slider-thumb {
 	-webkit-appearance: none;
 	appearance: none;
 	width: 14px;
@@ -67,7 +77,8 @@ button.htmx-request {
 	cursor: pointer;
 }
 
-.volume-slider::-moz-range-thumb {
+.volume-slider::-moz-range-thumb,
+.seek-slider::-moz-range-thumb {
 	width: 14px;
 	height: 14px;
 	border-radius: 50%;
@@ -76,7 +87,8 @@ button.htmx-request {
 	border: none;
 }
 
-.volume-slider::-moz-range-progress {
+.volume-slider::-moz-range-progress,
+.seek-slider::-moz-range-progress {
 	background: #3b82f6;
 	height: 4px;
 	border-radius: 2px;
@@ -231,5 +243,15 @@ button.htmx-request {
 
 	.status-dot {
 		@apply h-2 w-2 rounded-full;
+	}
+
+	/* Position seeker row */
+	.seeker-row {
+		@apply flex items-center gap-2;
+	}
+
+	.pos-time,
+	.dur-time {
+		@apply text-xs text-zinc-500 tabular-nums shrink-0;
 	}
 }

@@ -21,6 +21,27 @@
 		{{ end }}
 	</div>
 
+	<!-- Position seeker -->
+	{{ if and .CanSeek (gt .Duration 0) }}
+	<div class="seeker-row mb-3 px-2">
+		<span class="pos-time"
+			data-position="{{ .Position }}"
+			data-rate="{{ printf "%.4f" .Rate }}"
+			data-cache-updated-at="{{ .CacheUpdatedAt }}"
+			data-playing="{{ eq .State "Playing" }}">{{ fmtMicros .Position }}</span>
+		<input type="range" class="seek-slider"
+			min="0" max="{{ .Duration }}" value="{{ .Position }}"
+			data-player="{{ .Name }}"
+			data-position="{{ .Position }}"
+			data-rate="{{ printf "%.4f" .Rate }}"
+			data-cache-updated-at="{{ .CacheUpdatedAt }}"
+			data-playing="{{ eq .State "Playing" }}"
+			oninput="onSeekerInput(this)"
+			onchange="onSeekerChange(this)">
+		<span class="dur-time">{{ fmtMicros .Duration }}</span>
+	</div>
+	{{ end }}
+
 	<!-- Volume control -->
 	<div class="mb-3 px-2">
 		{{ template "volume-slider" (dict "Target" .Name "Type" "mpris" "Volume" .Volume "ShowMute" false) }}

@@ -288,6 +288,11 @@ func (s *SystemdBackend) connForScope(scope UnitScope) *dbus.Conn {
 	return s.sysConn
 }
 
+// CacheUpdatedAt returns the last time the service cache was written to.
+func (s *SystemdBackend) CacheUpdatedAt() time.Time {
+	return s.cache.UpdatedAt()
+}
+
 // invalidateCache invalidates the entire cache (used if need to reload everything)
 func (s *SystemdBackend) invalidateCache() {
 	s.cache.Delete(cacheKey)
