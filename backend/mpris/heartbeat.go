@@ -66,7 +66,7 @@ func (h *Heartbeat) run() {
 		logger.Debug("[mpris] position heartbeat stopped")
 	}()
 
-	ticker := time.NewTicker(2 * time.Second)
+	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 
 	logger.Debug("[mpris] position heartbeat started")
@@ -93,6 +93,7 @@ func (h *Heartbeat) updatePlayingPositions() bool {
 	}
 
 	hasPlaying := false
+	positions := make(map[string]int64)
 	for _, player := range players {
 		// Update only Playing players
 		if player.PlaybackStatus != StatusPlaying {
@@ -116,10 +117,11 @@ func (h *Heartbeat) updatePlayingPositions() bool {
 			continue
 		}
 
-		// Update via UpdateProperty (handles cache properly)
-		if err := h.backend.UpdateProperty(player.BusName, "Position", variant); err != nil {
-			logger.Warn("[mpris] failed to update position for %s: %v", player.BusName, err)
-		}
+		positions[player.BusName] = pos
+	}
+
+	if len(positions) > 0 {
+		h.backend.UpdatePositions(positions)
 	}
 
 	return hasPlaying
