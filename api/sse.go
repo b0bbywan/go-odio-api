@@ -121,8 +121,9 @@ func sseHandler(b *Broadcaster) http.HandlerFunc {
 		}
 
 		// Send initial keep-alive comment so the client knows the connection is live.
-		fmt.Fprint(w, ": connected\n\n")
-		flusher.Flush()
+		if err := sendToFlusher(flusher, w, ": connected\n\n"); err != nil {
+			return
+		}
 
 		ch := b.subscribe()
 		defer b.unsubscribe(ch)
@@ -140,9 +141,20 @@ func sseHandler(b *Broadcaster) http.HandlerFunc {
 					logger.Warn("[sse] failed to marshal event data: %v", err)
 					continue
 				}
-				fmt.Fprintf(w, "event: %s\ndata: %s\n\n", e.Type, data)
-				flusher.Flush()
+				if err = sendToFlusher(flusher, w, fmt.Sprintf("event: %s\ndata: %s\n\n", e.Type, data)); err != nil {
+					return
+				}
 			}
 		}
 	}
+}
+
+func sendToFlusher(flusher http.Flusher, w http.ResponseWriter, data string) error {
+	if _, err := fmt.Fprint(w, data); err != nil {
+		logger.Error("[sse] failed to send data to flusher: %v", err)
+		http.Error(w, "failed to send data to flusher", http.StatusInternalServerError)
+		return err
+	}
+	flusher.Flush()
+	return nil
 }
