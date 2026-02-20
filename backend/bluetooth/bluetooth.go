@@ -119,6 +119,12 @@ func (b *BluetoothBackend) PowerDown() error {
 }
 
 func (b *BluetoothBackend) NewPairing() error {
+	// Prevent resetting BlueZ timeouts on an already-active pairing session
+	if b.isDiscoverable() {
+		logger.Info("[bluetooth] pairing already in progress")
+		return nil
+	}
+
 	// RegisterAgent
 	if err := b.registerAgent(); err != nil {
 		if dbusErr, ok := err.(*dbus.Error); ok && dbusErr.Name == "org.bluez.Error.AlreadyExists" {

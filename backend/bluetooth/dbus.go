@@ -199,6 +199,16 @@ func (b *BluetoothBackend) isAdapterOn() bool {
 	return powered
 }
 
+func (b *BluetoothBackend) isDiscoverable() bool {
+	v, err := b.getAdapterProp(BT_STATE_DISCOVERABLE)
+	if err != nil {
+		logger.Warn("[bluetooth] failed to get adapter discoverable state: %v", err)
+		return false
+	}
+	discoverable, _ := extractBool(v)
+	return discoverable
+}
+
 func (b *BluetoothBackend) hasConnectedDevices() bool {
 	connected := false
 	err := b.iterateAdapterDevices(func(path dbus.ObjectPath, props map[string]dbus.Variant) bool {
