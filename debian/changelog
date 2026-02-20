@@ -24,7 +24,7 @@ odio-api (0.6.0) trixie; urgency=low
   * Tested on amd64 (HTPC) and armhf (RPi Model B 2012)
 
 
- -- Mathieu Réquillart <mathieu.requillart@gmail.com>  Fri, 13 Feb 2026 15:00:00 +0000
+ -- Mathieu Réquillart <mathieu.requillart@gmail.com>  Fri, 20 Feb 2026 20:00:00 +0000
 
 
 odio-api (0.5.1) trixie; urgency=low
