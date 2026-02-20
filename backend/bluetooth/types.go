@@ -18,6 +18,9 @@ type BluetoothBackend struct {
 	idleTimeout    time.Duration
 	agent          *bluezAgent
 	pairingMu      sync.Mutex
+	isPairing      bool           // pairing mode active, protected by pairingMu
+	pairingTimer   *time.Timer    // pairing timeout timer, protected by pairingMu
+	listenerCancel context.CancelFunc // cancel function for the main listener
 	idleTimer      *time.Timer
 	idleTimerMu    sync.Mutex
 	// permanent cache (no expiration) for status tracking
