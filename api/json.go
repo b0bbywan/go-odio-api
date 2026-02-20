@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/b0bbywan/go-odio-api/logger"
 )
@@ -14,11 +15,33 @@ type setVolumeRequest struct {
 	Volume float32 `json:"volume"`
 }
 
+// statusError is an error carrying an HTTP status code, recognised by JSONHandler.
+type statusError struct {
+	code int
+	msg  string
+}
+
+func (e *statusError) Error() string { return e.msg }
+
+// httpError wraps an error with an HTTP status code for JSONHandler to use.
+func httpError(code int, err error) error {
+	return &statusError{code: code, msg: err.Error()}
+}
+
+// JSONHandler wraps a handler returning (data, error) into an http.HandlerFunc:
+//   - statusError → that HTTP code + plain-text body
+//   - plain error → 500
+//   - non-nil data → 200 with JSON body
 func JSONHandler(h func(http.ResponseWriter, *http.Request) (any, error)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		data, err := h(w, r)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			code := http.StatusInternalServerError
+			var se *statusError
+			if errors.As(err, &se) {
+				code = se.code
+			}
+			http.Error(w, err.Error(), code)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -28,7 +51,7 @@ func JSONHandler(h func(http.ResponseWriter, *http.Request) (any, error)) http.H
 	}
 }
 
-// withBody parse et valide le body JSON, puis appelle next
+// withBody parses and validates a JSON request body, then calls next.
 func withBody[T any](
 	validate func(*T) error,
 	next func(w http.ResponseWriter, r *http.Request, req *T),
@@ -40,19 +63,16 @@ func withBody[T any](
 			}
 		}()
 
-		// Check Content-Type header
 		contentType := r.Header.Get("Content-Type")
 		if contentType != "application/json" {
 			http.Error(w, "Content-Type must be application/json", http.StatusUnsupportedMediaType)
 			return
 		}
 
-		// Limit request body size to prevent DOS attacks
 		r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodySize)
 
 		var req T
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			// Check if error is due to body size limit
 			var maxBytesErr *http.MaxBytesError
 			if errors.As(err, &maxBytesErr) {
 				http.Error(w, "request body too large", http.StatusRequestEntityTooLarge)
@@ -73,7 +93,27 @@ func withBody[T any](
 	}
 }
 
-// validateVolume valide qu'un volume est entre 0 et 1
+// setCacheHeader sets X-Cache-Updated-At to the given timestamp.
+func setCacheHeader(w http.ResponseWriter, t time.Time) {
+	if !t.IsZero() {
+		w.Header().Set("X-Cache-Updated-At", t.UTC().Format(time.RFC3339))
+	}
+}
+
+// listHandler wraps a backend list function into a JSONHandler that also sets
+// the X-Cache-Updated-At header from the provided timestamp function.
+func listHandler[T any](list func() (T, error), updatedAt func() time.Time) http.HandlerFunc {
+	return JSONHandler(func(w http.ResponseWriter, r *http.Request) (any, error) {
+		data, err := list()
+		if err != nil {
+			return nil, err
+		}
+		setCacheHeader(w, updatedAt())
+		return data, nil
+	})
+}
+
+// validateVolume validates that a volume is between 0 and 1
 func validateVolume(req *setVolumeRequest) error {
 	if req.Volume < 0 || req.Volume > 1 {
 		return errors.New("volume must be between 0 and 1")

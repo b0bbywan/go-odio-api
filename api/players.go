@@ -55,13 +55,6 @@ func handleMPRISError(w http.ResponseWriter, err error) {
 	http.Error(w, err.Error(), http.StatusInternalServerError)
 }
 
-// ListPlayersHandler returns the list of all MPRIS players
-func ListPlayersHandler(m *mpris.MPRISBackend) http.HandlerFunc {
-	return JSONHandler(func(w http.ResponseWriter, r *http.Request) (any, error) {
-		return m.ListPlayers()
-	})
-}
-
 // Handlers for simple actions
 func PlayHandler(m *mpris.MPRISBackend) http.HandlerFunc {
 	return withPlayer(func(w http.ResponseWriter, r *http.Request, busName string) {

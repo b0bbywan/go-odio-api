@@ -1,0 +1,109 @@
+{{ define "base" }}
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+
+	<title>{{ .Title }}</title>
+
+	<!-- Compiled Tailwind CSS -->
+	<link rel="stylesheet" href="/ui/static/output.css">
+
+	<!-- HTMX -->
+	<script src="/ui/static/htmx.v1.9.10.min.js"></script>
+
+
+</head>
+
+<body class="min-h-screen bg-zinc-900 text-zinc-100">
+	<!-- Responsive sticky header -->
+	<header class="sticky top-0 z-10 border-b border-zinc-800 bg-zinc-900/95 backdrop-blur">
+		<div class="mx-auto max-w-7xl px-4 py-3 sm:px-6 lg:px-8">
+			<div class="flex items-center justify-between">
+				<div>
+					<h1 class="text-lg font-semibold sm:text-xl">
+						{{ .Title }}
+					</h1>
+					{{ if .ServerInfo }}
+					<p class="text-xs text-zinc-500 sm:text-sm">
+						{{ .ServerInfo.Hostname }}
+					</p>
+					{{ end }}
+				</div>
+
+				{{ if .ServerInfo }}
+				<div class="flex items-center gap-3">
+					<!-- Backend status badges (hidden on mobile) -->
+					<div class="hidden gap-2 sm:flex">
+						{{ if .ServerInfo.Backends.PulseAudio }}
+						<span class="rounded-full bg-blue-500/10 px-2 py-1 text-xs text-blue-400">
+							Audio
+						</span>
+						{{ end }}
+						{{ if .ServerInfo.Backends.MPRIS }}
+						<span class="rounded-full bg-green-500/10 px-2 py-1 text-xs text-green-400">
+							MPRIS
+						</span>
+						{{ end }}
+						{{ if .ServerInfo.Backends.Systemd }}
+						<span class="rounded-full bg-purple-500/10 px-2 py-1 text-xs text-purple-400">
+							Systemd
+						</span>
+						{{ end }}
+					</div>
+					<!-- Power buttons -->
+					{{ if .ServerInfo.Power }}
+					<div class="flex items-center gap-1">
+						{{ if .ServerInfo.Power.PowerOff }}
+						<button class="text-lg hover:scale-110 transition-transform"
+						        hx-post="/power/power_off"
+						        hx-swap="none"
+						        hx-confirm="Power off the system?"
+						        title="Power off"> 🔌 </button>
+						{{ end }}
+
+
+						{{ if .ServerInfo.Power.Reboot }}
+						<button class="text-lg hover:scale-110 transition-transform"
+						        hx-post="/power/reboot"
+						        hx-swap="none"
+						        hx-confirm="Reboot the system?"
+						        title="Reboot"> 🔄 </button>
+						{{ end }}
+					</div>
+					{{ end }}
+				</div>
+				{{ end }}
+			</div>
+		</div>
+	</header>
+
+	<!-- Responsive main content -->
+	<main class="mx-auto max-w-7xl px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
+		{{ block "content" . }}{{ end }}
+	</main>
+
+	<!-- Footer with version info -->
+	{{ if .ServerInfo }}
+	<footer class="mt-8 border-t border-zinc-800 py-4">
+		<div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+			<div class="flex flex-col items-center justify-between gap-2 text-xs text-zinc-500 sm:flex-row">
+				<div class="flex items-center gap-2">
+					{{ .ServerInfo.APISW }} {{ .ServerInfo.APIVersion }}
+					{{ if .ServerInfo.Backends.Zeroconf }}
+					<span class="rounded-full bg-zinc-700/40 px-2 py-0.5 text-zinc-500">📡 zeroconf</span>
+					{{ end }}
+				</div>
+				<div>
+					{{ .ServerInfo.OSPlatform }} 🐧
+				</div>
+			</div>
+		</div>
+	</footer>
+	{{ end }}
+
+	<script src="/ui/static/odio.js"></script>
+</body>
+</html>
+{{ end }}

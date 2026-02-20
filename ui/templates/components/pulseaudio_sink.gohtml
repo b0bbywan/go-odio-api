@@ -1,0 +1,16 @@
+{{ define "pulseaudio-sink" }}
+<div class="client-card">
+	<!-- Client info -->
+	<div class="content-area">
+		<div class="player-name mb-1">
+			{{ if .Name }}{{ .Name }}{{ else if .Application }}{{ .Application }}{{ else }}Unknown{{ end }}
+		</div>
+		{{ if .Application }}
+		<div class="player-meta-small mb-2">{{ .Application }}</div>
+		{{ end }}
+
+		<!-- Volume control -->
+		{{ template "volume-slider" (dict "Target" .Name "Type" "audio-client" "Volume" .Volume "Muted" .Muted "ShowMute" true) }}
+	</div>
+</div>
+{{ end }}

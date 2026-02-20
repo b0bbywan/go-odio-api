@@ -277,6 +277,11 @@ func (pa *PulseAudioBackend) RefreshClient(name string) (*AudioClient, error) {
 	return &client, nil
 }
 
+// CacheUpdatedAt returns the last time the client cache was written to.
+func (pa *PulseAudioBackend) CacheUpdatedAt() time.Time {
+	return pa.cache.UpdatedAt()
+}
+
 // InvalidateCache invalidates the entire cache
 func (pa *PulseAudioBackend) InvalidateCache() {
 	pa.cache.Delete(cacheKey)

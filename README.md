@@ -1,183 +1,160 @@
-# go-odio-api
+# Odio API
+
+> The universal remote for your Linux multimedia server
 
 [![CI](https://github.com/b0bbywan/go-odio-api/actions/workflows/ci.yml/badge.svg)](https://github.com/b0bbywan/go-odio-api/actions/workflows/ci.yml)
+[![Build](https://github.com/b0bbywan/go-odio-api/actions/workflows/build.yml/badge.svg)](https://github.com/b0bbywan/go-odio-api/actions/workflows/build.yml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/b0bbywan/go-odio-api)](https://goreportcard.com/report/github.com/b0bbywan/go-odio-api)
 
-A lightweight and reliable REST API for controlling Linux audio and media players, built in Go. Provides unified interfaces for MPRIS media players, PulseAudio/PipeWire audio control, and systemd service management.
+Odio is an ultra-lightweight Go daemon that exposes a single clean REST API over your Linux user session's D-Bus: MPRIS players (Spotify, VLC, Firefox, MPD, Kodi), PulseAudio/PipeWire, systemd user services, and power management. No root. No hacks. Just Linux primitives.
 
-**Target Environment:** Designed for multimedia systems running with a user session (XDG_RUNTIME_DIR). Ideal for headless music servers, home audio systems dedicated media players and classic desktop sessions.
+Building a Linux multimedia setup is easy. Integrating it cleanly into Home Assistant always felt hacky, scattered integrations, SSH scripts, and fragile glue.
 
-Tested and validated on Fedora 43 Gnome, Debian 13 KDE, Raspbian 13 Raspberry B and B+. Works without any system tweak.
+
+Tested on Fedora 43 Gnome, Debian 13 KDE, Raspbian 13, Openmediavault 8
+Raspberry Pi B through Pi 5.
+Works without any system tweak.
+
+## Quick Start
+
+Start Spotify, VLC, or any MPRIS player first, then:
+
+```bash
+# 1. Config (bind: all required for Docker)
+cp share/config.yaml config.yaml
+
+# 2. Start
+docker compose up -d
+
+# 3. Test
+curl http://localhost:8018/players
+curl http://localhost:8018/audio/server
+```
+
+→ See [Installation](#installation) for systemd service, packages, or running from source.
+
+## User Interface
+
+<img width="1658" height="963" alt="Capture d’écran du 2026-02-17 00-32-56" src="https://github.com/user-attachments/assets/0a9697da-902b-41d0-8977-908ef66f1168" />
+
+The built-in Odio UI is accessible at:
+
+**http://localhost:8018/ui**
+(or http://your-host.local:8018/ui if zeroconf/mDNS is enabled)
+
+It's a **100% local**, **responsive** (mobile + desktop), web interface designed to control your entire Linux multimedia setup from one place: MPRIS players, per-app/global volume, systemd user services, PipeWire/PulseAudio server, and more.
+
+There's also an **[installable PWA](https://odio-pwa.vercel.app/)** to install on your phone/desktop to easily access your remote and navigate between several instances.
+
+[More info](UI.md)
+
+## Home Assistant Integration
+
+**[odio-ha](https://github.com/b0bbywan/odio-ha)** is the official Home Assistant integration for Odio.
+
+Install via HACS → Custom Repositories → `https://github.com/b0bbywan/odio-ha`
+
+What it exposes as HA entities:
+- `media_player` — global PulseAudio/PipeWire audio receiver (volume, mute)
+- `media_player` per systemd service — power on/off, volume, state tracking (MPD, Kodi, shairport-sync, etc.)
+- MPRIS players — auto-discovered players with full playback control and metadata *(in progress)*
+
+Odio becomes the hub that makes all your HA integrations point to the correct machine. MPD service lifecycle managed by Odio, rich playback via HA's existing MPD integration — the two work together.
+
+## Use Cases
+
+| Setup | What Odio gives you |
+|---|---|
+| RPi music server (MPD + shairport-sync) | MPRIS control + restart services from HA |
+| HTPC / Kodi | Start/stop Kodi, MPRIS control via odio-ha |
+| Firefox kiosk (Netflix, YouTube) | Start/stop fake Netflix and Youtube app, MPRIS control via odio-ha |
+| Headless Spotify (spotifyd) | MPRIS playback + service lifecycle |
+| Any PulseAudio/PipeWire setup | Per-client and global volume/mute control |
 
 ## Features
 
 ### Media Player Control (MPRIS)
-- List and control MPRIS-compatible media players (Spotify, VLC, Firefox, etc.)
+
+Auto-discovers all MPRIS-compatible players in real time — Spotify, VLC, Firefox, MPD, Kodi, etc. Add a new player and it appears immediately, zero config.
+
 - Full playback control: play, pause, stop, next, previous
-- Volume and position control
+- Volume, seek, and position control
 - Shuffle and loop mode management
-- Real-time player state updates via D-Bus signals
+- Real-time state updates via D-Bus signals
 - Smart caching with automatic cache invalidation
 - Position heartbeat for accurate playback tracking
 
-```yaml
-# config.yaml
-mpris:
-  enabled: true
-```
-
 ### Audio Management (PulseAudio/PipeWire)
-- List audio clients and server info with default output
-- Output and client volume control/mute
-- Real-time audio events via native PulseAudio monitoring
-- Limited PipeWire support with pipewire-pulse
 
-```yaml
-# config.yaml
-pulseaudio:
-  enabled: true
-```
+- Server info and default output
+- Global and per-client volume/mute control
+- Real-time audio events via native PulseAudio monitoring
+- Limited PipeWire support via `pipewire-pulse`
 
 ### Service Management (systemd)
-- List and monitor systemd services
-- Start, Stop, Restart, Enable, Disable services
+
+Explicit whitelist required — nothing managed unless listed in `config.yaml`.
+
+- List and monitor whitelisted systemd services (system + user)
+- Start, stop, restart, enable, disable user services
 - Real-time service state updates via D-Bus signals
-- Tracking via filesystem monitoring for systemd without utmp (/run/user/{uid}/systemd/units)
 - Disabled by default
 
-⚠️ **Security Notice**
+⚠️ **Security model:** Odio enforces user-session mutations only at the application layer, regardless of D-Bus or polkit configuration. System units are strictly read-only. See [Security](#security) for full details.
 
-Yes, systemd control is controversial and potentially dangerous if misused. But systemd units are really easy to setup and manage, and have great potential for features so I added it anyway, with a strong concern for security. Odio mitigates risks with these deliberate security designs:
+### Power Management
 
-- **Disabled by default**: Systemd backend off unless explicitly enabled + units configured in `config.yaml` (empty config → auto-disabled, even with `systemd.enabled: true`).
-- **Localhost only**: API binds to `lo` by default. Never expose to untrusted networks/Internet.
-- **No preconfigured units**: Nothing managed unless explicitly listed in config.
-- **User-only mutations**: All mutations (start/stop/restart/enable/disable) use the *user* D-Bus connection only. System units are strictly read-only. While properly configured systems enforce this via D-Bus policies, odio adds mandatory application-layer enforcement which should protect against misconfigured or compromised D-Bus setups.
-- **Root/sudo is not supported by design**: Odio runs as an unprivileged user with a user D‑Bus session. Running it as root is strictly forbidden and will be refused by the program. Issues or requests related to this will not be accepted, unless they improve security.
-
-**You must knowingly enable this at your own risk.**
-Odio is free software and comes with no warranty. Enabling systemd integration is at your own risk.
-
-Useful examples for audio servers or media centers, some are provided in `share/`:
-
-```yaml
-# config.yaml
-systemd:
-  enabled: true
-  system:
-    - bluetooth.service
-    - upmpdcli.service
-  user:
-    - pipewire-pulse.service
-    - pulseaudio.service
-    - mpd.service                       # see [1]
-    - shairport-sync.service            # see [2]
-    - snapclient.service                # incompatible with mpris
-    - spotifyd.service                  # see [3]
-
-    - firefox-kiosk@netflix.com.service # default suppport for mpris
-    - firefox-kiosk@youtube.com.service # default suppport for mpris
-    - firefox-kiosk@my.home-assistant.io.service
-    - kodi.service                      # see [4]
-    - vlc.service                       # default suppport for mpris
-    - plex.service                      # see [5]
-```
-[1] Install `mpd-mpris` or `mpDris2` for mpris support
-[2] Check my [article on medium to use Shairport Sync/Airplay with pulseaudio and mpris support](https://medium.com/@mathieu-requillart/set-up-a-b83d9c980e75)
-[3] Default on desktop, on headless your spotifyd version [must be built with mpris support](https://docs.spotifyd.rs/advanced/dbus.html)
-[4] Install [Kodi Add-on:MPRIS D-Bus interface](https://github.com/wastis/MediaPlayerRemoteInterface#)
-[5] Maybe supported, untested
-
-### Power Management / Login1
-
-This feature allows remote power-off or reboot of your appliance via the REST API — eliminating the need for SSH in most day-to-day scenarios.
-
-The feature is **disabled by default** and only becomes active when:
-- `power.enabled = true` in the configuration
-- **at least one** capability is enabled (`reboot` and/or `power_off`)
-- only power off and reboot available.
-
-It uses D-Bus **org.freedesktop.login1** interface, like when you power off from your desktop session.
-
-Backend validates declared capabilities at startup and fails fast if mismatched.
-
-```yaml
-# config.yaml
-power:
-  enabled: true
-  capabilities:
-    poweroff: true
-    reboot: true
-```
+Remote reboot and power-off via the REST API — no SSH needed for day-to-day operations. Disabled by default. Uses `org.freedesktop.login1` D-Bus interface.
 
 ### REST API
 
-Lightweight and fast REST API (<50ms 95% response time, 0% CPU on idle mode, tested on Raspberry Pi B and B+)
+- `<50ms` p95 response time, `0%` CPU on idle — tested on Raspberry Pi B and B+
+- Localhost binding by default, configurable per network interface
+- Zeroconf/mDNS auto-discovery on the LAN (opt-in)
 
-Enabled by default, binds to localhost for security. Configure network interface binding and port as needed:
+## Platform Support
 
-```yaml
-# config.yaml
-bind: lo
-# bind: enp2s0    # Specific network interface
-# bind: wlan0     # WiFi interface
-# bind: all       # All interfaces (Docker, remote access)
-api:
-  enabled: true
-  port: 8018
-```
+| Architecture | Package | Tested on |
+|---|---|---|
+| amd64 | deb, rpm | Fedora 43 Gnome, Debian 13 KDE |
+| arm64 | deb, rpm | Raspberry Pi 3/4/5 (64-bit) |
+| armv7hf | deb, rpm | Raspberry Pi 2/3 (32-bit) |
+| **armhf (ARMv6)** | deb, rpm | **Raspberry Pi B / B+ / Zero** |
 
-⚠️ **Security Notice:** No authentication mechanism is provided. **Never expose this API to untrusted networks or the Internet.** Designed for localhost or trusted LAN use only.
+Pre-built packages (amd64, arm64, armv7hf, armhf/ARMv6) and a multi-arch Docker image (amd64, arm64, arm/v7) are available on every build. Docker does not target arm/v6 — Pi B/Zero users should use the armhf package.
 
-### Zeroconf / mDNS
-Odio-api advertises itself using Zeroconf (mDNS). This allows users to discover the API without knowing the host IP or port. Disabled by default and with `lo` bind.
+## Roadmap
 
-Enable in configuration:
-
-```yaml
-bind: eno1
-zeroconf:
-  enabled: true
-```
-
-Developers can discover the API with any mDNS/Bonjour browser on the network. Look for the service type `_http._tcp.local.` and instance name `odio-api`.
-
-### Extensive and Safe Default Configuration
-
-Odio is designed with security and ease-of-use in mind through sensible defaults:
-
-- **Modular backends** - Each backend (MPRIS, PulseAudio, systemd, zeroconf) can be independently enabled or disabled. Run only what you need: media control without audio management, systemd without MPRIS, etc. Even the API can be disabled, though odio loses its interest then.
-- **Zero host configuration required** - Works out-of-the-box on any Linux system with a user session. No system-wide setup, daemon configuration, or special permissions needed for testing.
-- **Localhost binding by default** - API listens on localhost by default, preventing accidental exposure to untrusted networks
-- **Network interface binding** - Bind to network interfaces (`lo`, `eth0`, `wlan0`, `all`) instead of hardcoded IPs, surviving DHCP changes and making configurations portable across networks
-- **Systemd disabled by default** - Service control must be explicitly enabled and configured with a whitelist, no services managed by default
-- **Read-only Docker mounts** - All volume mounts are read-only by default in the `docker-compose.yml` provided, minimizing container's ability to modify the host system
-- **Zeroconf optin** - mDNS must be enabled and adapts based on network binding: disabled on localhost, enabled on specific interfaces, broadcasts on all interfaces when `bind: all`
-
-The default configuration requires no changes for local-only usage and provides clear, explicit opt-ins for remote access or privileged operations.
-
-### Logs
-Different log levels, exhaustive info and debug logs to provide in issues to help debugging.
+- **v0.6** — Built-in web dashboard served by Odio itself at `/ui/`
+- **v0.7** — Bluetooth backend: turn your Linux box into a fully API-controllable BT speaker, exposed as a `media_player` in HA
+- Later: SSE push events, Authentication, Wayland Remote Control, Photos Casting
 
 ## Installation
+
+### Packages (deb / rpm)
+
+Pre-built packages for amd64, arm64, armv7hf, and armhf (ARMv6) are available as artifacts on each [build workflow run](https://github.com/b0bbywan/go-odio-api/actions/workflows/build.yml).
+
+```bash
+# Debian/Ubuntu/Raspberry Pi OS
+sudo dpkg -i odio-api_<version>_amd64.deb
+
+# Fedora/RHEL
+sudo rpm -i odio-api-<version>.x86_64.rpm
+```
 
 ### From Source
 
 ```bash
-# Clone the repository
 git clone https://github.com/b0bbywan/go-odio-api.git
 cd go-odio-api
-
-# Build
-go build -o odio-api
-
-# Run
-./odio-api
+task build    # builds CSS + Go binary with version from git
+./bin/odio-api
 ```
 
 ### systemd User Service
 
-To run as a systemd user service, create `~/.config/systemd/user/odio-api.service`:
+Create `~/.config/systemd/user/odio-api.service`:
 
 ```ini
 [Unit]
@@ -198,71 +175,88 @@ TimeoutSec=30
 WantedBy=default.target
 ```
 
-Then enable and start the service:
-
 ```bash
 systemctl --user daemon-reload
 systemctl --user enable odio-api.service
 systemctl --user start odio-api.service
 ```
 
-**Headless systems:** On fully headless systems, lingering needs to be enabled:
+**Headless systems:** Enable lingering so the user session (PulseAudio/PipeWire, D-Bus, `XDG_RUNTIME_DIR`) survives without an active login:
 
-`sudo loginctl enable-linger <username>`
-
-This ensures the Pulseaudio/Pipewire, user D-Bus session and XDG_RUNTIME_DIR are available even without an active login session.
+```bash
+sudo loginctl enable-linger <username>
+```
 
 ### Docker
-You can also run odio as a container!
 
-#### Build
-Build the Go binary and Docker image
-```bash
-docker build -t odio:latest .
+A pre-built multi-arch image is available on GHCR (amd64, arm64, arm/v6, arm/v7):
+
 ```
-The Dockerfile uses a multi-stage build to compile the Go binary and copy it into a minimal runtime image.
-**Note**: the image includes DBus so that DBus-dependent functionality works correctly inside the container.
+ghcr.io/b0bbywan/go-odio-api:latest
+```
 
-#### Run
-A docker-compose.yml is provided in the repository for the most common use cases. It runs the container as a non-root user (UID 1000) and mounts the necessary host directories for DBus, systemd, and PulseAudio. You can adapt it for more specific setups if needed
+#### Quick start
 
-Environment variables:
-- XDG_RUNTIME_DIR=/run/user/1000                            DBus and Pulse runtime directory
-- DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus     user DBus session
-- HOME=/home/odio                                           ensures `PulseAudio cookie` is found
+```bash
+# 1. Prepare configuration (bind: all required for Docker)
+cp share/config.yaml config.yaml
+# Edit config.yaml: set bind: all
 
-Volumes:
-- ./config.yaml                    (odio configuration)       (read-only)
-- /run/user/1000/bus               (user DBus session)        (read-only)
-- /run/user/1000/systemd           (user systemd folder)      (read-only)
-- /run/utmp                        (user systemd monitoring)  (read-only)
-- /var/run/dbus/system_bus_socket  (system DBus socket)       (read-only)
-- /run/user/1000/pulse             (PulseAudio socket)        (read-only)
-- ./cookie    (`PulseAudio cookie`: $HOME/.config/pulse/cookie) (read-only)
+# 3. (Optional) Only needed if docker compose config shows wrong paths
+cp .env.example .env
 
-The container exposes port 8018 by default and is configured to automatically restart unless stopped. With this configuration, audio and DBus-dependent functionality works seamlessly inside Docker.
+# 4. Start
+docker compose up -d
+```
 
-**Note:** `bind` should be set to `all` in `config.yaml` for remote access with docker. Zeroconf won't work in bridge network mode. It's strongly advised against using host network mode.
+The `docker-compose.yml` reads `UID`, `XDG_RUNTIME_DIR`, `HOME` and `DBUS_SESSION_BUS_ADDRESS`
+directly from your shell environment — no configuration needed for a standard Linux setup.
+See `.env.example` if your shell doesn't export these automatically (e.g. fish).
 
-All mounts are read-only, minimizing the container’s ability to modify the host system.
+Environment variables passed to the container:
+
+| Variable | Source | Purpose |
+|---|---|---|
+| `XDG_RUNTIME_DIR` | host env → fallback `/run/user/$UID` | D-Bus and PulseAudio runtime directory |
+| `DBUS_SESSION_BUS_ADDRESS` | host env → fallback derived from `XDG_RUNTIME_DIR` | User D-Bus session socket |
+| `HOME` | host env → fallback `/home/odio` | PulseAudio cookie lookup path |
+
+Volumes mounted (all read-only):
+
+| Volume | Purpose |
+|---|---|
+| `./config.yaml` | odio configuration |
+| `$XDG_RUNTIME_DIR/bus` | user D-Bus session socket |
+| `$XDG_RUNTIME_DIR/systemd` | user systemd folder (utmp unavailable) |
+| `/run/utmp` | user systemd monitoring (utmp available) |
+| `/var/run/dbus/system_bus_socket` | system D-Bus socket |
+| `$XDG_RUNTIME_DIR/pulse` | PulseAudio socket |
+| `$HOME/.config/pulse/cookie` | PulseAudio cookie |
+
+**Note:** `bind` must be set to `all` in `config.yaml` for Docker remote access (bridge network). Zeroconf won't work in bridge network mode. Host network mode is strongly discouraged.
+
+To build locally instead:
+```bash
+docker build -t odio-api .
+# or simply: task docker:build
+```
+The Docker build is fully self-contained — Tailwind CSS is downloaded and compiled inside the builder stage.
 
 #### Command-line Flags
 
-- --config <path> specify a custom **yaml** configuration file.
-- --version       print the version of go-odio-api and exit.
-- --help          show help message
+- `--config <path>` — specify a custom YAML configuration file
+- `--version` — print version and exit
+- `--help` — show help message
 
 ## Configuration
 
-Configuration file can be placed at:
-- `/etc/odio-api/config.yaml` (system-wide)
+Configuration file locations (in order of precedence):
+- Specified with `--config <path>`
 - `~/.config/odio-api/config.yaml` (user-specific)
-- specified with `-config <path>`
+- `/etc/odio-api/config.yaml` (system-wide)
 - A default configuration is available in `share/config.yaml`
 
-Disabling a backend will disable the backend and its routes !
-
-Example configuration:
+Disabling a backend disables the backend and all its routes.
 
 ```yaml
 bind: lo
@@ -271,37 +265,88 @@ logLevel: info
 api:
   enabled: true
   port: 8018
+  ui:
+    enabled: true
+  cors:
+    origins: ["https://odio-pwa.vercel.app"] # default for PWA
+    # origins: ["https://app.example.com"]  # specific origins
+```
 
-zeroconf:
-  enabled: false
+### Backend configuration examples
 
+#### systemd (opt-in, whitelist required)
+
+```yaml
 systemd:
-  enabled: false
+  enabled: true
   system:
-    -
+    - bluetooth.service
+    - upmpdcli.service
   user:
-    -
+    - pipewire-pulse.service
+    - pulseaudio.service
+    - mpd.service                       # see [1]
+    - shairport-sync.service            # see [2]
+    - snapclient.service                # incompatible with mpris
+    - spotifyd.service                  # see [3]
+    - firefox-kiosk@netflix.com.service # default support for mpris
+    - firefox-kiosk@youtube.com.service # default support for mpris
+    - firefox-kiosk@my.home-assistant.io.service
+    - kodi.service                      # see [4]
+    - vlc.service                       # default support for mpris
+    - plex.service                      # see [5]
+```
+[1] Install `mpd-mpris` or `mpDris2` for MPRIS support
+[2] Check my [article on Medium: Shairport Sync/Airplay with PulseAudio and MPRIS support](https://medium.com/@mathieu-requillart/set-up-a-b83d9c980e75)
+[3] Default on desktop; on headless, your spotifyd version [must be built with MPRIS support](https://docs.spotifyd.rs/advanced/dbus.html)
+[4] Install [Kodi Add-on: MPRIS D-Bus interface](https://github.com/wastis/MediaPlayerRemoteInterface#)
+[5] Maybe supported, untested
 
-pulseaudio:
-  enabled: true
+#### Power Management
 
-mpris:
-  enabled: true
-  timeout: 5s
-
+```yaml
 power:
-  enabled: false
+  enabled: true
   capabilities:
     poweroff: true
     reboot: true
 ```
 
+#### Network binding
+
+```yaml
+bind: lo                      # loopback only (default)
+# bind: enp2s0                # single LAN interface
+# bind: [lo, enp2s0]          # loopback + LAN (required for UI access from the network)
+# bind: [lo, enp2s0, wlan0]   # loopback + ethernet + wifi
+# bind: all                   # all interfaces — 0.0.0.0 (Docker, remote access)
+```
+
+**Note:** The built-in web UI requires `lo` to be in the bind list. If `lo` is absent, the UI is automatically disabled.
+
+#### Zeroconf / mDNS
+
+```yaml
+bind: eno1
+zeroconf:
+  enabled: true
+```
+
+Odio advertises itself via mDNS. Look for `_http._tcp.local.` → instance `odio-api`. Disabled on `lo` binding.
+
+### Security defaults
+
+- **Localhost binding by default** — prevents accidental network exposure
+- **Systemd disabled by default** — service control must be explicitly enabled and configured
+- **Read-only Docker mounts** — all volume mounts are read-only in the provided `docker-compose.yml`
+- **Zeroconf opt-in** — must be enabled, then mDNS adapts to `bind`: disabled on `lo`, enabled on specific interfaces, or `all` interfaces without `lo`
+
 ## API Endpoints
 
-### Server Informations
+### Server Information
 
 ```
-GET    /server                             # {"hostname":"","os_platform":"","os_version":"","api_sw":"","api_version":"","backends":{"mpris":true,"pulseaudio":true,"systemd":false, "zeroconf": false}}
+GET    /server                             # {"hostname":"","os_platform":"","os_version":"","api_sw":"","api_version":"","backends":{"mpris":true,"pulseaudio":true,"systemd":false,"zeroconf":false}}
 ```
 
 ### MPRIS Media Players
@@ -346,33 +391,49 @@ POST   /services/{scope}/{unit}/disable   # Disable service
 ### Power Management
 
 ```
-GET    /power/                             # Power capabilites {"reboot": true, "power_off": false}
-POST   /power/power_off                    # Poweroff (403 if not declared in capabilities)
-POST   /power/reboot                       # Reboot (403 if not declared in capabilities)
+GET    /power/                            # Power capabilities {"reboot": true, "power_off": false}
+POST   /power/power_off                   # Poweroff (403 if not declared in capabilities)
+POST   /power/reboot                      # Reboot (403 if not declared in capabilities)
 ```
+
+## Security
+
+### systemd backend
+
+⚠️ **Security Notice**
+
+Systemd control is disabled by default and requires an explicit whitelist. Odio mitigates risks with deliberate security design:
+
+- **Disabled by default** — must explicitly set `systemd.enabled: true` AND configure units. Empty config → auto-disabled even with `enabled: true`.
+- **Localhost only** — API binds to `lo` by default. Never expose to untrusted networks or the Internet.
+- **User-only mutations** — start/stop/restart/enable/disable only work on user D-Bus. System units are strictly read-only, enforced at the application layer regardless of D-Bus or polkit configuration. This protects against misconfigured or compromised D-Bus setups.
+- **Root forbidden by design** — Odio refuses to run as root.
+- **No preconfigured units** — nothing managed unless explicitly listed.
+
+**You must knowingly enable this at your own risk.** Odio is free software and comes with no warranty.
+
+### REST API
+
+⚠️ **Security Notice:** No authentication mechanism is provided. **Never expose this API to untrusted networks or the Internet.** Designed for localhost or trusted LAN use only.
 
 ## Architecture
 
+### Key Design: The User Session
+
+All multimedia services run as systemd user units, not system-wide daemons. This unlocks a single, unified D-Bus session bus where PulseAudio/PipeWire, MPRIS players, and user systemd units all coexist. Odio listens to that bus and exposes everything via HTTP. Add a new MPRIS player — it appears immediately, zero code or config change.
+
 ### Backends
 
-The application uses a modular backend architecture:
+- **MPRIS Backend** — D-Bus communication with media players, smart caching, real-time D-Bus signal updates
+- **PulseAudio Backend** — native PulseAudio protocol (pure Go, no libpulse), real-time event monitoring
+- **Systemd Backend** — D-Bus with filesystem monitoring fallback (`/run/user/{uid}/systemd/units`)
+- **Power Backend** — `org.freedesktop.login1` D-Bus interface
 
-- **MPRIS Backend**: Communicates with media players via D-Bus, implements smart caching and real-time updates through D-Bus signals
-- **PulseAudio Backend**: Interacts with PulseAudio/PipeWire for audio control, supports real-time event monitoring
-- **Systemd Backend**: Manages systemd services via D-Bus with native signal-based monitoring
+### Performance
 
-### Key Components
-
-- **Cache System**: Optimized caching with TTL support to minimize D-Bus calls
-- **Event Listeners**: Real-time monitoring via D-Bus signals for instant state updates
-- **Heartbeat**: Automatic position tracking for playing media without constant polling
-- **Graceful Shutdown**: Clean resource cleanup on application termination
-
-### Performance Optimizations
-
-- caching reduces D-Bus calls by ~90%
-- Batch property retrieval
+- Caching reduces D-Bus calls by ~90%
 - D-Bus signal-based updates instead of polling
+- Batch property retrieval
 - Automatic heartbeat management for position tracking
 - Connection pooling and timeout handling
 
@@ -380,18 +441,14 @@ The application uses a modular backend architecture:
 
 ### Prerequisites
 
-- Go 1.21 or higher
+- Go 1.24 or higher
 
 ### Running Tests
 
 ```bash
-# Run all tests
 go test ./...
-
-# Run with coverage
 go test -cover ./...
 
-# Run specific backend tests
 go test ./backend/mpris/...
 go test ./backend/pulseaudio/...
 go test ./backend/systemd/...
@@ -399,43 +456,88 @@ go test ./backend/systemd/...
 
 ### Building
 
+The project uses [Task](https://taskfile.dev) for build automation.
+
 ```bash
-# Standard build
-go build -o odio-api
+# Install Task (once)
+go install github.com/go-task/task/v3/cmd/task@latest
 
-# Build with optimizations
-go build -ldflags="-s -w" -o odio-api
+# Build for the current host (CSS + Go binary, version from git)
+task build
 
-# Cross-compile for different architectures
-GOOS=linux GOARCH=amd64 go build -o odio-api-amd64
-GOOS=linux GOARCH=arm64 go build -o odio-api-arm64
+# Cross-compile for all supported architectures (output: dist/)
+task build:all-arch
+
+# Individual targets
+task build:linux-amd64     # x86_64
+task build:linux-arm64     # RPi 3/4/5 64-bit
+task build:linux-armv7hf   # RPi 2/3 32-bit (ARMv7)
+task build:linux-armhf     # RPi B/B+/Zero (ARMv6, RPi OS armhf)
+
+# CSS only
+task css              # Ensure CSS is available (compile or download from CDN)
+task css-local        # Compile locally (requires Tailwind CLI)
+task css:watch        # Watch mode for development
 ```
 
-### Debian Packaging
+**Note:** `task build` injects the version via `-ldflags` from `git describe`. The version is visible via `./bin/odio-api --version`.
 
-```bash
-# Build Debian package
-cd debian
-dpkg-buildpackage -us -uc -b
+#### CSS Build Strategy
+
+The UI uses Tailwind CSS with an intelligent multi-architecture build strategy:
+
+- **Development (x64/arm64/armv7)** — `task build` compiles CSS locally using Tailwind CLI
+- **Legacy ARM (ARMv6 — Raspberry Pi B/B+)** — `task build` downloads pre-built CSS from CDN (`https://bobbywan.me/odio-css/`)
+
+Tailwind CLI doesn't provide ARMv6 binaries. The CSS is architecture-independent, so it's compiled on x64 and distributed via CDN.
+
+**CDN structure:**
+```
+https://bobbywan.me/odio-css/
+  main/abc1234.css          # commit-specific
+  main/latest.css           # latest for branch
+  tags/v0.6.0.css           # release tags (never cleaned)
 ```
 
-### RPM Packaging
+CSS files are **not** committed to the repository.
+
+### Packaging (deb / rpm)
+
+Packages are built with [nfpm](https://nfpm.goreleaser.com/) via Task.
+
 ```bash
-mkdir -p ~/rpmbuild/RPMS/
-rpmbuild -ba odio-api.spec
+# Install nfpm (once)
+go install github.com/goreleaser/nfpm/v2/cmd/nfpm@latest
+
+# Build all packages for all architectures (output: dist/)
+task package:all
+
+# Individual targets
+task package:deb:linux-amd64     # .deb amd64
+task package:deb:linux-arm64     # .deb arm64
+task package:deb:linux-armv7hf   # .deb armv7hf
+task package:deb:linux-armhf     # .deb armhf (ARMv6, RPi OS)
+task package:rpm:linux-amd64     # .rpm x86_64
+task package:rpm:linux-arm64     # .rpm aarch64
+task package:rpm:linux-armv7hf   # .rpm armv7hl
+task package:rpm:linux-armhf     # .rpm armv6hl
 ```
 
 ## Dependencies
 
-- [spf13/viper](https://github.com/spf13/viper) - Go configuration with fangs
-- [godbus/dbus](https://github.com/godbus/dbus) - D-Bus bindings for Go
-- [coreos/go-systemd](https://github.com/coreos/go-systemd) - Go bindings to systemd socket activation, journal, D-Bus, and unit files
-- [the-jonsey/pulseaudio](https://github.com/the-jonsey/pulseaudio) - Pure-Go (no libpulse) implementation of the PulseAudio native protocol.
-- [grandcat/zeroconf](https://github.com/grandcat/zeroconf) - mDNS / DNS-SD Service Discovery in pure Go
+- [spf13/viper](https://github.com/spf13/viper) — configuration
+- [godbus/dbus](https://github.com/godbus/dbus) — D-Bus bindings
+- [coreos/go-systemd](https://github.com/coreos/go-systemd) — systemd D-Bus bindings
+- [the-jonsey/pulseaudio](https://github.com/the-jonsey/pulseaudio) — pure-Go PulseAudio native protocol (no libpulse)
+- [grandcat/zeroconf](https://github.com/grandcat/zeroconf) — mDNS / DNS-SD
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Odio was first pushed on January 25, 2026. It's early stage. v0.4 works out of the box, but there's a long road ahead. Expect bugs.
+
+**Does it work on your setup? What breaks? What's missing?**
+
+Try it. Tell me what works and what doesn't. Show me your setup. If you want to contribute code, even better. Go is a great language for this use case.
 
 1. Fork the repository
 2. Create your feature branch (`git checkout -b feature/amazing-feature`)
@@ -443,17 +545,8 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
+For issues and questions: [GitHub repository](https://github.com/b0bbywan/go-odio-api)
+
 ## License
 
-This project is licensed under the BSD 2-Clause License - see the LICENSE file for details.
-
-## Acknowledgments
-
-- Built with [godbus](https://github.com/godbus/dbus) for D-Bus integration
-- MPRIS specification by freedesktop.org
-- PulseAudio and PipeWire projects
-- systemd project for service management
-
-## Support
-
-For issues, questions, or contributions, please visit the [GitHub repository](https://github.com/b0bbywan/go-odio-api).
+BSD 2-Clause License — see the LICENSE file for details.

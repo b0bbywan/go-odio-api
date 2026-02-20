@@ -1,0 +1,22 @@
+name: odio-api
+arch: ${NFPM_ARCH}
+platform: linux
+version: ${VERSION}
+maintainer: "Mathieu Réquillart <mathieu.requillart@gmail.com>"
+description: "Web API for mpris, pulseaudio and systemd"
+homepage: "https://github.com/b0bbywan/go-odio-api"
+license: "BSD-2-Clause"
+
+contents:
+  - src: ${BINARY_PATH}
+    dst: /usr/bin/odio-api
+    file_info:
+      mode: 0755
+  - src: share/config.yaml
+    dst: /usr/share/odio-api/config.yaml
+  - src: debian/odio-api.service
+    dst: /usr/lib/systemd/user/odio-api.service
+
+scripts:
+  postinstall: debian/postinst
+  preremove: debian/prerm

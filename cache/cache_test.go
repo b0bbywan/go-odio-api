@@ -114,6 +114,30 @@ func TestCacheCleanExpired(t *testing.T) {
 	}
 }
 
+func TestCacheUpdatedAt(t *testing.T) {
+	c := New[string](0)
+
+	if !c.UpdatedAt().IsZero() {
+		t.Fatal("UpdatedAt should be zero before any Set")
+	}
+
+	before := time.Now()
+	c.Set("key1", "value1")
+	after := time.Now()
+
+	updatedAt := c.UpdatedAt()
+	if updatedAt.Before(before) || updatedAt.After(after) {
+		t.Fatalf("UpdatedAt %v not in expected range [%v, %v]", updatedAt, before, after)
+	}
+
+	// A second Set should advance UpdatedAt
+	time.Sleep(time.Millisecond)
+	c.Set("key2", "value2")
+	if !c.UpdatedAt().After(updatedAt) {
+		t.Fatal("UpdatedAt should advance on subsequent Set")
+	}
+}
+
 func TestCacheThreadSafety(t *testing.T) {
 	c := New[int](0)
 	done := make(chan bool, 10)

@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -50,6 +51,38 @@ func TestJSONHandlerError(t *testing.T) {
 
 	if w.Code != http.StatusInternalServerError {
 		t.Errorf("status code = %d, want 500", w.Code)
+	}
+}
+
+func TestJSONHandlerStatusError(t *testing.T) {
+	tests := []struct {
+		name     string
+		code     int
+		msg      string
+		wantCode int
+	}{
+		{"404", http.StatusNotFound, "not found", http.StatusNotFound},
+		{"403", http.StatusForbidden, "forbidden", http.StatusForbidden},
+		{"400", http.StatusBadRequest, "bad request", http.StatusBadRequest},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			handler := JSONHandler(func(w http.ResponseWriter, r *http.Request) (any, error) {
+				return nil, httpError(tt.code, errors.New(tt.msg))
+			})
+
+			req := httptest.NewRequest("GET", "/test", nil)
+			w := httptest.NewRecorder()
+			handler(w, req)
+
+			if w.Code != tt.wantCode {
+				t.Errorf("status code = %d, want %d", w.Code, tt.wantCode)
+			}
+			if body := w.Body.String(); !strings.Contains(body, tt.msg) {
+				t.Errorf("body = %q, want to contain %q", body, tt.msg)
+			}
+		})
 	}
 }
 

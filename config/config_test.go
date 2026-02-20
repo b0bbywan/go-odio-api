@@ -80,6 +80,52 @@ func TestSystemdConfigStructFields(t *testing.T) {
 	}
 }
 
+func TestNew_UIConfig(t *testing.T) {
+	tests := []struct {
+		name      string
+		uiEnabled bool
+	}{
+		{"UI disabled by default", false},
+		{"UI enabled", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			viper.Reset()
+			viper.Set("api.ui.enabled", tt.uiEnabled)
+			t.Setenv("HOME", t.TempDir())
+
+			cfg, err := New(nil)
+			if err != nil {
+				t.Fatalf("New(nil) returned error: %v", err)
+			}
+
+			if cfg.Api.UI == nil {
+				t.Fatal("Api.UI should not be nil")
+			}
+			if cfg.Api.UI.Enabled != tt.uiEnabled {
+				t.Errorf("Api.UI.Enabled = %v, want %v", cfg.Api.UI.Enabled, tt.uiEnabled)
+			}
+		})
+	}
+}
+
+func TestNew_UIDisabledByDefault(t *testing.T) {
+	viper.Reset()
+	t.Setenv("HOME", t.TempDir())
+
+	cfg, err := New(nil)
+	if err != nil {
+		t.Fatalf("New() returned error: %v", err)
+	}
+	if cfg.Api.UI == nil {
+		t.Fatal("Api.UI should not be nil")
+	}
+	if cfg.Api.UI.Enabled {
+		t.Error("Api.UI.Enabled should be false by default")
+	}
+}
+
 func BenchmarkParseLogLevel(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		parseLogLevel("DEBUG")
@@ -615,31 +661,38 @@ func TestNew_DefaultBindLocalhost(t *testing.T) {
 		t.Fatalf("New(nil) returned error: %v", err)
 	}
 
-	// Should bind to localhost by default for security
-	expectedListen := "127.0.0.1:8018"
-	if cfg.Api.Listen != expectedListen {
-		t.Errorf("Api.Listen = %q, want %q (localhost by default)", cfg.Api.Listen, expectedListen)
+	// Should always include localhost for security
+	loopback := "127.0.0.1:8018"
+	found := false
+	for _, l := range cfg.Api.Listens {
+		if l == loopback {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("Api.Listens = %v, want to contain %q (localhost by default)", cfg.Api.Listens, loopback)
 	}
 }
 
 func TestNew_CustomBindAddress(t *testing.T) {
 	tests := []struct {
-		name         string
-		bind         string
-		port         int
-		expectListen string
+		name          string
+		bind          string
+		port          int
+		expectContain string // address that must appear in Listens
 	}{
 		{
-			name:         "explicit localhost",
-			bind:         "lo",
-			port:         8080,
-			expectListen: "127.0.0.1:8080",
+			name:          "explicit localhost",
+			bind:          "lo",
+			port:          8080,
+			expectContain: "127.0.0.1:8080",
 		},
 		{
-			name:         "all interfaces",
-			bind:         "all",
-			port:         8018,
-			expectListen: "0.0.0.0:8018",
+			name:          "all interfaces",
+			bind:          "all",
+			port:          8018,
+			expectContain: "0.0.0.0:8018",
 		},
 	}
 
@@ -657,8 +710,15 @@ func TestNew_CustomBindAddress(t *testing.T) {
 				t.Fatalf("New(nil) returned error: %v", err)
 			}
 
-			if cfg.Api.Listen != tt.expectListen {
-				t.Errorf("Api.Listen = %q, want %q", cfg.Api.Listen, tt.expectListen)
+			found := false
+			for _, l := range cfg.Api.Listens {
+				if l == tt.expectContain {
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Errorf("Api.Listens = %v, want to contain %q", cfg.Api.Listens, tt.expectContain)
 			}
 		})
 	}
@@ -771,9 +831,9 @@ func TestNew_SecurityDefaults(t *testing.T) {
 	}{
 		{
 			name:     "bind localhost",
-			got:      cfg.Api.Listen,
+			got:      cfg.Api.Listens[0],
 			want:     "127.0.0.1:8018",
-			errorMsg: "API should bind to localhost by default",
+			errorMsg: "API should include localhost first by default",
 		},
 		{
 			name:     "systemd disabled",
@@ -813,7 +873,7 @@ func TestNew_SecurityDefaults(t *testing.T) {
 // Tests for network interface helpers
 func TestGetZeroconfInterfaces_Localhost(t *testing.T) {
 	// Localhost should return nil (no zeroconf on loopback)
-	interfaces := getZeroconfInterfaces("lo")
+	interfaces := getZeroconfInterfaces([]string{"lo"})
 
 	if interfaces != nil {
 		t.Errorf("getZeroconfInterfaces(lo) = %v, want nil (no zeroconf on localhost)", interfaces)
@@ -822,7 +882,7 @@ func TestGetZeroconfInterfaces_Localhost(t *testing.T) {
 
 func TestGetZeroconfInterfaces_AllInterfaces(t *testing.T) {
 	// 0.0.0.0 should return all active non-loopback interfaces
-	interfaces := getZeroconfInterfaces("all")
+	interfaces := getZeroconfInterfaces([]string{"all"})
 
 	// Should call getAllActiveInterfaces() which filters loopback
 	for _, iface := range interfaces {
@@ -845,7 +905,7 @@ func TestGetZeroconfInterfaces_InvalidIP(t *testing.T) {
 
 	for _, ip := range tests {
 		t.Run(ip, func(t *testing.T) {
-			interfaces := getZeroconfInterfaces(ip)
+			interfaces := getZeroconfInterfaces([]string{ip})
 
 			// Invalid IPs should return nil (with warning logged)
 			if interfaces != nil {
@@ -858,7 +918,7 @@ func TestGetZeroconfInterfaces_InvalidIP(t *testing.T) {
 func TestGetZeroconfInterfaces_NonexistentIP(t *testing.T) {
 	// IP that's valid but doesn't exist on this machine
 	nonexistentIP := "192.168.99.99"
-	interfaces := getZeroconfInterfaces(nonexistentIP)
+	interfaces := getZeroconfInterfaces([]string{nonexistentIP})
 
 	// Should return nil since no interface has this IP
 	if interfaces != nil {
@@ -889,5 +949,108 @@ func TestNew_ZeroconfAllInterfaces(t *testing.T) {
 		if iface.Flags&net.FlagLoopback != 0 {
 			t.Errorf("Zeroconf.Listen contains loopback interface: %s", iface.Name)
 		}
+	}
+}
+
+// --- Tests CORSConfig ---
+
+func TestNew_CORSDefaultOrigin(t *testing.T) {
+	viper.Reset()
+	t.Setenv("HOME", t.TempDir())
+
+	cfg, err := New(nil)
+	if err != nil {
+		t.Fatalf("New(nil) returned error: %v", err)
+	}
+	if cfg.Api.CORS == nil {
+		t.Fatal("Api.CORS should not be nil with default origin")
+	}
+	want := []string{"https://odio-pwa.vercel.app"}
+	if len(cfg.Api.CORS.Origins) != 1 || cfg.Api.CORS.Origins[0] != want[0] {
+		t.Errorf("Api.CORS.Origins = %v, want %v", cfg.Api.CORS.Origins, want)
+	}
+}
+
+func TestNew_CORSWildcard(t *testing.T) {
+	viper.Reset()
+	viper.Set("api.cors.origins", []string{"*"})
+	t.Setenv("HOME", t.TempDir())
+
+	cfg, err := New(nil)
+	if err != nil {
+		t.Fatalf("New(nil) returned error: %v", err)
+	}
+	if cfg.Api.CORS == nil {
+		t.Fatal("Api.CORS should not be nil when origins are configured")
+	}
+	if len(cfg.Api.CORS.Origins) != 1 || cfg.Api.CORS.Origins[0] != "*" {
+		t.Errorf("Api.CORS.Origins = %v, want [*]", cfg.Api.CORS.Origins)
+	}
+}
+
+func TestNew_CORSSpecificOrigins(t *testing.T) {
+	viper.Reset()
+	origins := []string{"https://app.example.com", "https://other.example.com"}
+	viper.Set("api.cors.origins", origins)
+	t.Setenv("HOME", t.TempDir())
+
+	cfg, err := New(nil)
+	if err != nil {
+		t.Fatalf("New(nil) returned error: %v", err)
+	}
+	if cfg.Api.CORS == nil {
+		t.Fatal("Api.CORS should not be nil when origins are configured")
+	}
+	if len(cfg.Api.CORS.Origins) != len(origins) {
+		t.Fatalf("Api.CORS.Origins len = %d, want %d", len(cfg.Api.CORS.Origins), len(origins))
+	}
+	for i, o := range origins {
+		if cfg.Api.CORS.Origins[i] != o {
+			t.Errorf("Api.CORS.Origins[%d] = %q, want %q", i, cfg.Api.CORS.Origins[i], o)
+		}
+	}
+}
+
+func TestNew_CORSFromConfigFile(t *testing.T) {
+	viper.Reset()
+
+	tmpDir := t.TempDir()
+	configFile := tmpDir + "/config.yaml"
+	configContent := `
+api:
+  cors:
+    origins:
+      - "*"
+`
+	if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
+		t.Fatalf("Failed to create test config file: %v", err)
+	}
+
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
+
+	cfg, err := New(&configFile)
+	if err != nil {
+		t.Fatalf("New() returned error: %v", err)
+	}
+	if cfg.Api.CORS == nil {
+		t.Fatal("Api.CORS should not be nil when loaded from config file")
+	}
+	if len(cfg.Api.CORS.Origins) != 1 || cfg.Api.CORS.Origins[0] != "*" {
+		t.Errorf("Api.CORS.Origins = %v, want [*]", cfg.Api.CORS.Origins)
+	}
+}
+
+func TestNew_CORSEmptyOriginsStaysNil(t *testing.T) {
+	viper.Reset()
+	viper.Set("api.cors.origins", []string{})
+	t.Setenv("HOME", t.TempDir())
+
+	cfg, err := New(nil)
+	if err != nil {
+		t.Fatalf("New(nil) returned error: %v", err)
+	}
+	if cfg.Api.CORS != nil {
+		t.Errorf("Api.CORS should be nil for empty origins list, got %+v", cfg.Api.CORS)
 	}
 }

@@ -1,0 +1,18 @@
+{{ define "volume-slider" }}
+<div class="flex items-center gap-2">
+	{{ if .ShowMute }}
+	<button class="text-base" onclick="toggleMute(this, '{{ .Target }}', '{{ .Type }}')" title="Toggle mute">
+		{{ if .Muted }}🔇{{ else }}🔊{{ end }}
+	</button>
+	{{ else }}
+	<span class="text-xs text-zinc-400">🔊</span>
+	{{ end }}
+	<input type="range"
+	       class="volume-slider flex-1"
+	       min="0"
+	       max="100"
+	       value="{{ printf "%.0f" (mul .Volume 100) }}"
+	       oninput="updateVolume(this, '{{ .Target }}', '{{ .Type }}')"
+	       title="{{ if .Title }}{{ .Title }}{{ else }}Volume{{ end }}">
+</div>
+{{ end }}

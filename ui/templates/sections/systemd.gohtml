@@ -1,0 +1,22 @@
+{{ define "section-systemd" }}
+<details id="section-systemd" open class="section-card">
+	<summary class="section-header">
+		<h2 class="section-title">⚙️ Services</h2>
+		<div class="flex items-center gap-2">
+			<span class="badge badge-purple">{{ len . }} configured</span>
+			<span class="section-toggle">▾</span>
+		</div>
+	</summary>
+
+	<div class="space-y-2">
+		{{ range . }}
+			{{ template "systemd-unit" . }}
+		{{ else }}
+			<div class="empty-state">
+				<div class="empty-state-icon">⚙️</div>
+				<p class="text-sm text-muted">No services configured</p>
+			</div>
+		{{ end }}
+	</div>
+</details>
+{{ end }}
