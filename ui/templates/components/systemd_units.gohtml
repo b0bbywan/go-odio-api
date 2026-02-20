@@ -1,0 +1,35 @@
+{{ define "systemd-unit" }}
+<div class="service-card">
+	<!-- Service info -->
+	<div class="content-area">
+		<div class="player-name mb-1">
+			{{ if .Description }}{{ .Description }}{{ else }}{{ .Name }}{{ end }}
+		</div>
+		<div class="flex items-center gap-2">
+			<div class="player-meta-small">{{ .Name }}</div>
+			{{ if .IsUser }}
+			<button class="text-sm hover:scale-110 transition-transform"
+			        hx-post="/services/user/{{ .Name }}/restart"
+			        hx-swap="none"
+			        title="Restart service">🔄</button>
+			{{ if .Active }}
+			<button class="text-sm hover:scale-110 transition-transform"
+			        hx-post="/services/user/{{ .Name }}/stop"
+			        hx-swap="none"
+			        title="Stop service">🛑</button>
+			{{ end }}
+			{{ end }}
+		</div>
+	</div>
+
+	<!-- Status indicator -->
+	<div class="meta-area">
+		<span class="flex items-center gap-1.5 text-xs">
+			<span class="status-dot {{ if .Active }}bg-green-500{{ else }}bg-red-500{{ end }}"></span>
+			<span class="{{ if .Active }}text-green-400{{ else }}text-red-400{{ end }}">
+				{{ .State }}
+			</span>
+		</span>
+	</div>
+</div>
+{{ end }}

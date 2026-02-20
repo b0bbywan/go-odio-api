@@ -1,0 +1,36 @@
+name: Cleanup CSS on branch deletion
+
+on:
+  delete:
+    branches:
+      - '**'
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    if: github.event.ref_type == 'branch'
+    steps:
+      - name: Install lftp
+        run: sudo apt-get update && sudo apt-get install -y lftp
+
+      - name: Remove branch CSS from CDN
+        env:
+          SFTP_HOST: ${{ secrets.FTP_HOST }}
+          SFTP_USER: ${{ secrets.FTP_USER }}
+          SFTP_PASS: ${{ secrets.FTP_PASS }}
+        run: |
+          BRANCH=${{ github.event.ref }}
+
+          echo "🗑️  Cleaning up CSS for deleted branch: ${BRANCH}"
+
+          # Supprimer le dossier de la branche via SFTP
+          lftp -c "
+            set sftp:auto-confirm yes
+            open -u ${SFTP_USER},${SFTP_PASS} sftp://${SFTP_HOST}
+            rm -rf www/odio-css/${BRANCH}
+            bye
+          "
+
+          echo "✅ Cleaned up CSS for branch ${BRANCH}"

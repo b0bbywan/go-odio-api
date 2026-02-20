@@ -1,9 +1,19 @@
+# bind accepts a single interface name, a list, or "all"
+# bind: lo                    # loopback only (default)
+# bind: [enp2s0, wlan0]       # multiple interfaces
+# bind: all                   # all active interfaces (0.0.0.0)
 bind: lo
 logLevel: info
 
 api:
   enabled: true
   port: 8018
+  # cors:
+  #   origins: ["https://odio-pwa.vercel.app"] # default for PWA
+  #   origins: ["https://app.example.com"]  # specific origins
+  ui:
+    enabled: false
+
 
 zeroconf:
   enabled: false
@@ -24,8 +34,8 @@ systemd:
 power:
   enabled: false
   capabilities:
-    poweroff: true
-    reboot: true
+    poweroff: false
+    reboot: false
 
 pulseaudio:
   enabled: true

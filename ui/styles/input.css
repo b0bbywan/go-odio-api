@@ -1,0 +1,257 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Remove native <details> disclosure marker */
+details > summary {
+	list-style: none;
+}
+details > summary::-webkit-details-marker {
+	display: none;
+}
+
+/* Custom scrollbar for dark theme */
+::-webkit-scrollbar {
+	width: 8px;
+	height: 8px;
+}
+::-webkit-scrollbar-track {
+	background: #18181b;
+}
+::-webkit-scrollbar-thumb {
+	background: #3f3f46;
+	border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+	background: #52525b;
+}
+
+/* HTMX request indicator */
+button.htmx-request {
+	opacity: 0.6;
+	pointer-events: none;
+}
+
+/* Custom animations */
+@keyframes pulse-opacity {
+	0%, 100% { opacity: 0.6; }
+	50% { opacity: 0.8; }
+}
+
+button.htmx-request {
+	animation: pulse-opacity 1s ease-in-out infinite;
+}
+
+/* Volume & seek sliders */
+.volume-slider,
+.seek-slider {
+	height: 4px;
+	border-radius: 2px;
+	background: #3f3f46;
+	outline: none;
+	opacity: 0.9;
+	transition: opacity 0.2s;
+}
+
+.volume-slider {
+	width: 100%;
+}
+
+.seek-slider {
+	flex: 1;
+}
+
+.volume-slider:hover,
+.seek-slider:hover {
+	opacity: 1;
+}
+
+.volume-slider::-webkit-slider-thumb,
+.seek-slider::-webkit-slider-thumb {
+	-webkit-appearance: none;
+	appearance: none;
+	width: 14px;
+	height: 14px;
+	border-radius: 50%;
+	background: #3b82f6;
+	cursor: pointer;
+}
+
+.volume-slider::-moz-range-thumb,
+.seek-slider::-moz-range-thumb {
+	width: 14px;
+	height: 14px;
+	border-radius: 50%;
+	background: #3b82f6;
+	cursor: pointer;
+	border: none;
+}
+
+.volume-slider::-moz-range-progress,
+.seek-slider::-moz-range-progress {
+	background: #3b82f6;
+	height: 4px;
+	border-radius: 2px;
+}
+
+/* Component utility classes */
+@layer components {
+	.section-card {
+		@apply rounded-xl bg-zinc-800 p-4 shadow-lg overflow-hidden;
+	}
+
+	.section-header {
+		@apply mb-4 flex items-center justify-between;
+	}
+
+	/* <summary> used as section-header: suppress mb when collapsed */
+	details > summary.section-header {
+		@apply mb-0 cursor-pointer;
+	}
+	details[open] > summary.section-header {
+		@apply mb-4;
+	}
+
+	/* Collapse chevron — mobile only */
+	.section-toggle {
+		@apply text-zinc-500 transition-transform duration-200 sm:hidden;
+	}
+	details[open] > summary .section-toggle {
+		@apply rotate-180;
+	}
+
+	.section-title {
+		@apply text-lg font-semibold;
+	}
+
+	.badge {
+		@apply rounded-full px-2 py-1 text-xs;
+	}
+
+	.badge-green {
+		@apply bg-green-500/10 text-green-400;
+	}
+
+	.badge-blue {
+		@apply bg-blue-500/10 text-blue-400;
+	}
+
+	.badge-purple {
+		@apply bg-purple-500/10 text-purple-400;
+	}
+
+	.badge-red {
+		@apply bg-red-500/20 text-red-400;
+	}
+
+	.player-card {
+		@apply flex flex-col gap-3 rounded-lg bg-zinc-700/50 p-3 transition-colors hover:bg-zinc-700;
+		container-type: inline-size;
+	}
+
+	.player-art {
+		@apply mx-auto max-w-[75%] rounded-md mb-2;
+		max-height: 75cqw;
+	}
+
+	.btn {
+		@apply rounded-lg bg-zinc-600/50 px-3 py-2 text-sm transition-colors hover:bg-zinc-600 active:scale-95;
+	}
+
+	.text-muted {
+		@apply text-zinc-400;
+	}
+
+	.text-subtle {
+		@apply text-zinc-500;
+	}
+
+	.info-card {
+		@apply rounded-lg bg-zinc-900/50 p-3;
+	}
+
+	.client-card {
+		@apply flex items-center justify-between rounded-lg bg-zinc-900/50 p-2.5 transition-colors hover:bg-zinc-900;
+	}
+
+	.service-card {
+		@apply flex items-center justify-between rounded-lg bg-zinc-900/50 p-3 transition-colors hover:bg-zinc-900;
+	}
+
+	/* Layout utilities */
+	.grid-responsive {
+		@apply grid gap-4 sm:grid-cols-2 lg:grid-cols-3;
+	}
+
+	.empty-state {
+		@apply flex flex-col items-center justify-center py-8 text-center;
+	}
+
+	.empty-state-large {
+		@apply flex min-h-[50vh] items-center justify-center;
+	}
+
+	.content-area {
+		@apply min-w-0 flex-1;
+	}
+
+	.meta-area {
+		@apply ml-3 flex shrink-0 items-center gap-2;
+	}
+
+	.controls-group {
+		@apply flex shrink-0 gap-1 sm:gap-2;
+	}
+
+	/* Typography utilities */
+	.player-name {
+		@apply truncate font-medium text-zinc-200;
+	}
+
+	.player-meta {
+		@apply truncate text-sm text-muted;
+	}
+
+	.player-meta-small {
+		@apply truncate text-xs text-subtle;
+	}
+
+	.empty-state-icon {
+		@apply mb-2 text-4xl opacity-50;
+	}
+
+	.empty-state-icon-large {
+		@apply mb-4 text-6xl;
+	}
+
+	.empty-state-title {
+		@apply mb-2 text-xl font-semibold text-zinc-300;
+	}
+
+	/* Status indicators */
+	.status-badge {
+		@apply rounded px-1.5 py-0.5 text-xs;
+	}
+
+	.status-badge-playing {
+		@apply bg-green-500/20 text-green-400;
+	}
+
+	.status-badge-paused {
+		@apply bg-zinc-600 text-zinc-400;
+	}
+
+	.status-dot {
+		@apply h-2 w-2 rounded-full;
+	}
+
+	/* Position seeker row */
+	.seeker-row {
+		@apply flex items-center gap-2;
+	}
+
+	.pos-time,
+	.dur-time {
+		@apply text-xs text-zinc-500 tabular-nums shrink-0;
+	}
+}

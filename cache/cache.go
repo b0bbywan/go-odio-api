@@ -19,9 +19,10 @@ func (e Entry[T]) IsExpired() bool {
 }
 
 type Cache[T any] struct {
-	mu      sync.RWMutex
-	entries map[string]Entry[T]
-	ttl     time.Duration
+	mu        sync.RWMutex
+	entries   map[string]Entry[T]
+	ttl       time.Duration
+	updatedAt time.Time
 }
 
 func New[T any](ttl time.Duration) *Cache[T] {
@@ -63,7 +64,7 @@ func (c *Cache[T]) Set(key string, value T) {
 		Value:     value,
 		ExpiresAt: expiresAt,
 	}
-
+	c.updatedAt = time.Now()
 }
 
 func (c *Cache[T]) Delete(key string) {
@@ -89,4 +90,11 @@ func (c *Cache[T]) CleanExpired() {
 			delete(c.entries, key)
 		}
 	}
+}
+
+func (c *Cache[T]) UpdatedAt() time.Time {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	return c.updatedAt
 }

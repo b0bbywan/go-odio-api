@@ -1,0 +1,54 @@
+{{ define "section-pulseaudio" }}
+<details id="section-audio" open class="section-card">
+	<summary class="section-header">
+		<div class="flex items-center gap-2">
+			<h2 class="section-title">🔊 Audio Server</h2>
+			{{ if .AudioInfo }}
+			{{ if .AudioInfo.Kind }}
+			<span class="badge badge-blue text-xs">{{ .AudioInfo.Kind }}</span>
+			{{ end }}
+			{{ end }}
+		</div>
+		<div class="flex items-center gap-2">
+			{{ if .AudioInfo }}
+			<span class="badge {{ if .AudioInfo.Muted }}badge-red{{ else }}badge-blue{{ end }}">
+				{{ if .AudioInfo.Muted }}Muted{{ else }}{{ printf "%.0f%%" (mul .AudioInfo.Volume 100) }}{{ end }}
+			</span>
+			{{ end }}
+			<span class="section-toggle">▾</span>
+		</div>
+	</summary>
+
+	{{ if .AudioInfo }}
+	<!-- Server info -->
+	<div class="info-card mb-4">
+		<div class="mb-2 text-xs text-subtle">Default Sink</div>
+		<div class="truncate text-sm font-medium mb-3" title="{{ .AudioInfo.DefaultSink }}">{{ .AudioInfo.DefaultSink }}</div>
+
+		<!-- Volume control -->
+		{{ template "volume-slider" (dict "Target" "" "Type" "audio-server" "Volume" .AudioInfo.Volume "Muted" .AudioInfo.Muted "ShowMute" true "Title" "Master volume") }}
+	</div>
+
+	<!-- Audio clients -->
+	{{ if .AudioClients }}
+	<div class="space-y-2">
+		<div class="text-xs font-semibold uppercase text-subtle">
+			Active Clients ({{ len .AudioClients }})
+		</div>
+		{{ range .AudioClients }}
+			{{ template "pulseaudio-sink" . }}
+		{{ end }}
+	</div>
+	{{ else }}
+	<div class="empty-state">
+		<p class="text-sm text-muted">No active audio clients</p>
+	</div>
+	{{ end }}
+	{{ else }}
+	<div class="empty-state">
+		<div class="empty-state-icon">🔊</div>
+		<p class="text-sm text-muted">Audio info unavailable</p>
+	</div>
+	{{ end }}
+</details>
+{{ end }}

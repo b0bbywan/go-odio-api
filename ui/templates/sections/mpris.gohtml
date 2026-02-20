@@ -1,0 +1,22 @@
+{{ define "section-mpris" }}
+<details id="section-mpris" open class="section-card">
+	<summary class="section-header">
+		<h2 class="section-title">🎵 Media Players</h2>
+		<div class="flex items-center gap-2">
+			<span class="badge badge-green">{{ len . }} active</span>
+			<span class="section-toggle">▾</span>
+		</div>
+	</summary>
+
+	<div class="space-y-3">
+		{{ range . }}
+			{{ template "mpris-player" . }}
+		{{ else }}
+			<div class="empty-state">
+				<div class="empty-state-icon">🎵</div>
+				<p class="text-sm text-muted">No active media players</p>
+			</div>
+		{{ end }}
+	</div>
+</details>
+{{ end }}

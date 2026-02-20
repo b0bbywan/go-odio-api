@@ -10,6 +10,8 @@ jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     strategy:
       matrix:
         go-version: ['1.23', '1.24']
@@ -38,6 +40,12 @@ jobs:
 
     - name: Verify dependencies
       run: go mod verify
+
+    - name: Install Task
+      run: go install github.com/go-task/task/v3/cmd/task@latest
+
+    - name: Compile CSS (required for embed)
+      run: task css
 
     - name: Run tests
       run: go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
@@ -71,6 +79,8 @@ jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
     - name: Checkout code
@@ -80,6 +90,12 @@ jobs:
       uses: actions/setup-go@v5
       with:
         go-version: '1.24'
+
+    - name: Install Task
+      run: go install github.com/go-task/task/v3/cmd/task@latest
+
+    - name: Compile CSS (required for embed)
+      run: task css
 
     - name: Run golangci-lint
       uses: golangci/golangci-lint-action@v7
@@ -87,35 +103,11 @@ jobs:
         version: v2.5.0
         args: --timeout=5m
 
-  build:
-    name: Build
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Set up Go
-      uses: actions/setup-go@v5
-      with:
-        go-version: '1.24'
-
-    - name: Cache Go modules
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.cache/go-build
-          ~/go/pkg/mod
-        key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}
-        restore-keys: |
-          ${{ runner.os }}-go-build-
-
-    - name: Build
-      run: go build -v ./...
-
   format:
     name: Format Check
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
     - name: Checkout code
@@ -149,13 +141,3 @@ jobs:
           echo "✅ go.mod and go.sum are tidy"
         fi
 
-  docker:
-    name: Build Docker image
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Build Docker image
-        run: docker build -t odio:latest .
