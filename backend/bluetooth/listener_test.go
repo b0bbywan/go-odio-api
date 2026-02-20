@@ -11,15 +11,23 @@ import (
 func TestNewDBusListener(t *testing.T) {
 	ctx := context.Background()
 	callback := func(sig *dbus.Signal) bool { return false }
-	matchRule := "type='signal',interface='org.freedesktop.DBus.Properties'"
+	matchRules := []string{
+		"type='signal',interface='org.freedesktop.DBus.Properties',arg0='org.bluez.Device1'",
+		"type='signal',interface='org.freedesktop.DBus.Properties',arg0='org.bluez.Adapter1'",
+	}
 
-	listener := NewDBusListener(nil, ctx, matchRule, callback)
+	listener := NewDBusListener(nil, ctx, matchRules, callback)
 
 	if listener.ctx != ctx {
 		t.Error("context not set correctly")
 	}
-	if listener.matchRule != matchRule {
-		t.Errorf("matchRule = %q, want %q", listener.matchRule, matchRule)
+	if len(listener.matchRules) != len(matchRules) {
+		t.Fatalf("matchRules len = %d, want %d", len(listener.matchRules), len(matchRules))
+	}
+	for i, rule := range matchRules {
+		if listener.matchRules[i] != rule {
+			t.Errorf("matchRules[%d] = %q, want %q", i, listener.matchRules[i], rule)
+		}
 	}
 	if listener.callback == nil {
 		t.Error("callback not set")
