@@ -8,6 +8,7 @@ import (
 
 	"github.com/b0bbywan/go-odio-api/cache"
 	"github.com/b0bbywan/go-odio-api/config"
+	"github.com/b0bbywan/go-odio-api/events"
 	"github.com/b0bbywan/go-odio-api/logger"
 )
 
@@ -44,6 +45,7 @@ func New(ctx context.Context, config *config.SystemdConfig) (*SystemdBackend, er
 		ctx:      ctx,
 		config:   config,
 		cache:    cache.New[[]Service](0), // TTL=0 = no expiration
+		events:   make(chan events.Event, 32),
 	}, nil
 }
 
@@ -80,7 +82,19 @@ func (s *SystemdBackend) Close() {
 		s.userConn.Close()
 		s.userConn = nil
 	}
+	close(s.events)
 }
+
+func (s *SystemdBackend) notify(e events.Event) {
+	select {
+	case s.events <- e:
+	default:
+		logger.Warn("[systemd] event channel full, dropping %s event", e.Type)
+	}
+}
+
+// Events returns the read-only event channel for this backend.
+func (s *SystemdBackend) Events() <-chan events.Event { return s.events }
 
 func (b *SystemdBackend) canExecute(name string, scope UnitScope) error {
 	switch scope {

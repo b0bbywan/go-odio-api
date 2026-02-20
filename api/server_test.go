@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -17,7 +18,7 @@ func emptyBackend() *backend.Backend {
 
 // TestNewServer_NilConfig verifies that NewServer returns nil when config is nil
 func TestNewServer_NilConfig(t *testing.T) {
-	s := NewServer(nil, nil)
+	s := NewServer(context.Background(), nil, nil)
 	if s != nil {
 		t.Error("NewServer(nil, nil) should return nil")
 	}
@@ -30,7 +31,7 @@ func TestNewServer_Disabled(t *testing.T) {
 		Port:    8080,
 		UI:      &config.UIConfig{Enabled: false},
 	}
-	s := NewServer(cfg, nil)
+	s := NewServer(context.Background(), cfg, nil)
 	if s != nil {
 		t.Error("NewServer with Enabled=false should return nil")
 	}
@@ -43,7 +44,7 @@ func TestNewServer_Valid(t *testing.T) {
 		Port:    8080,
 		UI:      &config.UIConfig{Enabled: false},
 	}
-	s := NewServer(cfg, nil)
+	s := NewServer(context.Background(), cfg, nil)
 	if s == nil {
 		t.Fatal("NewServer with valid config should not return nil")
 	}
@@ -56,7 +57,7 @@ func TestServer_RootReturns404(t *testing.T) {
 		Port:    8080,
 		UI:      &config.UIConfig{Enabled: false},
 	}
-	s := NewServer(cfg, emptyBackend())
+	s := NewServer(context.Background(), cfg, emptyBackend())
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	w := httptest.NewRecorder()
@@ -74,7 +75,7 @@ func TestServer_UIDisabled(t *testing.T) {
 		Port:    8080,
 		UI:      &config.UIConfig{Enabled: false},
 	}
-	s := NewServer(cfg, emptyBackend())
+	s := NewServer(context.Background(), cfg, emptyBackend())
 
 	req := httptest.NewRequest(http.MethodGet, "/ui", nil)
 	w := httptest.NewRecorder()
@@ -94,7 +95,7 @@ func TestServer_UIEnabled(t *testing.T) {
 		Port:    8080,
 		UI:      &config.UIConfig{Enabled: true},
 	}
-	s := NewServer(cfg, emptyBackend())
+	s := NewServer(context.Background(), cfg, emptyBackend())
 
 	req := httptest.NewRequest(http.MethodGet, "/ui", nil)
 	w := httptest.NewRecorder()
@@ -112,7 +113,7 @@ func TestServer_UIEnabledNilUIConfig(t *testing.T) {
 		Port:    8080,
 		UI:      nil, // no UI config
 	}
-	s := NewServer(cfg, emptyBackend())
+	s := NewServer(context.Background(), cfg, emptyBackend())
 	if s == nil {
 		t.Fatal("NewServer with nil UIConfig should still return a server")
 	}
@@ -135,7 +136,7 @@ func TestServerDisabled(t *testing.T) {
 	}
 
 	backend := &backend.Backend{}
-	server := NewServer(cfg, backend)
+	server := NewServer(context.Background(), cfg, backend)
 
 	if server != nil {
 		t.Error("NewServer should return nil when API is disabled")
@@ -151,7 +152,7 @@ func TestServerEnabled(t *testing.T) {
 	}
 
 	backend := &backend.Backend{}
-	server := NewServer(cfg, backend)
+	server := NewServer(context.Background(), cfg, backend)
 
 	if server == nil {
 		t.Fatal("NewServer should return a non-nil server when API is enabled")
@@ -179,7 +180,7 @@ func TestRoutesWithDisabledBackends(t *testing.T) {
 		Zeroconf: nil,
 	}
 
-	server := NewServer(cfg, backend)
+	server := NewServer(context.Background(), cfg, backend)
 	if server == nil {
 		t.Fatal("NewServer should return a non-nil server")
 		return
@@ -291,7 +292,7 @@ func TestRoutesWithEnabledSystemdBackend(t *testing.T) {
 		Systemd: nil, // Even with nil, we can't test real systemd without D-Bus
 	}
 
-	server := NewServer(cfg, backend)
+	server := NewServer(context.Background(), cfg, backend)
 	if server == nil {
 		t.Fatal("NewServer should return a non-nil server")
 		return
@@ -317,7 +318,7 @@ func TestNilBackendHandling(t *testing.T) {
 	}
 
 	// Nil backend
-	server := NewServer(cfg, nil)
+	server := NewServer(context.Background(), cfg, nil)
 	if server == nil {
 		t.Fatal("NewServer should return a non-nil server even with nil backend")
 		return
@@ -345,7 +346,7 @@ func TestServerRouteAlwaysRegistered(t *testing.T) {
 	// Backend with no sub-backends but should still have server info
 	backend := &backend.Backend{}
 
-	server := NewServer(cfg, backend)
+	server := NewServer(context.Background(), cfg, backend)
 	if server == nil {
 		t.Fatal("NewServer should return a non-nil server")
 	}
@@ -369,7 +370,7 @@ func TestRouteMethodRestrictions(t *testing.T) {
 	}
 
 	backend := &backend.Backend{}
-	server := NewServer(cfg, backend)
+	server := NewServer(context.Background(), cfg, backend)
 
 	tests := []struct {
 		name           string
