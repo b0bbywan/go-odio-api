@@ -17,7 +17,7 @@ func TestSSEHandler_ContentType(t *testing.T) {
 	upstream := make(chan events.Event)
 	b := newBroadcaster(context.Background(), upstream)
 
-	req := httptest.NewRequest(http.MethodGet, "/events", nil)
+	req := httptest.NewRequest(http.MethodGet, "/ws", nil)
 	// Use a cancellable context so the handler exits after we've checked headers.
 	ctx, cancel := context.WithCancel(context.Background())
 	req = req.WithContext(ctx)
@@ -51,7 +51,7 @@ func TestSSEHandler_ConnectedComment(t *testing.T) {
 	upstream := make(chan events.Event)
 	b := newBroadcaster(context.Background(), upstream)
 
-	req := httptest.NewRequest(http.MethodGet, "/events", nil)
+	req := httptest.NewRequest(http.MethodGet, "/ws", nil)
 	ctx, cancel := context.WithCancel(context.Background())
 	req = req.WithContext(ctx)
 
@@ -79,7 +79,7 @@ func TestSSEHandler_EventDelivery(t *testing.T) {
 	upstream := make(chan events.Event, 1)
 	b := newBroadcaster(context.Background(), upstream)
 
-	req := httptest.NewRequest(http.MethodGet, "/events", nil)
+	req := httptest.NewRequest(http.MethodGet, "/ws", nil)
 	ctx, cancel := context.WithCancel(context.Background())
 	req = req.WithContext(ctx)
 
