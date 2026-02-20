@@ -160,11 +160,10 @@ sudo systemctl restart bluetooth
 #### Usage
 
 Bluetooth is intentionally not left in an automatic or always-on state.
-All Bluetooth operations are explicitly controlled through the Odio API.
 
 - **Power up**:
-  Bluetooth is enabled, but the device is not discoverable.
-- **Power Down** There is no idle timeout on bluetooth (yet), so you have to explicitely turn off bluetooth
+  Bluetooth is enabled, but the device is not discoverable. You can connect to it if your phone is already paired
+- **Power Down** Default 30min of inactivity (= no connected clients)
 - **Pairing mode**:
   The device becomes visible to nearby Bluetooth devices and accepts new pairings.
   After a successful pairing (or when the timeout expires), Bluetooth automatically returns to its normal state:
@@ -174,7 +173,7 @@ All Bluetooth operations are explicitly controlled through the Odio API.
 
 This behavior matches how most Bluetooth speakers and audio receivers work.
 
-Bonus: You get to control it through `/pulseaudio/clients` or `/players/`
+Bonus: You get to control it through `/pulseaudio/clients` or `/players/` and in the UI !
 
 ## Installation
 
@@ -236,7 +235,7 @@ sudo loginctl enable-linger <username>
 
 ### Docker
 
-A pre-built multi-arch image is available on GHCR (amd64, arm64, arm/v6, arm/v7):
+A pre-built multi-arch image is available on GHCR (amd64, arm64, arm/v7):
 
 ```
 ghcr.io/b0bbywan/go-odio-api:latest
@@ -321,6 +320,18 @@ api:
 
 ### Backend configuration examples
 
+#### Network binding
+
+```yaml
+bind: lo                      # loopback only (default)
+# bind: enp2s0                # single LAN interface
+# bind: [lo, enp2s0]          # loopback + LAN (required for UI access from the network)
+# bind: [lo, enp2s0, wlan0]   # loopback + ethernet + wifi
+# bind: all                   # all interfaces — 0.0.0.0 (Docker, remote access)
+```
+
+**Note:** The built-in web UI requires `lo` to be in the bind list. If `lo` is absent, the UI is automatically disabled.
+
 #### systemd (opt-in, whitelist required)
 
 ```yaml
@@ -349,6 +360,16 @@ systemd:
 [4] Install [Kodi Add-on: MPRIS D-Bus interface](https://github.com/wastis/MediaPlayerRemoteInterface#)
 [5] Maybe supported, untested
 
+#### Bluetooth
+
+```yaml
+bluetooth:
+  enabled: true
+  timeout: 5s
+  pairingTimeout: 60s
+  idleTimeout: 30m # 0 for no autopoweroff
+```
+
 #### Power Management
 
 ```yaml
@@ -358,18 +379,6 @@ power:
     poweroff: true
     reboot: true
 ```
-
-#### Network binding
-
-```yaml
-bind: lo                      # loopback only (default)
-# bind: enp2s0                # single LAN interface
-# bind: [lo, enp2s0]          # loopback + LAN (required for UI access from the network)
-# bind: [lo, enp2s0, wlan0]   # loopback + ethernet + wifi
-# bind: all                   # all interfaces — 0.0.0.0 (Docker, remote access)
-```
-
-**Note:** The built-in web UI requires `lo` to be in the bind list. If `lo` is absent, the UI is automatically disabled.
 
 #### Zeroconf / mDNS
 
@@ -591,6 +600,8 @@ task package:rpm:linux-armhf     # .rpm armv6hl
 - [coreos/go-systemd](https://github.com/coreos/go-systemd) — systemd D-Bus bindings
 - [the-jonsey/pulseaudio](https://github.com/the-jonsey/pulseaudio) — pure-Go PulseAudio native protocol (no libpulse)
 - [grandcat/zeroconf](https://github.com/grandcat/zeroconf) — mDNS / DNS-SD
+- [HTMX](https://htmx.org/)
+- [TailwindCSS](https://tailwindcss.com/)
 
 ## Contributing
 

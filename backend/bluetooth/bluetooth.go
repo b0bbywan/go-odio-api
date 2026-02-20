@@ -37,8 +37,26 @@ func New(ctx context.Context, cfg *config.BluetoothConfig) (*BluetoothBackend, e
 		return nil, nil
 	}
 
-	logger.Info("[bluetooth] backend started (powered off)")
+	backend.syncAdapterState()
 	return &backend, nil
+}
+
+func (b *BluetoothBackend) syncAdapterState() {
+	powered := b.isAdapterOn()
+	pairable := b.isPairable()
+	discoverable := b.isDiscoverable()
+
+	b.updateStatus(func(s *BluetoothStatus) {
+		s.Powered = powered
+		s.Pairable = pairable
+		s.Discoverable = discoverable
+	})
+	logger.Info("[bluetooth] backend started (powered=%v pairable=%v discoverable=%v)", powered, pairable, discoverable)
+
+	if powered {
+		b.refreshKnownDevices()
+		b.startListener()
+	}
 }
 
 func (b *BluetoothBackend) PowerUp() error {
@@ -56,31 +74,43 @@ func (b *BluetoothBackend) PowerUp() error {
 
 	b.updateStatus(func(s *BluetoothStatus) {
 		s.Powered = true
-		s.Discoverable = false
-		s.Pairable = false
 	})
 	b.refreshKnownDevices()
-
-	b.startIdleListener()
+	b.startListener()
 
 	logger.Info("[bluetooth] Bluetooth ready to connect to already known devices")
 	return nil
 }
 
-func (b *BluetoothBackend) startIdleListener() {
-	if b.idleTimeout == 0 {
-		logger.Debug("[bluetooth] idle timeout disabled, skipping idle listener")
+func (b *BluetoothBackend) startListener() {
+	if b.listener != nil {
+		logger.Debug("[bluetooth] listener already running, skipping")
 		return
 	}
-	matchRule := "type='signal',interface='org.freedesktop.DBus.Properties',member='PropertiesChanged',arg0='org.bluez.Device1'"
-	logger.Debug("[bluetooth] starting idle listener (timeout=%v, matchRule=%s)", b.idleTimeout, matchRule)
-	listener := NewDBusListener(b.conn, b.ctx, matchRule, b.onDeviceConnectionChange)
+	matchRules := []string{
+		"type='signal',interface='org.freedesktop.DBus.Properties',member='PropertiesChanged',arg0='org.bluez.Device1'",
+		"type='signal',interface='org.freedesktop.DBus.Properties',member='PropertiesChanged',arg0='org.bluez.Adapter1'",
+	}
+	logger.Debug("[bluetooth] starting listener (device + adapter)")
+	listener := NewDBusListener(b.conn, b.ctx, matchRules, b.onPropertiesChanged)
 	if err := listener.Start(); err != nil {
-		logger.Warn("[bluetooth] failed to start idle timeout: %v", err)
+		listener.Stop()
+		logger.Warn("[bluetooth] failed to start listener: %v", err)
 		return
 	}
+	b.listener = listener
 	go listener.Listen()
-	logger.Debug("[bluetooth] idle listener started")
+	logger.Debug("[bluetooth] listener started")
+	b.checkAndStartIdleTimer()
+}
+
+func (b *BluetoothBackend) stopListener() {
+	if b.listener != nil {
+		b.listener.Stop()
+		b.listener = nil
+		logger.Debug("[bluetooth] listener stopped")
+	}
+	b.cancelIdleTimer()
 }
 
 func (b *BluetoothBackend) PowerDown() error {
@@ -92,6 +122,13 @@ func (b *BluetoothBackend) PowerDown() error {
 		return err
 	}
 
+	b.cleanupPoweredState()
+	logger.Info("[bluetooth] Powered down")
+	return nil
+}
+
+func (b *BluetoothBackend) cleanupPoweredState() {
+	b.stopListener()
 	b.updateStatus(func(s *BluetoothStatus) {
 		s.Powered = false
 		s.Discoverable = false
@@ -99,23 +136,14 @@ func (b *BluetoothBackend) PowerDown() error {
 		s.PairingActive = false
 		s.PairingUntil = nil
 	})
-
-	return nil
 }
 
 func (b *BluetoothBackend) NewPairing() error {
-	// Prevent concurrent pairing sessions
-	if !b.pairingMu.TryLock() {
+	// Prevent resetting BlueZ timeouts on an already-active pairing session
+	if b.isDiscoverable() {
 		logger.Info("[bluetooth] pairing already in progress")
 		return nil
 	}
-	// Unlock in NewPairing on error only
-	unlocked := false
-	defer func() {
-		if !unlocked {
-			b.pairingMu.Unlock()
-		}
-	}()
 
 	// RegisterAgent
 	if err := b.registerAgent(); err != nil {
@@ -132,9 +160,10 @@ func (b *BluetoothBackend) NewPairing() error {
 		if err := b.PowerOnAdapter(true); err != nil {
 			return err
 		}
+		b.startListener()
 	}
 
-	// Timeouts (in seconds)
+	// Set BlueZ native timeouts
 	if err := b.SetTimeOut(DISCOVERABLE_TIMEOUT); err != nil {
 		return err
 	}
@@ -143,144 +172,97 @@ func (b *BluetoothBackend) NewPairing() error {
 		return err
 	}
 
-	// pairing mode
+	// Enable pairing mode
 	if err := b.SetDiscoverableAndPairable(true); err != nil {
 		return err
 	}
 
-	// Track pairing state
 	pairingUntil := time.Now().Add(b.pairingTimeout)
 	b.updateStatus(func(s *BluetoothStatus) {
 		s.Powered = true
-		s.Discoverable = true
-		s.Pairable = true
 		s.PairingActive = true
 		s.PairingUntil = &pairingUntil
 	})
 
-	// Unlock in waitPairing
-	unlocked = true
-	go b.waitPairing(b.ctx)
 	logger.Info("[bluetooth] Bluetooth pairing mode enabled")
-
 	return nil
 }
 
-func (b *BluetoothBackend) waitPairing(ctx context.Context) {
-	logger.Debug("[bluetooth] waitPairing started (timeout=%v)", b.pairingTimeout)
-	subCtx, cancel := context.WithTimeout(ctx, b.pairingTimeout)
-	defer func() {
-		logger.Info("[bluetooth] resetting adapter state after pairing")
-		if err := b.SetDiscoverableAndPairable(false); err != nil {
-			logger.Warn("[bluetooth] failed to reset adapter state after pairing: %v", err)
-		}
-		b.updateStatus(func(s *BluetoothStatus) {
-			s.Discoverable = false
-			s.Pairable = false
-			s.PairingActive = false
-			s.PairingUntil = nil
-		})
-		cancel()
-		b.pairingMu.Unlock()
-		logger.Debug("[bluetooth] waitPairing cleanup complete, mutex released")
-	}()
-
-	matchRule := "type='signal',interface='org.freedesktop.DBus.Properties',member='PropertiesChanged',arg0='org.bluez.Device1'"
-	logger.Debug("[bluetooth] pairing listener matchRule=%s", matchRule)
-
-	listener := NewDBusListener(b.conn, subCtx, matchRule, b.onDevicePaired)
-	if err := listener.Start(); err != nil {
-		logger.Warn("[bluetooth] failed to start listener: %v", err)
-		return
+func (b *BluetoothBackend) onPropertiesChanged(sig *dbus.Signal) bool {
+	if sig == nil {
+		return true // channel closed
 	}
-	defer listener.Stop()
-
-	logger.Debug("[bluetooth] pairing listener started, waiting for signals")
-	listener.Listen()
-	logger.Info("[bluetooth] pairing listener stopped")
-}
-
-func (b *BluetoothBackend) onDevicePaired(sig *dbus.Signal) bool {
-	logger.Debug("[bluetooth] pairing signal received from %s (body length=%d)", sig.Path, len(sig.Body))
-
-	if len(sig.Body) < 2 {
-		logger.Debug("[bluetooth] pairing signal from %s ignored: body too short", sig.Path)
+	changed, iface, err := filterSignal(sig)
+	if err != nil {
+		logger.Debug("[bluetooth] signal filtered out: %v", err)
 		return false
 	}
 
-	changed, ok := sig.Body[1].(map[string]dbus.Variant)
-	if !ok {
-		logger.Debug("[bluetooth] pairing signal from %s ignored: body[1] is not map[string]Variant", sig.Path)
-		return false
-	}
-
-	logger.Debug("[bluetooth] pairing signal from %s: changed properties=%v", sig.Path, changedKeys(changed))
-
-	pairedVar, ok := changed["Paired"]
-	if !ok {
-		logger.Debug("[bluetooth] pairing signal from %s ignored: no Paired property in changed set", sig.Path)
-		return false
-	}
-
-	paired, ok := pairedVar.Value().(bool)
-	if !ok {
-		logger.Debug("[bluetooth] pairing signal from %s ignored: Paired value is not bool (got %T)", sig.Path, pairedVar.Value())
-		return false
-	}
-	if !paired {
-		logger.Debug("[bluetooth] pairing signal from %s ignored: Paired=false", sig.Path)
-		return false
-	}
-
-	logger.Info("[bluetooth] device %s paired successfully", sig.Path)
-
-	if !b.trustDevice(sig.Path) {
-		logger.Warn("[bluetooth] failed to trust device %s", sig.Path)
-		return false
-	}
-
-	logger.Info("[bluetooth] device %s trusted", sig.Path)
-	b.refreshKnownDevices()
-	return true
-}
-
-func (b *BluetoothBackend) onDeviceConnectionChange(sig *dbus.Signal) bool {
-	logger.Debug("[bluetooth] connection signal received from %s (body length=%d)", sig.Path, len(sig.Body))
-
-	if len(sig.Body) < 2 {
-		logger.Debug("[bluetooth] connection signal from %s ignored: body too short", sig.Path)
-		return false
-	}
-
-	changed, ok := sig.Body[1].(map[string]dbus.Variant)
-	if !ok {
-		logger.Debug("[bluetooth] connection signal from %s ignored: body[1] is not map[string]Variant", sig.Path)
-		return false
-	}
-
-	logger.Debug("[bluetooth] connection signal from %s: changed properties=%v", sig.Path, changedKeys(changed))
-
-	connectedVar, ok := changed["Connected"]
-	if !ok {
-		logger.Debug("[bluetooth] connection signal from %s ignored: no Connected property in changed set", sig.Path)
-		return false
-	}
-
-	connected, ok := connectedVar.Value().(bool)
-	if !ok {
-		logger.Debug("[bluetooth] connection signal from %s ignored: Connected value is not bool (got %T)", sig.Path, connectedVar.Value())
-		return false
-	}
-
-	logger.Debug("[bluetooth] device %s Connected=%v", sig.Path, connected)
-
-	if connected {
-		b.cancelIdleTimer()
-	} else {
-		b.checkAndStartIdleTimer()
+	logger.Debug("[bluetooth] signal from %s (%s): changed properties=%v", sig.Path, iface, changedKeys(changed))
+	switch iface {
+	case BLUETOOTH_DEVICE:
+		b.onDevicePropertiesChanged(sig.Path, changed)
+	case BLUETOOTH_ADAPTER:
+		b.onAdapterPropertiesChanged(changed)
 	}
 
 	return false
+}
+
+func (b *BluetoothBackend) onDevicePropertiesChanged(path dbus.ObjectPath, changed map[string]dbus.Variant) {
+	refresh := false
+	defer func() {
+		if refresh {
+			b.refreshKnownDevices()
+		}
+	}()
+
+	if connected, ok := extractMapBool(changed, BT_STATE_CONNECTED); ok {
+		logger.Info("[bluetooth] device %s Connected=%v", path, connected)
+		if connected {
+			b.cancelIdleTimer()
+			refresh = true
+			return
+		}
+		b.checkAndStartIdleTimer()
+		refresh = true
+		return
+	}
+
+	if paired, ok := extractMapBool(changed, BT_STATE_PAIRED); ok && paired {
+		logger.Info("[bluetooth] device %s paired successfully", path)
+		if ok = b.trustDevice(path); !ok {
+			logger.Warn("[bluetooth] failed to trust device %s", path)
+			return
+		}
+
+		logger.Info("[bluetooth] device %s trusted", path)
+		refresh = true
+		if err := b.SetDiscoverableAndPairable(false); err != nil {
+			logger.Warn("[bluetooth] failed to stop pairing mode: %v", err)
+		}
+	}
+}
+
+func (b *BluetoothBackend) onAdapterPropertiesChanged(changed map[string]dbus.Variant) {
+	if discoverable, ok := extractMapBool(changed, BT_STATE_DISCOVERABLE); ok {
+		logger.Debug("[bluetooth] adapter Discoverable=%v", discoverable)
+		b.updateStatus(func(s *BluetoothStatus) {
+			s.Discoverable = discoverable
+		})
+	}
+
+	if pairable, ok := extractMapBool(changed, BT_STATE_PAIRABLE); ok {
+		logger.Debug("[bluetooth] adapter Pairable=%v", pairable)
+		b.updateStatus(func(s *BluetoothStatus) {
+			s.Pairable = pairable
+			if !pairable {
+				logger.Info("[bluetooth] pairing mode ended")
+				s.PairingActive = false
+				s.PairingUntil = nil
+			}
+		})
+	}
 }
 
 func (b *BluetoothBackend) cancelIdleTimer() {
@@ -295,6 +277,10 @@ func (b *BluetoothBackend) cancelIdleTimer() {
 }
 
 func (b *BluetoothBackend) checkAndStartIdleTimer() {
+	if b.idleTimeout == 0 {
+		return
+	}
+
 	if b.hasConnectedDevices() {
 		logger.Debug("[bluetooth] still has connected devices, skipping idle timer")
 		return
@@ -313,19 +299,9 @@ func (b *BluetoothBackend) checkAndStartIdleTimer() {
 		if err := b.PowerOnAdapter(false); err != nil {
 			logger.Warn("[bluetooth] failed to power down: %v", err)
 		}
-		b.idleTimerMu.Lock()
-		b.idleTimer = nil
-		b.idleTimerMu.Unlock()
+		b.cleanupPoweredState()
 	})
 	logger.Info("[bluetooth] idle timer started (%v)", b.idleTimeout)
-}
-
-func changedKeys(changed map[string]dbus.Variant) []string {
-	keys := make([]string, 0, len(changed))
-	for k := range changed {
-		keys = append(keys, k)
-	}
-	return keys
 }
 
 func (b *BluetoothBackend) Close() {
@@ -359,6 +335,9 @@ func (b *BluetoothBackend) updateStatus(fn func(*BluetoothStatus)) {
 }
 
 func (b *BluetoothBackend) refreshKnownDevices() {
+	if b.conn == nil {
+		return
+	}
 	devices, err := b.listKnownDevices()
 	if err != nil {
 		logger.Warn("[bluetooth] failed to list known devices: %v", err)

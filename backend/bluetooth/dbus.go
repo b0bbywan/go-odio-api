@@ -1,6 +1,7 @@
 package bluetooth
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/godbus/dbus/v5"
@@ -8,6 +9,28 @@ import (
 
 	"github.com/b0bbywan/go-odio-api/logger"
 )
+
+func filterSignal(sig *dbus.Signal) (map[string]dbus.Variant, string, error) {
+	if sig == nil {
+		return nil, "", fmt.Errorf("channel closed")
+	}
+
+	if len(sig.Body) < 2 {
+		return nil, "", fmt.Errorf("signal from %s ignored: body too short", sig.Path)
+	}
+
+	iface, ok := sig.Body[0].(string)
+	if !ok {
+		return nil, "", fmt.Errorf("failed to parse iface")
+	}
+
+	changed, ok := sig.Body[1].(map[string]dbus.Variant)
+	if !ok {
+		return nil, "", fmt.Errorf("signal from %s ignored: body[1] is not map[string]Variant", sig.Path)
+	}
+
+	return changed, iface, nil
+}
 
 // callWithTimeout executes a D-Bus call with timeout
 func callWithTimeout(call *dbus.Call, timeout time.Duration) error {
@@ -25,7 +48,7 @@ func callWithTimeout(call *dbus.Call, timeout time.Duration) error {
 	}
 }
 
-// callWithTimeout receiver method for MPRISBackend
+// callWithTimeout receiver method for BluetoothBackend
 func (b *BluetoothBackend) callWithTimeout(call *dbus.Call) error {
 	return callWithTimeout(call, b.timeout)
 }
@@ -54,11 +77,11 @@ func (b *BluetoothBackend) getProperty(obj dbus.BusObject, iface, prop string) (
 }
 
 func (b *BluetoothBackend) getAdapterProp(prop BluetoothState) (dbus.Variant, error) {
-	return b.getProperty(b.adapter(), BLUETOOTH_ADAPTER, prop.toString())
+	return b.getProperty(b.adapter(), BLUETOOTH_ADAPTER, prop.String())
 }
 
 func (b *BluetoothBackend) adapter() dbus.BusObject {
-	return b.conn.Object(BLUETOOTH_PREFIX, dbus.ObjectPath(BLUETOOTH_PATH))
+	return b.getObj(BLUETOOTH_PREFIX, BLUETOOTH_PATH)
 }
 
 func (b *BluetoothBackend) setAdapterProp(prop string, value interface{}) error {
@@ -75,6 +98,21 @@ func (b *BluetoothBackend) setAdapterProp(prop string, value interface{}) error 
 func extractBool(v dbus.Variant) (bool, bool) {
 	val, ok := v.Value().(bool)
 	return val, ok
+}
+
+func extractMapBool(v map[string]dbus.Variant, value BluetoothState) (bool, bool) {
+	if extractVar, ok := v[value.String()]; ok {
+		return extractBool(extractVar)
+	}
+	return false, false
+}
+
+func changedKeys(changed map[string]dbus.Variant) []string {
+	keys := make([]string, 0, len(changed))
+	for k := range changed {
+		keys = append(keys, k)
+	}
+	return keys
 }
 
 func (b *BluetoothBackend) exportAgent(agent *bluezAgent) error {
@@ -147,24 +185,16 @@ func (b *BluetoothBackend) listKnownDevices() ([]BluetoothDevice, error) {
 
 	err := b.iterateAdapterDevices(func(path dbus.ObjectPath, props map[string]dbus.Variant) bool {
 		// Only keep trusted devices
-		trustedVar, ok := props[BT_PROP_TRUSTED]
-		if !ok {
-			return true
+		if trusted, ok := extractMapBool(props, BT_STATE_TRUSTED); ok && trusted {
+			// Extract device info
+			device := BluetoothDevice{
+				Address:   extractString(props, BT_PROP_ADDRESS),
+				Name:      extractString(props, BT_PROP_NAME),
+				Trusted:   trusted,
+				Connected: extractBoolProp(props, BT_STATE_CONNECTED),
+			}
+			devices = append(devices, device)
 		}
-		trusted, ok := trustedVar.Value().(bool)
-		if !ok || !trusted {
-			return true
-		}
-
-		// Extract device info
-		device := BluetoothDevice{
-			Address:   extractString(props, BT_PROP_ADDRESS),
-			Name:      extractString(props, BT_PROP_NAME),
-			Trusted:   trusted,
-			Connected: extractBoolProp(props, BT_PROP_CONNECTED),
-		}
-
-		devices = append(devices, device)
 		return true
 	})
 
@@ -180,8 +210,8 @@ func extractString(props map[string]dbus.Variant, key string) string {
 	return ""
 }
 
-func extractBoolProp(props map[string]dbus.Variant, key string) bool {
-	if v, ok := props[key]; ok {
+func extractBoolProp(props map[string]dbus.Variant, key BluetoothState) bool {
+	if v, ok := props[key.String()]; ok {
 		if b, ok := v.Value().(bool); ok {
 			return b
 		}
@@ -189,20 +219,32 @@ func extractBoolProp(props map[string]dbus.Variant, key string) bool {
 	return false
 }
 
-func (b *BluetoothBackend) isAdapterOn() bool {
-	v, err := b.getAdapterProp(BT_STATE_POWERED)
+func (b *BluetoothBackend) getAdapterBoolProp(prop BluetoothState) bool {
+	v, err := b.getAdapterProp(prop)
 	if err != nil {
-		logger.Warn("[bluetooth] failed to get adapter power state: %v", err)
+		logger.Warn("[bluetooth] failed to get adapter %s: %v", prop, err)
 		return false
 	}
-	powered, _ := extractBool(v)
-	return powered
+	val, _ := extractBool(v)
+	return val
+}
+
+func (b *BluetoothBackend) isAdapterOn() bool {
+	return b.getAdapterBoolProp(BT_STATE_POWERED)
+}
+
+func (b *BluetoothBackend) isPairable() bool {
+	return b.getAdapterBoolProp(BT_STATE_PAIRABLE)
+}
+
+func (b *BluetoothBackend) isDiscoverable() bool {
+	return b.getAdapterBoolProp(BT_STATE_DISCOVERABLE)
 }
 
 func (b *BluetoothBackend) hasConnectedDevices() bool {
 	connected := false
 	err := b.iterateAdapterDevices(func(path dbus.ObjectPath, props map[string]dbus.Variant) bool {
-		if extractBoolProp(props, BT_PROP_CONNECTED) {
+		if extractBoolProp(props, BT_STATE_CONNECTED) {
 			connected = true
 			return false // stop iterating
 		}
@@ -216,15 +258,15 @@ func (b *BluetoothBackend) hasConnectedDevices() bool {
 
 func (b *BluetoothBackend) trustDevice(path dbus.ObjectPath) bool {
 	obj := b.getObj(BLUETOOTH_PREFIX, string(path))
-	if err := b.setProperty(obj, BLUETOOTH_DEVICE, BT_STATE_TRUSTED.toString(), true); err != nil {
-		logger.Warn("[bluetooth] failed to trust devices: %v", err)
+	if err := b.setProperty(obj, BLUETOOTH_DEVICE, BT_STATE_TRUSTED.String(), true); err != nil {
+		logger.Warn("[bluetooth] failed to trust device: %v", err)
 		return false
 	}
 	return true
 }
 
 func (b *BluetoothBackend) SetPairable(state bool) error {
-	if err := b.setAdapterProp(BT_STATE_PAIRABLE.toString(), state); err != nil {
+	if err := b.setAdapterProp(BT_STATE_PAIRABLE.String(), state); err != nil {
 		logger.Warn("[bluetooth] failed to set adapter pairable %v: %v", state, err)
 		return err
 	}
@@ -232,7 +274,7 @@ func (b *BluetoothBackend) SetPairable(state bool) error {
 }
 
 func (b *BluetoothBackend) SetDiscoverable(state bool) error {
-	if err := b.setAdapterProp(BT_STATE_DISCOVERABLE.toString(), state); err != nil {
+	if err := b.setAdapterProp(BT_STATE_DISCOVERABLE.String(), state); err != nil {
 		logger.Warn("[bluetooth] failed to set adapter discoverable %v: %v", state, err)
 		return err
 	}
@@ -252,8 +294,8 @@ func (b *BluetoothBackend) SetDiscoverableAndPairable(state bool) error {
 }
 
 func (b *BluetoothBackend) PowerOnAdapter(state bool) error {
-	if err := b.setAdapterProp(BT_STATE_POWERED.toString(), state); err != nil {
-		logger.Warn("[bluetooth] failed to set adapter discoverable %v: %v", state, err)
+	if err := b.setAdapterProp(BT_STATE_POWERED.String(), state); err != nil {
+		logger.Warn("[bluetooth] failed to set adapter powered %v: %v", state, err)
 		return err
 	}
 	return nil
@@ -285,7 +327,7 @@ func (b *BluetoothBackend) CheckBluetoothSupport() error {
 
 	found := false
 	for _, ifaces := range managedObjects {
-		if _, ok := ifaces["org.bluez.Adapter1"]; ok {
+		if _, ok := ifaces[BLUETOOTH_ADAPTER]; ok {
 			found = true
 			break
 		}
@@ -305,7 +347,7 @@ func (b *BluetoothBackend) RequestNoInputOutputAgent(manager dbus.BusObject) err
 		dbus.ObjectPath(AGENT_PATH),
 		AGENT_CAPABILITY,
 	); err != nil {
-		logger.Warn("[bluetooth] failed to set agent capability %s timeout: %v", AGENT_CAPABILITY, err)
+		logger.Warn("[bluetooth] failed to register agent with capability %s: %v", AGENT_CAPABILITY, err)
 		return err
 	}
 

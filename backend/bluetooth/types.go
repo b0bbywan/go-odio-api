@@ -17,9 +17,9 @@ type BluetoothBackend struct {
 	pairingTimeout time.Duration
 	idleTimeout    time.Duration
 	agent          *bluezAgent
-	pairingMu      sync.Mutex
 	idleTimer      *time.Timer
 	idleTimerMu    sync.Mutex
+	listener       *DBusListener
 	// permanent cache (no expiration) for status tracking
 	statusCache *cache.Cache[BluetoothStatus]
 }

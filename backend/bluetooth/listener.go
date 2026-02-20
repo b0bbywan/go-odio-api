@@ -11,26 +11,34 @@ import (
 type SignalCallback func(*dbus.Signal) bool
 
 type DBusListener struct {
-	conn      *dbus.Conn
-	ctx       context.Context
-	matchRule string
-	callback  SignalCallback
-	signals   chan *dbus.Signal
+	conn       *dbus.Conn
+	ctx        context.Context
+	cancel     context.CancelFunc
+	matchRules []string
+	callback   SignalCallback
+	signals    chan *dbus.Signal
 }
 
-func NewDBusListener(conn *dbus.Conn, ctx context.Context, matchRule string, callback SignalCallback) *DBusListener {
+func NewDBusListener(conn *dbus.Conn, parentCtx context.Context, matchRules []string, callback SignalCallback) *DBusListener {
+	ctx, cancel := context.WithCancel(parentCtx)
 	return &DBusListener{
-		conn:      conn,
-		ctx:       ctx,
-		matchRule: matchRule,
-		callback:  callback,
-		signals:   make(chan *dbus.Signal, 10),
+		conn:       conn,
+		ctx:        ctx,
+		cancel:     cancel,
+		matchRules: matchRules,
+		signals:    make(chan *dbus.Signal, 10),
+		callback:   callback,
 	}
 }
 
 func (l *DBusListener) Start() error {
 	l.conn.Signal(l.signals)
-	return l.conn.BusObject().Call("org.freedesktop.DBus.AddMatch", 0, l.matchRule).Err
+	for _, rule := range l.matchRules {
+		if err := l.conn.BusObject().Call("org.freedesktop.DBus.AddMatch", 0, rule).Err; err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (l *DBusListener) Listen() {
@@ -47,8 +55,12 @@ func (l *DBusListener) Listen() {
 }
 
 func (l *DBusListener) Stop() {
+	l.cancel()
 	if l.conn != nil {
 		l.conn.RemoveSignal(l.signals)
+		for _, rule := range l.matchRules {
+			_ = l.conn.BusObject().Call("org.freedesktop.DBus.RemoveMatch", 0, rule).Err
+		}
 	}
 	close(l.signals)
 }
