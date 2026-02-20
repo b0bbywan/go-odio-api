@@ -13,15 +13,18 @@ type SignalCallback func(*dbus.Signal) bool
 type DBusListener struct {
 	conn       *dbus.Conn
 	ctx        context.Context
+	cancel     context.CancelFunc
 	matchRules []string
 	callback   SignalCallback
 	signals    chan *dbus.Signal
 }
 
-func NewDBusListener(conn *dbus.Conn, ctx context.Context, matchRules []string, callback SignalCallback) *DBusListener {
+func NewDBusListener(conn *dbus.Conn, parentCtx context.Context, matchRules []string, callback SignalCallback) *DBusListener {
+	ctx, cancel := context.WithCancel(parentCtx)
 	return &DBusListener{
 		conn:       conn,
 		ctx:        ctx,
+		cancel:     cancel,
 		matchRules: matchRules,
 		signals:    make(chan *dbus.Signal, 10),
 		callback:   callback,
@@ -52,6 +55,7 @@ func (l *DBusListener) Listen() {
 }
 
 func (l *DBusListener) Stop() {
+	l.cancel()
 	if l.conn != nil {
 		l.conn.RemoveSignal(l.signals)
 		for _, rule := range l.matchRules {

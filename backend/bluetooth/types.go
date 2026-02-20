@@ -20,7 +20,6 @@ type BluetoothBackend struct {
 	idleTimer      *time.Timer
 	idleTimerMu    sync.Mutex
 	listener       *DBusListener
-	listenerCancel context.CancelFunc
 	// permanent cache (no expiration) for status tracking
 	statusCache *cache.Cache[BluetoothStatus]
 }

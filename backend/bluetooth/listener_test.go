@@ -18,8 +18,11 @@ func TestNewDBusListener(t *testing.T) {
 
 	listener := NewDBusListener(nil, ctx, matchRules, callback)
 
-	if listener.ctx != ctx {
-		t.Error("context not set correctly")
+	if listener.ctx == nil {
+		t.Error("context not set")
+	}
+	if listener.cancel == nil {
+		t.Error("cancel not set")
 	}
 	if len(listener.matchRules) != len(matchRules) {
 		t.Fatalf("matchRules len = %d, want %d", len(listener.matchRules), len(matchRules))
@@ -228,11 +231,7 @@ func TestStopClosesChannelAndRemovesSignal(t *testing.T) {
 	ctx := context.Background()
 	callback := func(sig *dbus.Signal) bool { return false }
 
-	listener := &DBusListener{
-		ctx:      ctx,
-		callback: callback,
-		signals:  make(chan *dbus.Signal, 10),
-	}
+	listener := NewDBusListener(nil, ctx, nil, callback)
 
 	listener.Stop()
 

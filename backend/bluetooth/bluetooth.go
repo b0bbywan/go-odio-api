@@ -71,24 +71,18 @@ func (b *BluetoothBackend) startListener() {
 		"type='signal',interface='org.freedesktop.DBus.Properties',member='PropertiesChanged',arg0='org.bluez.Adapter1'",
 	}
 	logger.Debug("[bluetooth] starting listener (device + adapter)")
-	listenerCtx, cancel := context.WithCancel(b.ctx)
-	listener := NewDBusListener(b.conn, listenerCtx, matchRules, b.onPropertiesChanged)
+	listener := NewDBusListener(b.conn, b.ctx, matchRules, b.onPropertiesChanged)
 	if err := listener.Start(); err != nil {
-		cancel()
+		listener.Stop()
 		logger.Warn("[bluetooth] failed to start listener: %v", err)
 		return
 	}
 	b.listener = listener
-	b.listenerCancel = cancel
 	go listener.Listen()
 	logger.Debug("[bluetooth] listener started")
 }
 
 func (b *BluetoothBackend) stopListener() {
-	if b.listenerCancel != nil {
-		b.listenerCancel()
-		b.listenerCancel = nil
-	}
 	if b.listener != nil {
 		b.listener.Stop()
 		b.listener = nil
