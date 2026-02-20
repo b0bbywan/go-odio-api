@@ -20,7 +20,7 @@ func (s *Server) registerServerRoutes(b *backend.Backend) {
 		}),
 	)
 	// SSE event stream
-	s.mux.HandleFunc("GET /ws", sseHandler(s.broadcaster))
+	s.mux.HandleFunc("GET /events", sseHandler(s.broadcaster))
 }
 
 func (s *Server) registerUIRoutes() {

@@ -413,13 +413,13 @@ POST   /power/reboot                      # Reboot (403 if not declared in capab
 ### SSE Event Stream
 
 ```
-GET    /ws                            # Server-Sent Events stream (text/event-stream)
+GET    /events                            # Server-Sent Events stream (text/event-stream)
 ```
 
 #### Testing with curl
 
 ```bash
-curl -N http://localhost:8018/ws
+curl -N http://localhost:8018/events
 ```
 
 Expected output:
@@ -447,7 +447,7 @@ data: {"name":"mpd.service","scope":"user","active_state":"active","running":tru
 <pre id="log"></pre>
 <script>
   const log = document.getElementById('log');
-  const es  = new EventSource('http://localhost:8018/ws');
+  const es  = new EventSource('http://localhost:8018/events');
 
   ['player.updated', 'player.added', 'player.removed',
    'audio.updated', 'service.updated'].forEach(type => {
