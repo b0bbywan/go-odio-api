@@ -413,13 +413,13 @@ POST   /power/reboot                      # Reboot (403 if not declared in capab
 ### SSE Event Stream
 
 ```
-GET    /events                            # Server-Sent Events stream (text/event-stream)
+GET    /ws                            # Server-Sent Events stream (text/event-stream)
 ```
 
 #### Testing with curl
 
 ```bash
-curl -N http://localhost:8018/events
+curl -N http://localhost:8018/ws
 ```
 
 Expected output:

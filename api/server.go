@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"slices"
 	"sync"
@@ -59,7 +60,14 @@ func (s *Server) Run(ctx context.Context) error {
 
 	servers := make([]*http.Server, len(s.config.Listens))
 	for i, addr := range s.config.Listens {
-		servers[i] = &http.Server{Addr: addr, Handler: handler}
+		servers[i] = &http.Server{
+			Addr:    addr,
+			Handler: handler,
+			// Derive request contexts from ctx so that long-lived handlers
+			// (e.g. SSE) exit cleanly when the application shuts down,
+			// without waiting for the graceful-shutdown timeout.
+			BaseContext: func(_ net.Listener) context.Context { return ctx },
+		}
 	}
 
 	// Shutdown all servers on context cancellation
