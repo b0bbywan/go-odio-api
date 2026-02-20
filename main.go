@@ -49,6 +49,7 @@ func main() {
 		cfg.Login1,
 		cfg.MPRIS,
 		cfg.Pulseaudio,
+		cfg.RDP,
 		cfg.Systemd,
 		cfg.Zeroconf,
 	)

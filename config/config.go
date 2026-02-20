@@ -26,6 +26,7 @@ type Config struct {
 	Login1     *Login1Config
 	MPRIS      *MPRISConfig
 	Pulseaudio *PulseAudioConfig
+	RDP        *RemoteDesktopConfig
 	Systemd    *SystemdConfig
 	Zeroconf   *ZeroConfig
 	LogLevel   logger.Level
@@ -55,6 +56,11 @@ type MPRISConfig struct {
 type PulseAudioConfig struct {
 	Enabled       bool
 	XDGRuntimeDir string
+}
+
+type RemoteDesktopConfig struct {
+	Enabled   bool
+	TokenFile string
 }
 
 type SystemdConfig struct {
@@ -196,6 +202,18 @@ func readConfig(cfgFile *string) error {
 	return viper.ReadInConfig()
 }
 
+func defaultTokenFile() (string, error) {
+    home, err := os.UserHomeDir()
+    if err != nil {
+        return "", fmt.Errorf("home dir: %w", err)
+    }
+    dir := filepath.Join(home, ".cache", "odio-api")
+    if err := os.MkdirAll(dir, 0700); err != nil {
+        return "", fmt.Errorf("mkdir %s: %w", dir, err)
+    }
+    return filepath.Join(dir, "restore_token"), nil
+}
+
 func New(cfgFile *string) (*Config, error) {
 
 	viper.SetDefault("bind", "lo")
@@ -213,6 +231,8 @@ func New(cfgFile *string) (*Config, error) {
 
 	viper.SetDefault("pulseaudio.enabled", true)
 
+	viper.SetDefault("remotedesktop.enabled", false)
+
 	viper.SetDefault("systemd.enabled", false)
 	viper.SetDefault("systemd.system", []string{})
 	viper.SetDefault("systemd.user", []string{})
@@ -229,7 +249,7 @@ func New(cfgFile *string) (*Config, error) {
 		}
 		// Otherwise, only warn for non-file-not-found errors
 		if _, isNotFound := err.(viper.ConfigFileNotFoundError); !isNotFound {
-			logger.Warn("failed to read config: %v", err)
+			logger.Warn("[config] failed to read config: %v", err)
 		}
 	}
 
@@ -278,6 +298,15 @@ func New(cfgFile *string) (*Config, error) {
 		Enabled:       viper.GetBool("pulseaudio.enabled"),
 		XDGRuntimeDir: xdgRuntimeDir,
 	}
+	remotecfg := RemoteDesktopConfig{
+		Enabled: viper.GetBool("remotedesktop.enabled"),
+	}
+	token, err := defaultTokenFile()
+	if err != nil {
+		logger.Error("[config] failed to get cache default: %v", err)
+		return nil, err
+	}
+	remotecfg.TokenFile = token
 
 	syscfg := SystemdConfig{
 		Enabled:        viper.GetBool("systemd.enabled"),
@@ -303,6 +332,7 @@ func New(cfgFile *string) (*Config, error) {
 		Login1:     &logincfg,
 		MPRIS:      &mpriscfg,
 		Pulseaudio: &pulsecfg,
+		RDP:        &remotecfg,
 		Systemd:    &syscfg,
 		Zeroconf:   &zerocfg,
 		LogLevel:   parseLogLevel(viper.GetString("LogLevel")),
