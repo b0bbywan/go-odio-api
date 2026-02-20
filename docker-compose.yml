@@ -6,15 +6,15 @@ services:
       - "8018:8018"
     user: "${UID:-1000}:${UID:-1000}"
     environment:
-      XDG_RUNTIME_DIR: ${XDG_RUNTIME_DIR:-/run/user/${UID:-1000}}
-      DBUS_SESSION_BUS_ADDRESS: ${DBUS_SESSION_BUS_ADDRESS:-unix:path=/run/user/${UID:-1000}/bus}
-      HOME: ${HOME:-/home/odio}
+      XDG_RUNTIME_DIR: ${XDG_RUNTIME_DIR}
+      DBUS_SESSION_BUS_ADDRESS: ${DBUS_SESSION_BUS_ADDRESS}
+      HOME: ${HOME}
     volumes:
-      - ${XDG_RUNTIME_DIR:-/run/user/${UID:-1000}}/bus:${XDG_RUNTIME_DIR:-/run/user/${UID:-1000}}/bus:ro # DBUS_SESSION_BUS_ADDRESS socket
-      - /var/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket:ro # system dbus socket
-      - ${XDG_RUNTIME_DIR:-/run/user/${UID:-1000}}/systemd:${XDG_RUNTIME_DIR:-/run/user/${UID:-1000}}/systemd:ro # user systemd folder if utmp unavailable
-      - /run/utmp:/run/utmp:ro # user systemd socket if utmp available
-      - ${XDG_RUNTIME_DIR:-/run/user/${UID:-1000}}/pulse:${XDG_RUNTIME_DIR:-/run/user/${UID:-1000}}/pulse:ro # pulse socket
-      - ./cookie:${HOME:-/home/odio}/.config/pulse/cookie:ro # pulse cookie
       - ./config.yaml:/etc/odio-api/config.yml:ro # odio config
+      - ${HOME}/.config/pulse/cookie:${HOME}/.config/pulse/cookie:ro # pulse cookie
+      - ${XDG_RUNTIME_DIR}/bus:${XDG_RUNTIME_DIR}/bus:ro # DBUS_SESSION_BUS_ADDRESS socket
+      - ${XDG_RUNTIME_DIR}/systemd:${XDG_RUNTIME_DIR}/systemd:ro # user systemd folder if utmp unavailable
+      - ${XDG_RUNTIME_DIR}/pulse:${XDG_RUNTIME_DIR}/pulse:ro # pulse socket
+      - /var/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket:ro # system dbus socket
+      - /run/utmp:/run/utmp:ro # user systemd socket if utmp available
     restart: unless-stopped

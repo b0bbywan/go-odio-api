@@ -11,6 +11,9 @@ api:
   # cors:
   #   origins: ["https://odio-pwa.vercel.app"] # default for PWA
   #   origins: ["https://app.example.com"]  # specific origins
+  ui:
+    enabled: false
+
 
 zeroconf:
   enabled: false
@@ -31,8 +34,8 @@ systemd:
 power:
   enabled: false
   capabilities:
-    poweroff: true
-    reboot: true
+    poweroff: false
+    reboot: false
 
 pulseaudio:
   enabled: true

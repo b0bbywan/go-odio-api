@@ -33,6 +33,21 @@ curl http://localhost:8018/audio/server
 
 → See [Installation](#installation) for systemd service, packages, or running from source.
 
+## User Interface
+
+<img width="1658" height="963" alt="Capture d’écran du 2026-02-17 00-32-56" src="https://github.com/user-attachments/assets/0a9697da-902b-41d0-8977-908ef66f1168" />
+
+The built-in Odio UI is accessible at:
+
+**http://localhost:8018/ui**
+(or http://your-host.local:8018/ui if zeroconf/mDNS is enabled)
+
+It's a **100% local**, **responsive** (mobile + desktop), web interface designed to control your entire Linux multimedia setup from one place: MPRIS players, per-app/global volume, systemd user services, PipeWire/PulseAudio server, and more.
+
+There's also an **[installable PWA](https://odio-pwa.vercel.app/)** to install on your phone/desktop to easily access your remote and navigate between several instances.
+
+[More info](UI.md)
+
 ## Home Assistant Integration
 
 **[odio-ha](https://github.com/b0bbywan/odio-ha)** is the official Home Assistant integration for Odio.
@@ -187,9 +202,6 @@ ghcr.io/b0bbywan/go-odio-api:latest
 cp share/config.yaml config.yaml
 # Edit config.yaml: set bind: all
 
-# 2. (Optional) Provide your PulseAudio cookie
-cp ~/.config/pulse/cookie ./cookie
-
 # 3. (Optional) Only needed if docker compose config shows wrong paths
 cp .env.example .env
 
@@ -255,6 +267,9 @@ api:
   port: 8018
   ui:
     enabled: true
+  cors:
+    origins: ["https://odio-pwa.vercel.app"] # default for PWA
+    # origins: ["https://app.example.com"]  # specific origins
 ```
 
 ### Backend configuration examples
@@ -324,7 +339,7 @@ Odio advertises itself via mDNS. Look for `_http._tcp.local.` → instance `odio
 - **Localhost binding by default** — prevents accidental network exposure
 - **Systemd disabled by default** — service control must be explicitly enabled and configured
 - **Read-only Docker mounts** — all volume mounts are read-only in the provided `docker-compose.yml`
-- **Zeroconf opt-in** — must be enabled, then mDNS adapts to `bind`: disabled on `lo`, enabled on specific interfaces, or all interfaces without `lo`
+- **Zeroconf opt-in** — must be enabled, then mDNS adapts to `bind`: disabled on `lo`, enabled on specific interfaces, or `all` interfaces without `lo`
 
 ## API Endpoints
 
@@ -405,7 +420,7 @@ Systemd control is disabled by default and requires an explicit whitelist. Odio 
 
 ### Key Design: The User Session
 
-All multimedia services run as systemd user units — not system-wide daemons. This unlocks a single, unified D-Bus session bus where PulseAudio/PipeWire, MPRIS players, and user systemd units all coexist. Odio listens to that bus and exposes everything via HTTP. Add a new MPRIS player — it appears immediately, zero code or config change.
+All multimedia services run as systemd user units, not system-wide daemons. This unlocks a single, unified D-Bus session bus where PulseAudio/PipeWire, MPRIS players, and user systemd units all coexist. Odio listens to that bus and exposes everything via HTTP. Add a new MPRIS player — it appears immediately, zero code or config change.
 
 ### Backends
 
@@ -518,11 +533,11 @@ task package:rpm:linux-armhf     # .rpm armv6hl
 
 ## Contributing
 
-Odio was first pushed on January 25, 2026. It's early stage — v0.4 works out of the box, but there's a long road ahead. Expect bugs.
+Odio was first pushed on January 25, 2026. It's early stage. v0.4 works out of the box, but there's a long road ahead. Expect bugs.
 
 **Does it work on your setup? What breaks? What's missing?**
 
-Try it. Tell me what works and what doesn't. Show me your setup. If you want to contribute code, even better — Go is a great language for this use case.
+Try it. Tell me what works and what doesn't. Show me your setup. If you want to contribute code, even better. Go is a great language for this use case.
 
 1. Fork the repository
 2. Create your feature branch (`git checkout -b feature/amazing-feature`)
