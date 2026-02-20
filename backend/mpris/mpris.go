@@ -9,6 +9,7 @@ import (
 
 	"github.com/b0bbywan/go-odio-api/cache"
 	"github.com/b0bbywan/go-odio-api/config"
+	"github.com/b0bbywan/go-odio-api/events"
 	"github.com/b0bbywan/go-odio-api/logger"
 )
 
@@ -28,6 +29,7 @@ func New(ctx context.Context, cfg *config.MPRISConfig) (*MPRISBackend, error) {
 		ctx:     ctx,
 		timeout: cfg.Timeout,
 		cache:   cache.New[[]Player](0), // TTL=0 = no expiration
+		events:  make(chan events.Event, 64),
 	}, nil
 }
 
@@ -147,6 +149,11 @@ func (m *MPRISBackend) UpdatePlayer(updated Player) error {
 	}
 
 	m.cache.Set(CACHE_KEY, players)
+	eventType := events.TypePlayerUpdated
+	if !found {
+		eventType = events.TypePlayerAdded
+	}
+	m.notify(events.Event{Type: eventType, Data: updated})
 	return nil
 }
 
@@ -202,6 +209,7 @@ func (m *MPRISBackend) UpdatePlayerProperties(busName string, changed map[string
 		}
 
 		m.cache.Set(CACHE_KEY, players)
+		m.notify(events.Event{Type: events.TypePlayerUpdated, Data: players[i]})
 		logger.Debug("[mpris] updated %d properties for player %s", len(changed), busName)
 		return nil
 	}
@@ -255,6 +263,10 @@ func (m *MPRISBackend) RemovePlayer(busName string) error {
 	}
 
 	m.cache.Set(CACHE_KEY, filtered)
+	m.notify(events.Event{
+		Type: events.TypePlayerRemoved,
+		Data: map[string]string{"bus_name": busName},
+	})
 	logger.Debug("[mpris] removed player %s from cache", busName)
 	return nil
 }
@@ -494,4 +506,16 @@ func (m *MPRISBackend) Close() {
 		}
 		m.conn = nil
 	}
+	close(m.events)
 }
+
+func (m *MPRISBackend) notify(e events.Event) {
+	select {
+	case m.events <- e:
+	default:
+		logger.Warn("[mpris] event channel full, dropping %s event", e.Type)
+	}
+}
+
+// Events returns the read-only event channel for this backend.
+func (m *MPRISBackend) Events() <-chan events.Event { return m.events }

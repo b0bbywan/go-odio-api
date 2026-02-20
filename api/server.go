@@ -10,25 +10,43 @@ import (
 
 	"github.com/b0bbywan/go-odio-api/backend"
 	"github.com/b0bbywan/go-odio-api/config"
+	"github.com/b0bbywan/go-odio-api/events"
 	"github.com/b0bbywan/go-odio-api/logger"
 	"github.com/b0bbywan/go-odio-api/ui"
 )
 
 type Server struct {
-	mux    *http.ServeMux
-	config *config.ApiConfig
-	ui     bool
+	mux         *http.ServeMux
+	config      *config.ApiConfig
+	ui          bool
+	broadcaster *Broadcaster
 }
 
-func NewServer(cfg *config.ApiConfig, b *backend.Backend) *Server {
+func NewServer(ctx context.Context, cfg *config.ApiConfig, b *backend.Backend) *Server {
 	if cfg == nil || !cfg.Enabled {
 		return nil
 	}
 
+	var srcs []<-chan events.Event
+	if b != nil {
+		if b.MPRIS != nil {
+			srcs = append(srcs, b.MPRIS.Events())
+		}
+		if b.Pulse != nil {
+			srcs = append(srcs, b.Pulse.Events())
+		}
+		if b.Systemd != nil {
+			srcs = append(srcs, b.Systemd.Events())
+		}
+	}
+	merged := fanIn(ctx, srcs...)
+	broadcaster := newBroadcaster(ctx, merged)
+
 	server := &Server{
-		mux:    http.NewServeMux(),
-		config: cfg,
-		ui:     cfg.UI != nil && cfg.UI.Enabled,
+		mux:         http.NewServeMux(),
+		config:      cfg,
+		ui:          cfg.UI != nil && cfg.UI.Enabled,
+		broadcaster: broadcaster,
 	}
 	server.register(b)
 	return server
@@ -117,6 +135,9 @@ func (s *Server) register(b *backend.Backend) {
 	if b.MPRIS != nil {
 		s.registerMPRISRoutes(b.MPRIS)
 	}
+
+	// SSE event stream
+	s.mux.HandleFunc("GET /events", sseHandler(s.broadcaster))
 }
 
 func (s *Server) registerUIRoutes() {
