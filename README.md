@@ -447,7 +447,7 @@ data: {"name":"mpd.service","scope":"user","active_state":"active","running":tru
 <pre id="log"></pre>
 <script>
   const log = document.getElementById('log');
-  const es  = new EventSource('http://localhost:8018/events');
+  const es  = new EventSource('http://localhost:8018/ws');
 
   ['player.updated', 'player.added', 'player.removed',
    'audio.updated', 'service.updated'].forEach(type => {
