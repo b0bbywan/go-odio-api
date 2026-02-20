@@ -233,8 +233,6 @@ func (b *BluetoothBackend) onDevicePropertiesChanged(path dbus.ObjectPath, chang
 				logger.Warn("[bluetooth] failed to stop pairing mode: %v", err)
 			}
 			b.updateStatus(func(s *BluetoothStatus) {
-				s.Discoverable = false
-				s.Pairable = false
 				s.PairingActive = false
 				s.PairingUntil = nil
 			})
