@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/b0bbywan/go-odio-api/events"
 	"github.com/b0bbywan/go-odio-api/logger"
@@ -121,17 +122,23 @@ func sseHandler(b *Broadcaster) http.HandlerFunc {
 		}
 
 		// Send initial keep-alive comment so the client knows the connection is live.
-		if err := sendToFlusher(flusher, w, ": connected\n\n"); err != nil {
+		if err := sendToFlusher(flusher, w, ": connected"); err != nil {
 			return
 		}
 
 		ch := b.subscribe()
 		defer b.unsubscribe(ch)
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
 
 		for {
 			select {
 			case <-r.Context().Done():
 				return
+			case <-ticker.C:
+				if err := sendToFlusher(flusher, w, ": keep-alive"); err != nil {
+					return
+				}
 			case e, ok := <-ch:
 				if !ok {
 					return
@@ -141,7 +148,7 @@ func sseHandler(b *Broadcaster) http.HandlerFunc {
 					logger.Warn("[sse] failed to marshal event data: %v", err)
 					continue
 				}
-				if err = sendToFlusher(flusher, w, fmt.Sprintf("event: %s\ndata: %s\n\n", e.Type, data)); err != nil {
+				if err = sendToFlusher(flusher, w, fmt.Sprintf("event: %s\ndata: %s", e.Type, data)); err != nil {
 					return
 				}
 			}
@@ -150,7 +157,7 @@ func sseHandler(b *Broadcaster) http.HandlerFunc {
 }
 
 func sendToFlusher(flusher http.Flusher, w http.ResponseWriter, data string) error {
-	if _, err := fmt.Fprint(w, data); err != nil {
+	if _, err := fmt.Fprintf(w, "%s\n\n", data); err != nil {
 		logger.Error("[sse] failed to send data to flusher: %v", err)
 		http.Error(w, "failed to send data to flusher", http.StatusInternalServerError)
 		return err
