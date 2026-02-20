@@ -19,6 +19,8 @@ type Backend struct {
 	Pulse     *pulseaudio.PulseAudioBackend
 	Systemd   *systemd.SystemdBackend
 	Zeroconf  *zeroconf.ZeroConfBackend
+
+	broadcaster *Broadcaster
 }
 
 func New(
@@ -57,7 +59,15 @@ func New(
 		return nil, err
 	}
 
+	b.broadcaster = newBroadcasterFromBackend(ctx, &b)
+
 	return &b, nil
+}
+
+// Broadcaster returns the backend's event broadcaster. SSE clients subscribe
+// to it to receive live state changes.
+func (b *Backend) Broadcaster() *Broadcaster {
+	return b.broadcaster
 }
 
 func (b *Backend) Start() error {

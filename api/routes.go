@@ -9,6 +9,8 @@ import (
 	"github.com/b0bbywan/go-odio-api/backend/mpris"
 	"github.com/b0bbywan/go-odio-api/backend/pulseaudio"
 	"github.com/b0bbywan/go-odio-api/backend/systemd"
+	"github.com/b0bbywan/go-odio-api/logger"
+	"github.com/b0bbywan/go-odio-api/ui"
 )
 
 func (s *Server) registerServerRoutes(b *backend.Backend) {
@@ -18,6 +20,18 @@ func (s *Server) registerServerRoutes(b *backend.Backend) {
 			return b.GetServerDeviceInfo()
 		}),
 	)
+
+	// SSE event stream
+	if s.sse {
+		s.mux.HandleFunc("GET /events", sseHandler(s.broadcaster))
+		logger.Info("[api] SSE route registered at /events")
+	}
+}
+
+func (s *Server) registerUIRoutes() {
+	uiHandler := ui.NewHandler(s.config.Port)
+	uiHandler.RegisterRoutes(s.mux)
+	logger.Info("[api] UI routes registered at /ui")
 }
 
 func (s *Server) registerBluetoothRoutes(b *bluetooth.BluetoothBackend) {

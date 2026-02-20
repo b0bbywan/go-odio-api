@@ -9,6 +9,7 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 
+	"github.com/b0bbywan/go-odio-api/events"
 	"github.com/b0bbywan/go-odio-api/logger"
 )
 
@@ -143,6 +144,7 @@ func (l *Listener) waitForStableState(service string) {
 			switch unit.ActiveState {
 			case "active", "inactive", "failed":
 				logger.Debug("[systemd] %s/%s reached stable state: %s", ScopeUser, service, unit.ActiveState)
+				l.backend.notify(events.Event{Type: events.TypeServiceUpdated, Data: *unit})
 				return
 			}
 			logger.Debug("[systemd] %s/%s still in transitional state: %s", ScopeUser, service, unit.ActiveState)
