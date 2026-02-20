@@ -54,13 +54,8 @@ func (b *BluetoothBackend) PowerUp() error {
 		return err
 	}
 
-	pairingUntil := time.Now().Add(b.pairingTimeout)
 	b.updateStatus(func(s *BluetoothStatus) {
 		s.Powered = true
-		s.Discoverable = false
-		s.Pairable = false
-		s.PairingActive = true
-		s.PairingUntil = &pairingUntil
 	})
 	b.refreshKnownDevices()
 
@@ -164,8 +159,6 @@ func (b *BluetoothBackend) NewPairing() error {
 	pairingUntil := time.Now().Add(b.pairingTimeout)
 	b.updateStatus(func(s *BluetoothStatus) {
 		s.Powered = true
-		s.Discoverable = true
-		s.Pairable = true
 		s.PairingActive = true
 		s.PairingUntil = &pairingUntil
 	})
@@ -232,10 +225,6 @@ func (b *BluetoothBackend) onDevicePropertiesChanged(path dbus.ObjectPath, chang
 			if err := b.SetDiscoverableAndPairable(false); err != nil {
 				logger.Warn("[bluetooth] failed to stop pairing mode: %v", err)
 			}
-			b.updateStatus(func(s *BluetoothStatus) {
-				s.PairingActive = false
-				s.PairingUntil = nil
-			})
 		}
 	}
 }
@@ -246,10 +235,6 @@ func (b *BluetoothBackend) onAdapterPropertiesChanged(changed map[string]dbus.Va
 			logger.Debug("[bluetooth] adapter Discoverable=%v", discoverable)
 			b.updateStatus(func(s *BluetoothStatus) {
 				s.Discoverable = discoverable
-				if !discoverable {
-					s.PairingActive = false
-					s.PairingUntil = nil
-				}
 			})
 		}
 	}
@@ -259,6 +244,10 @@ func (b *BluetoothBackend) onAdapterPropertiesChanged(changed map[string]dbus.Va
 			logger.Debug("[bluetooth] adapter Pairable=%v", pairable)
 			b.updateStatus(func(s *BluetoothStatus) {
 				s.Pairable = pairable
+				if !pairable {
+					s.PairingActive = false
+					s.PairingUntil = nil
+				}
 			})
 		}
 	}
