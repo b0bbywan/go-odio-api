@@ -106,6 +106,20 @@ Explicit whitelist required — nothing managed unless listed in `config.yaml`.
 
 Remote reboot and power-off via the REST API — no SSH needed for day-to-day operations. Disabled by default. Uses `org.freedesktop.login1` D-Bus interface.
 
+### Real-time Event Stream (SSE)
+
+`GET /events` streams live state changes to any HTTP client — no polling needed.
+
+Events emitted:
+
+| Event type | Triggered by |
+|---|---|
+| `player.updated` | Playback state change, volume, metadata, position tick |
+| `player.added` | New MPRIS player appeared |
+| `player.removed` | MPRIS player closed |
+| `audio.updated` | PulseAudio sink-input change (volume, mute, cork) |
+| `service.updated` | systemd unit state change |
+
 ### REST API
 
 - `<50ms` p95 response time, `0%` CPU on idle — tested on Raspberry Pi B and B+
@@ -395,6 +409,61 @@ GET    /power/                            # Power capabilities {"reboot": true, 
 POST   /power/power_off                   # Poweroff (403 if not declared in capabilities)
 POST   /power/reboot                      # Reboot (403 if not declared in capabilities)
 ```
+
+### SSE Event Stream
+
+```
+GET    /events                            # Server-Sent Events stream (text/event-stream)
+```
+
+#### Testing with curl
+
+```bash
+curl -N http://localhost:8018/events
+```
+
+Expected output:
+
+```
+: connected
+
+event: player.updated
+data: {"bus_name":"org.mpris.MediaPlayer2.spotify","identity":"Spotify",...}
+
+event: audio.updated
+data: [{"id":42,"name":"Spotify","volume":0.75,"muted":false,...}]
+
+event: service.updated
+data: {"name":"mpd.service","scope":"user","active_state":"active","running":true,...}
+```
+
+#### Simple browser listener
+
+```html
+<!DOCTYPE html>
+<html>
+<head><title>Odio live events</title></head>
+<body>
+<pre id="log"></pre>
+<script>
+  const log = document.getElementById('log');
+  const es  = new EventSource('http://localhost:8018/events');
+
+  ['player.updated', 'player.added', 'player.removed',
+   'audio.updated', 'service.updated'].forEach(type => {
+    es.addEventListener(type, e => {
+      const entry = `[${type}] ${e.data}\n`;
+      log.textContent = entry + log.textContent;
+    });
+  });
+
+  es.onerror = () => log.textContent = '[error] connection lost\n' + log.textContent;
+</script>
+</body>
+</html>
+```
+
+Save as `events.html`, open in a browser — events appear live as they happen. No polling, no page refresh needed.
 
 ## Security
 
