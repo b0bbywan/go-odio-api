@@ -125,9 +125,9 @@ Pre-built packages (amd64, arm64, armv7hf, armhf/ARMv6) and a multi-arch Docker 
 
 ## Roadmap
 
-- **v0.6** — Built-in web dashboard served by Odio itself at `/ui/`
-- **v0.7** — Bluetooth backend: turn your Linux box into a fully API-controllable BT speaker, exposed as a `media_player` in HA
-- Later: SSE push events, Authentication, Wayland Remote Control, Photos Casting
+- Bluetooth backend: turn your Linux box into a fully API-controllable BT speaker, exposed as a `media_player` in HA
+- SSE push events
+- Wayland Remote Control, Authentication, Photos Casting...
 
 ## Installation
 
