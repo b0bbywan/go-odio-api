@@ -214,8 +214,8 @@ func TestBluetoothStateToString(t *testing.T) {
 	}
 }
 
-// onDevicePaired tests — only the signal-parsing paths that don't touch D-Bus
-func TestOnDevicePaired(t *testing.T) {
+// onPropertiesChanged tests — signal parsing paths that don't touch D-Bus
+func TestOnPropertiesChangedPaired(t *testing.T) {
 	b := &BluetoothBackend{}
 
 	tests := []struct {
@@ -223,6 +223,11 @@ func TestOnDevicePaired(t *testing.T) {
 		signal   *dbus.Signal
 		expected bool
 	}{
+		{
+			name:     "nil signal",
+			signal:   nil,
+			expected: true,
+		},
 		{
 			name:     "empty body",
 			signal:   &dbus.Signal{Path: "/dev/1", Body: []interface{}{}},
@@ -284,16 +289,16 @@ func TestOnDevicePaired(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := b.onDevicePaired(tt.signal)
+			result := b.onPropertiesChanged(tt.signal)
 			if result != tt.expected {
-				t.Errorf("onDevicePaired() = %v, want %v", result, tt.expected)
+				t.Errorf("onPropertiesChanged() = %v, want %v", result, tt.expected)
 			}
 		})
 	}
 }
 
-// onDeviceConnectionChange tests — signal parsing + idle timer paths
-func TestOnDeviceConnectionChange(t *testing.T) {
+// onPropertiesChanged Connected signal parsing tests
+func TestOnPropertiesChangedConnected(t *testing.T) {
 	b := &BluetoothBackend{}
 
 	tests := []struct {
@@ -349,16 +354,16 @@ func TestOnDeviceConnectionChange(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := b.onDeviceConnectionChange(tt.signal)
+			result := b.onPropertiesChanged(tt.signal)
 			if result != tt.expected {
-				t.Errorf("onDeviceConnectionChange() = %v, want %v", result, tt.expected)
+				t.Errorf("onPropertiesChanged() = %v, want %v", result, tt.expected)
 			}
 		})
 	}
 }
 
-// onDeviceConnectionChange always returns false (never stops the listener)
-func TestOnDeviceConnectionChangeNeverStops(t *testing.T) {
+// onPropertiesChanged always returns false for valid signals (never stops the listener)
+func TestOnPropertiesChangedNeverStops(t *testing.T) {
 	b := &BluetoothBackend{}
 
 	sig := &dbus.Signal{
@@ -371,9 +376,9 @@ func TestOnDeviceConnectionChangeNeverStops(t *testing.T) {
 		},
 	}
 
-	result := b.onDeviceConnectionChange(sig)
+	result := b.onPropertiesChanged(sig)
 	if result != false {
-		t.Errorf("onDeviceConnectionChange(connected=true) = %v, want false", result)
+		t.Errorf("onPropertiesChanged(connected=true) = %v, want false", result)
 	}
 }
 
@@ -417,7 +422,7 @@ func TestCancelIdleTimer(t *testing.T) {
 			},
 		}
 
-		b.onDeviceConnectionChange(sig)
+		b.onPropertiesChanged(sig)
 
 		if b.idleTimer != nil {
 			t.Error("idleTimer should be nil after connected=true signal")
