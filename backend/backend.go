@@ -91,7 +91,6 @@ func (b *Backend) Start() error {
 	return nil
 }
 
-
 func (b *Backend) Close() {
 	if b.Login1 != nil {
 		b.Login1.Close()

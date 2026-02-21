@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/b0bbywan/go-odio-api/backend"
+	"github.com/b0bbywan/go-odio-api/events"
 	"github.com/b0bbywan/go-odio-api/logger"
 )
 
@@ -29,7 +31,7 @@ func sseHandler(b *backend.Broadcaster) http.HandlerFunc {
 			return
 		}
 
-		ch := b.Subscribe()
+		ch := b.SubscribeFunc(parseFilter(r))
 		defer b.Unsubscribe(ch)
 		ticker := time.NewTicker(30 * time.Second)
 		defer ticker.Stop()
@@ -60,6 +62,35 @@ func sseHandler(b *backend.Broadcaster) http.HandlerFunc {
 			}
 		}
 	}
+}
+
+// parseFilter builds an event filter from the request's query parameters:
+//   - ?types=player.updated,player.added  — comma-separated event type names
+//   - ?backend=mpris,audio               — comma-separated backend names (resolved via events.BackendTypes)
+//
+// Types from both params are merged (union). A nil return means pass-all.
+func parseFilter(r *http.Request) func(events.Event) bool {
+	q := r.URL.Query()
+	var allTypes []string
+
+	if raw := q.Get("types"); raw != "" {
+		for _, t := range strings.Split(raw, ",") {
+			if t = strings.TrimSpace(t); t != "" {
+				allTypes = append(allTypes, t)
+			}
+		}
+	}
+
+	if raw := q.Get("backend"); raw != "" {
+		for _, name := range strings.Split(raw, ",") {
+			name = strings.TrimSpace(name)
+			if ts, ok := events.BackendTypes[name]; ok {
+				allTypes = append(allTypes, ts...)
+			}
+		}
+	}
+
+	return events.FilterTypes(allTypes)
 }
 
 func sendToFlusher(flusher http.Flusher, w http.ResponseWriter, data string) error {
