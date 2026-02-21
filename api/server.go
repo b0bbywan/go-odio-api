@@ -21,14 +21,14 @@ type Server struct {
 	broadcaster *backend.Broadcaster
 }
 
-func NewServer(ctx context.Context, cfg *config.ApiConfig, b *backend.Backend) *Server {
+func NewServer(cfg *config.ApiConfig, b *backend.Backend) *Server {
 	if cfg == nil || !cfg.Enabled {
 		return nil
 	}
 
 	var broadcaster *backend.Broadcaster
 	if b != nil {
-		broadcaster = b.NewBroadcaster(ctx)
+		broadcaster = b.Broadcaster()
 	}
 
 	server := &Server{

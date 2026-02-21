@@ -9,7 +9,6 @@ import (
 	"github.com/b0bbywan/go-odio-api/backend/systemd"
 	"github.com/b0bbywan/go-odio-api/backend/zeroconf"
 	"github.com/b0bbywan/go-odio-api/config"
-	"github.com/b0bbywan/go-odio-api/events"
 )
 
 type Backend struct {
@@ -18,6 +17,8 @@ type Backend struct {
 	Pulse    *pulseaudio.PulseAudioBackend
 	Systemd  *systemd.SystemdBackend
 	Zeroconf *zeroconf.ZeroConfBackend
+
+	broadcaster *Broadcaster
 }
 
 func New(
@@ -51,7 +52,15 @@ func New(
 		return nil, err
 	}
 
+	b.broadcaster = newBroadcasterFromBackend(ctx, &b)
+
 	return &b, nil
+}
+
+// Broadcaster returns the backend's event broadcaster. SSE clients subscribe
+// to it to receive live state changes.
+func (b *Backend) Broadcaster() *Broadcaster {
+	return b.broadcaster
 }
 
 func (b *Backend) Start() error {
@@ -82,21 +91,6 @@ func (b *Backend) Start() error {
 	return nil
 }
 
-// NewBroadcaster merges all enabled backend event channels and returns a
-// Broadcaster ready to fan out to SSE clients.
-func (b *Backend) NewBroadcaster(ctx context.Context) *Broadcaster {
-	var srcs []<-chan events.Event
-	if b.MPRIS != nil {
-		srcs = append(srcs, b.MPRIS.Events())
-	}
-	if b.Pulse != nil {
-		srcs = append(srcs, b.Pulse.Events())
-	}
-	if b.Systemd != nil {
-		srcs = append(srcs, b.Systemd.Events())
-	}
-	return NewBroadcaster(ctx, fanIn(ctx, srcs...))
-}
 
 func (b *Backend) Close() {
 	if b.Login1 != nil {
