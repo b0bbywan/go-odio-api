@@ -11,7 +11,6 @@ import (
 
 	"github.com/b0bbywan/go-odio-api/backend"
 	"github.com/b0bbywan/go-odio-api/config"
-	"github.com/b0bbywan/go-odio-api/events"
 	"github.com/b0bbywan/go-odio-api/logger"
 )
 
@@ -19,7 +18,7 @@ type Server struct {
 	mux         *http.ServeMux
 	config      *config.ApiConfig
 	ui          bool
-	broadcaster *Broadcaster
+	broadcaster *backend.Broadcaster
 }
 
 func NewServer(ctx context.Context, cfg *config.ApiConfig, b *backend.Backend) *Server {
@@ -27,20 +26,10 @@ func NewServer(ctx context.Context, cfg *config.ApiConfig, b *backend.Backend) *
 		return nil
 	}
 
-	var srcs []<-chan events.Event
+	var broadcaster *backend.Broadcaster
 	if b != nil {
-		if b.MPRIS != nil {
-			srcs = append(srcs, b.MPRIS.Events())
-		}
-		if b.Pulse != nil {
-			srcs = append(srcs, b.Pulse.Events())
-		}
-		if b.Systemd != nil {
-			srcs = append(srcs, b.Systemd.Events())
-		}
+		broadcaster = b.NewBroadcaster(ctx)
 	}
-	merged := fanIn(ctx, srcs...)
-	broadcaster := newBroadcaster(ctx, merged)
 
 	server := &Server{
 		mux:         http.NewServeMux(),
