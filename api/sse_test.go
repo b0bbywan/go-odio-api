@@ -9,13 +9,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/b0bbywan/go-odio-api/backend"
 	"github.com/b0bbywan/go-odio-api/events"
 )
 
 // TestSSEHandler_ContentType verifies GET /events returns 200 with text/event-stream.
 func TestSSEHandler_ContentType(t *testing.T) {
 	upstream := make(chan events.Event)
-	b := newBroadcaster(context.Background(), upstream)
+	b := backend.NewBroadcaster(context.Background(), upstream)
 
 	req := httptest.NewRequest(http.MethodGet, "/events", nil)
 	// Use a cancellable context so the handler exits after we've checked headers.
@@ -49,7 +50,7 @@ func TestSSEHandler_ContentType(t *testing.T) {
 // TestSSEHandler_ConnectedComment verifies the initial ": connected" comment is sent.
 func TestSSEHandler_ConnectedComment(t *testing.T) {
 	upstream := make(chan events.Event)
-	b := newBroadcaster(context.Background(), upstream)
+	b := backend.NewBroadcaster(context.Background(), upstream)
 
 	req := httptest.NewRequest(http.MethodGet, "/events", nil)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -77,7 +78,7 @@ func TestSSEHandler_ConnectedComment(t *testing.T) {
 // appears in the SSE response body.
 func TestSSEHandler_EventDelivery(t *testing.T) {
 	upstream := make(chan events.Event, 1)
-	b := newBroadcaster(context.Background(), upstream)
+	b := backend.NewBroadcaster(context.Background(), upstream)
 
 	req := httptest.NewRequest(http.MethodGet, "/events", nil)
 	ctx, cancel := context.WithCancel(context.Background())
