@@ -112,13 +112,22 @@ Remote reboot and power-off via the REST API — no SSH needed for day-to-day op
 
 Events emitted:
 
-| Event type | Triggered by |
-|---|---|
-| `player.updated` | Playback state change, volume, metadata, position tick |
-| `player.added` | New MPRIS player appeared |
-| `player.removed` | MPRIS player closed |
-| `audio.updated` | PulseAudio sink-input change (volume, mute, cork) |
-| `service.updated` | systemd unit state change |
+| Event type | Backend | Triggered by |
+|---|---|---|
+| `player.updated` | `mpris` | Playback state change, volume, metadata, position tick |
+| `player.added` | `mpris` | New MPRIS player appeared |
+| `player.removed` | `mpris` | MPRIS player closed |
+| `audio.updated` | `audio` | PulseAudio sink-input change (volume, mute, cork) |
+| `service.updated` | `systemd` | systemd unit state change |
+
+Subscribe to a subset of events using query parameters:
+
+| Parameter | Description | Example |
+|---|---|---|
+| `types` | Comma-separated event type names | `?types=player.updated,player.added` |
+| `backend` | Comma-separated backend names | `?backend=mpris,audio` |
+
+Both parameters can be combined — the union of all matched types is used. Omitting both receives all events.
 
 ### REST API
 
@@ -480,12 +489,23 @@ POST   /power/reboot                      # Reboot (403 if not declared in capab
 
 ```
 GET    /events                            # Server-Sent Events stream (text/event-stream)
+GET    /events?backend=mpris              # Only MPRIS player events
+GET    /events?backend=mpris,audio        # Player + audio events
+GET    /events?types=player.updated       # Specific event types
+GET    /events?types=player.updated,service.updated&backend=audio  # Mixed
 ```
 
 #### Testing with curl
 
 ```bash
+# All events
 curl -N http://localhost:8018/events
+
+# Only player events
+curl -N "http://localhost:8018/events?backend=mpris"
+
+# Only position ticks (e.g. to drive a seek bar)
+curl -N "http://localhost:8018/events?types=player.updated"
 ```
 
 Expected output:
@@ -513,6 +533,8 @@ data: {"name":"mpd.service","scope":"user","active_state":"active","running":tru
 <pre id="log"></pre>
 <script>
   const log = document.getElementById('log');
+
+  // Subscribe to all events — add ?backend=mpris or ?types=... to filter
   const es  = new EventSource('http://localhost:8018/events');
 
   ['player.updated', 'player.added', 'player.removed',

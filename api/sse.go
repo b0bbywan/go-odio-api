@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/b0bbywan/go-odio-api/backend"
+	"github.com/b0bbywan/go-odio-api/events"
 	"github.com/b0bbywan/go-odio-api/logger"
 )
 
@@ -28,7 +30,7 @@ func sseHandler(b *backend.Broadcaster) http.HandlerFunc {
 			return
 		}
 
-		ch := b.Subscribe()
+		ch := b.SubscribeFunc(parseFilter(r))
 		defer b.Unsubscribe(ch)
 		keepAlive := time.NewTimer(30 * time.Second)
 		defer keepAlive.Stop()
@@ -75,8 +77,38 @@ func sendToFlusher(flusher http.Flusher, w http.ResponseWriter, e events.Event) 
 	}
 	if _, err = fmt.Fprintf(w, "event: %s\ndata: %s\n\n", e.Type, data); err != nil {
 		logger.Error("[sse] failed to write to flusher: %v", err)
+		http.Error(w, "failed to send data to flusher", http.StatusInternalServerError)
 		return err
 	}
 	flusher.Flush()
 	return nil
+}
+
+// parseFilter builds an event filter from the request's query parameters:
+//   - ?types=player.updated,player.added  — comma-separated event type names to include
+//   - ?backend=mpris,audio               — comma-separated backend names to include (resolved via events.BackendTypes)
+//   - ?exclude=player.position           — comma-separated event type names to exclude
+//
+// Types from both params are merged (union). Exclude is applied after include. A nil return means pass-all.
+func parseFilter(r *http.Request) func(events.Event) bool {
+	q := r.URL.Query()
+
+	var include []string
+	for _, t := range strings.Split(q.Get("types"), ",") {
+		if t = strings.TrimSpace(t); t != "" {
+			include = append(include, t)
+		}
+	}
+	for _, name := range strings.Split(q.Get("backend"), ",") {
+		include = append(include, events.BackendTypes[strings.TrimSpace(name)]...)
+	}
+
+	var exclude []string
+	for _, t := range strings.Split(q.Get("exclude"), ",") {
+		if t = strings.TrimSpace(t); t != "" {
+			exclude = append(exclude, t)
+		}
+	}
+
+	return events.NewFilter(include, exclude)
 }

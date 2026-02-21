@@ -11,24 +11,32 @@ import (
 // Broadcaster fans out events from a single upstream channel to all subscribers.
 type Broadcaster struct {
 	mu      sync.RWMutex
-	clients map[chan events.Event]struct{}
+	clients map[chan events.Event]func(events.Event) bool
 }
 
 // NewBroadcaster starts a broadcaster that reads from upstream and fans out to
 // all subscribers. It stops when ctx is cancelled or upstream is closed.
 func NewBroadcaster(ctx context.Context, upstream <-chan events.Event) *Broadcaster {
 	b := &Broadcaster{
-		clients: make(map[chan events.Event]struct{}),
+		clients: make(map[chan events.Event]func(events.Event) bool),
 	}
 	go b.run(ctx, upstream)
 	return b
 }
 
-// Subscribe registers a new subscriber and returns its dedicated channel (buffered, size 32).
+// Subscribe registers a new subscriber (no filter — all events pass) and returns
+// its dedicated channel (buffered, size 32).
 func (b *Broadcaster) Subscribe() chan events.Event {
+	return b.SubscribeFunc(nil)
+}
+
+// SubscribeFunc registers a new subscriber with an optional filter function.
+// Only events for which filter returns true are delivered to the channel.
+// A nil filter passes all events.
+func (b *Broadcaster) SubscribeFunc(filter func(events.Event) bool) chan events.Event {
 	ch := make(chan events.Event, 32)
 	b.mu.Lock()
-	b.clients[ch] = struct{}{}
+	b.clients[ch] = filter
 	b.mu.Unlock()
 	return ch
 }
@@ -44,7 +52,10 @@ func (b *Broadcaster) Unsubscribe(ch chan events.Event) {
 func (b *Broadcaster) broadcast(e events.Event) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
-	for ch := range b.clients {
+	for ch, filter := range b.clients {
+		if filter != nil && !filter(e) {
+			continue
+		}
 		select {
 		case ch <- e:
 		default:
