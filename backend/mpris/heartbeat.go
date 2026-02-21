@@ -107,6 +107,15 @@ func (h *Heartbeat) updatePlayingPositions() bool {
 			continue
 		}
 
+		// Some MPRIS implementations (e.g. go-librespot) return 0 for Position
+		// even during active playback. Skip the update to avoid resetting the
+		// seeker to the beginning of the track.
+		pos, ok := extractInt64(variant)
+		if !ok || pos <= 0 {
+			logger.Debug("[mpris] skipping zero/invalid position for %s", player.BusName)
+			continue
+		}
+
 		// Update via UpdateProperty (handles cache properly)
 		if err := h.backend.UpdateProperty(player.BusName, "Position", variant); err != nil {
 			logger.Warn("[mpris] failed to update position for %s: %v", player.BusName, err)
