@@ -62,7 +62,7 @@ func main() {
 	}
 
 	// New api server
-	server := api.NewServer(ctx, cfg.Api, b)
+	server := api.NewServer(cfg.Api, b)
 
 	// Channel to synchronize shutdown
 	shutdownDone := make(chan struct{})
