@@ -7,6 +7,7 @@ import (
 	"github.com/the-jonsey/pulseaudio"
 
 	"github.com/b0bbywan/go-odio-api/cache"
+	"github.com/b0bbywan/go-odio-api/events"
 )
 
 type AudioServerKind string
@@ -27,6 +28,7 @@ type PulseAudioBackend struct {
 
 	cache    *cache.Cache[[]AudioClient]
 	listener *Listener
+	events   chan events.Event
 }
 
 type ServerInfo struct {

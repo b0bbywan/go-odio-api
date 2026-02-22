@@ -8,6 +8,7 @@ import (
 
 	"github.com/b0bbywan/go-odio-api/cache"
 	"github.com/b0bbywan/go-odio-api/config"
+	"github.com/b0bbywan/go-odio-api/events"
 )
 
 // Listener listens for systemd changes via native D-Bus signals (godbus)
@@ -44,6 +45,8 @@ type SystemdBackend struct {
 
 	// listener for systemd changes
 	listener *Listener
+
+	events chan events.Event
 }
 
 type Service struct {

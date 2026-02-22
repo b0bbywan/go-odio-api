@@ -8,6 +8,7 @@ import (
 
 	"github.com/b0bbywan/go-odio-api/cache"
 	"github.com/b0bbywan/go-odio-api/config"
+	"github.com/b0bbywan/go-odio-api/events"
 	"github.com/b0bbywan/go-odio-api/logger"
 	"github.com/the-jonsey/pulseaudio"
 )
@@ -25,6 +26,7 @@ func New(ctx context.Context, cfg *config.PulseAudioConfig) (*PulseAudioBackend,
 		address: address,
 		ctx:     ctx,
 		cache:   cache.New[[]AudioClient](0), // TTL=0 = no expiration
+		events:  make(chan events.Event, 32),
 	}
 
 	return backend, nil
@@ -298,7 +300,19 @@ func (pa *PulseAudioBackend) Close() {
 		pa.client.Close()
 		pa.client = nil
 	}
+	close(pa.events)
 }
+
+func (pa *PulseAudioBackend) notify(e events.Event) {
+	select {
+	case pa.events <- e:
+	default:
+		logger.Warn("[pulseaudio] event channel full, dropping %s event", e.Type)
+	}
+}
+
+// Events returns the read-only event channel for this backend.
+func (pa *PulseAudioBackend) Events() <-chan events.Event { return pa.events }
 
 func (pa *PulseAudioBackend) ToggleMuteMaster() error {
 	if _, err := pa.client.ToggleMute(); err != nil {
