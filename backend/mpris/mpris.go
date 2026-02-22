@@ -195,7 +195,7 @@ func (m *MPRISBackend) UpdatePlayerProperties(busName string, changed map[string
 					players[i].Rate = val
 				}
 			case "Position":
-				if val, ok := extractInt64(variant); ok {
+				if val, ok := extractInt64(variant); ok && val > 0 {
 					players[i].Position = val
 				}
 			}
