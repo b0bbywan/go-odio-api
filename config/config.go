@@ -261,7 +261,7 @@ func New(cfgFile *string) (*Config, error) {
 	viper.SetDefault("api.enabled", true)
 	viper.SetDefault("api.port", 8018)
 	viper.SetDefault("api.cors.origins", "https://odio-pwa.vercel.app")
-	viper.SetDefault("api.ui.enabled", false)
+	viper.SetDefault("api.ui.enabled", true)
 
 	viper.SetDefault("power.enabled", false)
 	viper.SetDefault("power.capabilities.reboot", false)

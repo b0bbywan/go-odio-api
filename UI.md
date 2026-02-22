@@ -12,7 +12,7 @@ The built-in Odio UI is accessible at:
 
 ### Configuration
 
-UI must be enabled in configuration
+UI is enabled by default in configuration
 
 ```yaml
 api:
