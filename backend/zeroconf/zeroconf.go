@@ -2,6 +2,8 @@ package zeroconf
 
 import (
 	"context"
+	"net"
+	"os"
 	"sync"
 
 	"github.com/grandcat/zeroconf"
@@ -37,6 +39,24 @@ func New(ctx context.Context, cfg *config.ZeroConfig) (*ZeroConfBackend, error) 
 	}, nil
 }
 
+func ipv4sFromInterfaces(ifaces []net.Interface) []string {
+	var ips []string
+	for _, iface := range ifaces {
+		addrs, err := iface.Addrs()
+		if err != nil {
+			continue
+		}
+		for _, addr := range addrs {
+			if ipnet, ok := addr.(*net.IPNet); ok {
+				if v4 := ipnet.IP.To4(); v4 != nil {
+					ips = append(ips, v4.String())
+				}
+			}
+		}
+	}
+	return ips
+}
+
 func (z *ZeroConfBackend) Start() error {
 	z.mu.Lock()
 	defer z.mu.Unlock()
@@ -45,11 +65,15 @@ func (z *ZeroConfBackend) Start() error {
 		return nil
 	}
 
-	server, err := zeroconf.Register(
+	hostname, _ := os.Hostname()
+	ips := ipv4sFromInterfaces(z.Config.Listen)
+	server, err := zeroconf.RegisterProxy(
 		z.Config.InstanceName,
 		z.Config.ServiceType,
 		z.Config.Domain,
 		z.Config.Port,
+		hostname+".",
+		ips,
 		z.Config.TxtRecords,
 		z.Config.Listen,
 	)
