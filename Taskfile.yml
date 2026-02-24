@@ -19,6 +19,8 @@ vars:
           git describe --tags --always 2>/dev/null || echo "dev"
         fi
       fi
+  PKG_VERSION:
+    sh: echo "{{.VERSION}}" | sed 's/^v//'
   LDFLAGS: "-X 'github.com/b0bbywan/go-odio-api/config.AppVersion={{.VERSION}}'"
 
 tasks:
@@ -196,7 +198,7 @@ tasks:
     desc: Build .deb package for amd64
     deps: [build:linux-amd64]
     env:
-      VERSION: "{{.VERSION}}"
+      VERSION: "{{.PKG_VERSION}}"
       NFPM_ARCH: amd64
       BINARY_PATH: dist/odio-api-linux-amd64
     cmds:
@@ -212,7 +214,7 @@ tasks:
     desc: Build .deb package for armhf (RPi OS ARMv6 hard-float)
     deps: [build:linux-armhf]
     env:
-      VERSION: "{{.VERSION}}"
+      VERSION: "{{.PKG_VERSION}}"
       NFPM_ARCH: armhf
       BINARY_PATH: dist/odio-api-linux-armhf
     cmds:
@@ -228,7 +230,7 @@ tasks:
     desc: Build .deb package for armv7hf (RPi 2/3 32-bit)
     deps: [build:linux-armv7hf]
     env:
-      VERSION: "{{.VERSION}}"
+      VERSION: "{{.PKG_VERSION}}"
       NFPM_ARCH: armv7hf
       BINARY_PATH: dist/odio-api-linux-armv7hf
     cmds:
@@ -244,7 +246,7 @@ tasks:
     desc: Build .deb package for arm64
     deps: [build:linux-arm64]
     env:
-      VERSION: "{{.VERSION}}"
+      VERSION: "{{.PKG_VERSION}}"
       NFPM_ARCH: arm64
       BINARY_PATH: dist/odio-api-linux-arm64
     cmds:
@@ -260,7 +262,7 @@ tasks:
     desc: Build .rpm package for amd64
     deps: [build:linux-amd64]
     env:
-      VERSION: "{{.VERSION}}"
+      VERSION: "{{.PKG_VERSION}}"
       NFPM_ARCH: x86_64
       BINARY_PATH: dist/odio-api-linux-amd64
     cmds:
@@ -276,7 +278,7 @@ tasks:
     desc: Build .rpm package for armv7hf (RPi 2/3 32-bit)
     deps: [build:linux-armv7hf]
     env:
-      VERSION: "{{.VERSION}}"
+      VERSION: "{{.PKG_VERSION}}"
       NFPM_ARCH: armv7hl
       BINARY_PATH: dist/odio-api-linux-armv7hf
     cmds:
@@ -292,7 +294,7 @@ tasks:
     desc: Build .rpm package for armhf (ARMv6 hard-float)
     deps: [build:linux-armhf]
     env:
-      VERSION: "{{.VERSION}}"
+      VERSION: "{{.PKG_VERSION}}"
       NFPM_ARCH: armv6hl
       BINARY_PATH: dist/odio-api-linux-armhf
     cmds:
@@ -308,7 +310,7 @@ tasks:
     desc: Build .rpm package for arm64
     deps: [build:linux-arm64]
     env:
-      VERSION: "{{.VERSION}}"
+      VERSION: "{{.PKG_VERSION}}"
       NFPM_ARCH: aarch64
       BINARY_PATH: dist/odio-api-linux-arm64
     cmds:
