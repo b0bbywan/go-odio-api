@@ -69,7 +69,7 @@ func TestExtractBoolProp(t *testing.T) {
 	tests := []struct {
 		name     string
 		props    map[string]dbus.Variant
-		key      string
+		key      BluetoothState
 		expected bool
 	}{
 		{
@@ -77,7 +77,7 @@ func TestExtractBoolProp(t *testing.T) {
 			props: map[string]dbus.Variant{
 				"Connected": dbus.MakeVariant(true),
 			},
-			key:      "Connected",
+			key:      BT_STATE_CONNECTED,
 			expected: true,
 		},
 		{
@@ -85,7 +85,7 @@ func TestExtractBoolProp(t *testing.T) {
 			props: map[string]dbus.Variant{
 				"Connected": dbus.MakeVariant(false),
 			},
-			key:      "Connected",
+			key:      BT_STATE_CONNECTED,
 			expected: false,
 		},
 		{
@@ -93,13 +93,13 @@ func TestExtractBoolProp(t *testing.T) {
 			props: map[string]dbus.Variant{
 				"Other": dbus.MakeVariant(true),
 			},
-			key:      "Connected",
+			key:      BT_STATE_CONNECTED,
 			expected: false,
 		},
 		{
 			name:     "empty map",
 			props:    map[string]dbus.Variant{},
-			key:      "Connected",
+			key:      BT_STATE_CONNECTED,
 			expected: false,
 		},
 		{
@@ -107,7 +107,7 @@ func TestExtractBoolProp(t *testing.T) {
 			props: map[string]dbus.Variant{
 				"Connected": dbus.MakeVariant("true"),
 			},
-			key:      "Connected",
+			key:      BT_STATE_CONNECTED,
 			expected: false,
 		},
 		{
@@ -115,7 +115,7 @@ func TestExtractBoolProp(t *testing.T) {
 			props: map[string]dbus.Variant{
 				"Connected": dbus.MakeVariant(1),
 			},
-			key:      "Connected",
+			key:      BT_STATE_CONNECTED,
 			expected: false,
 		},
 	}
@@ -206,7 +206,7 @@ func TestBluetoothStateToString(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := tt.state.toString()
+			result := tt.state.String()
 			if result != tt.expected {
 				t.Errorf("toString() = %q, want %q", result, tt.expected)
 			}

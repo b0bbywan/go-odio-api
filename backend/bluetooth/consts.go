@@ -33,22 +33,22 @@ const (
 	CapNoInputNoOutput = "NoInputNoOutput"
 	CapKeyboardDisplay = "KeyboardDisplay"
 
-	BT_PROP_ADAPTER   = "Adapter"
-	BT_PROP_ADDRESS   = "Address"
-	BT_PROP_NAME      = "Name"
-	BT_PROP_CONNECTED = "Connected"
-	BT_PROP_TRUSTED   = "Trusted"
+	BT_PROP_ADAPTER = "Adapter"
+	BT_PROP_ADDRESS = "Address"
+	BT_PROP_NAME    = "Name"
 )
 
 type BluetoothState string
 
 const (
-	BT_STATE_POWERED      BluetoothState = "Powered"
+	BT_STATE_CONNECTED    BluetoothState = "Connected"
 	BT_STATE_DISCOVERABLE BluetoothState = "Discoverable"
 	BT_STATE_PAIRABLE     BluetoothState = "Pairable"
+	BT_STATE_PAIRED       BluetoothState = "Paired"
+	BT_STATE_POWERED      BluetoothState = "Powered"
 	BT_STATE_TRUSTED      BluetoothState = "Trusted"
 )
 
-func (b BluetoothState) toString() string {
+func (b BluetoothState) String() string {
 	return string(b)
 }
