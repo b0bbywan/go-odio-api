@@ -3,7 +3,6 @@ package mpris
 import (
 	"context"
 	"sync"
-	"time"
 
 	"github.com/godbus/dbus/v5"
 
@@ -18,9 +17,8 @@ type LoopStatus string
 
 // MPRISBackend manages connections to media players via MPRIS
 type MPRISBackend struct {
-	conn    *dbus.Conn
-	ctx     context.Context
-	timeout time.Duration
+	conn *dbus.Conn
+	ctx  context.Context
 
 	// permanent cache (no expiration)
 	cache *cache.Cache[[]Player]
@@ -47,7 +45,6 @@ type Listener struct {
 type Player struct {
 	backend    *MPRISBackend // Parent backend (not exported)
 	conn       *dbus.Conn    // D-Bus connection (not exported)
-	timeout    time.Duration // Timeout for D-Bus calls (not exported)
 	uniqueName string        // Unique D-Bus connection name (e.g., :1.107)
 
 	BusName string `json:"bus_name"`

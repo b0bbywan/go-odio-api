@@ -13,15 +13,9 @@ const (
 	DBUS_INTERFACE  = "org.freedesktop.DBus"
 	DBUS_PROP_IFACE = "org.freedesktop.DBus.Properties"
 
-	// D-Bus method names
-	DBUS_LIST_NAMES_METHOD   = DBUS_INTERFACE + ".ListNames"
-	DBUS_ADD_MATCH_METHOD    = DBUS_INTERFACE + ".AddMatch"
-	DBUS_PROP_GET            = DBUS_PROP_IFACE + ".Get"
-	DBUS_PROP_GET_ALL        = DBUS_PROP_IFACE + ".GetAll"
-	DBUS_PROP_SET            = DBUS_PROP_IFACE + ".Set"
+	// D-Bus signal names
 	DBUS_PROP_CHANGED_SIGNAL = DBUS_PROP_IFACE + ".PropertiesChanged"
 	DBUS_NAME_OWNER_CHANGED  = DBUS_INTERFACE + ".NameOwnerChanged"
-	DBUS_GET_NAME_OWNER      = DBUS_INTERFACE + ".GetNameOwner"
 
 	// MPRIS Player methods
 	MPRIS_METHOD_PLAY         = MPRIS_PLAYER_IFACE + ".Play"
