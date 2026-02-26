@@ -3,7 +3,6 @@ package login1
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/godbus/dbus/v5"
 
@@ -23,9 +22,8 @@ func New(ctx context.Context, cfg *config.Login1Config) (*Login1Backend, error) 
 	}
 
 	backend := &Login1Backend{
-		conn:    conn,
-		ctx:     ctx,
-		timeout: 10 * time.Second,
+		conn: conn,
+		ctx:  ctx,
 	}
 
 	if cfg.Capabilities != nil {
@@ -59,7 +57,7 @@ func (l *Login1Backend) Reboot() error {
 		return &CapabilityError{Required: "reboot capability disabled"}
 	}
 	logger.Info("[login1] Reboot requested")
-	return l.callMethod(LOGIN1_PREFIX, LOGIN1_METHOD_REBOOT, true)
+	return l.callMethod(LOGIN1_METHOD_REBOOT, true)
 }
 
 func (l *Login1Backend) PowerOff() error {
@@ -67,7 +65,7 @@ func (l *Login1Backend) PowerOff() error {
 		return &CapabilityError{Required: "poweroff capability disabled"}
 	}
 	logger.Info("[login1] PowerOff requested")
-	return l.callMethod(LOGIN1_PREFIX, LOGIN1_METHOD_POWEROFF, true)
+	return l.callMethod(LOGIN1_METHOD_POWEROFF, true)
 }
 
 func (l *Login1Backend) validateCapabilities(capabilities config.Login1Capabilities) error {
@@ -95,8 +93,8 @@ func (l *Login1Backend) checkCapability(method string) (bool, error) {
 		return false, err
 	}
 
-	result, err := extractString(call)
-	if err != nil {
+	var result string
+	if err := call.Store(&result); err != nil {
 		return false, err
 	}
 
