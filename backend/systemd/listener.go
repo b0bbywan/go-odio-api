@@ -5,6 +5,7 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
+	idbus "github.com/b0bbywan/go-odio-api/backend/internal/dbus"
 	"github.com/b0bbywan/go-odio-api/logger"
 )
 
@@ -77,7 +78,7 @@ func (l *Listener) startScope(scope UnitScope, watched map[string]bool) error {
 	// Subscribe to systemd signals (path filters on systemd1)
 	matchRule := "type='signal',sender='org.freedesktop.systemd1'"
 
-	if err := conn.BusObject().Call("org.freedesktop.DBus.AddMatch", 0, matchRule).Err; err != nil {
+	if err := idbus.AddMatchRule(conn, matchRule); err != nil {
 		if closeErr := conn.Close(); closeErr != nil {
 			logger.Info("Failed to close D-Bus connection: %v", closeErr)
 		}
@@ -105,20 +106,13 @@ func (l *Listener) checkUnit(sig *dbus.Signal, scope UnitScope) (string, bool) {
 	}
 
 	// Extract SubState from changed properties (PropertiesChanged signals)
-	if len(sig.Body) < 2 {
-		return unitName, false
-	}
-	changed, ok := sig.Body[1].(map[string]dbus.Variant)
-	if !ok {
+	changed, _, err := idbus.FilterSignal(sig)
+	if err != nil {
 		return unitName, false
 	}
 
-	subStateVar, hasSubState := changed["SubState"]
-	if !hasSubState {
-		return unitName, false
-	}
-	subState, ok := subStateVar.Value().(string)
-	if !ok {
+	subState := idbus.MapString(changed, "SubState")
+	if subState == "" {
 		return unitName, false
 	}
 
