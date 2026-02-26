@@ -12,40 +12,27 @@
 
     <div class="space-y-2">
 
-        {{/* Power row */}}
         <div class="service-card">
             <div class="content-area flex items-center gap-2">
-                <span class="status-dot {{ if .Powered }}bg-blue-400{{ else }}bg-zinc-600{{ end }}"></span>
-                <span class="text-sm {{ if .Powered }}text-zinc-200{{ else }}text-muted{{ end }}">
-                    {{ if .Powered }}Powered{{ else }}Off{{ end }}
-                </span>
-            </div>
-            <div class="meta-area">
                 {{ if .Powered }}
                 <button class="btn text-xs"
                         hx-post="/bluetooth/power_down"
-                        hx-swap="none"
-                        title="Turn Bluetooth off">Turn off</button>
+                        hx-swap="none">Off</button>
                 {{ else }}
                 <button class="btn text-xs"
                         hx-post="/bluetooth/power_up"
-                        hx-swap="none"
-                        title="Turn Bluetooth on">Turn on</button>
+                        hx-swap="none">On</button>
                 {{ end }}
-            </div>
-        </div>
-
-        {{/* Pairing row */}}
-        <div class="service-card">
-            <div class="content-area">
                 {{ if .PairingActive }}
-                <span class="text-xs text-blue-400 animate-pulse">⏱ {{ .PairingSecondsLeft }}s</span>
+                <span class="text-xs text-blue-400">⏱ {{ .PairingSecondsLeft }}s</span>
                 {{ else }}
                 <button class="btn text-xs"
                         hx-post="/bluetooth/pairing_mode"
-                        hx-swap="none"
-                        title="Enable pairing mode for 60s">Enable Pairing</button>
+                        hx-swap="none">Pairing</button>
                 {{ end }}
+            </div>
+            <div class="meta-area">
+                <span class="status-dot {{ if .PairingActive }}bg-blue-400 animate-pulse{{ else if .Powered }}bg-green-500{{ else }}bg-red-500{{ end }}"></span>
             </div>
         </div>
 
