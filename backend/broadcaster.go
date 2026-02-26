@@ -82,6 +82,9 @@ func (b *Broadcaster) run(ctx context.Context, upstream <-chan events.Event) {
 // a single Broadcaster. Called once by Backend.New().
 func newBroadcasterFromBackend(ctx context.Context, b *Backend) *Broadcaster {
 	var srcs []<-chan events.Event
+	if b.Bluetooth != nil {
+		srcs = append(srcs, b.Bluetooth.Events())
+	}
 	if b.MPRIS != nil {
 		srcs = append(srcs, b.MPRIS.Events())
 	}

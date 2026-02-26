@@ -8,6 +8,7 @@ import (
 	"github.com/godbus/dbus/v5"
 
 	"github.com/b0bbywan/go-odio-api/cache"
+	"github.com/b0bbywan/go-odio-api/events"
 )
 
 type BluetoothBackend struct {
@@ -22,6 +23,7 @@ type BluetoothBackend struct {
 	listener       *DBusListener
 	// permanent cache (no expiration) for status tracking
 	statusCache *cache.Cache[BluetoothStatus]
+	events      chan events.Event
 }
 
 type dbusTimeoutError struct{}

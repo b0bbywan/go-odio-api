@@ -1,13 +1,14 @@
 package events
 
 const (
-	TypeServerInfo     = "server.info"
-	TypePlayerUpdated  = "player.updated"
-	TypePlayerAdded    = "player.added"
-	TypePlayerRemoved  = "player.removed"
-	TypePlayerPosition = "player.position"
-	TypeAudioUpdated   = "audio.updated"
-	TypeServiceUpdated = "service.updated"
+	TypeServerInfo       = "server.info"
+	TypePlayerUpdated    = "player.updated"
+	TypePlayerAdded      = "player.added"
+	TypePlayerRemoved    = "player.removed"
+	TypePlayerPosition   = "player.position"
+	TypeAudioUpdated     = "audio.updated"
+	TypeServiceUpdated   = "service.updated"
+	TypeBluetoothUpdated = "bluetooth.updated"
 )
 
 type Event struct {
@@ -17,10 +18,10 @@ type Event struct {
 
 // BackendTypes maps backend names to their event type constants.
 var BackendTypes = map[string][]string{
-	"mpris":   {TypePlayerUpdated, TypePlayerAdded, TypePlayerRemoved, TypePlayerPosition},
-	"mpris":   {TypePlayerUpdated, TypePlayerAdded, TypePlayerRemoved},
-	"audio":   {TypeAudioUpdated},
-	"systemd": {TypeServiceUpdated},
+	"mpris":     {TypePlayerUpdated, TypePlayerAdded, TypePlayerRemoved, TypePlayerPosition},
+	"audio":     {TypeAudioUpdated},
+	"systemd":   {TypeServiceUpdated},
+	"bluetooth": {TypeBluetoothUpdated},
 }
 
 // NewFilter combines include and exclude type lists into a single filter func.

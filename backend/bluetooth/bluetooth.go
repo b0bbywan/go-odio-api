@@ -8,6 +8,7 @@ import (
 
 	"github.com/b0bbywan/go-odio-api/cache"
 	"github.com/b0bbywan/go-odio-api/config"
+	"github.com/b0bbywan/go-odio-api/events"
 	"github.com/b0bbywan/go-odio-api/logger"
 )
 
@@ -29,6 +30,7 @@ func New(ctx context.Context, cfg *config.BluetoothConfig) (*BluetoothBackend, e
 		pairingTimeout: cfg.PairingTimeout,
 		idleTimeout:    cfg.IdleTimeout,
 		statusCache:    cache.New[BluetoothStatus](0), // no expiration
+		events:         make(chan events.Event, 16),
 	}
 
 	if err = backend.CheckBluetoothSupport(); err != nil {
@@ -332,6 +334,19 @@ func (b *BluetoothBackend) updateStatus(fn func(*BluetoothStatus)) {
 	status, _ := b.statusCache.Get(statusKey)
 	fn(&status)
 	b.statusCache.Set(statusKey, status)
+	b.notify(status)
+}
+
+func (b *BluetoothBackend) notify(status BluetoothStatus) {
+	select {
+	case b.events <- events.Event{Type: events.TypeBluetoothUpdated, Data: status}:
+	default:
+		logger.Warn("[bluetooth] event channel full, dropping %s event", events.TypeBluetoothUpdated)
+	}
+}
+
+func (b *BluetoothBackend) Events() <-chan events.Event {
+	return b.events
 }
 
 func (b *BluetoothBackend) refreshKnownDevices() {
