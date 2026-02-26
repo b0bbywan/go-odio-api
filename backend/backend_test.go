@@ -53,6 +53,7 @@ func TestBackendDisabled(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			bluetoothCfg := &config.BluetoothConfig{Enabled: tt.bluetoothEnabled}
 			login1Cfg := &config.Login1Config{Enabled: tt.login1Enabled}
 			mprisCfg := &config.MPRISConfig{Enabled: tt.mprisEnabled}
 			pulseCfg := &config.PulseAudioConfig{Enabled: tt.pulseEnabled}
@@ -64,7 +65,7 @@ func TestBackendDisabled(t *testing.T) {
 			}
 			zeroconfCfg := &config.ZeroConfig{Enabled: tt.zeroconfEnabled}
 
-			backend, err := New(ctx, login1Cfg, mprisCfg, pulseCfg, systemdCfg, zeroconfCfg)
+			backend, err := New(ctx, bluetoothCfg, login1Cfg, mprisCfg, pulseCfg, systemdCfg, zeroconfCfg)
 
 			// Bluetooth and other D-Bus backends may fail in test environment
 			// This is expected and we should skip the test
@@ -116,6 +117,7 @@ func TestSystemdWithEmptyConfig(t *testing.T) {
 
 	backend, err := New(
 		ctx,
+		&config.BluetoothConfig{Enabled: false},
 		&config.Login1Config{Enabled: false},
 		&config.MPRISConfig{Enabled: false},
 		&config.PulseAudioConfig{Enabled: false},
@@ -143,6 +145,7 @@ func TestZeroconfWithLocalhostBind(t *testing.T) {
 
 	backend, err := New(
 		ctx,
+		&config.BluetoothConfig{Enabled: false},
 		&config.Login1Config{Enabled: false},
 		&config.MPRISConfig{Enabled: false},
 		&config.PulseAudioConfig{Enabled: false},
@@ -198,6 +201,7 @@ func TestLogin1DisabledInBackend(t *testing.T) {
 
 	backend, err := New(
 		ctx,
+		&config.BluetoothConfig{Enabled: false},
 		login1Cfg,
 		&config.MPRISConfig{Enabled: false},
 		&config.PulseAudioConfig{Enabled: false},
@@ -228,6 +232,7 @@ func TestLogin1DisabledWithCapabilities(t *testing.T) {
 
 	backend, err := New(
 		ctx,
+		&config.BluetoothConfig{Enabled: false},
 		login1Cfg,
 		&config.MPRISConfig{Enabled: false},
 		&config.PulseAudioConfig{Enabled: false},
@@ -263,6 +268,7 @@ func TestBackendNew_Login1FieldInitialisedToNil(t *testing.T) {
 
 	backend, err := New(
 		ctx,
+		&config.BluetoothConfig{Enabled: false},
 		&config.Login1Config{Enabled: false},
 		&config.MPRISConfig{Enabled: false},
 		&config.PulseAudioConfig{Enabled: false},

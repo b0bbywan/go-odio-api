@@ -43,3 +43,9 @@ pulseaudio:
 mpris:
   enabled: true
   timeout: 5s
+
+bluetooth:
+  enabled: true
+  timeout: 5s
+  pairingTimeout: 60s
+  idleTimeout: 30m

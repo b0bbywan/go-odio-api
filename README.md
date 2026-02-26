@@ -129,6 +129,52 @@ Pre-built packages (amd64, arm64, armv7hf, armhf/ARMv6) and a multi-arch Docker 
 - SSE push events
 - Wayland Remote Control, Authentication, Photos Casting...
 
+### Bluetooth Sink (A2DP)
+
+Odio can act as a Bluetooth audio receiver (A2DP sink) using D-Bus, allowing phones, computers, and other Bluetooth devices to stream audio to it.
+
+#### Configuration
+
+To ensure the device is correctly identified by phones and computers, you must edit `/etc/bluetooth/main.conf`:
+
+```ini
+[General]
+Name=Odio       # Bluetooth name shown during device discovery
+Class=0x240428
+```
+
+Class of Device (CoD) breakdown:
+- `0x24` → Major Device Class: **Audio/Video**
+- `0x0428` → Minor + services :
+  - **Audio Sink**
+  - Loudspeaker
+  - Rendering device
+
+This configuration makes Odio appear as a standard Bluetooth speaker or audio receiver.
+
+After modifying the configuration file, restart the Bluetooth service:
+```bash
+sudo systemctl restart bluetooth
+```
+
+#### Usage
+
+Bluetooth is intentionally not left in an automatic or always-on state.
+
+- **Power up**:
+  Bluetooth is enabled, but the device is not discoverable. You can connect to it if your phone is already paired
+- **Power Down** Default 30min of inactivity (= no connected clients)
+- **Pairing mode**:
+  The device becomes visible to nearby Bluetooth devices and accepts new pairings.
+  After a successful pairing (or when the timeout expires), Bluetooth automatically returns to its normal state:
+    - Not discoverable
+    - Not pairable
+- Audio profile: **A2DP** (high-quality audio streaming).
+
+This behavior matches how most Bluetooth speakers and audio receivers work.
+
+Bonus: You get to control it through `/pulseaudio/clients` or `/players/` and in the UI !
+
 ## Installation
 
 ### Packages (deb / rpm)
@@ -189,7 +235,7 @@ sudo loginctl enable-linger <username>
 
 ### Docker
 
-A pre-built multi-arch image is available on GHCR (amd64, arm64, arm/v6, arm/v7):
+A pre-built multi-arch image is available on GHCR (amd64, arm64, arm/v7):
 
 ```
 ghcr.io/b0bbywan/go-odio-api:latest
@@ -274,6 +320,18 @@ api:
 
 ### Backend configuration examples
 
+#### Network binding
+
+```yaml
+bind: lo                      # loopback only (default)
+# bind: enp2s0                # single LAN interface
+# bind: [lo, enp2s0]          # loopback + LAN (required for UI access from the network)
+# bind: [lo, enp2s0, wlan0]   # loopback + ethernet + wifi
+# bind: all                   # all interfaces — 0.0.0.0 (Docker, remote access)
+```
+
+**Note:** The built-in web UI requires `lo` to be in the bind list. If `lo` is absent, the UI is automatically disabled.
+
 #### systemd (opt-in, whitelist required)
 
 ```yaml
@@ -302,6 +360,16 @@ systemd:
 [4] Install [Kodi Add-on: MPRIS D-Bus interface](https://github.com/wastis/MediaPlayerRemoteInterface#)
 [5] Maybe supported, untested
 
+#### Bluetooth
+
+```yaml
+bluetooth:
+  enabled: true
+  timeout: 5s
+  pairingTimeout: 60s
+  idleTimeout: 30m # 0 for no autopoweroff
+```
+
 #### Power Management
 
 ```yaml
@@ -311,18 +379,6 @@ power:
     poweroff: true
     reboot: true
 ```
-
-#### Network binding
-
-```yaml
-bind: lo                      # loopback only (default)
-# bind: enp2s0                # single LAN interface
-# bind: [lo, enp2s0]          # loopback + LAN (required for UI access from the network)
-# bind: [lo, enp2s0, wlan0]   # loopback + ethernet + wifi
-# bind: all                   # all interfaces — 0.0.0.0 (Docker, remote access)
-```
-
-**Note:** The built-in web UI requires `lo` to be in the bind list. If `lo` is absent, the UI is automatically disabled.
 
 #### Zeroconf / mDNS
 
@@ -388,6 +444,16 @@ POST   /services/{scope}/{unit}/enable    # Enable service (scope: system|user)
 POST   /services/{scope}/{unit}/disable   # Disable service
 ```
 
+### Bluetooth Sink
+```
+GET    /bluetooth                         # Get Bluetooth status (powered, pairing mode state)
+POST   /bluetooth/power_up                # Turns Bluetooth on and makes the device ready to connect to already paired devices.
+POST   /bluetooth/power_down              # Turns Bluetooth off and disconnects any active Bluetooth connections.
+POST   /bluetooth/pairing_mode            # Enables Bluetooth pairing mode for 60s (configurable).
+                                          # Returns to non-discoverable state after timeout or successful pairing.
+
+```
+
 ### Power Management
 
 ```
@@ -410,7 +476,11 @@ Systemd control is disabled by default and requires an explicit whitelist. Odio 
 - **Root forbidden by design** — Odio refuses to run as root.
 - **No preconfigured units** — nothing managed unless explicitly listed.
 
+- **MPRIS Backend**: Communicates with media players via D-Bus, implements smart caching and real-time updates through D-Bus signals
+- **PulseAudio Backend**: Interacts with PulseAudio/PipeWire for audio control, supports real-time event monitoring
+- **Systemd Backend**: Manages systemd services via D-Bus with native signal-based monitoring
 **You must knowingly enable this at your own risk.** Odio is free software and comes with no warranty.
+- **Bluetooth Backend**: Act as a Bluetooth audio receiver (A2DP sink) via D-Bus
 
 ### REST API
 
@@ -530,6 +600,8 @@ task package:rpm:linux-armhf     # .rpm armv6hl
 - [coreos/go-systemd](https://github.com/coreos/go-systemd) — systemd D-Bus bindings
 - [the-jonsey/pulseaudio](https://github.com/the-jonsey/pulseaudio) — pure-Go PulseAudio native protocol (no libpulse)
 - [grandcat/zeroconf](https://github.com/grandcat/zeroconf) — mDNS / DNS-SD
+- [HTMX](https://htmx.org/)
+- [TailwindCSS](https://tailwindcss.com/)
 
 ## Contributing
 

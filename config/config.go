@@ -25,6 +25,7 @@ var AppVersion = "dev"
 
 type Config struct {
 	Api        *ApiConfig
+	Bluetooth  *BluetoothConfig
 	Login1     *Login1Config
 	MPRIS      *MPRISConfig
 	Pulseaudio *PulseAudioConfig
@@ -76,6 +77,13 @@ type SystemdConfig struct {
 	UserServices   []string
 	SupportsUTMP   bool
 	XDGRuntimeDir  string
+}
+
+type BluetoothConfig struct {
+	Enabled        bool
+	PairingTimeout time.Duration
+	Timeout        time.Duration
+	IdleTimeout    time.Duration
 }
 
 type ZeroConfig struct {
@@ -263,6 +271,11 @@ func New(cfgFile *string) (*Config, error) {
 	viper.SetDefault("api.cors.origins", "https://odio-pwa.vercel.app")
 	viper.SetDefault("api.ui.enabled", true)
 
+	viper.SetDefault("bluetooth.enabled", true)
+	viper.SetDefault("bluetooth.timeout", "5s")
+	viper.SetDefault("bluetooth.pairingtimeout", "60s")
+	viper.SetDefault("bluetooth.idletimeout", "30m")
+
 	viper.SetDefault("power.enabled", false)
 	viper.SetDefault("power.capabilities.reboot", false)
 	viper.SetDefault("power.capabilities.poweroff", false)
@@ -350,6 +363,28 @@ func New(cfgFile *string) (*Config, error) {
 		Timeout: mprisTimeout,
 	}
 
+	bluetoothTimeout := viper.GetDuration("bluetooth.timeout")
+	if bluetoothTimeout <= 0 {
+		bluetoothTimeout = 5 * time.Second
+	}
+
+	bluetoothPairingTimeout := viper.GetDuration("bluetooth.pairingtimeout")
+	if bluetoothPairingTimeout <= 0 {
+		bluetoothPairingTimeout = 60 * time.Second
+	}
+
+	bluetoothIdleTimeout := viper.GetDuration("bluetooth.idletimeout")
+	if bluetoothIdleTimeout <= 0 {
+		bluetoothIdleTimeout = 30 * time.Minute
+	}
+
+	bluetoothcfg := BluetoothConfig{
+		Enabled:        viper.GetBool("bluetooth.enabled"),
+		Timeout:        bluetoothTimeout,
+		PairingTimeout: bluetoothPairingTimeout,
+		IdleTimeout:    bluetoothIdleTimeout,
+	}
+
 	pulsecfg := PulseAudioConfig{
 		Enabled:       viper.GetBool("pulseaudio.enabled"),
 		XDGRuntimeDir: xdgRuntimeDir,
@@ -376,6 +411,7 @@ func New(cfgFile *string) (*Config, error) {
 
 	cfg := Config{
 		Api:        &apiCfg,
+		Bluetooth:  &bluetoothcfg,
 		Login1:     &logincfg,
 		MPRIS:      &mpriscfg,
 		Pulseaudio: &pulsecfg,
