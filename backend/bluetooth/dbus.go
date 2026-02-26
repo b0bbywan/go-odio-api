@@ -219,24 +219,26 @@ func extractBoolProp(props map[string]dbus.Variant, key BluetoothState) bool {
 	return false
 }
 
-func (b *BluetoothBackend) isAdapterOn() bool {
-	v, err := b.getAdapterProp(BT_STATE_POWERED)
+func (b *BluetoothBackend) getAdapterBoolProp(prop BluetoothState) bool {
+	v, err := b.getAdapterProp(prop)
 	if err != nil {
-		logger.Warn("[bluetooth] failed to get adapter power state: %v", err)
+		logger.Warn("[bluetooth] failed to get adapter %s: %v", prop, err)
 		return false
 	}
-	powered, _ := extractBool(v)
-	return powered
+	val, _ := extractBool(v)
+	return val
+}
+
+func (b *BluetoothBackend) isAdapterOn() bool {
+	return b.getAdapterBoolProp(BT_STATE_POWERED)
+}
+
+func (b *BluetoothBackend) isPairable() bool {
+	return b.getAdapterBoolProp(BT_STATE_PAIRABLE)
 }
 
 func (b *BluetoothBackend) isDiscoverable() bool {
-	v, err := b.getAdapterProp(BT_STATE_DISCOVERABLE)
-	if err != nil {
-		logger.Warn("[bluetooth] failed to get adapter discoverable state: %v", err)
-		return false
-	}
-	discoverable, _ := extractBool(v)
-	return discoverable
+	return b.getAdapterBoolProp(BT_STATE_DISCOVERABLE)
 }
 
 func (b *BluetoothBackend) hasConnectedDevices() bool {

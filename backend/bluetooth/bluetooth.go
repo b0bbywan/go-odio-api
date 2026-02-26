@@ -37,8 +37,26 @@ func New(ctx context.Context, cfg *config.BluetoothConfig) (*BluetoothBackend, e
 		return nil, nil
 	}
 
-	logger.Info("[bluetooth] backend started (powered off)")
+	backend.syncAdapterState()
 	return &backend, nil
+}
+
+func (b *BluetoothBackend) syncAdapterState() {
+	powered := b.isAdapterOn()
+	pairable := b.isPairable()
+	discoverable := b.isDiscoverable()
+
+	b.updateStatus(func(s *BluetoothStatus) {
+		s.Powered = powered
+		s.Pairable = pairable
+		s.Discoverable = discoverable
+	})
+	logger.Info("[bluetooth] backend started (powered=%v pairable=%v discoverable=%v)", powered, pairable, discoverable)
+
+	if powered {
+		b.refreshKnownDevices()
+		b.startListener()
+	}
 }
 
 func (b *BluetoothBackend) PowerUp() error {
