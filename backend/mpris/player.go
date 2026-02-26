@@ -5,6 +5,8 @@ import (
 	"reflect"
 
 	"github.com/godbus/dbus/v5"
+
+	idbus "github.com/b0bbywan/go-odio-api/backend/internal/dbus"
 )
 
 // newPlayer creates a new Player with backend connection
@@ -12,7 +14,6 @@ func newPlayer(backend *MPRISBackend, busName string) *Player {
 	return &Player{
 		backend: backend,
 		conn:    backend.conn,
-		timeout: backend.timeout,
 		BusName: busName,
 	}
 }
@@ -109,22 +110,22 @@ func (p *Player) loadFromDBus() error {
 		// Handle according to field type
 		switch field.Kind() {
 		case reflect.String:
-			if val, ok := extractString(variant); ok {
+			if val, ok := idbus.ExtractString(variant); ok {
 				field.SetString(val)
 			}
 
 		case reflect.Bool:
-			if val, ok := extractBool(variant); ok {
+			if val, ok := idbus.ExtractBool(variant); ok {
 				field.SetBool(val)
 			}
 
 		case reflect.Float64:
-			if val, ok := extractFloat64(variant); ok {
+			if val, ok := idbus.ExtractFloat64(variant); ok {
 				field.SetFloat(val)
 			}
 
 		case reflect.Int64:
-			if val, ok := extractInt64(variant); ok {
+			if val, ok := idbus.ExtractInt64(variant); ok {
 				field.SetInt(val)
 			}
 
@@ -164,7 +165,7 @@ func (p *Player) loadCapabilitiesFromProps(props map[string]dbus.Variant) Capabi
 
 		// Retrieve property from props
 		if variant, ok := props[dbusTag]; ok {
-			if boolVal, ok := extractBool(variant); ok {
+			if boolVal, ok := idbus.ExtractBool(variant); ok {
 				field.SetBool(boolVal)
 			}
 		}

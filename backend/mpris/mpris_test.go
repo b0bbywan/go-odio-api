@@ -4,8 +4,10 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/b0bbywan/go-odio-api/cache"
 	"github.com/godbus/dbus/v5"
+
+	idbus "github.com/b0bbywan/go-odio-api/backend/internal/dbus"
+	"github.com/b0bbywan/go-odio-api/cache"
 )
 
 func TestGetPlayerFromCache(t *testing.T) {
@@ -377,10 +379,10 @@ func TestValidationError(t *testing.T) {
 }
 
 func TestDBusTimeoutError(t *testing.T) {
-	err := &dbusTimeoutError{}
-	expected := "D-Bus call timeout"
+	err := &idbus.TimeoutError{}
+	expected := "dbus: call timed out"
 	if err.Error() != expected {
-		t.Errorf("dbusTimeoutError.Error() = %q, want %q", err.Error(), expected)
+		t.Errorf("TimeoutError.Error() = %q, want %q", err.Error(), expected)
 	}
 }
 
@@ -496,7 +498,7 @@ func TestExtractString(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			value, ok := extractString(tt.variant)
+			value, ok := idbus.ExtractString(tt.variant)
 			if ok != tt.wantOk {
 				t.Errorf("extractString() ok = %v, want %v", ok, tt.wantOk)
 			}
@@ -536,7 +538,7 @@ func TestExtractBool(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			value, ok := extractBool(tt.variant)
+			value, ok := idbus.ExtractBool(tt.variant)
 			if ok != tt.wantOk {
 				t.Errorf("extractBool() ok = %v, want %v", ok, tt.wantOk)
 			}
@@ -582,7 +584,7 @@ func TestExtractInt64(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			value, ok := extractInt64(tt.variant)
+			value, ok := idbus.ExtractInt64(tt.variant)
 			if ok != tt.wantOk {
 				t.Errorf("extractInt64() ok = %v, want %v", ok, tt.wantOk)
 			}
@@ -628,7 +630,7 @@ func TestExtractFloat64(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			value, ok := extractFloat64(tt.variant)
+			value, ok := idbus.ExtractFloat64(tt.variant)
 			if ok != tt.wantOk {
 				t.Errorf("extractFloat64() ok = %v, want %v", ok, tt.wantOk)
 			}
@@ -666,7 +668,7 @@ func TestExtractMetadataMap(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, ok := extractMetadataMap(tt.variant)
+			_, ok := idbus.ExtractVariantMap(tt.variant)
 			if ok != tt.wantOk {
 				t.Errorf("extractMetadataMap() ok = %v, want %v", ok, tt.wantOk)
 			}
