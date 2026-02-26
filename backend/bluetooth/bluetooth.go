@@ -84,6 +84,10 @@ func (b *BluetoothBackend) PowerUp() error {
 }
 
 func (b *BluetoothBackend) startListener() {
+	if b.listener != nil {
+		logger.Debug("[bluetooth] listener already running, skipping")
+		return
+	}
 	matchRules := []string{
 		"type='signal',interface='org.freedesktop.DBus.Properties',member='PropertiesChanged',arg0='org.bluez.Device1'",
 		"type='signal',interface='org.freedesktop.DBus.Properties',member='PropertiesChanged',arg0='org.bluez.Adapter1'",
@@ -152,6 +156,7 @@ func (b *BluetoothBackend) NewPairing() error {
 		if err := b.PowerOnAdapter(true); err != nil {
 			return err
 		}
+		b.startListener()
 	}
 
 	// Set BlueZ native timeouts
