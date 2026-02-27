@@ -102,6 +102,99 @@ Explicit whitelist required — nothing managed unless listed in `config.yaml`.
 
 ⚠️ **Security model:** Odio enforces user-session mutations only at the application layer, regardless of D-Bus or polkit configuration. System units are strictly read-only. See [Security](#security) for full details.
 
+
+### Bluetooth Sink (A2DP)
+
+Odio can act as a Bluetooth audio receiver (A2DP sink) using D-Bus, allowing phones, computers, and other Bluetooth devices to stream audio to it.
+
+[Live example](UI.md#bluetooth-on-pi-b)
+
+[Inspired from my own Bluetooth setup since 2020](https://mathieu-requillart.medium.com/my-ultimate-guide-to-the-raspberry-pi-audio-server-i-wanted-bluetooth-64c347ee0d22)
+
+#### Configuration
+A few system configuration steps are required to make this work. Since Odio doesn't run as root, it can't do it by itself.
+
+First make sure the user running Odio belongs to `bluetooth` group
+
+```bash
+
+$ groups
+pi adm dialout cdrom sudo audio video plugdev games users input render netdev bluetooth gpio i2c spi
+
+# if 'bluetooth' doesn't show in the line above:
+
+$ sudo usermod -a -G bluetooth <username>
+```
+
+Some packages are needed to automatically plug PulseAudio or PipeWire to Bluetooth.
+Odio doesn't directly support `ALSA` and never will.
+
+```bash
+
+# PulseAudio
+$ sudo apt install pulseaudio-module-bluetooth
+
+# PipeWire
+$ sudo apt install libspa-0.2-bluetooth
+```
+
+To ensure the device is correctly identified by phones and computers, you must edit `/etc/bluetooth/main.conf`:
+
+```ini
+[General]
+Name=Odio       # Bluetooth name shown during device discovery
+Class=0x240428
+```
+
+Class of Device (CoD) breakdown:
+- `0x24` → Major Device Class: **Audio/Video**
+- `0x0428` → Minor + services :
+  - **Audio Sink**
+  - Loudspeaker
+  - Rendering device
+
+This configuration makes Odio appear as a standard Bluetooth speaker or audio receiver.
+
+After modifying the configuration file, restart the Bluetooth service:
+```bash
+
+$ sudo systemctl restart bluetooth
+
+# A new user service should now be running
+# It creates an mpris player for each connected device
+$ systemctl --user status mpris-proxy.service
+● mpris-proxy.service - Bluetooth mpris proxy
+     Loaded: loaded (/usr/lib/systemd/user/mpris-proxy.service; enabled; preset: enabled)
+     Active: active (running) since Fri 2026-02-27 13:17:33 CET; 1h 15min ago
+ Invocation: 4480169b9adb4c239ad81d7345dc1f92
+       Docs: man:mpris-proxy(1)
+   Main PID: 674 (mpris-proxy)
+      Tasks: 1 (limit: 379)
+        CPU: 791ms
+     CGroup: /user.slice/user-1000.slice/user@1000.service/app.slice/mpris-proxy.service
+             └─674 /usr/bin/mpris-proxy
+
+févr. 27 13:17:33 rasponkyold systemd[559]: Started mpris-proxy.service - Bluetooth mpris proxy.
+```
+
+#### Usage
+
+Bluetooth is intentionally not left in an automatic or always-on state.
+
+- **Power up**:
+  Bluetooth is enabled, but the device is not discoverable. You can connect to it if your phone is already paired
+- **Power Down** Default 30min of inactivity (= no connected clients)
+- **Pairing mode**:
+  The device becomes visible to nearby Bluetooth devices and accepts new pairings.
+  After a successful pairing (or when the timeout expires), Bluetooth automatically returns to its normal state:
+    - Not discoverable
+    - Not pairable
+- Audio profile: **A2DP** (high-quality audio streaming).
+
+This behavior matches how most Bluetooth speakers and audio receivers work.
+
+Bonus: You get to control it through `/pulseaudio/clients` or `/players/` and in the UI !
+
 ### Power Management
 
 Remote reboot and power-off via the REST API — no SSH needed for day-to-day operations. Disabled by default. Uses `org.freedesktop.login1` D-Bus interface.
@@ -128,52 +221,6 @@ Pre-built packages (amd64, arm64, armv7hf, armhf/ARMv6) and a multi-arch Docker 
 - Bluetooth backend: turn your Linux box into a fully API-controllable BT speaker, exposed as a `media_player` in HA
 - SSE push events
 - Wayland Remote Control, Authentication, Photos Casting...
-
-### Bluetooth Sink (A2DP)
-
-Odio can act as a Bluetooth audio receiver (A2DP sink) using D-Bus, allowing phones, computers, and other Bluetooth devices to stream audio to it.
-
-#### Configuration
-
-To ensure the device is correctly identified by phones and computers, you must edit `/etc/bluetooth/main.conf`:
-
-```ini
-[General]
-Name=Odio       # Bluetooth name shown during device discovery
-Class=0x240428
-```
-
-Class of Device (CoD) breakdown:
-- `0x24` → Major Device Class: **Audio/Video**
-- `0x0428` → Minor + services :
-  - **Audio Sink**
-  - Loudspeaker
-  - Rendering device
-
-This configuration makes Odio appear as a standard Bluetooth speaker or audio receiver.
-
-After modifying the configuration file, restart the Bluetooth service:
-```bash
-sudo systemctl restart bluetooth
-```
-
-#### Usage
-
-Bluetooth is intentionally not left in an automatic or always-on state.
-
-- **Power up**:
-  Bluetooth is enabled, but the device is not discoverable. You can connect to it if your phone is already paired
-- **Power Down** Default 30min of inactivity (= no connected clients)
-- **Pairing mode**:
-  The device becomes visible to nearby Bluetooth devices and accepts new pairings.
-  After a successful pairing (or when the timeout expires), Bluetooth automatically returns to its normal state:
-    - Not discoverable
-    - Not pairable
-- Audio profile: **A2DP** (high-quality audio streaming).
-
-This behavior matches how most Bluetooth speakers and audio receivers work.
-
-Bonus: You get to control it through `/pulseaudio/clients` or `/players/` and in the UI !
 
 ## Installation
 
