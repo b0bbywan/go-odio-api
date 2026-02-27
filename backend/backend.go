@@ -3,6 +3,7 @@ package backend
 import (
 	"context"
 
+	"github.com/b0bbywan/go-odio-api/backend/bluetooth"
 	"github.com/b0bbywan/go-odio-api/backend/login1"
 	"github.com/b0bbywan/go-odio-api/backend/mpris"
 	"github.com/b0bbywan/go-odio-api/backend/pulseaudio"
@@ -12,15 +13,19 @@ import (
 )
 
 type Backend struct {
-	Login1   *login1.Login1Backend
-	MPRIS    *mpris.MPRISBackend
-	Pulse    *pulseaudio.PulseAudioBackend
-	Systemd  *systemd.SystemdBackend
-	Zeroconf *zeroconf.ZeroConfBackend
+	Bluetooth *bluetooth.BluetoothBackend
+	Login1    *login1.Login1Backend
+	MPRIS     *mpris.MPRISBackend
+	Pulse     *pulseaudio.PulseAudioBackend
+	Systemd   *systemd.SystemdBackend
+	Zeroconf  *zeroconf.ZeroConfBackend
+
+	broadcaster *Broadcaster
 }
 
 func New(
 	ctx context.Context,
+	btcfg *config.BluetoothConfig,
 	login1cfg *config.Login1Config,
 	mpriscfg *config.MPRISConfig,
 	pulscfg *config.PulseAudioConfig,
@@ -29,6 +34,10 @@ func New(
 ) (*Backend, error) {
 	var b Backend
 	var err error
+
+	if b.Bluetooth, err = bluetooth.New(ctx, btcfg); err != nil {
+		return nil, err
+	}
 
 	if b.Login1, err = login1.New(ctx, login1cfg); err != nil {
 		return nil, err
@@ -50,7 +59,15 @@ func New(
 		return nil, err
 	}
 
+	b.broadcaster = newBroadcasterFromBackend(ctx, &b)
+
 	return &b, nil
+}
+
+// Broadcaster returns the backend's event broadcaster. SSE clients subscribe
+// to it to receive live state changes.
+func (b *Backend) Broadcaster() *Broadcaster {
+	return b.broadcaster
 }
 
 func (b *Backend) Start() error {
@@ -82,10 +99,12 @@ func (b *Backend) Start() error {
 }
 
 func (b *Backend) Close() {
+	if b.Bluetooth != nil {
+		b.Bluetooth.Close()
+	}
 	if b.Login1 != nil {
 		b.Login1.Close()
 	}
-
 	if b.MPRIS != nil {
 		b.MPRIS.Close()
 	}

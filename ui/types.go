@@ -50,7 +50,7 @@ type Player struct {
 	Status       string             `json:"playback_status"` // API returns "playback_status", not "status"
 	Position     int64              `json:"position"`
 	Rate         float64            `json:"rate"`
-	Volume       float64            `json:"volume"`
+	Volume       *float64           `json:"volume"`
 	Capabilities PlayerCapabilities `json:"capabilities"`
 }
 
@@ -122,9 +122,9 @@ type PlayerView struct {
 	Artist      string
 	Title       string
 	Album       string
-	ArtUrl      string  // Cover art URL (http/https only, empty if unavailable)
-	State       string  // "playing", "paused", "stopped"
-	Volume      float64 // Volume level 0.0-1.0
+	ArtUrl      string   // Cover art URL (http/https only, empty if unavailable)
+	State       string   // "playing", "paused", "stopped"
+	Volume      *float64 // Volume level 0.0-1.0
 	CanPlay     bool
 	CanPause    bool
 	CanNext     bool

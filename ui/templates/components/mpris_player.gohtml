@@ -42,10 +42,12 @@
 	</div>
 	{{ end }}
 
+	{{ if ne .Volume nil }}
 	<!-- Volume control -->
 	<div class="mb-3 px-2">
 		{{ template "volume-slider" (dict "Target" .Name "Type" "mpris" "Volume" .Volume "ShowMute" false) }}
 	</div>
+	{{ end }}
 
 	<!-- Control buttons (centered) — hidden when no capability is available -->
 	{{ if or .CanPrev (or .CanPlay .CanPause) .CanNext }}

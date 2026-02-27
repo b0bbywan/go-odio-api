@@ -25,6 +25,7 @@ var AppVersion = "dev"
 
 type Config struct {
 	Api        *ApiConfig
+	Bluetooth  *BluetoothConfig
 	Login1     *Login1Config
 	MPRIS      *MPRISConfig
 	Pulseaudio *PulseAudioConfig
@@ -34,6 +35,10 @@ type Config struct {
 }
 
 type UIConfig struct {
+	Enabled bool
+}
+
+type SSEConfig struct {
 	Enabled bool
 }
 
@@ -47,6 +52,7 @@ type ApiConfig struct {
 	Port    int
 
 	UI   *UIConfig
+	SSE  *SSEConfig
 	CORS *CORSConfig // nil = CORS disabled
 }
 
@@ -76,6 +82,13 @@ type SystemdConfig struct {
 	UserServices   []string
 	SupportsUTMP   bool
 	XDGRuntimeDir  string
+}
+
+type BluetoothConfig struct {
+	Enabled        bool
+	PairingTimeout time.Duration
+	Timeout        time.Duration
+	IdleTimeout    time.Duration
 }
 
 type ZeroConfig struct {
@@ -261,7 +274,13 @@ func New(cfgFile *string) (*Config, error) {
 	viper.SetDefault("api.enabled", true)
 	viper.SetDefault("api.port", 8018)
 	viper.SetDefault("api.cors.origins", "https://odio-pwa.vercel.app")
-	viper.SetDefault("api.ui.enabled", false)
+	viper.SetDefault("api.ui.enabled", true)
+	viper.SetDefault("api.sse.enabled", true)
+
+	viper.SetDefault("bluetooth.enabled", true)
+	viper.SetDefault("bluetooth.timeout", "5s")
+	viper.SetDefault("bluetooth.pairingtimeout", "60s")
+	viper.SetDefault("bluetooth.idletimeout", "30m")
 
 	viper.SetDefault("power.enabled", false)
 	viper.SetDefault("power.capabilities.reboot", false)
@@ -319,11 +338,16 @@ func New(cfgFile *string) (*Config, error) {
 		uiCfg.Enabled = false
 	}
 
+	sseCfg := SSEConfig{
+		Enabled: viper.GetBool("api.sse.enabled"),
+	}
+
 	apiCfg := ApiConfig{
 		Enabled: viper.GetBool("api.enabled"),
 		Listens: listens,
 		Port:    port,
 		UI:      &uiCfg,
+		SSE:     &sseCfg,
 	}
 
 	if origins := viper.GetStringSlice("api.cors.origins"); len(origins) > 0 {
@@ -348,6 +372,28 @@ func New(cfgFile *string) (*Config, error) {
 	mpriscfg := MPRISConfig{
 		Enabled: viper.GetBool("mpris.enabled"),
 		Timeout: mprisTimeout,
+	}
+
+	bluetoothTimeout := viper.GetDuration("bluetooth.timeout")
+	if bluetoothTimeout <= 0 {
+		bluetoothTimeout = 5 * time.Second
+	}
+
+	bluetoothPairingTimeout := viper.GetDuration("bluetooth.pairingtimeout")
+	if bluetoothPairingTimeout <= 0 {
+		bluetoothPairingTimeout = 60 * time.Second
+	}
+
+	bluetoothIdleTimeout := viper.GetDuration("bluetooth.idletimeout")
+	if bluetoothIdleTimeout <= 0 {
+		bluetoothIdleTimeout = 30 * time.Minute
+	}
+
+	bluetoothcfg := BluetoothConfig{
+		Enabled:        viper.GetBool("bluetooth.enabled"),
+		Timeout:        bluetoothTimeout,
+		PairingTimeout: bluetoothPairingTimeout,
+		IdleTimeout:    bluetoothIdleTimeout,
 	}
 
 	pulsecfg := PulseAudioConfig{
@@ -376,6 +422,7 @@ func New(cfgFile *string) (*Config, error) {
 
 	cfg := Config{
 		Api:        &apiCfg,
+		Bluetooth:  &bluetoothcfg,
 		Login1:     &logincfg,
 		MPRIS:      &mpriscfg,
 		Pulseaudio: &pulsecfg,

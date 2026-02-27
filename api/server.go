@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"slices"
 	"sync"
@@ -11,13 +12,14 @@ import (
 	"github.com/b0bbywan/go-odio-api/backend"
 	"github.com/b0bbywan/go-odio-api/config"
 	"github.com/b0bbywan/go-odio-api/logger"
-	"github.com/b0bbywan/go-odio-api/ui"
 )
 
 type Server struct {
-	mux    *http.ServeMux
-	config *config.ApiConfig
-	ui     bool
+	mux         *http.ServeMux
+	config      *config.ApiConfig
+	ui          bool
+	sse         bool
+	broadcaster *backend.Broadcaster
 }
 
 func NewServer(cfg *config.ApiConfig, b *backend.Backend) *Server {
@@ -25,10 +27,17 @@ func NewServer(cfg *config.ApiConfig, b *backend.Backend) *Server {
 		return nil
 	}
 
+	var broadcaster *backend.Broadcaster
+	if b != nil {
+		broadcaster = b.Broadcaster()
+	}
+
 	server := &Server{
-		mux:    http.NewServeMux(),
-		config: cfg,
-		ui:     cfg.UI != nil && cfg.UI.Enabled,
+		mux:         http.NewServeMux(),
+		config:      cfg,
+		ui:          cfg.UI != nil && cfg.UI.Enabled,
+		sse:         cfg.SSE != nil && cfg.SSE.Enabled,
+		broadcaster: broadcaster,
 	}
 	server.register(b)
 	return server
@@ -42,7 +51,14 @@ func (s *Server) Run(ctx context.Context) error {
 
 	servers := make([]*http.Server, len(s.config.Listens))
 	for i, addr := range s.config.Listens {
-		servers[i] = &http.Server{Addr: addr, Handler: handler}
+		servers[i] = &http.Server{
+			Addr:    addr,
+			Handler: handler,
+			// Derive request contexts from ctx so that long-lived handlers
+			// (e.g. SSE) exit cleanly when the application shuts down,
+			// without waiting for the graceful-shutdown timeout.
+			BaseContext: func(_ net.Listener) context.Context { return ctx },
+		}
 	}
 
 	// Shutdown all servers on context cancellation
@@ -99,6 +115,10 @@ func (s *Server) register(b *backend.Backend) {
 		s.registerUIRoutes()
 	}
 
+	if b.Bluetooth != nil {
+		s.registerBluetoothRoutes(b.Bluetooth)
+	}
+
 	if b.Login1 != nil {
 		s.registerLogin1Routes(b.Login1)
 	}
@@ -117,12 +137,6 @@ func (s *Server) register(b *backend.Backend) {
 	if b.MPRIS != nil {
 		s.registerMPRISRoutes(b.MPRIS)
 	}
-}
-
-func (s *Server) registerUIRoutes() {
-	uiHandler := ui.NewHandler(s.config.Port)
-	uiHandler.RegisterRoutes(s.mux)
-	logger.Info("[api] UI routes registered at /ui")
 }
 
 func corsMiddleware(cfg *config.CORSConfig) func(http.Handler) http.Handler {

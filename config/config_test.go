@@ -110,7 +110,7 @@ func TestNew_UIConfig(t *testing.T) {
 	}
 }
 
-func TestNew_UIDisabledByDefault(t *testing.T) {
+func TestNew_UIEnabledByDefault(t *testing.T) {
 	viper.Reset()
 	t.Setenv("HOME", t.TempDir())
 
@@ -121,8 +121,8 @@ func TestNew_UIDisabledByDefault(t *testing.T) {
 	if cfg.Api.UI == nil {
 		t.Fatal("Api.UI should not be nil")
 	}
-	if cfg.Api.UI.Enabled {
-		t.Error("Api.UI.Enabled should be false by default")
+	if !cfg.Api.UI.Enabled {
+		t.Error("Api.UI.Enabled should be true by default")
 	}
 }
 

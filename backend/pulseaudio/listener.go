@@ -5,6 +5,7 @@ import (
 
 	"github.com/the-jonsey/pulseaudio"
 
+	"github.com/b0bbywan/go-odio-api/events"
 	"github.com/b0bbywan/go-odio-api/logger"
 )
 
@@ -54,8 +55,10 @@ func (l *Listener) listen(updates <-chan struct{}) {
 
 			// A sink input changed, refresh the cache
 			logger.Debug("[pulseaudio] sink inputs changed, refreshing cache")
-			if _, err := l.backend.refreshCache(); err != nil {
+			if clients, err := l.backend.refreshCache(); err != nil {
 				logger.Warn("[pulseaudio] failed to refresh clients: %v", err)
+			} else {
+				l.backend.notify(events.Event{Type: events.TypeAudioUpdated, Data: clients})
 			}
 		}
 	}
