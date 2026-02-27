@@ -5,13 +5,6 @@ const (
 	BLUETOOTH_ADAPTER = BLUETOOTH_PREFIX + ".Adapter1"
 	BLUETOOTH_DEVICE  = BLUETOOTH_PREFIX + ".Device1"
 
-	DBUS_INTERFACE      = "org.freedesktop.DBus"
-	DBUS_PROP_IFACE     = DBUS_INTERFACE + ".Properties"
-	DBUS_PROP_SET       = DBUS_PROP_IFACE + ".Set"
-	DBUS_PROP_GET       = DBUS_PROP_IFACE + ".Get"
-	DBUS_INTROSPECTABLE = DBUS_INTERFACE + ".Introspectable"
-	MANAGED_OBJECTS     = DBUS_INTERFACE + ".ObjectManager.GetManagedObjects"
-
 	AGENT_IFACE   = BLUETOOTH_PREFIX + ".Agent1"
 	AGENT_MANAGER = BLUETOOTH_PREFIX + ".AgentManager1"
 
