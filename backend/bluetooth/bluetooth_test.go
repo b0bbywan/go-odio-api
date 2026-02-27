@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/godbus/dbus/v5"
+
+	idbus "github.com/b0bbywan/go-odio-api/backend/internal/dbus"
 )
 
 func TestExtractString(t *testing.T) {
@@ -57,7 +59,7 @@ func TestExtractString(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := extractString(tt.props, tt.key)
+			result := idbus.MapString(tt.props, tt.key)
 			if result != tt.expected {
 				t.Errorf("extractString(%v, %q) = %q, want %q", tt.props, tt.key, result, tt.expected)
 			}
@@ -122,7 +124,7 @@ func TestExtractBoolProp(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := extractBoolProp(tt.props, tt.key)
+			result := mapBTBool(tt.props, tt.key)
 			if result != tt.expected {
 				t.Errorf("extractBoolProp(%v, %q) = %v, want %v", tt.props, tt.key, result, tt.expected)
 			}
@@ -165,7 +167,7 @@ func TestExtractBool(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, ok := extractBool(tt.variant)
+			result, ok := idbus.ExtractBool(tt.variant)
 			if ok != tt.expectedOk {
 				t.Errorf("extractBool(%v) ok = %v, want %v", tt.variant, ok, tt.expectedOk)
 			}

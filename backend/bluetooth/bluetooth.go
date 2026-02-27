@@ -6,6 +6,7 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
+	idbus "github.com/b0bbywan/go-odio-api/backend/internal/dbus"
 	"github.com/b0bbywan/go-odio-api/cache"
 	"github.com/b0bbywan/go-odio-api/config"
 	"github.com/b0bbywan/go-odio-api/events"
@@ -26,7 +27,6 @@ func New(ctx context.Context, cfg *config.BluetoothConfig) (*BluetoothBackend, e
 	backend := BluetoothBackend{
 		conn:           conn,
 		ctx:            ctx,
-		timeout:        cfg.Timeout,
 		pairingTimeout: cfg.PairingTimeout,
 		idleTimeout:    cfg.IdleTimeout,
 		statusCache:    cache.New[BluetoothStatus](0), // no expiration
@@ -194,13 +194,13 @@ func (b *BluetoothBackend) onPropertiesChanged(sig *dbus.Signal) bool {
 	if sig == nil {
 		return true // channel closed
 	}
-	changed, iface, err := filterSignal(sig)
+	changed, iface, err := idbus.FilterSignal(sig)
 	if err != nil {
 		logger.Debug("[bluetooth] signal filtered out: %v", err)
 		return false
 	}
 
-	logger.Debug("[bluetooth] signal from %s (%s): changed properties=%v", sig.Path, iface, changedKeys(changed))
+	logger.Debug("[bluetooth] signal from %s (%s): changed properties=%v", sig.Path, iface, idbus.Keys(changed))
 	switch iface {
 	case BLUETOOTH_DEVICE:
 		b.onDevicePropertiesChanged(sig.Path, changed)
@@ -219,7 +219,7 @@ func (b *BluetoothBackend) onDevicePropertiesChanged(path dbus.ObjectPath, chang
 		}
 	}()
 
-	if connected, ok := extractMapBool(changed, BT_STATE_CONNECTED); ok {
+	if connected, ok := mapBTBoolOK(changed, BT_STATE_CONNECTED); ok {
 		logger.Info("[bluetooth] device %s Connected=%v", path, connected)
 		if connected {
 			b.cancelIdleTimer()
@@ -231,7 +231,7 @@ func (b *BluetoothBackend) onDevicePropertiesChanged(path dbus.ObjectPath, chang
 		return
 	}
 
-	if paired, ok := extractMapBool(changed, BT_STATE_PAIRED); ok && paired {
+	if paired, ok := mapBTBoolOK(changed, BT_STATE_PAIRED); ok && paired {
 		logger.Info("[bluetooth] device %s paired successfully", path)
 		if ok = b.trustDevice(path); !ok {
 			logger.Warn("[bluetooth] failed to trust device %s", path)
@@ -247,14 +247,14 @@ func (b *BluetoothBackend) onDevicePropertiesChanged(path dbus.ObjectPath, chang
 }
 
 func (b *BluetoothBackend) onAdapterPropertiesChanged(changed map[string]dbus.Variant) {
-	if discoverable, ok := extractMapBool(changed, BT_STATE_DISCOVERABLE); ok {
+	if discoverable, ok := mapBTBoolOK(changed, BT_STATE_DISCOVERABLE); ok {
 		logger.Debug("[bluetooth] adapter Discoverable=%v", discoverable)
 		b.updateStatus(func(s *BluetoothStatus) {
 			s.Discoverable = discoverable
 		})
 	}
 
-	if pairable, ok := extractMapBool(changed, BT_STATE_PAIRABLE); ok {
+	if pairable, ok := mapBTBoolOK(changed, BT_STATE_PAIRABLE); ok {
 		logger.Debug("[bluetooth] adapter Pairable=%v", pairable)
 		b.updateStatus(func(s *BluetoothStatus) {
 			s.Pairable = pairable
