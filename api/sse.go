@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -18,6 +19,12 @@ import (
 func sseHandler(b *backend.Broadcaster) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		filter, err := parseFilter(r)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		keepAliveDuration, err := parseKeepAlive(r)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
@@ -40,7 +47,7 @@ func sseHandler(b *backend.Broadcaster) http.HandlerFunc {
 
 		ch := b.SubscribeFunc(filter)
 		defer b.Unsubscribe(ch)
-		keepAlive := time.NewTimer(30 * time.Second)
+		keepAlive := time.NewTimer(keepAliveDuration)
 		defer keepAlive.Stop()
 
 		for {
@@ -55,7 +62,7 @@ func sseHandler(b *backend.Broadcaster) http.HandlerFunc {
 					logger.Warn("[sse] failed to send keepalive, closing: %v", err)
 					return
 				}
-				keepAlive.Reset(30 * time.Second)
+				keepAlive.Reset(keepAliveDuration)
 			case e, ok := <-ch:
 				if !ok {
 					return
@@ -63,7 +70,7 @@ func sseHandler(b *backend.Broadcaster) http.HandlerFunc {
 				if err := sendToFlusher(flusher, w, e); err != nil {
 					return
 				}
-				keepAlive.Reset(30 * time.Second)
+				keepAlive.Reset(keepAliveDuration)
 			}
 		}
 	}
@@ -90,6 +97,24 @@ func sendToFlusher(flusher http.Flusher, w http.ResponseWriter, e events.Event) 
 	}
 	flusher.Flush()
 	return nil
+}
+
+// parseKeepAlive reads the optional ?keepalive=<seconds> query parameter.
+// Default: 30s. Min: 10s. Max: 120s.
+func parseKeepAlive(r *http.Request) (time.Duration, error) {
+	const defaultKeepalive = 30 * time.Second
+	raw := r.URL.Query().Get("keepalive")
+	if raw == "" {
+		return defaultKeepalive, nil
+	}
+	secs, err := strconv.Atoi(raw)
+	if err != nil {
+		return 0, errors.New("keepalive must be an integer (seconds)")
+	}
+	if secs < 10 || secs > 120 {
+		return 0, errors.New("keepalive must be between 10 and 120 seconds")
+	}
+	return time.Duration(secs) * time.Second, nil
 }
 
 // parseFilter builds an event filter from the request's query parameters:

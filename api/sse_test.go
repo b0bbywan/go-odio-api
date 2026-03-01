@@ -255,6 +255,60 @@ func TestSSEHandler_FilteredDelivery(t *testing.T) {
 	}
 }
 
+// TestParseKeepAlive covers the full range of valid/invalid ?keepalive= values.
+func TestParseKeepAlive(t *testing.T) {
+	tests := []struct {
+		name     string
+		query    string
+		wantSecs int
+		wantErr  bool
+	}{
+		{"default (no param)", "/events", 30, false},
+		{"min boundary", "/events?keepalive=10", 10, false},
+		{"max boundary", "/events?keepalive=120", 120, false},
+		{"mid value", "/events?keepalive=60", 60, false},
+		{"too low", "/events?keepalive=9", 0, true},
+		{"too high", "/events?keepalive=121", 0, true},
+		{"zero", "/events?keepalive=0", 0, true},
+		{"negative", "/events?keepalive=-1", 0, true},
+		{"non-integer", "/events?keepalive=abc", 0, true},
+		{"float", "/events?keepalive=30.5", 0, true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, tc.query, nil)
+			d, err := parseKeepAlive(req)
+			if tc.wantErr {
+				if err == nil {
+					t.Errorf("expected error, got duration %v", d)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if d != time.Duration(tc.wantSecs)*time.Second {
+				t.Errorf("expected %ds, got %v", tc.wantSecs, d)
+			}
+		})
+	}
+}
+
+// TestSSEHandler_InvalidKeepalive verifies that an out-of-range ?keepalive= returns 400.
+func TestSSEHandler_InvalidKeepalive(t *testing.T) {
+	upstream := make(chan events.Event)
+	b := backend.NewBroadcaster(context.Background(), upstream)
+
+	for _, q := range []string{"?keepalive=5", "?keepalive=200", "?keepalive=bad"} {
+		req := httptest.NewRequest(http.MethodGet, "/events"+q, nil)
+		w := httptest.NewRecorder()
+		sseHandler(b)(w, req)
+		if w.Code != http.StatusBadRequest {
+			t.Errorf("query %s: expected 400, got %d", q, w.Code)
+		}
+	}
+}
+
 // TestSSEHandler_EventDelivery verifies that an event pushed to the broadcaster
 // appears in the SSE response body.
 func TestSSEHandler_EventDelivery(t *testing.T) {
