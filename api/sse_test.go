@@ -1,0 +1,354 @@
+package api
+
+import (
+	"bufio"
+	"context"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/b0bbywan/go-odio-api/backend"
+	"github.com/b0bbywan/go-odio-api/events"
+)
+
+// TestSSEHandler_ContentType verifies GET /events returns 200 with text/event-stream.
+func TestSSEHandler_ContentType(t *testing.T) {
+	upstream := make(chan events.Event)
+	b := backend.NewBroadcaster(context.Background(), upstream)
+
+	req := httptest.NewRequest(http.MethodGet, "/events", nil)
+	// Use a cancellable context so the handler exits after we've checked headers.
+	ctx, cancel := context.WithCancel(context.Background())
+	req = req.WithContext(ctx)
+
+	w := httptest.NewRecorder()
+
+	// Run the handler in the background and cancel quickly.
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		sseHandler(b)(w, req)
+	}()
+
+	// Give the handler a moment to write headers and the initial comment.
+	time.Sleep(20 * time.Millisecond)
+	cancel()
+	<-done
+
+	resp := w.Result()
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected status 200, got %d", resp.StatusCode)
+	}
+	ct := resp.Header.Get("Content-Type")
+	if ct != "text/event-stream" {
+		t.Errorf("expected Content-Type text/event-stream, got %q", ct)
+	}
+}
+
+// TestSSEHandler_ConnectedEvent verifies the initial server.info connected event is sent.
+func TestSSEHandler_ConnectedEvent(t *testing.T) {
+	upstream := make(chan events.Event)
+	b := backend.NewBroadcaster(context.Background(), upstream)
+
+	req := httptest.NewRequest(http.MethodGet, "/events", nil)
+	ctx, cancel := context.WithCancel(context.Background())
+	req = req.WithContext(ctx)
+
+	w := httptest.NewRecorder()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		sseHandler(b)(w, req)
+	}()
+
+	time.Sleep(20 * time.Millisecond)
+	cancel()
+	<-done
+
+	body := w.Body.String()
+	if !strings.Contains(body, "event: "+events.TypeServerInfo) {
+		t.Errorf("expected initial 'event: %s' in body, got: %q", events.TypeServerInfo, body)
+	}
+	if !strings.Contains(body, `"connected"`) {
+		t.Errorf("expected 'connected' data in body, got: %q", body)
+	}
+}
+
+// TestParseFilter_NoParams returns nil (pass-all) when no query params are given.
+func TestParseFilter_NoParams(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/events", nil)
+	f, err := parseFilter(req)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if f != nil {
+		t.Error("parseFilter with no params should return nil (pass-all)")
+	}
+}
+
+// TestParseFilter_TypesParam verifies ?types= builds a type-based filter.
+func TestParseFilter_TypesParam(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/events?types=player.updated,player.added", nil)
+	f, err := parseFilter(req)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if f == nil {
+		t.Fatal("expected non-nil filter")
+	}
+	if !f(events.Event{Type: events.TypePlayerUpdated}) {
+		t.Errorf("filter should pass %s", events.TypePlayerUpdated)
+	}
+	if !f(events.Event{Type: events.TypePlayerAdded}) {
+		t.Errorf("filter should pass %s", events.TypePlayerAdded)
+	}
+	if f(events.Event{Type: events.TypeAudioUpdated}) {
+		t.Errorf("filter should block %s", events.TypeAudioUpdated)
+	}
+}
+
+// TestParseFilter_BackendParam verifies ?backend= expands to the backend's types.
+func TestParseFilter_BackendParam(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/events?backend=audio", nil)
+	f, err := parseFilter(req)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if f == nil {
+		t.Fatal("expected non-nil filter")
+	}
+	if !f(events.Event{Type: events.TypeAudioUpdated}) {
+		t.Errorf("filter should pass %s", events.TypeAudioUpdated)
+	}
+	if f(events.Event{Type: events.TypePlayerUpdated}) {
+		t.Errorf("filter should block %s", events.TypePlayerUpdated)
+	}
+}
+
+// TestParseFilter_BothParams verifies ?types= and ?backend= are merged (union).
+func TestParseFilter_BothParams(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/events?types=service.updated&backend=audio", nil)
+	f, err := parseFilter(req)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if f == nil {
+		t.Fatal("expected non-nil filter")
+	}
+	if !f(events.Event{Type: events.TypeServiceUpdated}) {
+		t.Errorf("filter should pass %s (from types param)", events.TypeServiceUpdated)
+	}
+	if !f(events.Event{Type: events.TypeAudioUpdated}) {
+		t.Errorf("filter should pass %s (from backend param)", events.TypeAudioUpdated)
+	}
+	if f(events.Event{Type: events.TypePlayerUpdated}) {
+		t.Errorf("filter should block %s", events.TypePlayerUpdated)
+	}
+}
+
+// TestParseFilter_ServerInfoAlwaysIncluded verifies server.info passes even when not listed in ?types=.
+func TestParseFilter_ServerInfoAlwaysIncluded(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/events?types=player.updated", nil)
+	f, err := parseFilter(req)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if f == nil {
+		t.Fatal("expected non-nil filter")
+	}
+	if !f(events.Event{Type: events.TypeServerInfo}) {
+		t.Error("filter should always pass server.info even when not listed in types")
+	}
+	if f(events.Event{Type: events.TypeAudioUpdated}) {
+		t.Error("filter should block audio.updated when not listed in types")
+	}
+}
+
+// TestParseFilter_TypesOnlyServerInfo verifies that ?types=server.info does not duplicate server.info.
+func TestParseFilter_TypesOnlyServerInfo(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/events?types="+events.TypeServerInfo, nil)
+	f, err := parseFilter(req)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if f == nil {
+		t.Fatal("expected non-nil filter")
+	}
+	if !f(events.Event{Type: events.TypeServerInfo}) {
+		t.Error("filter should pass server.info")
+	}
+	if f(events.Event{Type: events.TypePlayerUpdated}) {
+		t.Error("filter should block player.updated when only server.info was requested")
+	}
+}
+
+// TestParseFilter_ExcludeServerInfo verifies ?exclude=server.info returns an error.
+func TestParseFilter_ExcludeServerInfo(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/events?exclude=server.info", nil)
+	_, err := parseFilter(req)
+	if err == nil {
+		t.Error("expected error when excluding server.info")
+	}
+}
+
+// TestParseFilter_ServerInfoBackendFilter verifies server.info passes with ?backend= filter.
+func TestParseFilter_ServerInfoBackendFilter(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/events?backend=audio", nil)
+	f, err := parseFilter(req)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !f(events.Event{Type: events.TypeServerInfo}) {
+		t.Error("filter should always pass server.info even with backend filter")
+	}
+}
+
+// TestSSEHandler_ExcludeServerInfo verifies ?exclude=server.info returns 400.
+func TestSSEHandler_ExcludeServerInfo(t *testing.T) {
+	upstream := make(chan events.Event)
+	b := backend.NewBroadcaster(context.Background(), upstream)
+
+	req := httptest.NewRequest(http.MethodGet, "/events?exclude=server.info", nil)
+	w := httptest.NewRecorder()
+	sseHandler(b)(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d", w.Code)
+	}
+}
+
+// TestSSEHandler_FilteredDelivery verifies that events not matching ?types= are not sent.
+func TestSSEHandler_FilteredDelivery(t *testing.T) {
+	upstream := make(chan events.Event, 4)
+	b := backend.NewBroadcaster(context.Background(), upstream)
+
+	req := httptest.NewRequest(http.MethodGet, "/events?types=audio.updated", nil)
+	ctx, cancel := context.WithCancel(context.Background())
+	req = req.WithContext(ctx)
+
+	w := httptest.NewRecorder()
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		sseHandler(b)(w, req)
+	}()
+
+	time.Sleep(20 * time.Millisecond)
+
+	// Push a non-matching event (should be filtered) and a matching one.
+	upstream <- events.Event{Type: events.TypePlayerUpdated, Data: "player"}
+	upstream <- events.Event{Type: events.TypeAudioUpdated, Data: "audio"}
+
+	time.Sleep(30 * time.Millisecond)
+	cancel()
+	<-done
+
+	body := w.Body.String()
+	if strings.Contains(body, "player.updated") {
+		t.Error("player.updated should not appear when filter is audio.updated only")
+	}
+	if !strings.Contains(body, "audio.updated") {
+		t.Errorf("audio.updated should appear in filtered SSE body, got: %q", body)
+	}
+}
+
+// TestParseKeepAlive covers the full range of valid/invalid ?keepalive= values.
+func TestParseKeepAlive(t *testing.T) {
+	tests := []struct {
+		name     string
+		query    string
+		wantSecs int
+		wantErr  bool
+	}{
+		{"default (no param)", "/events", 30, false},
+		{"min boundary", "/events?keepalive=10", 10, false},
+		{"max boundary", "/events?keepalive=120", 120, false},
+		{"mid value", "/events?keepalive=60", 60, false},
+		{"too low", "/events?keepalive=9", 0, true},
+		{"too high", "/events?keepalive=121", 0, true},
+		{"zero", "/events?keepalive=0", 0, true},
+		{"negative", "/events?keepalive=-1", 0, true},
+		{"non-integer", "/events?keepalive=abc", 0, true},
+		{"float", "/events?keepalive=30.5", 0, true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, tc.query, nil)
+			d, err := parseKeepAlive(req)
+			if tc.wantErr {
+				if err == nil {
+					t.Errorf("expected error, got duration %v", d)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if d != time.Duration(tc.wantSecs)*time.Second {
+				t.Errorf("expected %ds, got %v", tc.wantSecs, d)
+			}
+		})
+	}
+}
+
+// TestSSEHandler_InvalidKeepalive verifies that an out-of-range ?keepalive= returns 400.
+func TestSSEHandler_InvalidKeepalive(t *testing.T) {
+	upstream := make(chan events.Event)
+	b := backend.NewBroadcaster(context.Background(), upstream)
+
+	for _, q := range []string{"?keepalive=5", "?keepalive=200", "?keepalive=bad"} {
+		req := httptest.NewRequest(http.MethodGet, "/events"+q, nil)
+		w := httptest.NewRecorder()
+		sseHandler(b)(w, req)
+		if w.Code != http.StatusBadRequest {
+			t.Errorf("query %s: expected 400, got %d", q, w.Code)
+		}
+	}
+}
+
+// TestSSEHandler_EventDelivery verifies that an event pushed to the broadcaster
+// appears in the SSE response body.
+func TestSSEHandler_EventDelivery(t *testing.T) {
+	upstream := make(chan events.Event, 1)
+	b := backend.NewBroadcaster(context.Background(), upstream)
+
+	req := httptest.NewRequest(http.MethodGet, "/events", nil)
+	ctx, cancel := context.WithCancel(context.Background())
+	req = req.WithContext(ctx)
+
+	w := httptest.NewRecorder()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		sseHandler(b)(w, req)
+	}()
+
+	// Wait for the handler to subscribe and write the initial comment.
+	time.Sleep(20 * time.Millisecond)
+
+	// Push an event.
+	upstream <- events.Event{Type: events.TypePlayerUpdated, Data: map[string]string{"bus_name": "org.mpris.MediaPlayer2.test"}}
+
+	// Wait for it to be written.
+	time.Sleep(20 * time.Millisecond)
+	cancel()
+	<-done
+
+	body := w.Body.String()
+	scanner := bufio.NewScanner(strings.NewReader(body))
+	foundEvent := false
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, "event: "+events.TypePlayerUpdated) {
+			foundEvent = true
+			break
+		}
+	}
+	if !foundEvent {
+		t.Errorf("expected 'event: %s' line in SSE body, got: %q", events.TypePlayerUpdated, body)
+	}
+}

@@ -38,6 +38,10 @@ type UIConfig struct {
 	Enabled bool
 }
 
+type SSEConfig struct {
+	Enabled bool
+}
+
 type CORSConfig struct {
 	Origins []string // allowed origins; ["*"] for wildcard
 }
@@ -48,6 +52,7 @@ type ApiConfig struct {
 	Port    int
 
 	UI   *UIConfig
+	SSE  *SSEConfig
 	CORS *CORSConfig // nil = CORS disabled
 }
 
@@ -270,6 +275,7 @@ func New(cfgFile *string) (*Config, error) {
 	viper.SetDefault("api.port", 8018)
 	viper.SetDefault("api.cors.origins", "https://odio-pwa.vercel.app")
 	viper.SetDefault("api.ui.enabled", true)
+	viper.SetDefault("api.sse.enabled", true)
 
 	viper.SetDefault("bluetooth.enabled", true)
 	viper.SetDefault("bluetooth.timeout", "5s")
@@ -332,11 +338,16 @@ func New(cfgFile *string) (*Config, error) {
 		uiCfg.Enabled = false
 	}
 
+	sseCfg := SSEConfig{
+		Enabled: viper.GetBool("api.sse.enabled"),
+	}
+
 	apiCfg := ApiConfig{
 		Enabled: viper.GetBool("api.enabled"),
 		Listens: listens,
 		Port:    port,
 		UI:      &uiCfg,
+		SSE:     &sseCfg,
 	}
 
 	if origins := viper.GetStringSlice("api.cors.origins"); len(origins) > 0 {

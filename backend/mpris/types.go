@@ -8,6 +8,7 @@ import (
 	"github.com/godbus/dbus/v5"
 
 	"github.com/b0bbywan/go-odio-api/cache"
+	"github.com/b0bbywan/go-odio-api/events"
 )
 
 // PlaybackStatus represents the current playback state
@@ -30,6 +31,8 @@ type MPRISBackend struct {
 
 	// heartbeat to update Position of playing players
 	heartbeat *Heartbeat
+
+	events chan events.Event
 }
 
 // Listener listens to MPRIS changes via D-Bus signals
@@ -71,6 +74,12 @@ type Capabilities struct {
 	CanGoPrevious bool `json:"can_go_previous" dbus:"CanGoPrevious"`
 	CanSeek       bool `json:"can_seek" dbus:"CanSeek"`
 	CanControl    bool `json:"can_control" dbus:"CanControl"`
+}
+
+type positionUpdate struct {
+	position  int64
+	trackID   string
+	emittedAt int64
 }
 
 // Request types for the API
