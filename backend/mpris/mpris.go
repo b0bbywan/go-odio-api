@@ -10,6 +10,7 @@ import (
 	idbus "github.com/b0bbywan/go-odio-api/backend/internal/dbus"
 	"github.com/b0bbywan/go-odio-api/cache"
 	"github.com/b0bbywan/go-odio-api/config"
+	"github.com/b0bbywan/go-odio-api/events"
 	"github.com/b0bbywan/go-odio-api/logger"
 )
 
@@ -28,6 +29,8 @@ func New(ctx context.Context, cfg *config.MPRISConfig) (*MPRISBackend, error) {
 		conn:  conn,
 		ctx:   ctx,
 		cache: cache.New[[]Player](0), // TTL=0 = no expiration
+
+		events: make(chan events.Event, 64),
 	}, nil
 }
 
@@ -147,6 +150,11 @@ func (m *MPRISBackend) UpdatePlayer(updated Player) error {
 	}
 
 	m.cache.Set(CACHE_KEY, players)
+	eventType := events.TypePlayerUpdated
+	if !found {
+		eventType = events.TypePlayerAdded
+	}
+	m.notify(events.Event{Type: eventType, Data: playerEnvelope(updated)})
 	return nil
 }
 
@@ -202,6 +210,7 @@ func (m *MPRISBackend) UpdatePlayerProperties(busName string, changed map[string
 		}
 
 		m.cache.Set(CACHE_KEY, players)
+		m.notify(events.Event{Type: events.TypePlayerUpdated, Data: playerEnvelope(players[i])})
 		logger.Debug("[mpris] updated %d properties for player %s", len(changed), busName)
 		return nil
 	}
@@ -214,6 +223,33 @@ func (m *MPRISBackend) UpdateProperty(busName, property string, value dbus.Varia
 	return m.UpdatePlayerProperties(busName, map[string]dbus.Variant{
 		property: value,
 	})
+}
+
+// UpdatePositions updates positions for multiple players in a single cache pass
+// and emits a single player.position event with all updated positions.
+func (m *MPRISBackend) UpdatePositions(positions map[string]positionUpdate) {
+	players, ok := m.cache.Get(CACHE_KEY)
+	if !ok {
+		return
+	}
+
+	var updates []map[string]any
+	for i, player := range players {
+		if u, ok := positions[player.BusName]; ok {
+			players[i].Position = u.position
+			updates = append(updates, map[string]any{
+				"bus_name":   player.BusName,
+				"track_id":   u.trackID,
+				"position":   u.position,
+				"emitted_at": u.emittedAt,
+			})
+		}
+	}
+
+	m.cache.Set(CACHE_KEY, players)
+	if len(updates) > 0 {
+		m.notify(events.Event{Type: events.TypePlayerPosition, Data: updates})
+	}
 }
 
 // ReloadPlayerFromDBus reloads a specific player from D-Bus and updates the cache.
@@ -255,6 +291,10 @@ func (m *MPRISBackend) RemovePlayer(busName string) error {
 	}
 
 	m.cache.Set(CACHE_KEY, filtered)
+	m.notify(events.Event{
+		Type: events.TypePlayerRemoved,
+		Data: map[string]string{"bus_name": busName},
+	})
 	logger.Debug("[mpris] removed player %s from cache", busName)
 	return nil
 }
@@ -494,4 +534,23 @@ func (m *MPRISBackend) Close() {
 		}
 		m.conn = nil
 	}
+	close(m.events)
 }
+
+func playerEnvelope(p Player) map[string]any {
+	return map[string]any{
+		"data":       p,
+		"emitted_at": time.Now().UnixMilli(),
+	}
+}
+
+func (m *MPRISBackend) notify(e events.Event) {
+	select {
+	case m.events <- e:
+	default:
+		logger.Warn("[mpris] event channel full, dropping %s event", e.Type)
+	}
+}
+
+// Events returns the read-only event channel for this backend.
+func (m *MPRISBackend) Events() <-chan events.Event { return m.events }

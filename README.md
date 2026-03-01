@@ -102,38 +102,41 @@ Explicit whitelist required — nothing managed unless listed in `config.yaml`.
 
 ⚠️ **Security model:** Odio enforces user-session mutations only at the application layer, regardless of D-Bus or polkit configuration. System units are strictly read-only. See [Security](#security) for full details.
 
-### Power Management
-
-Remote reboot and power-off via the REST API — no SSH needed for day-to-day operations. Disabled by default. Uses `org.freedesktop.login1` D-Bus interface.
-
-### REST API
-
-- `<50ms` p95 response time, `0%` CPU on idle — tested on Raspberry Pi B and B+
-- Localhost binding by default, configurable per network interface
-- Zeroconf/mDNS auto-discovery on the LAN (opt-in)
-
-## Platform Support
-
-| Architecture | Package | Tested on |
-|---|---|---|
-| amd64 | deb, rpm | Fedora 43 Gnome, Debian 13 KDE |
-| arm64 | deb, rpm | Raspberry Pi 3/4/5 (64-bit) |
-| armv7hf | deb, rpm | Raspberry Pi 2/3 (32-bit) |
-| **armhf (ARMv6)** | deb, rpm | **Raspberry Pi B / B+ / Zero** |
-
-Pre-built packages (amd64, arm64, armv7hf, armhf/ARMv6) and a multi-arch Docker image (amd64, arm64, arm/v7) are available on every build. Docker does not target arm/v6 — Pi B/Zero users should use the armhf package.
-
-## Roadmap
-
-- Bluetooth backend: turn your Linux box into a fully API-controllable BT speaker, exposed as a `media_player` in HA
-- SSE push events
-- Wayland Remote Control, Authentication, Photos Casting...
 
 ### Bluetooth Sink (A2DP)
 
 Odio can act as a Bluetooth audio receiver (A2DP sink) using D-Bus, allowing phones, computers, and other Bluetooth devices to stream audio to it.
 
+[Live example](UI.md#bluetooth-on-pi-b)
+
+[Inspired from my own Bluetooth setup since 2020](https://mathieu-requillart.medium.com/my-ultimate-guide-to-the-raspberry-pi-audio-server-i-wanted-bluetooth-64c347ee0d22)
+
 #### Configuration
+A few system configuration steps are required to make this work. Since Odio doesn't run as root, it can't do it by itself.
+
+First make sure the user running Odio belongs to `bluetooth` group
+
+```bash
+
+$ groups
+pi adm dialout cdrom sudo audio video plugdev games users input render netdev bluetooth gpio i2c spi
+
+# if 'bluetooth' doesn't show in the line above:
+
+$ sudo usermod -a -G bluetooth <username>
+```
+
+Some packages are needed to automatically plug PulseAudio or PipeWire to Bluetooth.
+Odio doesn't directly support `ALSA` and never will.
+
+```bash
+
+# PulseAudio
+$ sudo apt install pulseaudio-module-bluetooth
+
+# PipeWire
+$ sudo apt install libspa-0.2-bluetooth
+```
 
 To ensure the device is correctly identified by phones and computers, you must edit `/etc/bluetooth/main.conf`:
 
@@ -154,7 +157,24 @@ This configuration makes Odio appear as a standard Bluetooth speaker or audio re
 
 After modifying the configuration file, restart the Bluetooth service:
 ```bash
-sudo systemctl restart bluetooth
+
+$ sudo systemctl restart bluetooth
+
+# A new user service should now be running
+# It creates an mpris player for each connected device
+$ systemctl --user status mpris-proxy.service
+● mpris-proxy.service - Bluetooth mpris proxy
+     Loaded: loaded (/usr/lib/systemd/user/mpris-proxy.service; enabled; preset: enabled)
+     Active: active (running) since Fri 2026-02-27 13:17:33 CET; 1h 15min ago
+ Invocation: 4480169b9adb4c239ad81d7345dc1f92
+       Docs: man:mpris-proxy(1)
+   Main PID: 674 (mpris-proxy)
+      Tasks: 1 (limit: 379)
+        CPU: 791ms
+     CGroup: /user.slice/user-1000.slice/user@1000.service/app.slice/mpris-proxy.service
+             └─674 /usr/bin/mpris-proxy
+
+févr. 27 13:17:33 rasponkyold systemd[559]: Started mpris-proxy.service - Bluetooth mpris proxy.
 ```
 
 #### Usage
@@ -174,6 +194,59 @@ Bluetooth is intentionally not left in an automatic or always-on state.
 This behavior matches how most Bluetooth speakers and audio receivers work.
 
 Bonus: You get to control it through `/pulseaudio/clients` or `/players/` and in the UI !
+
+### Power Management
+
+Remote reboot and power-off via the REST API — no SSH needed for day-to-day operations. Disabled by default. Uses `org.freedesktop.login1` D-Bus interface.
+
+### Real-time Event Stream (SSE)
+
+`GET /events` streams live state changes to any HTTP client — no polling needed.
+
+Events emitted:
+
+| Event type | Backend | Triggered by |
+|---|---|---|
+| `player.updated` | `mpris` | Playback state change, volume, metadata |
+| `player.added` | `mpris` | New MPRIS player appeared |
+| `player.removed` | `mpris` | MPRIS player closed |
+| `player.position` | `mpris` | Position tick (periodic, lightweight) |
+| `audio.updated` | `audio` | PulseAudio sink-input change (volume, mute, cork) |
+| `service.updated` | `systemd` | systemd unit state change |
+| `bluetooth.updated` | `bluetooth` | Bluetooth adapter or device state change (power, pairing, connection) |
+| `power.action` | `power` | Reboot or poweroff triggered via the API |
+
+Subscribe to a subset of events using query parameters:
+
+| Parameter | Description | Example |
+|---|---|---|
+| `types` | Comma-separated event type names to include | `?types=player.updated,player.added` |
+| `backend` | Comma-separated backend names to include | `?backend=mpris,audio` |
+| `exclude` | Comma-separated event type names to exclude | `?exclude=player.position` |
+| `keepalive` | Keepalive interval in seconds (default `30`, min `10`, max `120`) | `?keepalive=60` |
+
+`types` and `backend` can be combined — the union of all matched types is used. Omitting both receives all events. `server.info` is always delivered and cannot be excluded.
+
+### REST API
+
+- `<50ms` p95 response time, `0%` CPU on idle — tested on Raspberry Pi B and B+
+- Localhost binding by default, configurable per network interface
+- Zeroconf/mDNS auto-discovery on the LAN (opt-in)
+
+## Platform Support
+
+| Architecture | Package | Tested on |
+|---|---|---|
+| amd64 | deb, rpm | Fedora 43 Gnome, Debian 13 KDE |
+| arm64 | deb, rpm | Raspberry Pi 3/4/5 (64-bit) |
+| armv7hf | deb, rpm | Raspberry Pi 2/3 (32-bit) |
+| **armhf (ARMv6)** | deb, rpm | **Raspberry Pi B / B+ / Zero** |
+
+Pre-built packages (amd64, arm64, armv7hf, armhf/ARMv6) and a multi-arch Docker image (amd64, arm64, arm/v7) are available on every build. Docker does not target arm/v6 — Pi B/Zero users should use the armhf package.
+
+## Roadmap
+
+- Wayland Remote Control, Authentication, Photos Casting...
 
 ## Installation
 
@@ -461,6 +534,86 @@ GET    /power/                            # Power capabilities {"reboot": true, 
 POST   /power/power_off                   # Poweroff (403 if not declared in capabilities)
 POST   /power/reboot                      # Reboot (403 if not declared in capabilities)
 ```
+
+### SSE Event Stream
+
+```
+GET    /events                                        # All events (text/event-stream)
+GET    /events?backend=mpris                          # Only MPRIS player events
+GET    /events?backend=mpris,audio                    # Player + audio events
+GET    /events?backend=bluetooth                      # Only Bluetooth state changes
+GET    /events?backend=power                          # Only power actions (reboot/poweroff)
+GET    /events?types=player.updated                   # Specific event types
+GET    /events?exclude=player.position                # All events except position ticks
+GET    /events?keepalive=60                           # Custom keepalive interval (seconds)
+
+GET    /events?types=player.updated,service.updated&backend=audio&exclude=player.position  # Mixed
+```
+
+#### Testing with curl
+
+```bash
+# All events
+curl -N http://localhost:8018/events
+
+# Only player events
+curl -N "http://localhost:8018/events?backend=mpris"
+
+# Only position ticks lightweight on purpose (e.g. to drive a seek bar)
+curl -N "http://localhost:8018/events?types=player.position"
+```
+
+Expected output:
+
+```
+event: server.info
+data: "connected"
+
+event: player.updated
+data: {"bus_name":"org.mpris.MediaPlayer2.spotify","identity":"Spotify",...}
+
+event: audio.updated
+data: [{"id":42,"name":"Spotify","volume":0.75,"muted":false,...}]
+
+event: service.updated
+data: {"name":"mpd.service","scope":"user","active_state":"active","running":true,...}
+
+event: bluetooth.updated
+data: {"powered":true,"discoverable":false,"pairable":false,"pairing_active":false,"known_devices":[{"address":"AA:BB:CC:DD:EE:FF","name":"My Phone","trusted":true,"connected":true}]}
+
+event: power.action
+data: {"action":"reboot"}
+```
+
+#### Simple browser listener
+
+```html
+<!DOCTYPE html>
+<html>
+<head><title>Odio live events</title></head>
+<body>
+<pre id="log"></pre>
+<script>
+  const log = document.getElementById('log');
+
+  // Subscribe to all events — add ?backend=mpris or ?types=... to filter
+  const es  = new EventSource('http://localhost:8018/events');
+
+  ['player.updated', 'player.added', 'player.removed', 'player.position',
+   'audio.updated', 'service.updated', 'bluetooth.updated', 'power.action'].forEach(type => {
+    es.addEventListener(type, e => {
+      const entry = `[${type}] ${e.data}\n`;
+      log.textContent = entry + log.textContent;
+    });
+  });
+
+  es.onerror = () => log.textContent = '[error] connection lost\n' + log.textContent;
+</script>
+</body>
+</html>
+```
+
+Save as `events.html`, open in a browser — events appear live as they happen. No polling, no page refresh needed.
 
 ## Security
 

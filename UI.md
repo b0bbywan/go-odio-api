@@ -70,6 +70,18 @@ Audio and Service only. MPRIS and power disabled
 
 <img width="1274" height="754" alt="image" src="https://github.com/user-attachments/assets/b88e12df-77df-402a-8ba8-7b95556e6423" />
 
+#### Bluetooth on Pi B
+
+https://github.com/user-attachments/assets/07e0f04e-8758-452e-9561-4984c1dee554
+
+**Quick explanation**: This shows the full feature in video
+- My Phone wasn't paired yet to this adapter.
+- You can see I start by powering `On` Bluetooth: The status indicator goes green
+- By clicking `Pairing`, a 60s timer starts that will accept any new connection, as most Bluetooth speakers and receivers work.
+- Once connected and trusted, a notification is played with `pactl` and appears in audio clients. It's a custom script not handled by Odio.
+- Then my phone appears both in Audio Clients, and MPRIS players with the current song played. 1 connected client appears in the Bluetooth section.
+- The play and volume commands are executed directly on the phone through BubbleUPnP, and reported automatically on the UI. Also tested with Spotify and Youtube.
+- Bluetooth is finally powered off and my phone disconnected.
 
 ### How to Install the Central PWA App
 

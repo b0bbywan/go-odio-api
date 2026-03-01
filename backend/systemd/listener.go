@@ -6,6 +6,7 @@ import (
 	"github.com/godbus/dbus/v5"
 
 	idbus "github.com/b0bbywan/go-odio-api/backend/internal/dbus"
+	"github.com/b0bbywan/go-odio-api/events"
 	"github.com/b0bbywan/go-odio-api/logger"
 )
 
@@ -167,8 +168,10 @@ func (l *Listener) listen(
 				return
 			}
 			if unitName, ok := l.checkUnit(sig, scope); ok {
-				if _, err := l.backend.RefreshService(l.ctx, unitName, scope); err != nil {
+				if svc, err := l.backend.RefreshService(l.ctx, unitName, scope); err != nil {
 					logger.Error("[systemd] failed to refresh service %s/%s: %v", scope, unitName, err)
+				} else {
+					l.backend.notify(events.Event{Type: events.TypeServiceUpdated, Data: *svc})
 				}
 			}
 		}
