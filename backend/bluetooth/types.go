@@ -14,7 +14,6 @@ import (
 type BluetoothBackend struct {
 	conn           *dbus.Conn
 	ctx            context.Context
-	timeout        time.Duration
 	pairingTimeout time.Duration
 	idleTimeout    time.Duration
 	agent          *bluezAgent
@@ -24,12 +23,6 @@ type BluetoothBackend struct {
 	// permanent cache (no expiration) for status tracking
 	statusCache *cache.Cache[BluetoothStatus]
 	events      chan events.Event
-}
-
-type dbusTimeoutError struct{}
-
-func (e *dbusTimeoutError) Error() string {
-	return "D-Bus call timeout"
 }
 
 type bluetoothUnsupportedError struct{}

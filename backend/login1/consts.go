@@ -1,10 +1,6 @@
 package login1
 
 const (
-	// D-Bus system constants
-	DBUS_INTERFACE  = "org.freedesktop.DBus"
-	DBUS_PROP_IFACE = DBUS_INTERFACE + ".Properties"
-
 	LOGIN1_PREFIX    = "org.freedesktop.login1"
 	LOGIN1_PATH      = "/org/freedesktop/login1"
 	LOGIN1_INTERFACE = LOGIN1_PREFIX + ".Manager"

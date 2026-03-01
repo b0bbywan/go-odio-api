@@ -7,6 +7,7 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
+	idbus "github.com/b0bbywan/go-odio-api/backend/internal/dbus"
 	"github.com/b0bbywan/go-odio-api/cache"
 	"github.com/b0bbywan/go-odio-api/config"
 	"github.com/b0bbywan/go-odio-api/events"
@@ -25,11 +26,11 @@ func New(ctx context.Context, cfg *config.MPRISConfig) (*MPRISBackend, error) {
 	}
 
 	return &MPRISBackend{
-		conn:    conn,
-		ctx:     ctx,
-		timeout: cfg.Timeout,
-		cache:   cache.New[[]Player](0), // TTL=0 = no expiration
-		events:  make(chan events.Event, 64),
+		conn:  conn,
+		ctx:   ctx,
+		cache: cache.New[[]Player](0), // TTL=0 = no expiration
+
+		events: make(chan events.Event, 64),
 	}, nil
 }
 
@@ -175,34 +176,34 @@ func (m *MPRISBackend) UpdatePlayerProperties(busName string, changed map[string
 		for key, variant := range changed {
 			switch key {
 			case "PlaybackStatus":
-				if val, ok := extractString(variant); ok {
+				if val, ok := idbus.ExtractString(variant); ok {
 					players[i].PlaybackStatus = PlaybackStatus(val)
 				}
 			case "LoopStatus":
-				if val, ok := extractString(variant); ok {
+				if val, ok := idbus.ExtractString(variant); ok {
 					players[i].LoopStatus = LoopStatus(val)
 				}
 			case "Shuffle":
-				if val, ok := extractBool(variant); ok {
+				if val, ok := idbus.ExtractBool(variant); ok {
 					players[i].Shuffle = val
 				}
 			case "Volume":
-				if val, ok := extractFloat64(variant); ok {
+				if val, ok := idbus.ExtractFloat64(variant); ok {
 					players[i].Volume = val
 				}
 			case "Metadata":
-				if metaMap, ok := extractMetadataMap(variant); ok {
+				if metaMap, ok := idbus.ExtractVariantMap(variant); ok {
 					players[i].Metadata = make(map[string]string)
 					for k, v := range metaMap {
 						players[i].Metadata[k] = formatMetadataValue(v.Value())
 					}
 				}
 			case "Rate":
-				if val, ok := extractFloat64(variant); ok {
+				if val, ok := idbus.ExtractFloat64(variant); ok {
 					players[i].Rate = val
 				}
 			case "Position":
-				if val, ok := extractInt64(variant); ok && val > 0 {
+				if val, ok := idbus.ExtractInt64(variant); ok && val > 0 {
 					players[i].Position = val
 				}
 			}

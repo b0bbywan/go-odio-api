@@ -6,6 +6,7 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
+	idbus "github.com/b0bbywan/go-odio-api/backend/internal/dbus"
 	"github.com/b0bbywan/go-odio-api/logger"
 )
 
@@ -73,18 +74,9 @@ func (l *Listener) handlePropertiesChanged(sig *dbus.Signal) {
 	// Body[1] = changed properties (map[string]Variant)
 	// Body[2] = invalidated properties ([]string)
 
-	if len(sig.Body) < 2 {
-		return
-	}
-
-	iface, ok := sig.Body[0].(string)
-	if !ok || iface != MPRIS_PLAYER_IFACE {
+	changed, iface, err := idbus.FilterSignal(sig)
+	if err != nil || iface != MPRIS_PLAYER_IFACE {
 		// We only care about Player changes
-		return
-	}
-
-	changed, ok := sig.Body[1].(map[string]dbus.Variant)
-	if !ok {
 		return
 	}
 
@@ -97,26 +89,24 @@ func (l *Listener) handlePropertiesChanged(sig *dbus.Signal) {
 	}
 
 	// Check if PlaybackStatus changed for deduplication
-	if statusVar, hasStatus := changed["PlaybackStatus"]; hasStatus {
-		if status, ok := extractString(statusVar); ok {
-			newStatus := PlaybackStatus(status)
+	if status := idbus.MapString(changed, "PlaybackStatus"); status != "" {
+		newStatus := PlaybackStatus(status)
 
-			// Deduplication
-			l.lastStateMu.RLock()
-			lastStatus := l.lastState[busName]
-			l.lastStateMu.RUnlock()
+		// Deduplication
+		l.lastStateMu.RLock()
+		lastStatus := l.lastState[busName]
+		l.lastStateMu.RUnlock()
 
-			if lastStatus != newStatus {
-				l.lastStateMu.Lock()
-				l.lastState[busName] = newStatus
-				l.lastStateMu.Unlock()
+		if lastStatus != newStatus {
+			l.lastStateMu.Lock()
+			l.lastState[busName] = newStatus
+			l.lastStateMu.Unlock()
 
-				logger.Debug("[mpris] player %s changed status: %s -> %s", busName, lastStatus, newStatus)
+			logger.Debug("[mpris] player %s changed status: %s -> %s", busName, lastStatus, newStatus)
 
-				// If player switches to Playing, ensure heartbeat is running
-				if newStatus == StatusPlaying {
-					l.backend.heartbeat.Start()
-				}
+			// If player switches to Playing, ensure heartbeat is running
+			if newStatus == StatusPlaying {
+				l.backend.heartbeat.Start()
 			}
 		}
 	}

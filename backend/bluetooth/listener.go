@@ -4,6 +4,8 @@ import (
 	"context"
 
 	"github.com/godbus/dbus/v5"
+
+	idbus "github.com/b0bbywan/go-odio-api/backend/internal/dbus"
 )
 
 // SignalCallback is called for each received signal.
@@ -34,7 +36,7 @@ func NewDBusListener(conn *dbus.Conn, parentCtx context.Context, matchRules []st
 func (l *DBusListener) Start() error {
 	l.conn.Signal(l.signals)
 	for _, rule := range l.matchRules {
-		if err := l.conn.BusObject().Call("org.freedesktop.DBus.AddMatch", 0, rule).Err; err != nil {
+		if err := idbus.AddMatchRule(l.conn, rule); err != nil {
 			return err
 		}
 	}
@@ -59,7 +61,7 @@ func (l *DBusListener) Stop() {
 	if l.conn != nil {
 		l.conn.RemoveSignal(l.signals)
 		for _, rule := range l.matchRules {
-			_ = l.conn.BusObject().Call("org.freedesktop.DBus.RemoveMatch", 0, rule).Err
+			_ = idbus.RemoveMatchRule(l.conn, rule)
 		}
 	}
 	close(l.signals)
