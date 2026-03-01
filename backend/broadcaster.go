@@ -85,6 +85,9 @@ func newBroadcasterFromBackend(ctx context.Context, b *Backend) *Broadcaster {
 	if b.Bluetooth != nil {
 		srcs = append(srcs, b.Bluetooth.Events())
 	}
+	if b.Login1 != nil {
+		srcs = append(srcs, b.Login1.Events())
+	}
 	if b.MPRIS != nil {
 		srcs = append(srcs, b.MPRIS.Events())
 	}

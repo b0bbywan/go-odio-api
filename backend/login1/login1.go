@@ -8,6 +8,7 @@ import (
 	"github.com/godbus/dbus/v5"
 
 	"github.com/b0bbywan/go-odio-api/config"
+	"github.com/b0bbywan/go-odio-api/events"
 	"github.com/b0bbywan/go-odio-api/logger"
 )
 
@@ -26,6 +27,7 @@ func New(ctx context.Context, cfg *config.Login1Config) (*Login1Backend, error) 
 		conn:    conn,
 		ctx:     ctx,
 		timeout: 10 * time.Second,
+		eventsC: make(chan events.Event, 4),
 	}
 
 	if cfg.Capabilities != nil {
@@ -54,11 +56,25 @@ func (l *Login1Backend) Close() {
 	}
 }
 
+func (l *Login1Backend) Events() <-chan events.Event {
+	return l.eventsC
+}
+
+func (l *Login1Backend) notify(action string) {
+	e := events.Event{Type: events.TypePowerAction, Data: PowerActionData{Action: action}}
+	select {
+	case l.eventsC <- e:
+	default:
+		logger.Warn("[login1] event channel full, dropping %s event", events.TypePowerAction)
+	}
+}
+
 func (l *Login1Backend) Reboot() error {
 	if !l.CanReboot {
 		return &CapabilityError{Required: "reboot capability disabled"}
 	}
 	logger.Info("[login1] Reboot requested")
+	l.notify("reboot")
 	return l.callMethod(LOGIN1_PREFIX, LOGIN1_METHOD_REBOOT, true)
 }
 
@@ -67,6 +83,7 @@ func (l *Login1Backend) PowerOff() error {
 		return &CapabilityError{Required: "poweroff capability disabled"}
 	}
 	logger.Info("[login1] PowerOff requested")
+	l.notify("poweroff")
 	return l.callMethod(LOGIN1_PREFIX, LOGIN1_METHOD_POWEROFF, true)
 }
 

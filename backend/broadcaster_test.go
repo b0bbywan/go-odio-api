@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/b0bbywan/go-odio-api/backend/login1"
 	"github.com/b0bbywan/go-odio-api/events"
 )
 
@@ -77,6 +78,46 @@ func TestBroadcaster_SubscribeFunc_NilFilterPassesAll(t *testing.T) {
 		}
 	case <-time.After(100 * time.Millisecond):
 		t.Fatal("timed out waiting for service.updated event")
+	}
+}
+
+func TestBroadcaster_PowerActionEventFlowsThrough(t *testing.T) {
+	upstream := make(chan events.Event, 4)
+	b := NewBroadcaster(context.Background(), upstream)
+
+	ch := b.Subscribe()
+	defer b.Unsubscribe(ch)
+
+	upstream <- events.Event{Type: events.TypePowerAction, Data: login1.PowerActionData{Action: "reboot"}}
+
+	select {
+	case got := <-ch:
+		if got.Type != events.TypePowerAction {
+			t.Errorf("got %s, want %s", got.Type, events.TypePowerAction)
+		}
+		data, ok := got.Data.(login1.PowerActionData)
+		if !ok {
+			t.Fatalf("data is %T, want PowerActionData", got.Data)
+		}
+		if data.Action != "reboot" {
+			t.Errorf("data.Action = %q, want %q", data.Action, "reboot")
+		}
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("timed out waiting for power.action event")
+	}
+}
+
+func TestNewBroadcasterFromBackend_Login1Nil_NoPanic(t *testing.T) {
+	b := &Backend{Login1: nil}
+	broadcaster := newBroadcasterFromBackend(context.Background(), b)
+	ch := broadcaster.Subscribe()
+	defer broadcaster.Unsubscribe(ch)
+	// No events expected, just verify no panic and channel is usable.
+	select {
+	case got := <-ch:
+		t.Errorf("unexpected event %s from empty backend", got.Type)
+	case <-time.After(20 * time.Millisecond):
+		// expected
 	}
 }
 

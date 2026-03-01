@@ -9,6 +9,7 @@ const (
 	TypeAudioUpdated     = "audio.updated"
 	TypeServiceUpdated   = "service.updated"
 	TypeBluetoothUpdated = "bluetooth.updated"
+	TypePowerAction      = "power.action"
 )
 
 type Event struct {
@@ -22,6 +23,7 @@ var BackendTypes = map[string][]string{
 	"audio":     {TypeAudioUpdated},
 	"systemd":   {TypeServiceUpdated},
 	"bluetooth": {TypeBluetoothUpdated},
+	"power":     {TypePowerAction},
 }
 
 // NewFilter combines include and exclude type lists into a single filter func.

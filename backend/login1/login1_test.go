@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/b0bbywan/go-odio-api/config"
+	"github.com/b0bbywan/go-odio-api/events"
 )
 
 // --- Tests pour New() ---
@@ -225,6 +226,67 @@ func TestConstants_Login1Methods(t *testing.T) {
 				t.Errorf("%s = %q, want %q", tt.name, tt.got, tt.expected)
 			}
 		})
+	}
+}
+
+// --- Tests pour notify() et Events() ---
+
+func TestNotify_EmitsCorrectEvent(t *testing.T) {
+	b := &Login1Backend{eventsC: make(chan events.Event, 4)}
+
+	for _, action := range []string{"reboot", "poweroff"} {
+		b.notify(action)
+		select {
+		case got := <-b.Events():
+			if got.Type != events.TypePowerAction {
+				t.Errorf("notify(%s): got type %s, want %s", action, got.Type, events.TypePowerAction)
+			}
+			data, ok := got.Data.(PowerActionData)
+			if !ok {
+				t.Fatalf("notify(%s): data is %T, want PowerActionData", action, got.Data)
+			}
+			if data.Action != action {
+				t.Errorf("notify(%s): data.Action = %q, want %q", action, data.Action, action)
+			}
+		default:
+			t.Errorf("notify(%s): no event emitted", action)
+		}
+	}
+}
+
+func TestNotify_ChannelFull_NoPanic(t *testing.T) {
+	b := &Login1Backend{eventsC: make(chan events.Event, 1)}
+	b.notify("reboot")   // fills the channel
+	b.notify("poweroff") // should not panic or block
+}
+
+func TestEvents_ReturnsInitialisedChannel(t *testing.T) {
+	b := &Login1Backend{eventsC: make(chan events.Event, 1)}
+	ch := b.Events()
+	if ch == nil {
+		t.Error("Events() should return a non-nil channel")
+	}
+}
+
+func TestReboot_CapabilityDisabled_NoEvent(t *testing.T) {
+	b := &Login1Backend{CanReboot: false, eventsC: make(chan events.Event, 4)}
+	_ = b.Reboot()
+	select {
+	case got := <-b.Events():
+		t.Errorf("Reboot() with CanReboot=false should not emit an event, got %s", got.Type)
+	default:
+		// expected: no event
+	}
+}
+
+func TestPowerOff_CapabilityDisabled_NoEvent(t *testing.T) {
+	b := &Login1Backend{CanPoweroff: false, eventsC: make(chan events.Event, 4)}
+	_ = b.PowerOff()
+	select {
+	case got := <-b.Events():
+		t.Errorf("PowerOff() with CanPoweroff=false should not emit an event, got %s", got.Type)
+	default:
+		// expected: no event
 	}
 }
 
