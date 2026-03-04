@@ -53,15 +53,52 @@ func (l *Listener) listen(updates <-chan struct{}) {
 				return
 			}
 
-			// A sink input changed, refresh the cache
 			logger.Debug("[pulseaudio] sink inputs changed, refreshing cache")
-			if clients, err := l.backend.refreshCache(); err != nil {
+			old, err := l.backend.ListClients()
+			if err != nil {
+				logger.Warn("[pulseaudio] failed to get clients before refresh: %v", err)
+				continue
+			}
+
+			clients, err := l.backend.refreshCache()
+			if err != nil {
 				logger.Warn("[pulseaudio] failed to refresh clients: %v", err)
-			} else {
-				l.backend.notify(events.Event{Type: events.TypeAudioUpdated, Data: clients})
+				continue
+			}
+
+			changed, removed := diffClients(old, clients)
+			if len(changed) > 0 {
+				l.backend.notify(events.Event{Type: events.TypeAudioUpdated, Data: changed})
+			}
+			if len(removed) > 0 {
+				l.backend.notify(events.Event{Type: events.TypeAudioRemoved, Data: removed})
 			}
 		}
 	}
+}
+
+// diffClients returns clients that were added/modified and clients that were removed.
+func diffClients(old, new []AudioClient) (changed []AudioClient, removed []AudioClient) {
+	newByName := make(map[string]struct{}, len(new))
+	for _, c := range new {
+		newByName[c.Name] = struct{}{}
+	}
+
+	oldByName := make(map[string]AudioClient, len(old))
+	for _, c := range old {
+		oldByName[c.Name] = c
+		if _, exists := newByName[c.Name]; !exists {
+			removed = append(removed, c)
+		}
+	}
+
+	for _, c := range new {
+		o, exists := oldByName[c.Name]
+		if !exists || clientChanged(o, c) {
+			changed = append(changed, c)
+		}
+	}
+	return
 }
 
 // Stop stops the listener

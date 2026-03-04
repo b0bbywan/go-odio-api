@@ -7,6 +7,7 @@ const (
 	TypePlayerRemoved    = "player.removed"
 	TypePlayerPosition   = "player.position"
 	TypeAudioUpdated     = "audio.updated"
+	TypeAudioRemoved     = "audio.removed"
 	TypeServiceUpdated   = "service.updated"
 	TypeBluetoothUpdated = "bluetooth.updated"
 	TypePowerAction      = "power.action"
@@ -20,7 +21,7 @@ type Event struct {
 // BackendTypes maps backend names to their event type constants.
 var BackendTypes = map[string][]string{
 	"mpris":     {TypePlayerUpdated, TypePlayerAdded, TypePlayerRemoved, TypePlayerPosition},
-	"audio":     {TypeAudioUpdated},
+	"audio":     {TypeAudioUpdated, TypeAudioRemoved},
 	"systemd":   {TypeServiceUpdated},
 	"bluetooth": {TypeBluetoothUpdated},
 	"power":     {TypePowerAction},

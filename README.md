@@ -211,7 +211,8 @@ Events emitted:
 | `player.added` | `mpris` | New MPRIS player appeared |
 | `player.removed` | `mpris` | MPRIS player closed |
 | `player.position` | `mpris` | Position tick (periodic, lightweight) |
-| `audio.updated` | `audio` | PulseAudio sink-input change (volume, mute, cork) |
+| `audio.updated` | `audio` | PulseAudio sink-input added or changed (volume, mute, cork) |
+| `audio.removed` | `audio` | PulseAudio sink-input removed |
 | `service.updated` | `systemd` | systemd unit state change |
 | `bluetooth.updated` | `bluetooth` | Bluetooth adapter or device state change (power, pairing, connection) |
 | `power.action` | `power` | Reboot or poweroff triggered via the API |
@@ -575,6 +576,9 @@ data: {"bus_name":"org.mpris.MediaPlayer2.spotify","identity":"Spotify",...}
 event: audio.updated
 data: [{"id":42,"name":"Spotify","volume":0.75,"muted":false,...}]
 
+event: audio.removed
+data: [{"id":41,"name":"pactl","volume":1,...}]
+
 event: service.updated
 data: {"name":"mpd.service","scope":"user","active_state":"active","running":true,...}
 
@@ -600,7 +604,7 @@ data: {"action":"reboot"}
   const es  = new EventSource('http://localhost:8018/events');
 
   ['player.updated', 'player.added', 'player.removed', 'player.position',
-   'audio.updated', 'service.updated', 'bluetooth.updated', 'power.action'].forEach(type => {
+   'audio.updated', 'audio.removed', 'service.updated', 'bluetooth.updated', 'power.action'].forEach(type => {
     es.addEventListener(type, e => {
       const entry = `[${type}] ${e.data}\n`;
       log.textContent = entry + log.textContent;
