@@ -48,6 +48,42 @@ func SetVolumeMasterHandler(pa *pulseaudio.PulseAudioBackend) http.HandlerFunc {
 	})
 }
 
+func MuteOutputHandler(pa *pulseaudio.PulseAudioBackend) http.HandlerFunc {
+	return withOutput(pa, func(w http.ResponseWriter, r *http.Request, output string) {
+		if err := pa.ToggleMuteOutput(output); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusAccepted)
+	})
+}
+
+func SetVolumeOutputHandler(pa *pulseaudio.PulseAudioBackend) http.HandlerFunc {
+	return withOutput(pa, func(w http.ResponseWriter, r *http.Request, output string) {
+		withBody(validateVolume, func(w http.ResponseWriter, r *http.Request, req *setVolumeRequest) {
+			if err := pa.SetVolumeOutput(output, req.Volume); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			w.WriteHeader(http.StatusAccepted)
+		})(w, r)
+	})
+}
+
+func withOutput(
+	pa *pulseaudio.PulseAudioBackend,
+	fn func(w http.ResponseWriter, r *http.Request, output string),
+) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		output := r.PathValue("output")
+		if output == "" {
+			http.Error(w, "missing output", http.StatusNotFound)
+			return
+		}
+		fn(w, r, output)
+	}
+}
+
 func withSink(
 	pa *pulseaudio.PulseAudioBackend,
 	fn func(w http.ResponseWriter, r *http.Request, sink string),

@@ -102,6 +102,18 @@ func (s *Server) registerPulseRoutes(b *pulseaudio.PulseAudioBackend) {
 		"POST /audio/clients/{sink}/volume",
 		SetVolumeClientHandler(b),
 	)
+	s.mux.HandleFunc(
+		"/audio/outputs",
+		listHandler(b.ListOutputs, b.OutputCacheUpdatedAt),
+	)
+	s.mux.HandleFunc(
+		"POST /audio/outputs/{output}/mute",
+		MuteOutputHandler(b),
+	)
+	s.mux.HandleFunc(
+		"POST /audio/outputs/{output}/volume",
+		SetVolumeOutputHandler(b),
+	)
 }
 
 func (s *Server) registerSystemdRoutes(b *systemd.SystemdBackend) {

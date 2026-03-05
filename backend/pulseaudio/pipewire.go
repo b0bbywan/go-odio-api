@@ -4,6 +4,24 @@ import (
 	"github.com/the-jonsey/pulseaudio"
 )
 
+func (pa *PulseAudioBackend) parsePipeWireSink(s pulseaudio.Sink, defaultName string) AudioOutput {
+	props := cloneProps(s.PropList)
+	return AudioOutput{
+		Index:       s.Index,
+		Name:        s.Name,
+		Description: s.Description,
+		Nick:        props["node.nick"],
+		Muted:       s.IsMute(),
+		Volume:      s.GetVolume(),
+		State:       sinkStateString(s.SinkState),
+		Default:     s.Name == defaultName,
+		Driver:      s.Driver,
+		ActivePort:  s.ActivePortName,
+		IsNetwork:   props["node.network"] == "true",
+		Props:       props,
+	}
+}
+
 func (pa *PulseAudioBackend) parsePipeWireSinkInput(s pulseaudio.SinkInput) AudioClient {
 	props := cloneProps(s.PropList)
 
