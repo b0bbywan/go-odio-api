@@ -27,8 +27,8 @@ func NewListener(backend *PulseAudioBackend) *Listener {
 
 // Start starts listening for pulseaudio events
 func (l *Listener) Start() error {
-	// Subscribe to sink input changes
-	updates, err := l.backend.client.UpdatesByType(pulseaudio.SUBSCRIPTION_MASK_SINK_INPUT)
+	// Subscribe to sink and sink input changes
+	updates, err := l.backend.client.UpdatesByType(pulseaudio.SUBSCRIPTION_MASK_SINK | pulseaudio.SUBSCRIPTION_MASK_SINK_INPUT)
 	if err != nil {
 		return err
 	}
@@ -53,25 +53,42 @@ func (l *Listener) listen(updates <-chan struct{}) {
 				return
 			}
 
-			logger.Debug("[pulseaudio] sink inputs changed, refreshing cache")
-			old, err := l.backend.ListClients()
+			logger.Debug("[pulseaudio] audio changed, refreshing caches")
+
+			oldClients, err := l.backend.ListClients()
 			if err != nil {
 				logger.Warn("[pulseaudio] failed to get clients before refresh: %v", err)
 				continue
 			}
-
 			clients, err := l.backend.refreshCache()
 			if err != nil {
 				logger.Warn("[pulseaudio] failed to refresh clients: %v", err)
 				continue
 			}
-
-			changed, removed := diffClients(old, clients)
+			changed, removed := diffClients(oldClients, clients)
 			if len(changed) > 0 {
 				l.backend.notify(events.Event{Type: events.TypeAudioUpdated, Data: changed})
 			}
 			if len(removed) > 0 {
 				l.backend.notify(events.Event{Type: events.TypeAudioRemoved, Data: removed})
+			}
+
+			oldOutputs, err := l.backend.ListOutputs()
+			if err != nil {
+				logger.Warn("[pulseaudio] failed to get outputs before refresh: %v", err)
+				continue
+			}
+			outputs, err := l.backend.refreshOutputCache()
+			if err != nil {
+				logger.Warn("[pulseaudio] failed to refresh outputs: %v", err)
+				continue
+			}
+			changedOut, removedOut := diffOutputs(oldOutputs, outputs)
+			if len(changedOut) > 0 {
+				l.backend.notify(events.Event{Type: events.TypeAudioOutputUpdated, Data: changedOut})
+			}
+			if len(removedOut) > 0 {
+				l.backend.notify(events.Event{Type: events.TypeAudioOutputRemoved, Data: removedOut})
 			}
 		}
 	}

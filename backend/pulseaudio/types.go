@@ -26,9 +26,10 @@ type PulseAudioBackend struct {
 	server  *pulseaudio.Server
 	kind    AudioServerKind
 
-	cache    *cache.Cache[[]AudioClient]
-	listener *Listener
-	events   chan events.Event
+	cache       *cache.Cache[[]AudioClient]
+	outputCache *cache.Cache[[]AudioOutput]
+	listener    *Listener
+	events      chan events.Event
 }
 
 type ServerInfo struct {
@@ -39,6 +40,21 @@ type ServerInfo struct {
 	Hostname    string          `json:"hostname"`
 	DefaultSink string          `json:"default_sink"`
 	Volume      float32         `json:"volume"`
+}
+
+type AudioOutput struct {
+	Index       uint32            `json:"id"`
+	Name        string            `json:"name"`
+	Description string            `json:"description"`
+	Nick        string            `json:"nick,omitempty"`
+	Muted       bool              `json:"muted"`
+	Volume      float32           `json:"volume"`
+	State       string            `json:"state"`
+	Default     bool              `json:"default"`
+	Driver      string            `json:"driver,omitempty"`
+	ActivePort  string            `json:"active_port,omitempty"`
+	IsNetwork   bool              `json:"is_network,omitempty"`
+	Props       map[string]string `json:"props"`
 }
 
 type AudioClient struct {

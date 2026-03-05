@@ -13,7 +13,10 @@ import (
 	"github.com/the-jonsey/pulseaudio"
 )
 
-const cacheKey = "clients"
+const (
+	cacheKey       = "clients"
+	outputCacheKey = "outputs"
+)
 
 func New(ctx context.Context, cfg *config.PulseAudioConfig) (*PulseAudioBackend, error) {
 	if cfg == nil || !cfg.Enabled {
@@ -23,10 +26,11 @@ func New(ctx context.Context, cfg *config.PulseAudioConfig) (*PulseAudioBackend,
 	address := fmt.Sprintf("%s/pulse/native", cfg.XDGRuntimeDir)
 
 	backend := &PulseAudioBackend{
-		address: address,
-		ctx:     ctx,
-		cache:   cache.New[[]AudioClient](0), // TTL=0 = no expiration
-		events:  make(chan events.Event, 32),
+		address:     address,
+		ctx:         ctx,
+		cache:       cache.New[[]AudioClient](0),
+		outputCache: cache.New[[]AudioOutput](0),
+		events:      make(chan events.Event, 32),
 	}
 
 	return backend, nil
@@ -50,6 +54,9 @@ func (pa *PulseAudioBackend) Start() error {
 
 	// Load the cache at startup
 	if _, err := pa.ListClients(); err != nil {
+		return err
+	}
+	if _, err := pa.ListOutputs(); err != nil {
 		return err
 	}
 
@@ -474,6 +481,180 @@ func (pa *PulseAudioBackend) findSourceByName(name string) (*pulseaudio.Source, 
 		}
 	}
 	return nil, fmt.Errorf("source %s not found", name)
+}
+
+func (pa *PulseAudioBackend) ListOutputs() ([]AudioOutput, error) {
+	if cached, ok := pa.outputCache.Get(outputCacheKey); ok {
+		logger.Debug("[pulseaudio] returning %d outputs from cache", len(cached))
+		return cached, nil
+	}
+
+	logger.Debug("[pulseaudio] output cache miss, loading outputs")
+	return pa.refreshOutputCache()
+}
+
+func (pa *PulseAudioBackend) refreshOutputCache() ([]AudioOutput, error) {
+	srv, err := pa.client.ServerInfo()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get server info: %w", err)
+	}
+
+	sinks, err := pa.client.Sinks()
+	if err != nil {
+		return nil, err
+	}
+
+	logger.Debug("[pulseaudio] loaded %d sinks", len(sinks))
+
+	outputs := make([]AudioOutput, 0, len(sinks))
+	for _, s := range sinks {
+		outputs = append(outputs, pa.parseSink(s, srv.DefaultSink))
+	}
+
+	pa.outputCache.Set(outputCacheKey, outputs)
+	return outputs, nil
+}
+
+func (pa *PulseAudioBackend) GetOutput(name string) (*AudioOutput, bool) {
+	outputs, ok := pa.outputCache.Get(outputCacheKey)
+	if !ok {
+		return nil, false
+	}
+	for _, o := range outputs {
+		if o.Name == name {
+			return &o, true
+		}
+	}
+	return nil, false
+}
+
+func (pa *PulseAudioBackend) UpdateOutput(updated AudioOutput) error {
+	outputs, ok := pa.outputCache.Get(outputCacheKey)
+	if !ok {
+		_, err := pa.ListOutputs()
+		return err
+	}
+
+	found := false
+	for i, o := range outputs {
+		if o.Name == updated.Name {
+			outputs[i] = updated
+			found = true
+			break
+		}
+	}
+	if !found {
+		outputs = append(outputs, updated)
+	}
+
+	pa.outputCache.Set(outputCacheKey, outputs)
+	return nil
+}
+
+func (pa *PulseAudioBackend) OutputCacheUpdatedAt() time.Time {
+	return pa.outputCache.UpdatedAt()
+}
+
+func (pa *PulseAudioBackend) ToggleMuteOutput(name string) error {
+	logger.Debug("[pulseaudio] toggling mute for output %q", name)
+	sink, err := pa.findSinkByName(name)
+	if err != nil {
+		return err
+	}
+	return sink.ToggleMute()
+}
+
+func (pa *PulseAudioBackend) SetVolumeOutput(name string, vol float32) error {
+	logger.Debug("[pulseaudio] setting volume for output %q to %.2f", name, vol)
+	sink, err := pa.findSinkByName(name)
+	if err != nil {
+		return err
+	}
+	return sink.SetVolume(vol)
+}
+
+func (pa *PulseAudioBackend) findSinkByName(name string) (*pulseaudio.Sink, error) {
+	sinks, err := pa.client.Sinks()
+	if err != nil {
+		return nil, err
+	}
+	for _, s := range sinks {
+		if s.Name == name {
+			return &s, nil
+		}
+	}
+	return nil, fmt.Errorf("sink %s not found", name)
+}
+
+func (pa *PulseAudioBackend) parseSink(s pulseaudio.Sink, defaultName string) AudioOutput {
+	switch pa.kind {
+	case ServerPipeWire:
+		return pa.parsePipeWireSink(s, defaultName)
+	default:
+		return pa.parsePulseSink(s, defaultName)
+	}
+}
+
+func (pa *PulseAudioBackend) parsePulseSink(s pulseaudio.Sink, defaultName string) AudioOutput {
+	props := cloneProps(s.PropList)
+	const paNetworkFlag uint32 = 0x20000
+	return AudioOutput{
+		Index:       s.Index,
+		Name:        s.Name,
+		Description: s.Description,
+		Nick:        props["device.description"],
+		Muted:       s.IsMute(),
+		Volume:      s.GetVolume(),
+		State:       sinkStateString(s.SinkState),
+		Default:     s.Name == defaultName,
+		Driver:      s.Driver,
+		ActivePort:  s.ActivePortName,
+		IsNetwork:   s.Flags&paNetworkFlag != 0,
+		Props:       props,
+	}
+}
+
+func sinkStateString(state uint32) string {
+	switch state {
+	case 0:
+		return "running"
+	case 1:
+		return "idle"
+	case 2:
+		return "suspended"
+	default:
+		return "unknown"
+	}
+}
+
+func diffOutputs(old, new []AudioOutput) (changed []AudioOutput, removed []AudioOutput) {
+	newByName := make(map[string]struct{}, len(new))
+	for _, o := range new {
+		newByName[o.Name] = struct{}{}
+	}
+
+	oldByName := make(map[string]AudioOutput, len(old))
+	for _, o := range old {
+		oldByName[o.Name] = o
+		if _, exists := newByName[o.Name]; !exists {
+			removed = append(removed, o)
+		}
+	}
+
+	for _, o := range new {
+		prev, exists := oldByName[o.Name]
+		if !exists || outputChanged(prev, o) {
+			changed = append(changed, o)
+		}
+	}
+	return
+}
+
+func outputChanged(a, b AudioOutput) bool {
+	return a.Volume != b.Volume ||
+		a.Muted != b.Muted ||
+		a.State != b.State ||
+		a.Default != b.Default
 }
 
 func extractModuleSource(arg string) string {
