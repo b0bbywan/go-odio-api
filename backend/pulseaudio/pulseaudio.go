@@ -325,6 +325,9 @@ func (pa *PulseAudioBackend) notify(e events.Event) {
 // Events returns the read-only event channel for this backend.
 func (pa *PulseAudioBackend) Events() <-chan events.Event { return pa.events }
 
+// Kind returns the detected audio server kind (pulseaudio or pipewire).
+func (pa *PulseAudioBackend) Kind() AudioServerKind { return pa.kind }
+
 func (pa *PulseAudioBackend) ToggleMuteMaster() error {
 	if _, err := pa.client.ToggleMute(); err != nil {
 		return fmt.Errorf("failed to get default sink: %w", err)

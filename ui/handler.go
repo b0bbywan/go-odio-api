@@ -98,20 +98,12 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if serverInfo.Backends.PulseAudio {
-		logger.Debug("[ui] → API GET /audio/server")
-		if audioInfo, err := h.client.GetAudioInfo(); err == nil {
-			data.AudioInfo = audioInfo
-			logger.Debug("[ui] ← API /audio/server: volume=%.2f muted=%v", audioInfo.Volume, audioInfo.Muted)
+		logger.Debug("[ui] → API GET /audio")
+		if audioData, err := h.client.GetAudio(); err == nil {
+			data.AudioData = audioData
+			logger.Debug("[ui] ← API /audio: %d clients, %d outputs", len(audioData.Clients), len(audioData.Outputs))
 		} else {
-			logger.Warn("[ui] Failed to fetch audio info: %v", err)
-		}
-
-		logger.Debug("[ui] → API GET /audio/clients")
-		if audioClients, err := h.client.GetAudioClients(); err == nil {
-			data.AudioClients = audioClients
-			logger.Debug("[ui] ← API /audio/clients: %d clients", len(audioClients))
-		} else {
-			logger.Warn("[ui] Failed to fetch audio clients: %v", err)
+			logger.Warn("[ui] Failed to fetch audio data: %v", err)
 		}
 	}
 
@@ -165,33 +157,16 @@ func (h *Handler) MPRISSection(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) AudioSection(w http.ResponseWriter, r *http.Request) {
 	logger.Debug("[ui] %s %s (HTMX section refresh)", r.Method, r.URL.Path)
 
-	logger.Debug("[ui] → API GET /audio/server")
-	audioInfo, err := h.client.GetAudioInfo()
+	logger.Debug("[ui] → API GET /audio")
+	audioData, err := h.client.GetAudio()
 	if err != nil {
-		logger.Error("[ui] Failed to fetch audio info: %v", err)
-		http.Error(w, "Failed to load audio info", http.StatusInternalServerError)
+		logger.Error("[ui] Failed to fetch audio data: %v", err)
+		http.Error(w, "Failed to load audio data", http.StatusInternalServerError)
 		return
 	}
-	logger.Debug("[ui] ← API /audio/server: volume=%.2f muted=%v", audioInfo.Volume, audioInfo.Muted)
+	logger.Debug("[ui] ← API /audio: %d clients, %d outputs", len(audioData.Clients), len(audioData.Outputs))
 
-	logger.Debug("[ui] → API GET /audio/clients")
-	audioClients, err := h.client.GetAudioClients()
-	if err != nil {
-		logger.Error("[ui] Failed to fetch audio clients: %v", err)
-		http.Error(w, "Failed to load audio clients", http.StatusInternalServerError)
-		return
-	}
-	logger.Debug("[ui] ← API /audio/clients: %d clients", len(audioClients))
-
-	data := struct {
-		AudioInfo    *AudioInfo
-		AudioClients []AudioClient
-	}{
-		AudioInfo:    audioInfo,
-		AudioClients: audioClients,
-	}
-
-	if err := h.tmpl.ExecuteTemplate(w, "section-pulseaudio", data); err != nil {
+	if err := h.tmpl.ExecuteTemplate(w, "section-pulseaudio", audioData); err != nil {
 		logger.Error("[ui] Template execution failed: %v", err)
 		http.Error(w, "Failed to render section", http.StatusInternalServerError)
 	}

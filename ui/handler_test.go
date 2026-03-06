@@ -65,16 +65,16 @@ func TestSectionTemplates(t *testing.T) {
 		{
 			name:     "PulseAudio section",
 			template: "section-pulseaudio",
-			data: struct {
-				AudioInfo    *AudioInfo
-				AudioClients []AudioClient
-			}{
-				AudioInfo: &AudioInfo{
-					DefaultSink: "test-sink",
+			data: &AudioData{
+				Kind: "pipewire",
+				DefaultSink: &AudioOutput{
+					Name:        "test-sink",
+					Description: "Test Sink",
 					Volume:      0.5,
 					Muted:       false,
+					Default:     true,
 				},
-				AudioClients: []AudioClient{},
+				Clients: []AudioClient{},
 			},
 		},
 		{

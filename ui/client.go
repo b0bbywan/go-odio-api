@@ -99,20 +99,27 @@ func parseMicros(s string) int64 {
 	return v
 }
 
-func (c *APIClient) GetAudioInfo() (*AudioInfo, error) {
-	var v AudioInfo
-	if err := c.get("/audio/server", &v); err != nil {
+func (c *APIClient) GetAudio() (*AudioData, error) {
+	var raw struct {
+		Kind    string        `json:"kind"`
+		Clients []AudioClient `json:"clients"`
+		Outputs []AudioOutput `json:"outputs"`
+	}
+	if err := c.get("/audio", &raw); err != nil {
 		return nil, err
 	}
-	return &v, nil
-}
-
-func (c *APIClient) GetAudioClients() ([]AudioClient, error) {
-	var v []AudioClient
-	if err := c.get("/audio/clients", &v); err != nil {
-		return nil, err
+	data := &AudioData{
+		Kind:    raw.Kind,
+		Clients: raw.Clients,
+		Outputs: raw.Outputs,
 	}
-	return v, nil
+	for i := range raw.Outputs {
+		if raw.Outputs[i].Default {
+			data.DefaultSink = &raw.Outputs[i]
+			break
+		}
+	}
+	return data, nil
 }
 
 func (c *APIClient) GetBluetoothStatus() (*BluetoothView, error) {

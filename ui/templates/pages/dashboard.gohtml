@@ -5,7 +5,7 @@
 <div class="grid gap-4{{ if or (and $g1 $g2) (and $g1 $g3) (and $g2 $g3) }} sm:grid-cols-2{{ end }}{{ if and $g1 $g2 $g3 }} lg:grid-cols-3{{ end }}">
 	{{ if .ServerInfo.Backends.PulseAudio }}
 	<div class="min-w-0" hx-get="/ui/sections/audio" hx-trigger="every 3s [document.visibilityState === 'visible' && !!this.querySelector('details[open]')]" hx-swap="innerHTML">
-		{{ template "section-pulseaudio" . }}
+		{{ template "section-pulseaudio" .AudioData }}
 	</div>
 	{{ end }}
 

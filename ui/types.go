@@ -54,22 +54,36 @@ type Player struct {
 	Capabilities PlayerCapabilities `json:"capabilities"`
 }
 
-// AudioInfo represents PulseAudio server info from /audio/server
-type AudioInfo struct {
-	Kind         string  `json:"kind"` // "pulseaudio" or "pipewire"
-	ServerString string  `json:"server_string"`
-	DefaultSink  string  `json:"default_sink"`
-	Volume       float64 `json:"volume"`
-	Muted        bool    `json:"muted"`
+// AudioOutput represents a PulseAudio/PipeWire sink from /audio
+type AudioOutput struct {
+	Index       uint32  `json:"id"`
+	Name        string  `json:"name"`
+	Description string  `json:"description"`
+	Nick        string  `json:"nick,omitempty"`
+	Muted       bool    `json:"muted"`
+	Volume      float64 `json:"volume"`
+	State       string  `json:"state"`
+	Default     bool    `json:"default"`
+	Driver      string  `json:"driver,omitempty"`
+	ActivePort  string  `json:"active_port,omitempty"`
+	IsNetwork   bool    `json:"is_network,omitempty"`
 }
 
-// AudioClient represents a PulseAudio sink input from /audio/clients
+// AudioClient represents a PulseAudio sink input from /audio
 type AudioClient struct {
 	Index       uint32  `json:"index"`
 	Name        string  `json:"name"`
 	Application string  `json:"app"` // API returns "app", not "application"
 	Volume      float64 `json:"volume"`
 	Muted       bool    `json:"muted"`
+}
+
+// AudioData holds the combined audio state from GET /audio
+type AudioData struct {
+	Kind        string       // "pulseaudio" or "pipewire"
+	DefaultSink *AudioOutput // the output with default=true
+	Clients     []AudioClient
+	Outputs     []AudioOutput
 }
 
 // Service represents a systemd service from /services
@@ -106,13 +120,12 @@ type BluetoothStatus struct {
 
 // DashboardView is the main view model for the dashboard page
 type DashboardView struct {
-	Title        string
-	ServerInfo   *ServerInfo
-	Players      []PlayerView
-	AudioInfo    *AudioInfo
-	AudioClients []AudioClient
-	Services     []ServiceView
-	Bluetooth    *BluetoothView
+	Title      string
+	ServerInfo *ServerInfo
+	Players    []PlayerView
+	AudioData  *AudioData
+	Services   []ServiceView
+	Bluetooth  *BluetoothView
 }
 
 // PlayerView is a view-optimized version of Player for templates

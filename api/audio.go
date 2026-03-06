@@ -25,6 +25,7 @@ func AudioHandler(pa *pulseaudio.PulseAudioBackend) http.HandlerFunc {
 			setCacheHeader(w, clientsUpdated)
 		}
 		return map[string]any{
+			"kind":    pa.Kind(),
 			"clients": clients,
 			"outputs": outputs,
 		}, nil
