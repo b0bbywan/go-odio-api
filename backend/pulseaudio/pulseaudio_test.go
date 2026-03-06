@@ -3,6 +3,7 @@ package pulseaudio
 import (
 	"testing"
 
+	"github.com/b0bbywan/go-odio-api/cache"
 	"github.com/the-jonsey/pulseaudio"
 )
 
@@ -322,6 +323,210 @@ func TestUpdateOrAddClient(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSinkStateString(t *testing.T) {
+	tests := []struct {
+		state    uint32
+		expected string
+	}{
+		{0, "running"},
+		{1, "idle"},
+		{2, "suspended"},
+		{99, "unknown"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.expected, func(t *testing.T) {
+			if got := sinkStateString(tt.state); got != tt.expected {
+				t.Errorf("sinkStateString(%d) = %q, want %q", tt.state, got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestOutputChanged(t *testing.T) {
+	tests := []struct {
+		name     string
+		a        AudioOutput
+		b        AudioOutput
+		expected bool
+	}{
+		{
+			name:     "identical",
+			a:        AudioOutput{Volume: 0.5, Muted: false, State: "running", Default: false},
+			b:        AudioOutput{Volume: 0.5, Muted: false, State: "running", Default: false},
+			expected: false,
+		},
+		{
+			name:     "volume changed",
+			a:        AudioOutput{Volume: 0.5},
+			b:        AudioOutput{Volume: 0.8},
+			expected: true,
+		},
+		{
+			name:     "muted changed",
+			a:        AudioOutput{Muted: false},
+			b:        AudioOutput{Muted: true},
+			expected: true,
+		},
+		{
+			name:     "state changed",
+			a:        AudioOutput{State: "running"},
+			b:        AudioOutput{State: "suspended"},
+			expected: true,
+		},
+		{
+			name:     "default changed",
+			a:        AudioOutput{Default: false},
+			b:        AudioOutput{Default: true},
+			expected: true,
+		},
+		{
+			name:     "name differs but state identical",
+			a:        AudioOutput{Name: "sink1", Volume: 0.5, State: "idle"},
+			b:        AudioOutput{Name: "sink2", Volume: 0.5, State: "idle"},
+			expected: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := outputChanged(tt.a, tt.b); got != tt.expected {
+				t.Errorf("outputChanged() = %v, want %v", got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestDiffOutputs(t *testing.T) {
+	tests := []struct {
+		name            string
+		old             []AudioOutput
+		new             []AudioOutput
+		wantChangedLen  int
+		wantRemovedLen  int
+		wantChangedName string
+		wantRemovedName string
+	}{
+		{
+			name:           "no changes",
+			old:            []AudioOutput{{Name: "sink1", Volume: 0.5, State: "running"}},
+			new:            []AudioOutput{{Name: "sink1", Volume: 0.5, State: "running"}},
+			wantChangedLen: 0,
+			wantRemovedLen: 0,
+		},
+		{
+			name:            "new output added",
+			old:             []AudioOutput{{Name: "sink1", Volume: 0.5, State: "running"}},
+			new:             []AudioOutput{{Name: "sink1", Volume: 0.5, State: "running"}, {Name: "sink2", State: "idle"}},
+			wantChangedLen:  1,
+			wantChangedName: "sink2",
+			wantRemovedLen:  0,
+		},
+		{
+			name:            "output removed",
+			old:             []AudioOutput{{Name: "sink1"}, {Name: "sink2"}},
+			new:             []AudioOutput{{Name: "sink1"}},
+			wantChangedLen:  0,
+			wantRemovedLen:  1,
+			wantRemovedName: "sink2",
+		},
+		{
+			name:            "volume changed",
+			old:             []AudioOutput{{Name: "sink1", Volume: 0.5, State: "running"}},
+			new:             []AudioOutput{{Name: "sink1", Volume: 0.8, State: "running"}},
+			wantChangedLen:  1,
+			wantChangedName: "sink1",
+			wantRemovedLen:  0,
+		},
+		{
+			name:           "default changed",
+			old:            []AudioOutput{{Name: "sink1", Default: false}, {Name: "sink2", Default: true}},
+			new:            []AudioOutput{{Name: "sink1", Default: true}, {Name: "sink2", Default: false}},
+			wantChangedLen: 2,
+			wantRemovedLen: 0,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			changed, removed := diffOutputs(tt.old, tt.new)
+			if len(changed) != tt.wantChangedLen {
+				t.Errorf("diffOutputs() changed len = %d, want %d", len(changed), tt.wantChangedLen)
+			}
+			if len(removed) != tt.wantRemovedLen {
+				t.Errorf("diffOutputs() removed len = %d, want %d", len(removed), tt.wantRemovedLen)
+			}
+			if tt.wantChangedName != "" && len(changed) > 0 && changed[0].Name != tt.wantChangedName {
+				t.Errorf("diffOutputs() changed[0].Name = %q, want %q", changed[0].Name, tt.wantChangedName)
+			}
+			if tt.wantRemovedName != "" && len(removed) > 0 && removed[0].Name != tt.wantRemovedName {
+				t.Errorf("diffOutputs() removed[0].Name = %q, want %q", removed[0].Name, tt.wantRemovedName)
+			}
+		})
+	}
+}
+
+// parsePulseSink/parsePipeWireSink cannot be unit tested directly:
+// pulseaudio.Sink.GetVolume() panics on a zero-initialized Sink because
+// the lib's cvolume type is an unexported slice that requires protocol
+// deserialization to be valid.
+
+func TestServerInfoFromCache(t *testing.T) {
+	t.Run("cache miss returns error", func(t *testing.T) {
+		pa := &PulseAudioBackend{
+			kind:        ServerPipeWire,
+			outputCache: newOutputCache(),
+		}
+		_, err := pa.ServerInfo()
+		if err == nil {
+			t.Error("expected error on cache miss, got nil")
+		}
+	})
+
+	t.Run("no default sink returns error", func(t *testing.T) {
+		pa := &PulseAudioBackend{
+			kind:        ServerPipeWire,
+			outputCache: newOutputCache(),
+		}
+		pa.outputCache.Set(outputCacheKey, []AudioOutput{
+			{Name: "sink1", Default: false},
+			{Name: "sink2", Default: false},
+		})
+		_, err := pa.ServerInfo()
+		if err == nil {
+			t.Error("expected error when no default sink, got nil")
+		}
+	})
+
+	t.Run("reconstructs from default output", func(t *testing.T) {
+		pa := &PulseAudioBackend{
+			kind:        ServerPipeWire,
+			outputCache: newOutputCache(),
+		}
+		pa.outputCache.Set(outputCacheKey, []AudioOutput{
+			{Name: "sink1", Default: false, Volume: 0.3, Muted: false},
+			{Name: "sink2", Default: true, Volume: 0.7, Muted: true},
+		})
+		info, err := pa.ServerInfo()
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if info.Kind != ServerPipeWire {
+			t.Errorf("Kind = %v, want %v", info.Kind, ServerPipeWire)
+		}
+		if info.DefaultSink != "sink2" {
+			t.Errorf("DefaultSink = %q, want sink2", info.DefaultSink)
+		}
+		if info.Volume != 0.7 {
+			t.Errorf("Volume = %v, want 0.7", info.Volume)
+		}
+		if !info.Muted {
+			t.Error("Muted = false, want true")
+		}
+	})
+}
+
+func newOutputCache() *cache.Cache[[]AudioOutput] {
+	return cache.New[[]AudioOutput](0)
 }
 
 func TestRemoveMissingClients(t *testing.T) {
