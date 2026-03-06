@@ -49,7 +49,7 @@ func (l *Listener) listen(updates <-chan struct{}) {
 
 		case _, ok := <-updates:
 			if !ok {
-				logger.Debug("[pulseaudio] updates channel closed")
+				logger.Warn("[pulseaudio] updates channel closed")
 				return
 			}
 
@@ -66,6 +66,7 @@ func (l *Listener) listen(updates <-chan struct{}) {
 				continue
 			}
 			changed, removed := diffClients(oldClients, clients)
+			logger.Debug("[pulseaudio] client diff: %d changed, %d removed", len(changed), len(removed))
 			if len(changed) > 0 {
 				l.backend.notify(events.Event{Type: events.TypeAudioUpdated, Data: changed})
 			}
@@ -84,6 +85,7 @@ func (l *Listener) listen(updates <-chan struct{}) {
 				continue
 			}
 			changedOut, removedOut := diffOutputs(oldOutputs, outputs)
+			logger.Debug("[pulseaudio] output diff: %d changed, %d removed", len(changedOut), len(removedOut))
 			if len(changedOut) > 0 {
 				l.backend.notify(events.Event{Type: events.TypeAudioOutputUpdated, Data: changedOut})
 			}
