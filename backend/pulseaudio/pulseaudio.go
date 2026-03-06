@@ -73,8 +73,7 @@ func (pa *PulseAudioBackend) Start() error {
 }
 
 func (pa *PulseAudioBackend) Reconnect() error {
-	pa.Close()
-
+	pa.closeConnections()
 	return pa.Start()
 }
 
@@ -294,23 +293,30 @@ func (pa *PulseAudioBackend) InvalidateCache() {
 	pa.cache.Delete(cacheKey)
 }
 
-// Close cleanly closes the connections and stops the listener
-func (pa *PulseAudioBackend) Close() {
+// closeConnections stops the listener and closes the client without closing the events channel.
+// Used internally for reconnects.
+func (pa *PulseAudioBackend) closeConnections() {
 	if pa.listener != nil {
 		pa.listener.Stop()
 		pa.listener = nil
-
 	}
 	if pa.client != nil {
 		pa.client.Close()
 		pa.client = nil
 	}
+}
+
+// Close cleanly closes connections and shuts down the event channel.
+// Called only at program shutdown.
+func (pa *PulseAudioBackend) Close() {
+	pa.closeConnections()
 	close(pa.events)
 }
 
 func (pa *PulseAudioBackend) notify(e events.Event) {
 	select {
 	case pa.events <- e:
+		logger.Debug("[pulseaudio] emitted %s event", e.Type)
 	default:
 		logger.Warn("[pulseaudio] event channel full, dropping %s event", e.Type)
 	}
