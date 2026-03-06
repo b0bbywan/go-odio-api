@@ -6,6 +6,30 @@ import (
 	"github.com/b0bbywan/go-odio-api/backend/pulseaudio"
 )
 
+func AudioHandler(pa *pulseaudio.PulseAudioBackend) http.HandlerFunc {
+	return JSONHandler(func(w http.ResponseWriter, r *http.Request) (any, error) {
+		clients, err := pa.ListClients()
+		if err != nil {
+			return nil, err
+		}
+		outputs, err := pa.ListOutputs()
+		if err != nil {
+			return nil, err
+		}
+		clientsUpdated := pa.CacheUpdatedAt()
+		outputsUpdated := pa.OutputCacheUpdatedAt()
+		if outputsUpdated.After(clientsUpdated) {
+			setCacheHeader(w, outputsUpdated)
+		} else {
+			setCacheHeader(w, clientsUpdated)
+		}
+		return map[string]any{
+			"clients": clients,
+			"outputs": outputs,
+		}, nil
+	})
+}
+
 func MuteClientHandler(pa *pulseaudio.PulseAudioBackend) http.HandlerFunc {
 	return withSink(pa, func(w http.ResponseWriter, r *http.Request, sink string) {
 		if err := pa.ToggleMute(sink); err != nil {
