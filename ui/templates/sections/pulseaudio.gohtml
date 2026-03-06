@@ -3,39 +3,37 @@
 	<summary class="section-header">
 		<div class="flex items-center gap-2">
 			<h2 class="section-title">🔊 Audio Server</h2>
-			{{ if .AudioInfo }}
-			{{ if .AudioInfo.Kind }}
-			<span class="badge badge-blue text-xs">{{ .AudioInfo.Kind }}</span>
-			{{ end }}
+			{{ if .Kind }}
+			<span class="badge badge-blue text-xs">{{ .Kind }}</span>
 			{{ end }}
 		</div>
 		<div class="flex items-center gap-2">
-			{{ if .AudioInfo }}
-			<span class="badge {{ if .AudioInfo.Muted }}badge-red{{ else }}badge-blue{{ end }}">
-				{{ if .AudioInfo.Muted }}Muted{{ else }}{{ printf "%.0f%%" (mul .AudioInfo.Volume 100) }}{{ end }}
+			{{ if .DefaultSink }}
+			<span class="badge {{ if .DefaultSink.Muted }}badge-red{{ else }}badge-blue{{ end }}">
+				{{ if .DefaultSink.Muted }}Muted{{ else }}{{ printf "%.0f%%" (mul .DefaultSink.Volume 100) }}{{ end }}
 			</span>
 			{{ end }}
 			<span class="section-toggle">▾</span>
 		</div>
 	</summary>
 
-	{{ if .AudioInfo }}
+	{{ if .DefaultSink }}
 	<!-- Server info -->
 	<div class="info-card mb-4">
 		<div class="mb-2 text-xs text-subtle">Default Sink</div>
-		<div class="truncate text-sm font-medium mb-3" title="{{ .AudioInfo.DefaultSink }}">{{ .AudioInfo.DefaultSink }}</div>
+		<div class="truncate text-sm font-medium mb-3" title="{{ .DefaultSink.Description }}">{{ .DefaultSink.Description }}</div>
 
 		<!-- Volume control -->
-		{{ template "volume-slider" (dict "Target" "" "Type" "audio-server" "Volume" .AudioInfo.Volume "Muted" .AudioInfo.Muted "ShowMute" true "Title" "Master volume") }}
+		{{ template "volume-slider" (dict "Target" "" "Type" "audio-server" "Volume" .DefaultSink.Volume "Muted" .DefaultSink.Muted "ShowMute" true "Title" "Master volume") }}
 	</div>
 
 	<!-- Audio clients -->
-	{{ if .AudioClients }}
+	{{ if .Clients }}
 	<div class="space-y-2">
 		<div class="text-xs font-semibold uppercase text-subtle">
-			Active Clients ({{ len .AudioClients }})
+			Active Clients ({{ len .Clients }})
 		</div>
-		{{ range .AudioClients }}
+		{{ range .Clients }}
 			{{ template "pulseaudio-sink" . }}
 		{{ end }}
 	</div>
