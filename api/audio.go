@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/b0bbywan/go-odio-api/backend/pulseaudio"
@@ -30,76 +31,69 @@ func AudioHandler(pa *pulseaudio.PulseAudioBackend) http.HandlerFunc {
 	})
 }
 
+func handleAudioError(w http.ResponseWriter, err error) {
+	if err == nil {
+		w.WriteHeader(http.StatusAccepted)
+		return
+	}
+
+	var notFoundErr *pulseaudio.NotFoundError
+	if errors.As(err, &notFoundErr) {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	var notReadyErr *pulseaudio.NotReadyError
+	if errors.As(err, &notReadyErr) {
+		http.Error(w, err.Error(), http.StatusServiceUnavailable)
+		return
+	}
+
+	http.Error(w, err.Error(), http.StatusInternalServerError)
+}
+
 func MuteClientHandler(pa *pulseaudio.PulseAudioBackend) http.HandlerFunc {
 	return withSink(pa, func(w http.ResponseWriter, r *http.Request, sink string) {
-		if err := pa.ToggleMute(sink); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		w.WriteHeader(http.StatusAccepted)
+		handleAudioError(w, pa.ToggleMute(sink))
 	})
 }
 
 func MuteMasterHandler(pa *pulseaudio.PulseAudioBackend) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if err := pa.ToggleMuteMaster(); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		w.WriteHeader(http.StatusAccepted)
+		handleAudioError(w, pa.ToggleMuteMaster())
 	}
 }
 
 func SetVolumeClientHandler(pa *pulseaudio.PulseAudioBackend) http.HandlerFunc {
 	return withSink(pa, func(w http.ResponseWriter, r *http.Request, sink string) {
 		withBody(validateVolume, func(w http.ResponseWriter, r *http.Request, req *setVolumeRequest) {
-			if err := pa.SetVolume(sink, req.Volume); err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-			w.WriteHeader(http.StatusAccepted)
+			handleAudioError(w, pa.SetVolume(sink, req.Volume))
 		})(w, r)
 	})
 }
 
 func SetVolumeMasterHandler(pa *pulseaudio.PulseAudioBackend) http.HandlerFunc {
 	return withBody(validateVolume, func(w http.ResponseWriter, r *http.Request, req *setVolumeRequest) {
-		if err := pa.SetVolumeMaster(req.Volume); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		w.WriteHeader(http.StatusAccepted)
+		handleAudioError(w, pa.SetVolumeMaster(req.Volume))
 	})
 }
 
 func SetDefaultOutputHandler(pa *pulseaudio.PulseAudioBackend) http.HandlerFunc {
 	return withOutput(pa, func(w http.ResponseWriter, r *http.Request, output string) {
-		if err := pa.SetDefaultOutput(output); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		w.WriteHeader(http.StatusAccepted)
+		handleAudioError(w, pa.SetDefaultOutput(output))
 	})
 }
 
 func MuteOutputHandler(pa *pulseaudio.PulseAudioBackend) http.HandlerFunc {
 	return withOutput(pa, func(w http.ResponseWriter, r *http.Request, output string) {
-		if err := pa.ToggleMuteOutput(output); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		w.WriteHeader(http.StatusAccepted)
+		handleAudioError(w, pa.ToggleMuteOutput(output))
 	})
 }
 
 func SetVolumeOutputHandler(pa *pulseaudio.PulseAudioBackend) http.HandlerFunc {
 	return withOutput(pa, func(w http.ResponseWriter, r *http.Request, output string) {
 		withBody(validateVolume, func(w http.ResponseWriter, r *http.Request, req *setVolumeRequest) {
-			if err := pa.SetVolumeOutput(output, req.Volume); err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-			w.WriteHeader(http.StatusAccepted)
+			handleAudioError(w, pa.SetVolumeOutput(output, req.Volume))
 		})(w, r)
 	})
 }
