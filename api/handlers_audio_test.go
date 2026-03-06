@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -134,6 +135,122 @@ func TestAudioHandlerCacheHeader(t *testing.T) {
 			got := w.Header().Get("X-Cache-Updated-At")
 			if got != tt.wantHeader {
 				t.Errorf("X-Cache-Updated-At = %q, want %q", got, tt.wantHeader)
+			}
+		})
+	}
+}
+
+// TestHandleAudioError tests the centralized audio error handler.
+func TestHandleAudioError(t *testing.T) {
+	tests := []struct {
+		name     string
+		err      error
+		wantCode int
+		wantBody string
+	}{
+		{
+			name:     "no error returns 202 Accepted",
+			err:      nil,
+			wantCode: http.StatusAccepted,
+		},
+		{
+			name:     "NotFoundError returns 404 Not Found",
+			err:      &pulseaudio.NotFoundError{Resource: "sink", Name: "test-sink"},
+			wantCode: http.StatusNotFound,
+			wantBody: "sink not found: test-sink",
+		},
+		{
+			name:     "NotReadyError returns 503 Service Unavailable",
+			err:      &pulseaudio.NotReadyError{Message: "output cache not ready"},
+			wantCode: http.StatusServiceUnavailable,
+			wantBody: "output cache not ready",
+		},
+		{
+			name:     "generic error returns 500 Internal Server Error",
+			err:      errors.New("pulse connection lost"),
+			wantCode: http.StatusInternalServerError,
+			wantBody: "pulse connection lost",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			handleAudioError(w, tt.err)
+
+			if w.Code != tt.wantCode {
+				t.Errorf("status = %d, want %d", w.Code, tt.wantCode)
+			}
+			if tt.wantBody != "" {
+				body := w.Body.String()
+				if !strings.Contains(body, tt.wantBody) {
+					t.Errorf("body = %q, want to contain %q", body, tt.wantBody)
+				}
+			}
+		})
+	}
+}
+
+// TestWithOutput tests the middleware for extracting output from path.
+func TestWithOutput(t *testing.T) {
+	tests := []struct {
+		name           string
+		output         string
+		wantStatusCode int
+		wantBodyMatch  string
+		wantCalls      int
+	}{
+		{
+			name:           "valid output is passed to next handler",
+			output:         "alsa_output.pci-0000_00_1f.3.analog-stereo",
+			wantStatusCode: http.StatusOK,
+			wantCalls:      1,
+		},
+		{
+			name:           "empty output returns 404 Not Found",
+			output:         "",
+			wantStatusCode: http.StatusNotFound,
+			wantBodyMatch:  "missing output",
+			wantCalls:      0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			calls := 0
+			var receivedOutput string
+
+			nextFunc := func(w http.ResponseWriter, r *http.Request, output string) {
+				calls++
+				receivedOutput = output
+				w.WriteHeader(http.StatusOK)
+			}
+
+			handler := withOutput(nil, nextFunc)
+
+			req := httptest.NewRequest("POST", "/audio/outputs/"+tt.output+"/mute", nil)
+			req.SetPathValue("output", tt.output)
+			w := httptest.NewRecorder()
+
+			handler(w, req)
+
+			if w.Code != tt.wantStatusCode {
+				t.Errorf("status = %d, want %d", w.Code, tt.wantStatusCode)
+			}
+
+			if calls != tt.wantCalls {
+				t.Errorf("calls = %d, want %d", calls, tt.wantCalls)
+			}
+
+			if tt.wantCalls > 0 && receivedOutput != tt.output {
+				t.Errorf("output = %q, want %q", receivedOutput, tt.output)
+			}
+
+			if tt.wantBodyMatch != "" {
+				body := w.Body.String()
+				if !strings.Contains(body, tt.wantBodyMatch) {
+					t.Errorf("body = %q, want to contain %q", body, tt.wantBodyMatch)
+				}
 			}
 		})
 	}

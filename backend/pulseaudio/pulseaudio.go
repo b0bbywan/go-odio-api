@@ -123,7 +123,7 @@ func (pa *PulseAudioBackend) reconnectWithBackoff() {
 func (pa *PulseAudioBackend) ServerInfo() (*ServerInfo, error) {
 	outputs, ok := pa.outputCache.Get(outputCacheKey)
 	if !ok {
-		return nil, fmt.Errorf("output cache not ready")
+		return nil, &NotReadyError{Message: "output cache not ready"}
 	}
 
 	for _, o := range outputs {
@@ -137,7 +137,7 @@ func (pa *PulseAudioBackend) ServerInfo() (*ServerInfo, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("no default sink found")
+	return nil, &NotFoundError{Resource: "sink", Name: "default"}
 }
 
 func (pa *PulseAudioBackend) ListClients() ([]AudioClient, error) {
@@ -270,7 +270,7 @@ func (pa *PulseAudioBackend) RefreshClient(name string) (*AudioClient, error) {
 		if _, err := pa.ListClients(); err != nil {
 			return nil, err
 		}
-		return nil, fmt.Errorf("client not found: %s", name)
+		return nil, &NotFoundError{Resource: "client", Name: name}
 	}
 
 	client := pa.parseSinkInput(sink)
@@ -471,7 +471,7 @@ func (pa *PulseAudioBackend) findModule(index uint32, name string) (*pulseaudio.
 			return &m, nil
 		}
 	}
-	return nil, fmt.Errorf("module %s %d not found", name, index)
+	return nil, &NotFoundError{Resource: "module", Name: fmt.Sprintf("%s %d", name, index)}
 }
 
 func (pa *PulseAudioBackend) findSourceByName(name string) (*pulseaudio.Source, error) {
@@ -484,7 +484,7 @@ func (pa *PulseAudioBackend) findSourceByName(name string) (*pulseaudio.Source, 
 			return &s, nil
 		}
 	}
-	return nil, fmt.Errorf("source %s not found", name)
+	return nil, &NotFoundError{Resource: "source", Name: name}
 }
 
 func (pa *PulseAudioBackend) ListOutputs() ([]AudioOutput, error) {
@@ -592,7 +592,7 @@ func (pa *PulseAudioBackend) findSinkByName(name string) (*pulseaudio.Sink, erro
 			return &s, nil
 		}
 	}
-	return nil, fmt.Errorf("sink %s not found", name)
+	return nil, &NotFoundError{Resource: "sink", Name: name}
 }
 
 func (pa *PulseAudioBackend) parseSink(s pulseaudio.Sink, defaultName string) AudioOutput {
