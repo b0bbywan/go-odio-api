@@ -499,12 +499,17 @@ POST   /players/{player}/shuffle          # Set shuffle (body: {"shuffle": true}
 ### PulseAudio
 
 ```
+GET    /audio                             # Combined: server info, outputs, clients
 GET    /audio/server                      # Get server info
-POST   /audio/server/mute                 # Mute/unmute server
-POST   /audio/server/volume               # Set server volume (body: {"volume": 0.5})
+POST   /audio/server/mute                 # Mute/unmute default output
+POST   /audio/server/volume               # Set default output volume (body: {"volume": 0.5})
 GET    /audio/clients                     # List audio clients (sink-inputs)
 POST   /audio/clients/{sink}/mute         # Mute/unmute client
 POST   /audio/clients/{sink}/volume       # Set client volume (body: {"volume": 0.5})
+GET    /audio/outputs                     # List all audio outputs (sinks)
+POST   /audio/outputs/{output}/default    # Set default output
+POST   /audio/outputs/{output}/mute       # Mute/unmute output
+POST   /audio/outputs/{output}/volume     # Set output volume (body: {"volume": 0.5})
 ```
 
 ### Systemd Services

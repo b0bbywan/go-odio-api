@@ -36,7 +36,7 @@ Note: Necessary cors for the PWA are included by default but can be overridden.
   - Add to home screen (Android/iOS)
 
 - **Dynamic & Adaptive Sections**
-  - **Audio Server**: default sink, global volume, active clients with per-app volume control
+  - **Audio Server**: default sink selector (click to switch output), global volume, active clients with per-app volume control
   - **Media Players**: live list of MPRIS players (Spotify/go-librespot, MPD, Chrome, Kodi, Firefox instances…)
     - Dynamic cover art
     - Full metadata (title, artist, album)
