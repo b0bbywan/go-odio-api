@@ -77,6 +77,10 @@ func (s *Server) registerLogin1Routes(b *login1.Login1Backend) {
 
 func (s *Server) registerPulseRoutes(b *pulseaudio.PulseAudioBackend) {
 	s.mux.HandleFunc(
+		"GET /audio",
+		AudioHandler(b),
+	)
+	s.mux.HandleFunc(
 		"/audio/server",
 		JSONHandler(func(w http.ResponseWriter, r *http.Request) (any, error) {
 			return b.ServerInfo()
