@@ -21,7 +21,21 @@
 	<!-- Server info -->
 	<div class="info-card mb-4">
 		<div class="mb-2 text-xs text-subtle">Default Sink</div>
-		<div class="truncate text-sm font-medium mb-3" title="{{ .DefaultSink.Description }}">{{ .DefaultSink.Description }}</div>
+		<div class="sink-dropdown relative mb-3">
+			<button onclick="this.nextElementSibling.classList.toggle('hidden')" class="truncate text-sm font-medium w-full text-left cursor-pointer hover:text-blue-400 transition-colors" title="{{ .DefaultSink.Description }}">
+				{{ .DefaultSink.Description }} <span class="text-xs text-subtle">▾</span>
+			</button>
+			<ul class="hidden absolute left-0 right-0 mt-1 bg-gray-800 border border-gray-600 rounded shadow-lg z-10 max-h-48 overflow-y-auto">
+				{{ range .Outputs }}
+				<li>
+					<button onclick="setDefaultOutput('{{ .Name }}'); closeSinkDropdown()"
+						class="w-full text-left px-3 py-2 text-sm hover:bg-gray-700 cursor-pointer truncate {{ if .Default }}text-blue-400 font-medium{{ else }}text-gray-300{{ end }}">
+						{{ .Description }}
+					</button>
+				</li>
+				{{ end }}
+			</ul>
+		</div>
 
 		<!-- Volume control -->
 		{{ template "volume-slider" (dict "Target" "" "Type" "audio-server" "Volume" .DefaultSink.Volume "Muted" .DefaultSink.Muted "ShowMute" true "Title" "Master volume") }}

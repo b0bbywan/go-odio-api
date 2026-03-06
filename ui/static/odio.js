@@ -102,6 +102,26 @@ function updatePositions() {
 document.addEventListener('DOMContentLoaded', () => setInterval(updatePositions, 500));
 document.addEventListener('htmx:afterSwap', updatePositions);
 
+function setDefaultOutput(name) {
+	fetch(`/audio/outputs/${encodeURIComponent(name)}/default`, {
+		method: 'POST'
+	}).catch(err => console.error('Failed to set default output:', err));
+}
+
+function closeSinkDropdown() {
+	document.querySelectorAll('.sink-dropdown ul').forEach(ul => ul.classList.add('hidden'));
+	// Trigger an immediate HTMX refresh on the audio section
+	const el = document.querySelector('[hx-get="/ui/sections/audio"]');
+	if (el) htmx.trigger(el, 'refreshAudio');
+}
+
+// Close sink dropdown when clicking outside
+document.addEventListener('click', function(e) {
+	if (!e.target.closest('.sink-dropdown')) {
+		closeSinkDropdown();
+	}
+});
+
 function toggleMute(button, target, type) {
 	let url;
 	if (type === 'audio-server') {
