@@ -107,6 +107,10 @@ func (s *Server) registerPulseRoutes(b *pulseaudio.PulseAudioBackend) {
 		listHandler(b.ListOutputs, b.OutputCacheUpdatedAt),
 	)
 	s.mux.HandleFunc(
+		"POST /audio/outputs/{output}/default",
+		SetDefaultOutputHandler(b),
+	)
+	s.mux.HandleFunc(
 		"POST /audio/outputs/{output}/mute",
 		MuteOutputHandler(b),
 	)
