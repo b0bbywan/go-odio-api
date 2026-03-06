@@ -27,8 +27,8 @@ func NewListener(backend *PulseAudioBackend) *Listener {
 
 // Start starts listening for pulseaudio events
 func (l *Listener) Start() error {
-	// Subscribe to sink and sink input changes
-	updates, err := l.backend.client.UpdatesByType(pulseaudio.SUBSCRIPTION_MASK_SINK | pulseaudio.SUBSCRIPTION_MASK_SINK_INPUT)
+	// Subscribe to sink, sink input and server changes
+	updates, err := l.backend.client.UpdatesByType(pulseaudio.SUBSCRIPTION_MASK_SINK | pulseaudio.SUBSCRIPTION_MASK_SINK_INPUT | pulseaudio.SUBSCRIPTION_MASK_SERVER)
 	if err != nil {
 		return err
 	}

@@ -34,12 +34,9 @@ type PulseAudioBackend struct {
 
 type ServerInfo struct {
 	Kind        AudioServerKind `json:"kind"`
-	Name        string          `json:"name"`
-	Version     string          `json:"version"`
-	User        string          `json:"user"`
-	Hostname    string          `json:"hostname"`
 	DefaultSink string          `json:"default_sink"`
 	Volume      float32         `json:"volume"`
+	Muted       bool            `json:"muted"`
 }
 
 type AudioOutput struct {

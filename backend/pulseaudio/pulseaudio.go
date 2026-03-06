@@ -122,25 +122,23 @@ func (pa *PulseAudioBackend) reconnectWithBackoff() {
 }
 
 func (pa *PulseAudioBackend) ServerInfo() (*ServerInfo, error) {
-	var volume float32
-	var err error
-
-	if volume, err = pa.client.Volume(); err != nil {
-		logger.Warn("[pulseaudio] failed to get client volume: %v", err)
-	}
-	if pa.server != nil {
-		return &ServerInfo{
-			Kind:        pa.kind,
-			Name:        pa.server.PackageName,
-			Version:     pa.server.PackageVersion,
-			User:        pa.server.User,
-			Hostname:    pa.server.Hostname,
-			DefaultSink: pa.server.DefaultSink,
-			Volume:      volume,
-		}, nil
+	outputs, ok := pa.outputCache.Get(outputCacheKey)
+	if !ok {
+		return nil, fmt.Errorf("output cache not ready")
 	}
 
-	return nil, fmt.Errorf("server info unavailable")
+	for _, o := range outputs {
+		if o.Default {
+			return &ServerInfo{
+				Kind:        pa.kind,
+				DefaultSink: o.Name,
+				Volume:      o.Volume,
+				Muted:       o.Muted,
+			}, nil
+		}
+	}
+
+	return nil, fmt.Errorf("no default sink found")
 }
 
 func (pa *PulseAudioBackend) ListClients() ([]AudioClient, error) {
@@ -553,6 +551,11 @@ func (pa *PulseAudioBackend) UpdateOutput(updated AudioOutput) error {
 
 func (pa *PulseAudioBackend) OutputCacheUpdatedAt() time.Time {
 	return pa.outputCache.UpdatedAt()
+}
+
+func (pa *PulseAudioBackend) SetDefaultOutput(name string) error {
+	logger.Debug("[pulseaudio] setting default output to %q", name)
+	return pa.client.SetDefaultSink(name)
 }
 
 func (pa *PulseAudioBackend) ToggleMuteOutput(name string) error {

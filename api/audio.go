@@ -48,6 +48,16 @@ func SetVolumeMasterHandler(pa *pulseaudio.PulseAudioBackend) http.HandlerFunc {
 	})
 }
 
+func SetDefaultOutputHandler(pa *pulseaudio.PulseAudioBackend) http.HandlerFunc {
+	return withOutput(pa, func(w http.ResponseWriter, r *http.Request, output string) {
+		if err := pa.SetDefaultOutput(output); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusAccepted)
+	})
+}
+
 func MuteOutputHandler(pa *pulseaudio.PulseAudioBackend) http.HandlerFunc {
 	return withOutput(pa, func(w http.ResponseWriter, r *http.Request, output string) {
 		if err := pa.ToggleMuteOutput(output); err != nil {
