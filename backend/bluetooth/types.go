@@ -7,19 +7,21 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
+	idbus "github.com/b0bbywan/go-odio-api/backend/internal/dbus"
 	"github.com/b0bbywan/go-odio-api/cache"
 	"github.com/b0bbywan/go-odio-api/events"
 )
 
 type BluetoothBackend struct {
-	conn           *dbus.Conn
+	dbus           *idbus.DBusBackend
+	conn           *dbus.Conn // borrowed from dbus, not owned
 	ctx            context.Context
 	pairingTimeout time.Duration
 	idleTimeout    time.Duration
 	agent          *bluezAgent
 	idleTimer      *time.Timer
 	idleTimerMu    sync.Mutex
-	listener       *DBusListener
+	sigCh          chan *dbus.Signal
 	// permanent cache (no expiration) for status tracking
 	statusCache *cache.Cache[BluetoothStatus]
 	events      chan events.Event

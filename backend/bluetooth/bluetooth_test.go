@@ -220,82 +220,18 @@ func TestBluetoothStateToString(t *testing.T) {
 func TestOnPropertiesChangedPaired(t *testing.T) {
 	b := &BluetoothBackend{}
 
-	tests := []struct {
-		name     string
-		signal   *dbus.Signal
-		expected bool
-	}{
-		{
-			name:     "nil signal",
-			signal:   nil,
-			expected: true,
-		},
-		{
-			name:     "empty body",
-			signal:   &dbus.Signal{Path: "/dev/1", Body: []interface{}{}},
-			expected: false,
-		},
-		{
-			name:     "body too short",
-			signal:   &dbus.Signal{Path: "/dev/1", Body: []interface{}{"org.bluez.Device1"}},
-			expected: false,
-		},
-		{
-			name: "body[1] wrong type",
-			signal: &dbus.Signal{
-				Path: "/dev/1",
-				Body: []interface{}{"org.bluez.Device1", "not a map"},
-			},
-			expected: false,
-		},
-		{
-			name: "no Paired key",
-			signal: &dbus.Signal{
-				Path: "/dev/1",
-				Body: []interface{}{
-					"org.bluez.Device1",
-					map[string]dbus.Variant{
-						"Name": dbus.MakeVariant("Speaker"),
-					},
-				},
-			},
-			expected: false,
-		},
-		{
-			name: "Paired wrong type",
-			signal: &dbus.Signal{
-				Path: "/dev/1",
-				Body: []interface{}{
-					"org.bluez.Device1",
-					map[string]dbus.Variant{
-						"Paired": dbus.MakeVariant("yes"),
-					},
-				},
-			},
-			expected: false,
-		},
-		{
-			name: "Paired false",
-			signal: &dbus.Signal{
-				Path: "/dev/1",
-				Body: []interface{}{
-					"org.bluez.Device1",
-					map[string]dbus.Variant{
-						"Paired": dbus.MakeVariant(false),
-					},
-				},
-			},
-			expected: false,
-		},
+	signals := []*dbus.Signal{
+		nil,
+		{Path: "/dev/1", Body: []interface{}{}},
+		{Path: "/dev/1", Body: []interface{}{"org.bluez.Device1"}},
+		{Path: "/dev/1", Body: []interface{}{"org.bluez.Device1", "not a map"}},
+		{Path: "/dev/1", Body: []interface{}{"org.bluez.Device1", map[string]dbus.Variant{"Name": dbus.MakeVariant("Speaker")}}},
+		{Path: "/dev/1", Body: []interface{}{"org.bluez.Device1", map[string]dbus.Variant{"Paired": dbus.MakeVariant("yes")}}},
+		{Path: "/dev/1", Body: []interface{}{"org.bluez.Device1", map[string]dbus.Variant{"Paired": dbus.MakeVariant(false)}}},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := b.onPropertiesChanged(tt.signal)
-			if result != tt.expected {
-				t.Errorf("onPropertiesChanged() = %v, want %v", result, tt.expected)
-			}
-		})
+	for _, sig := range signals {
+		b.onPropertiesChanged(sig) // must not panic
 	}
 }
 
@@ -303,68 +239,20 @@ func TestOnPropertiesChangedPaired(t *testing.T) {
 func TestOnPropertiesChangedConnected(t *testing.T) {
 	b := &BluetoothBackend{}
 
-	tests := []struct {
-		name     string
-		signal   *dbus.Signal
-		expected bool
-	}{
-		{
-			name:     "empty body",
-			signal:   &dbus.Signal{Path: "/dev/1", Body: []interface{}{}},
-			expected: false,
-		},
-		{
-			name:     "body too short",
-			signal:   &dbus.Signal{Path: "/dev/1", Body: []interface{}{"org.bluez.Device1"}},
-			expected: false,
-		},
-		{
-			name: "body[1] wrong type",
-			signal: &dbus.Signal{
-				Path: "/dev/1",
-				Body: []interface{}{"org.bluez.Device1", 42},
-			},
-			expected: false,
-		},
-		{
-			name: "no Connected key",
-			signal: &dbus.Signal{
-				Path: "/dev/1",
-				Body: []interface{}{
-					"org.bluez.Device1",
-					map[string]dbus.Variant{
-						"Name": dbus.MakeVariant("Speaker"),
-					},
-				},
-			},
-			expected: false,
-		},
-		{
-			name: "Connected wrong type",
-			signal: &dbus.Signal{
-				Path: "/dev/1",
-				Body: []interface{}{
-					"org.bluez.Device1",
-					map[string]dbus.Variant{
-						"Connected": dbus.MakeVariant("yes"),
-					},
-				},
-			},
-			expected: false,
-		},
+	signals := []*dbus.Signal{
+		{Path: "/dev/1", Body: []interface{}{}},
+		{Path: "/dev/1", Body: []interface{}{"org.bluez.Device1"}},
+		{Path: "/dev/1", Body: []interface{}{"org.bluez.Device1", 42}},
+		{Path: "/dev/1", Body: []interface{}{"org.bluez.Device1", map[string]dbus.Variant{"Name": dbus.MakeVariant("Speaker")}}},
+		{Path: "/dev/1", Body: []interface{}{"org.bluez.Device1", map[string]dbus.Variant{"Connected": dbus.MakeVariant("yes")}}},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := b.onPropertiesChanged(tt.signal)
-			if result != tt.expected {
-				t.Errorf("onPropertiesChanged() = %v, want %v", result, tt.expected)
-			}
-		})
+	for _, sig := range signals {
+		b.onPropertiesChanged(sig) // must not panic
 	}
 }
 
-// onPropertiesChanged always returns false for valid signals (never stops the listener)
+// onPropertiesChanged handles valid signals without panicking
 func TestOnPropertiesChangedNeverStops(t *testing.T) {
 	b := &BluetoothBackend{}
 
@@ -378,10 +266,7 @@ func TestOnPropertiesChangedNeverStops(t *testing.T) {
 		},
 	}
 
-	result := b.onPropertiesChanged(sig)
-	if result != false {
-		t.Errorf("onPropertiesChanged(connected=true) = %v, want false", result)
-	}
+	b.onPropertiesChanged(sig) // must not panic
 }
 
 func TestCancelIdleTimer(t *testing.T) {

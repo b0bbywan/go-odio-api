@@ -39,7 +39,7 @@ func New(
 
 	b.DBus = dbus.NewDBusBackend(ctx)
 
-	if b.Bluetooth, err = bluetooth.New(ctx, btcfg); err != nil {
+	if b.Bluetooth, err = bluetooth.New(ctx, btcfg, b.DBus); err != nil {
 		return nil, err
 	}
 

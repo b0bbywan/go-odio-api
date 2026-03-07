@@ -14,17 +14,18 @@ import (
 )
 
 // New creates a new Bluetooth backend
-func New(ctx context.Context, cfg *config.BluetoothConfig) (*BluetoothBackend, error) {
+func New(ctx context.Context, cfg *config.BluetoothConfig, d *idbus.DBusBackend) (*BluetoothBackend, error) {
 	if cfg == nil || !cfg.Enabled {
 		return nil, nil
 	}
 
-	conn, err := dbus.ConnectSystemBus()
+	conn, err := d.SystemConn()
 	if err != nil {
 		return nil, err
 	}
 
 	backend := BluetoothBackend{
+		dbus:           d,
 		conn:           conn,
 		ctx:            ctx,
 		pairingTimeout: cfg.PairingTimeout,
@@ -85,7 +86,7 @@ func (b *BluetoothBackend) PowerUp() error {
 }
 
 func (b *BluetoothBackend) startListener() {
-	if b.listener != nil {
+	if b.sigCh != nil {
 		logger.Debug("[bluetooth] listener already running, skipping")
 		return
 	}
@@ -94,22 +95,25 @@ func (b *BluetoothBackend) startListener() {
 		"type='signal',interface='org.freedesktop.DBus.Properties',member='PropertiesChanged',arg0='org.bluez.Adapter1'",
 	}
 	logger.Debug("[bluetooth] starting listener (device + adapter)")
-	listener := NewDBusListener(b.conn, b.ctx, matchRules, b.onPropertiesChanged)
-	if err := listener.Start(); err != nil {
-		listener.Stop()
+	ch, err := b.dbus.Subscribe(idbus.SystemBus, matchRules, nil)
+	if err != nil {
 		logger.Warn("[bluetooth] failed to start listener: %v", err)
 		return
 	}
-	b.listener = listener
-	go listener.Listen()
+	b.sigCh = ch
+	go func() {
+		for sig := range ch {
+			b.onPropertiesChanged(sig)
+		}
+	}()
 	logger.Debug("[bluetooth] listener started")
 	b.checkAndStartIdleTimer()
 }
 
 func (b *BluetoothBackend) stopListener() {
-	if b.listener != nil {
-		b.listener.Stop()
-		b.listener = nil
+	if b.sigCh != nil {
+		b.dbus.Unsubscribe(idbus.SystemBus, b.sigCh)
+		b.sigCh = nil
 		logger.Debug("[bluetooth] listener stopped")
 	}
 	b.cancelIdleTimer()
@@ -190,14 +194,11 @@ func (b *BluetoothBackend) NewPairing() error {
 	return nil
 }
 
-func (b *BluetoothBackend) onPropertiesChanged(sig *dbus.Signal) bool {
-	if sig == nil {
-		return true // channel closed
-	}
+func (b *BluetoothBackend) onPropertiesChanged(sig *dbus.Signal) {
 	changed, iface, err := idbus.FilterSignal(sig)
 	if err != nil {
 		logger.Debug("[bluetooth] signal filtered out: %v", err)
-		return false
+		return
 	}
 
 	logger.Debug("[bluetooth] signal from %s (%s): changed properties=%v", sig.Path, iface, idbus.Keys(changed))
@@ -207,8 +208,6 @@ func (b *BluetoothBackend) onPropertiesChanged(sig *dbus.Signal) bool {
 	case BLUETOOTH_ADAPTER:
 		b.onAdapterPropertiesChanged(changed)
 	}
-
-	return false
 }
 
 func (b *BluetoothBackend) onDevicePropertiesChanged(path dbus.ObjectPath, changed map[string]dbus.Variant) {
@@ -311,13 +310,7 @@ func (b *BluetoothBackend) Close() {
 	if err := b.PowerDown(); err != nil {
 		logger.Warn("[bluetooth] Failed power off adapter at shutdown: %v", err)
 	}
-
-	if b.conn != nil {
-		if err := b.conn.Close(); err != nil {
-			logger.Warn("[bluetooth] Failed to close D-Bus connection: %v", err)
-		}
-		b.conn = nil
-	}
+	b.conn = nil // conn is owned by DBusBackend
 }
 
 func (b *BluetoothBackend) GetStatus() BluetoothStatus {
