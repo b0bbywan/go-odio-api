@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/b0bbywan/go-odio-api/backend/bluetooth"
+	"github.com/b0bbywan/go-odio-api/backend/internal/dbus"
 	"github.com/b0bbywan/go-odio-api/backend/login1"
 	"github.com/b0bbywan/go-odio-api/backend/mpris"
 	"github.com/b0bbywan/go-odio-api/backend/pulseaudio"
@@ -13,6 +14,7 @@ import (
 )
 
 type Backend struct {
+	DBus      *dbus.DBusBackend
 	Bluetooth *bluetooth.BluetoothBackend
 	Login1    *login1.Login1Backend
 	MPRIS     *mpris.MPRISBackend
@@ -34,6 +36,8 @@ func New(
 ) (*Backend, error) {
 	var b Backend
 	var err error
+
+	b.DBus = dbus.NewDBusBackend(ctx)
 
 	if b.Bluetooth, err = bluetooth.New(ctx, btcfg); err != nil {
 		return nil, err
@@ -116,5 +120,8 @@ func (b *Backend) Close() {
 	}
 	if b.Zeroconf != nil {
 		b.Zeroconf.Close()
+	}
+	if b.DBus != nil {
+		b.DBus.Close()
 	}
 }
