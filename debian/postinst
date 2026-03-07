@@ -18,4 +18,4 @@ echo ""
 echo "To check status:"
 echo "  systemctl --user status odio-api.service"
 
-exit 0
+#DEBHELPER#
