@@ -156,3 +156,24 @@ jobs:
           files: dist/*
           generate_release_notes: true
           prerelease: ${{ contains(github.ref_name, '-rc') || contains(github.ref_name, '-beta') || contains(github.ref_name, '-alpha') }}
+
+# Add this job at the end of your existing release workflow in
+# go-odio-api and go-mpd-discplayer (.github/workflows/build.yml)
+#
+# It triggers the apt-repo rebuild after a successful release.
+
+  notify-apt-repo:
+    name: Trigger APT repo update
+    needs: release
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions: {}
+
+    steps:
+      - name: Trigger apt-repo rebuild
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.APT_REPO_TOKEN }}
+          repository: b0bbywan/odio-apt-repo
+          event-type: release-published
+          client-payload: '{"repo": "${{ github.repository }}", "tag": "${{ github.ref_name }}"}'
