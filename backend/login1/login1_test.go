@@ -13,7 +13,7 @@ import (
 // --- Tests pour New() ---
 
 func TestNew_NilConfig(t *testing.T) {
-	b, err := New(context.Background(), nil)
+	b, err := New(context.Background(), nil, nil)
 	if err != nil {
 		t.Errorf("New(nil) should return nil error, got: %v", err)
 	}
@@ -24,7 +24,7 @@ func TestNew_NilConfig(t *testing.T) {
 
 func TestNew_DisabledConfig(t *testing.T) {
 	cfg := &config.Login1Config{Enabled: false}
-	b, err := New(context.Background(), cfg)
+	b, err := New(context.Background(), cfg, nil)
 	if err != nil {
 		t.Errorf("New(disabled) should return nil error, got: %v", err)
 	}
@@ -41,7 +41,7 @@ func TestNew_DisabledConfig_WithCapabilities(t *testing.T) {
 			CanPoweroff: true,
 		},
 	}
-	b, err := New(context.Background(), cfg)
+	b, err := New(context.Background(), cfg, nil)
 	if err != nil {
 		t.Errorf("New(disabled with capabilities) should return nil error, got: %v", err)
 	}

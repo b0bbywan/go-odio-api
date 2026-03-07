@@ -43,7 +43,7 @@ func New(
 		return nil, err
 	}
 
-	if b.Login1, err = login1.New(ctx, login1cfg); err != nil {
+	if b.Login1, err = login1.New(ctx, login1cfg, b.DBus); err != nil {
 		return nil, err
 	}
 
