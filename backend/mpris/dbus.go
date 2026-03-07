@@ -55,28 +55,6 @@ func (m *MPRISBackend) listDBusNames() ([]string, error) {
 	return names, nil
 }
 
-// addMatchRule subscribes to a D-Bus signal via a match rule
-func (m *MPRISBackend) addMatchRule(rule string) error {
-	return idbus.AddMatchRule(m.conn, rule)
-}
-
-// addListenMatchRules subscribes to the necessary D-Bus signals for the listener.
-// Subscribes to PropertiesChanged (player state changes) and
-// NameOwnerChanged (player appearance/disappearance).
-func (m *MPRISBackend) addListenMatchRules() error {
-	matchRule := "type='signal',interface='" + DBUS_PROP_IFACE + "',member='PropertiesChanged',arg0namespace='" + MPRIS_PREFIX + "'"
-	if err := m.addMatchRule(matchRule); err != nil {
-		return err
-	}
-
-	ownerMatchRule := "type='signal',interface='" + DBUS_INTERFACE + "',member='NameOwnerChanged',arg0namespace='" + MPRIS_PREFIX + "'"
-	if err := m.addMatchRule(ownerMatchRule); err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func (m *MPRISBackend) getNameOwner(busName string) (string, error) {
 	var owner string
 	call := m.conn.BusObject().Call(idbus.BUS_GET_NAME_OWNER, 0, busName)

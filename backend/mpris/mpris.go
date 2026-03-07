@@ -15,21 +15,23 @@ import (
 )
 
 // New creates a new MPRIS backend
-func New(ctx context.Context, cfg *config.MPRISConfig) (*MPRISBackend, error) {
+func New(ctx context.Context, cfg *config.MPRISConfig, d *idbus.DBusBackend) (*MPRISBackend, error) {
 	if cfg == nil || !cfg.Enabled {
 		return nil, nil
 	}
 
-	conn, err := dbus.ConnectSessionBus()
+	conn, err := d.SessionConn()
 	if err != nil {
 		return nil, err
 	}
 
 	return &MPRISBackend{
-		conn:   conn,
-		ctx:    ctx,
-		cache:  cache.New[[]Player](0), // TTL=0 = no expiration
-		events: make(chan events.Event, 64),
+		dbus:      d,
+		conn:      conn,
+		ctx:       ctx,
+		cache:     cache.New[[]Player](0), // TTL=0 = no expiration
+		lastState: make(map[string]PlaybackStatus),
+		events:    make(chan events.Event, 64),
 	}, nil
 }
 
@@ -44,10 +46,21 @@ func (m *MPRISBackend) Start() error {
 	}
 
 	// Start the listener for MPRIS changes
-	m.listener = NewListener(m)
-	if err := m.listener.Start(); err != nil {
+	matchRules := []string{
+		"type='signal',interface='" + DBUS_PROP_IFACE + "',member='PropertiesChanged',arg0namespace='" + MPRIS_PREFIX + "'",
+		"type='signal',interface='" + DBUS_INTERFACE + "',member='NameOwnerChanged',arg0namespace='" + MPRIS_PREFIX + "'",
+	}
+	ch, err := m.dbus.Subscribe(idbus.SessionBus, matchRules, nil)
+	if err != nil {
 		return err
 	}
+	m.sigCh = ch
+	go func() {
+		for sig := range ch {
+			m.handleSignal(sig)
+		}
+	}()
+	logger.Info("[mpris] listener started (D-Bus signal-based)")
 
 	// Start the heartbeat (will auto-stop if no player is Playing)
 	m.heartbeat = NewHeartbeat(m)
@@ -517,22 +530,17 @@ func (m *MPRISBackend) InvalidateCache() {
 	m.cache.Delete(CACHE_KEY)
 }
 
-// Close cleanly closes connections and stops the listener
+// Close cleanly stops the backend. The D-Bus connection is owned by DBusBackend.
 func (m *MPRISBackend) Close() {
 	if m.heartbeat != nil {
 		m.heartbeat.Stop()
 		m.heartbeat = nil
 	}
-	if m.listener != nil {
-		m.listener.Stop()
-		m.listener = nil
+	if m.sigCh != nil {
+		m.dbus.Unsubscribe(idbus.SessionBus, m.sigCh)
+		m.sigCh = nil
 	}
-	if m.conn != nil {
-		if err := m.conn.Close(); err != nil {
-			logger.Info("Failed to close D-Bus connection: %v", err)
-		}
-		m.conn = nil
-	}
+	m.conn = nil
 	close(m.events)
 }
 

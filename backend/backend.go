@@ -47,7 +47,7 @@ func New(
 		return nil, err
 	}
 
-	if b.MPRIS, err = mpris.New(ctx, mpriscfg); err != nil {
+	if b.MPRIS, err = mpris.New(ctx, mpriscfg, b.DBus); err != nil {
 		return nil, err
 	}
 
