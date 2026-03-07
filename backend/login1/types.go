@@ -2,18 +2,18 @@ package login1
 
 import (
 	"context"
-	"time"
 
 	"github.com/godbus/dbus/v5"
 
+	idbus "github.com/b0bbywan/go-odio-api/backend/internal/dbus"
 	"github.com/b0bbywan/go-odio-api/events"
 )
 
 // Login1Backend manages reboot and shutdown
 type Login1Backend struct {
-	conn    *dbus.Conn
-	ctx     context.Context
-	timeout time.Duration
+	dbus *idbus.DBusBackend
+	conn *dbus.Conn // borrowed from dbus, not owned
+	ctx  context.Context
 
 	CanReboot   bool
 	CanPoweroff bool

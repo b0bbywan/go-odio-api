@@ -3,30 +3,28 @@ package login1
 import (
 	"context"
 	"fmt"
-	"time"
 
-	"github.com/godbus/dbus/v5"
-
+	"github.com/b0bbywan/go-odio-api/backend/internal/dbus"
 	"github.com/b0bbywan/go-odio-api/config"
 	"github.com/b0bbywan/go-odio-api/events"
 	"github.com/b0bbywan/go-odio-api/logger"
 )
 
 // New creates a new Login1 backend
-func New(ctx context.Context, cfg *config.Login1Config) (*Login1Backend, error) {
+func New(ctx context.Context, cfg *config.Login1Config, d *dbus.DBusBackend) (*Login1Backend, error) {
 	if cfg == nil || !cfg.Enabled {
 		return nil, nil
 	}
 
-	conn, err := dbus.ConnectSystemBus()
+	conn, err := d.SystemConn()
 	if err != nil {
 		return nil, err
 	}
 
 	backend := &Login1Backend{
+		dbus:    d,
 		conn:    conn,
 		ctx:     ctx,
-		timeout: 10 * time.Second,
 		eventsC: make(chan events.Event, 4),
 	}
 
@@ -46,14 +44,9 @@ func New(ctx context.Context, cfg *config.Login1Config) (*Login1Backend, error) 
 	return backend, nil
 }
 
-// Close cleanly closes connections and stops the listener
+// Close cleans up the backend. The D-Bus connection is owned by DBusBackend.
 func (l *Login1Backend) Close() {
-	if l.conn != nil {
-		if err := l.conn.Close(); err != nil {
-			logger.Error("Failed to close D-Bus connection: %v", err)
-		}
-		l.conn = nil
-	}
+	l.conn = nil
 }
 
 func (l *Login1Backend) Events() <-chan events.Event {
@@ -75,7 +68,7 @@ func (l *Login1Backend) Reboot() error {
 	}
 	logger.Info("[login1] Reboot requested")
 	l.notify("reboot")
-	return l.callMethod(LOGIN1_PREFIX, LOGIN1_METHOD_REBOOT, true)
+	return l.callMethod(LOGIN1_METHOD_REBOOT, true)
 }
 
 func (l *Login1Backend) PowerOff() error {
@@ -84,7 +77,7 @@ func (l *Login1Backend) PowerOff() error {
 	}
 	logger.Info("[login1] PowerOff requested")
 	l.notify("poweroff")
-	return l.callMethod(LOGIN1_PREFIX, LOGIN1_METHOD_POWEROFF, true)
+	return l.callMethod(LOGIN1_METHOD_POWEROFF, true)
 }
 
 func (l *Login1Backend) validateCapabilities(capabilities config.Login1Capabilities) error {
@@ -112,8 +105,8 @@ func (l *Login1Backend) checkCapability(method string) (bool, error) {
 		return false, err
 	}
 
-	result, err := extractString(call)
-	if err != nil {
+	var result string
+	if err := call.Store(&result); err != nil {
 		return false, err
 	}
 
