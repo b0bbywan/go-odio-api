@@ -21,10 +21,11 @@ type PulseAudioBackend struct {
 	ctx context.Context
 	mu  sync.Mutex
 
-	address string
-	client  *pulseaudio.Client
-	server  *pulseaudio.Server
-	kind    AudioServerKind
+	address     string
+	serveCookie bool
+	client      *pulseaudio.Client
+	server      *pulseaudio.Server
+	kind        AudioServerKind
 
 	cache       *cache.Cache[[]AudioClient]
 	outputCache *cache.Cache[[]AudioOutput]

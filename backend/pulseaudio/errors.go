@@ -18,3 +18,12 @@ type NotReadyError struct {
 func (e *NotReadyError) Error() string {
 	return e.Message
 }
+
+// DisabledError indicates that a feature is disabled in config.
+type DisabledError struct {
+	Feature string
+}
+
+func (e *DisabledError) Error() string {
+	return e.Feature + " is disabled"
+}
