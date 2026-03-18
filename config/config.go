@@ -74,6 +74,7 @@ type MPRISConfig struct {
 type PulseAudioConfig struct {
 	Enabled       bool
 	XDGRuntimeDir string
+	ServeCookie   bool
 }
 
 type SystemdConfig struct {
@@ -290,6 +291,7 @@ func New(cfgFile *string) (*Config, error) {
 	viper.SetDefault("mpris.timeout", "5s")
 
 	viper.SetDefault("pulseaudio.enabled", true)
+	viper.SetDefault("pulseaudio.serve_cookie", false)
 
 	viper.SetDefault("systemd.enabled", false)
 	viper.SetDefault("systemd.system", []string{})
@@ -399,6 +401,7 @@ func New(cfgFile *string) (*Config, error) {
 	pulsecfg := PulseAudioConfig{
 		Enabled:       viper.GetBool("pulseaudio.enabled"),
 		XDGRuntimeDir: xdgRuntimeDir,
+		ServeCookie:   viper.GetBool("pulseaudio.serve_cookie"),
 	}
 
 	syscfg := SystemdConfig{

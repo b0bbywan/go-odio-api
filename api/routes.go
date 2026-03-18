@@ -81,6 +81,10 @@ func (s *Server) registerPulseRoutes(b *pulseaudio.PulseAudioBackend) {
 		AudioHandler(b),
 	)
 	s.mux.HandleFunc(
+		"GET /audio/cookie",
+		CookieHandler(b),
+	)
+	s.mux.HandleFunc(
 		"/audio/server",
 		JSONHandler(func(w http.ResponseWriter, r *http.Request) (any, error) {
 			return b.ServerInfo()

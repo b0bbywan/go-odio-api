@@ -3,6 +3,8 @@ package pulseaudio
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -27,6 +29,7 @@ func New(ctx context.Context, cfg *config.PulseAudioConfig) (*PulseAudioBackend,
 
 	backend := &PulseAudioBackend{
 		address:     address,
+		serveCookie: cfg.ServeCookie,
 		ctx:         ctx,
 		cache:       cache.New[[]AudioClient](0),
 		outputCache: cache.New[[]AudioOutput](0),
@@ -327,6 +330,22 @@ func (pa *PulseAudioBackend) Events() <-chan events.Event { return pa.events }
 
 // Kind returns the detected audio server kind (pulseaudio or pipewire).
 func (pa *PulseAudioBackend) Kind() AudioServerKind { return pa.kind }
+
+// Cookie returns the PulseAudio cookie file contents, or DisabledError if not enabled.
+func (pa *PulseAudioBackend) Cookie() ([]byte, error) {
+	if !pa.serveCookie {
+		return nil, &DisabledError{Feature: "cookie"}
+	}
+	return pa.cookie()
+}
+
+func (pa *PulseAudioBackend) cookie() ([]byte, error) {
+	configDir, err := os.UserConfigDir()
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve config dir: %w", err)
+	}
+	return os.ReadFile(filepath.Join(configDir, "pulse", "cookie"))
+}
 
 func (pa *PulseAudioBackend) ToggleMuteMaster() error {
 	if _, err := pa.client.ToggleMute(); err != nil {

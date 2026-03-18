@@ -154,6 +154,12 @@ func TestHandleAudioError(t *testing.T) {
 			wantCode: http.StatusAccepted,
 		},
 		{
+			name:     "DisabledError returns 403 Forbidden",
+			err:      &pulseaudio.DisabledError{Feature: "cookie"},
+			wantCode: http.StatusForbidden,
+			wantBody: "cookie is disabled",
+		},
+		{
 			name:     "NotFoundError returns 404 Not Found",
 			err:      &pulseaudio.NotFoundError{Resource: "sink", Name: "test-sink"},
 			wantCode: http.StatusNotFound,

@@ -1,6 +1,8 @@
 package pulseaudio
 
 import (
+	"errors"
+	"os"
 	"testing"
 
 	"github.com/b0bbywan/go-odio-api/cache"
@@ -527,6 +529,56 @@ func TestServerInfoFromCache(t *testing.T) {
 
 func newOutputCache() *cache.Cache[[]AudioOutput] {
 	return cache.New[[]AudioOutput](0)
+}
+
+func TestCookie(t *testing.T) {
+	t.Run("disabled returns DisabledError", func(t *testing.T) {
+		pa := &PulseAudioBackend{serveCookie: false}
+		_, err := pa.Cookie()
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		var disabled *DisabledError
+		if !errors.As(err, &disabled) {
+			t.Errorf("expected DisabledError, got %T: %v", err, err)
+		}
+	})
+
+	t.Run("enabled but file missing returns error", func(t *testing.T) {
+		t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+		pa := &PulseAudioBackend{serveCookie: true}
+		_, err := pa.Cookie()
+		if err == nil {
+			t.Fatal("expected error for missing cookie file, got nil")
+		}
+		var disabled *DisabledError
+		if errors.As(err, &disabled) {
+			t.Errorf("expected file error, got DisabledError")
+		}
+	})
+
+	t.Run("enabled and file exists returns content", func(t *testing.T) {
+		configDir := t.TempDir()
+		t.Setenv("XDG_CONFIG_HOME", configDir)
+
+		cookieDir := configDir + "/pulse"
+		if err := os.MkdirAll(cookieDir, 0700); err != nil {
+			t.Fatal(err)
+		}
+		want := []byte("fakecookiedata")
+		if err := os.WriteFile(cookieDir+"/cookie", want, 0600); err != nil {
+			t.Fatal(err)
+		}
+
+		pa := &PulseAudioBackend{serveCookie: true}
+		got, err := pa.Cookie()
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if string(got) != string(want) {
+			t.Errorf("Cookie() = %q, want %q", got, want)
+		}
+	})
 }
 
 func TestRemoveMissingClients(t *testing.T) {

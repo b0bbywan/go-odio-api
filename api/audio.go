@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/b0bbywan/go-odio-api/backend/pulseaudio"
+	"github.com/b0bbywan/go-odio-api/logger"
 )
 
 func AudioHandler(pa *pulseaudio.PulseAudioBackend) http.HandlerFunc {
@@ -35,6 +36,12 @@ func AudioHandler(pa *pulseaudio.PulseAudioBackend) http.HandlerFunc {
 func handleAudioError(w http.ResponseWriter, err error) {
 	if err == nil {
 		w.WriteHeader(http.StatusAccepted)
+		return
+	}
+
+	var disabledErr *pulseaudio.DisabledError
+	if errors.As(err, &disabledErr) {
+		http.Error(w, err.Error(), http.StatusForbidden)
 		return
 	}
 
@@ -110,6 +117,21 @@ func withOutput(
 			return
 		}
 		fn(w, r, output)
+	}
+}
+
+func CookieHandler(pa *pulseaudio.PulseAudioBackend) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		data, err := pa.Cookie()
+		if err != nil {
+			handleAudioError(w, err)
+			return
+		}
+		w.Header().Set("Content-Type", "application/octet-stream")
+		w.Header().Set("Content-Disposition", `attachment; filename="cookie"`)
+		if _, err := w.Write(data); err != nil {
+			logger.Warn("[api] failed to write cookie response: %v", err)
+		}
 	}
 }
 
