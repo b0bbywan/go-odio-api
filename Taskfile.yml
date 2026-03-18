@@ -7,8 +7,9 @@ vars:
   CSS_OUTPUT: ui/static/output.css
   VERSION:
     sh: |
-      if git describe --tags --exact-match HEAD 2>/dev/null; then
-        :
+      EXACT=$(git tag --points-at HEAD 2>/dev/null | grep -E '^v[0-9]' | sort -V | tail -1)
+      if [ -n "${EXACT}" ]; then
+        echo "${EXACT}"
       else
         BASE_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "dev")
         BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
