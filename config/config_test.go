@@ -965,9 +965,15 @@ func TestNew_CORSDefaultOrigin(t *testing.T) {
 	if cfg.Api.CORS == nil {
 		t.Fatal("Api.CORS should not be nil with default origin")
 	}
-	want := []string{"https://odio-pwa.vercel.app"}
-	if len(cfg.Api.CORS.Origins) != 1 || cfg.Api.CORS.Origins[0] != want[0] {
+	want := []string{"https://odio-pwa.vercel.app", "https://pwa.odio.love"}
+	if len(cfg.Api.CORS.Origins) != len(want) {
 		t.Errorf("Api.CORS.Origins = %v, want %v", cfg.Api.CORS.Origins, want)
+	} else {
+		for i, o := range want {
+			if cfg.Api.CORS.Origins[i] != o {
+				t.Errorf("Api.CORS.Origins[%d] = %q, want %q", i, cfg.Api.CORS.Origins[i], o)
+			}
+		}
 	}
 }
 
