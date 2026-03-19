@@ -66,6 +66,8 @@ func (b *BluetoothBackend) PowerUp() error {
 		return nil
 	}
 
+	unblockIfSoftBlocked()
+
 	if err := b.PowerOnAdapter(true); err != nil {
 		return err
 	}
@@ -159,6 +161,7 @@ func (b *BluetoothBackend) NewPairing() error {
 
 	// Bluetooth ON
 	if powered := b.isAdapterOn(); !powered {
+		unblockIfSoftBlocked()
 		if err := b.PowerOnAdapter(true); err != nil {
 			return err
 		}
