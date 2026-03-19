@@ -193,6 +193,8 @@ Bluetooth is intentionally not left in an automatic or always-on state.
 
 This behavior matches how most Bluetooth speakers and audio receivers work.
 
+Odio automatically unblocks soft-blocked Bluetooth rfkill devices on power-up, so a `rfkill block bluetooth` followed by a power-up via the API will work without manual intervention.
+
 Bonus: You get to control it through `/pulseaudio/clients` or `/players/` and in the UI !
 
 ### Power Management
@@ -510,6 +512,7 @@ GET    /audio/outputs                     # List all audio outputs (sinks)
 POST   /audio/outputs/{output}/default    # Set default output
 POST   /audio/outputs/{output}/mute       # Mute/unmute output
 POST   /audio/outputs/{output}/volume     # Set output volume (body: {"volume": 0.5})
+GET    /audio/cookie                      # Download PulseAudio cookie file (requires pulseaudio.serve_cookie: true)
 ```
 
 ### Systemd Services
