@@ -7,7 +7,6 @@ Wants=network-online.target
 After=network-online.target
 
 [Service]
-SupplementaryGroups=rfkill
 ExecStart=/usr/bin/odio-api
 Restart=always
 RestartSec=12
