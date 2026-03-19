@@ -1,3 +1,5 @@
+github.com/amenzhinsky/rfkill v0.1.0 h1:J8+L4WEkNnVTYx8RQCFZj0nDEBY2X6B+Ljf2CsGB1+I=
+github.com/amenzhinsky/rfkill v0.1.0/go.mod h1:6dXIGe2H/g2RcC0KMHS7cYcHV3/hatcxygp76g7QYow=
 github.com/cenkalti/backoff v2.2.1+incompatible h1:tNowT99t7UNflLxfYYSlKYsBpXdEet03Pg2g16Swow4=
 github.com/cenkalti/backoff v2.2.1+incompatible/go.mod h1:90ReRw6GdpyfrHakVjL/QHaoyV4aDUVVkXQJJJ3NXXM=
 github.com/coreos/go-systemd/v22 v22.7.0 h1:LAEzFkke61DFROc7zNLX/WA2i5J8gYqe0rSj9KI28KA=
