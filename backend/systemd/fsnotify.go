@@ -122,7 +122,7 @@ func (l *Listener) waitForStableState(service string) {
 	}()
 
 	logger.Debug("[systemd] waitForStableState %s", service)
-	waitTime := 500 * time.Millisecond
+	waitTime := 1 * time.Minute
 	maxWait := 8 * time.Second
 	factor := 1.5
 
