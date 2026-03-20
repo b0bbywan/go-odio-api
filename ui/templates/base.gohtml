@@ -7,6 +7,8 @@
 
 	<title>{{ .Title }}</title>
 
+	<link rel="icon" type="image/png" href="/ui/static/logo.png">
+
 	<!-- Compiled Tailwind CSS -->
 	<link rel="stylesheet" href="/ui/static/output.css">
 
@@ -21,15 +23,18 @@
 	<header class="sticky top-0 z-10 border-b border-zinc-800 bg-zinc-900/95 backdrop-blur">
 		<div class="mx-auto max-w-7xl px-4 py-3 sm:px-6 lg:px-8">
 			<div class="flex items-center justify-between">
-				<div>
-					<h1 class="text-lg font-semibold sm:text-xl">
-						{{ .Title }}
-					</h1>
-					{{ if .ServerInfo }}
-					<p class="text-xs text-zinc-500 sm:text-sm">
-						{{ .ServerInfo.Hostname }}
-					</p>
-					{{ end }}
+				<div class="flex items-center gap-3">
+					<img src="/ui/static/logo.png" alt="odio logo" class="h-10 w-10 object-contain">
+					<div>
+						<h1 class="text-lg font-semibold sm:text-xl lowercase">
+							{{ .Title }}
+						</h1>
+						{{ if .ServerInfo }}
+						<p class="text-xs text-zinc-500 sm:text-sm">
+							{{ .ServerInfo.Hostname }}
+						</p>
+						{{ end }}
+					</div>
 				</div>
 
 				{{ if .ServerInfo }}
@@ -37,17 +42,17 @@
 					<!-- Backend status badges (hidden on mobile) -->
 					<div class="hidden gap-2 sm:flex">
 						{{ if .ServerInfo.Backends.PulseAudio }}
-						<span class="rounded-full bg-blue-500/10 px-2 py-1 text-xs text-blue-400">
+						<span class="rounded-full bg-zinc-700/50 px-2 py-1 text-xs text-zinc-400">
 							Audio
 						</span>
 						{{ end }}
 						{{ if .ServerInfo.Backends.MPRIS }}
-						<span class="rounded-full bg-green-500/10 px-2 py-1 text-xs text-green-400">
+						<span class="rounded-full bg-leaf/10 px-2 py-1 text-xs text-leaf">
 							MPRIS
 						</span>
 						{{ end }}
 						{{ if .ServerInfo.Backends.Systemd }}
-						<span class="rounded-full bg-purple-500/10 px-2 py-1 text-xs text-purple-400">
+						<span class="rounded-full bg-moss/20 px-2 py-1 text-xs text-zinc-300">
 							Systemd
 						</span>
 						{{ end }}
