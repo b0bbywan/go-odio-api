@@ -16,14 +16,14 @@ details > summary::-webkit-details-marker {
 	height: 8px;
 }
 ::-webkit-scrollbar-track {
-	background: #18181b;
+	background: #0d1410;
 }
 ::-webkit-scrollbar-thumb {
-	background: #3f3f46;
+	background: #243629;
 	border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-	background: #52525b;
+	background: #3a5440;
 }
 
 /* HTMX request indicator */
@@ -45,9 +45,10 @@ button.htmx-request {
 /* Volume & seek sliders */
 .volume-slider,
 .seek-slider {
+	accent-color: #c8963a;
 	height: 4px;
 	border-radius: 2px;
-	background: #3f3f46;
+	background: #243629;
 	outline: none;
 	opacity: 0.9;
 	transition: opacity 0.2s;
@@ -73,7 +74,7 @@ button.htmx-request {
 	width: 14px;
 	height: 14px;
 	border-radius: 50%;
-	background: #3b82f6;
+	background: #c8963a;
 	cursor: pointer;
 }
 
@@ -82,16 +83,22 @@ button.htmx-request {
 	width: 14px;
 	height: 14px;
 	border-radius: 50%;
-	background: #3b82f6;
+	background: #c8963a;
 	cursor: pointer;
 	border: none;
 }
 
 .volume-slider::-moz-range-progress,
 .seek-slider::-moz-range-progress {
-	background: #3b82f6;
+	background: #c8963a;
 	height: 4px;
 	border-radius: 2px;
+}
+
+/* Forest theme: highlight playing state with leaf green */
+.status-badge-playing {
+	background-color: rgba(74, 124, 89, 0.2);
+	color: #4a7c59;
 }
 
 /* Component utility classes */
@@ -129,15 +136,15 @@ button.htmx-request {
 	}
 
 	.badge-green {
-		@apply bg-green-500/10 text-green-400;
+		@apply bg-leaf/10 text-leaf;
 	}
 
 	.badge-blue {
-		@apply bg-blue-500/10 text-blue-400;
+		@apply bg-zinc-700/50 text-zinc-400;
 	}
 
 	.badge-purple {
-		@apply bg-purple-500/10 text-purple-400;
+		@apply bg-moss/30 text-zinc-300;
 	}
 
 	.badge-red {
@@ -145,7 +152,7 @@ button.htmx-request {
 	}
 
 	.player-card {
-		@apply flex flex-col gap-3 rounded-lg bg-zinc-700/50 p-3 transition-colors hover:bg-zinc-700;
+		@apply flex flex-col gap-3 rounded-lg bg-zinc-900/50 p-3 transition-colors hover:bg-zinc-900;
 		container-type: inline-size;
 	}
 
@@ -155,7 +162,7 @@ button.htmx-request {
 	}
 
 	.btn {
-		@apply rounded-lg bg-zinc-600/50 px-3 py-2 text-sm transition-colors hover:bg-zinc-600 active:scale-95;
+		@apply rounded-lg bg-zinc-700/50 px-3 py-2 text-sm transition-colors hover:bg-zinc-700 active:scale-95;
 	}
 
 	.text-muted {
@@ -205,15 +212,18 @@ button.htmx-request {
 
 	/* Typography utilities */
 	.player-name {
-		@apply truncate font-medium text-zinc-200;
+		@apply truncate font-medium;
+		color: #e4e4e7;
 	}
 
 	.player-meta {
-		@apply truncate text-sm text-muted;
+		@apply truncate text-sm;
+		color: #a1a1aa;
 	}
 
 	.player-meta-small {
-		@apply truncate text-xs text-subtle;
+		@apply truncate text-xs;
+		color: #71717a;
 	}
 
 	.empty-state-icon {
