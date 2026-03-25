@@ -7,7 +7,9 @@ vars:
   CSS_OUTPUT: ui/static/output.css
   VERSION:
     sh: |
-      EXACT=$(git tag --points-at HEAD 2>/dev/null | grep -E '^v[0-9]' | sort -V | tail -1)
+      TAGS=$(git tag --points-at HEAD 2>/dev/null | grep -E '^v[0-9]')
+      EXACT=$(echo "$TAGS" | grep -vE '[-\.](rc|beta|alpha)' | sort -V | tail -1)
+      if [ -z "$EXACT" ]; then EXACT=$(echo "$TAGS" | sort -V | tail -1); fi
       if [ -n "${EXACT}" ]; then
         echo "${EXACT}"
       else
