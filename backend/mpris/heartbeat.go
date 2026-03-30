@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	idbus "github.com/b0bbywan/go-odio-api/backend/internal/dbus"
 	"github.com/b0bbywan/go-odio-api/logger"
 )
 
@@ -111,7 +112,7 @@ func (h *Heartbeat) updatePlayingPositions() bool {
 		// Some MPRIS implementations (e.g. go-librespot) return 0 for Position
 		// even during active playback. Skip the update to avoid resetting the
 		// seeker to the beginning of the track.
-		pos, ok := extractInt64(variant)
+		pos, ok := idbus.ExtractInt64(variant)
 		if !ok || pos <= 0 {
 			logger.Debug("[mpris] skipping zero/invalid position for %s", player.BusName)
 			continue

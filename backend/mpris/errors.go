@@ -40,9 +40,3 @@ func (e *ValidationError) Error() string {
 	}
 	return e.Message
 }
-
-type dbusTimeoutError struct{}
-
-func (e *dbusTimeoutError) Error() string {
-	return "D-Bus call timeout"
-}

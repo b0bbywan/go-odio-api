@@ -3,10 +3,10 @@ package mpris
 import (
 	"context"
 	"sync"
-	"time"
 
 	"github.com/godbus/dbus/v5"
 
+	idbus "github.com/b0bbywan/go-odio-api/backend/internal/dbus"
 	"github.com/b0bbywan/go-odio-api/cache"
 	"github.com/b0bbywan/go-odio-api/events"
 )
@@ -19,15 +19,19 @@ type LoopStatus string
 
 // MPRISBackend manages connections to media players via MPRIS
 type MPRISBackend struct {
-	conn    *dbus.Conn
-	ctx     context.Context
-	timeout time.Duration
+	dbus *idbus.DBusBackend
+	conn *dbus.Conn // borrowed from dbus, not owned
+	ctx  context.Context
 
 	// permanent cache (no expiration)
 	cache *cache.Cache[[]Player]
 
-	// listener for MPRIS changes
-	listener *Listener
+	// signal subscription
+	sigCh chan *dbus.Signal
+
+	// deduplication: last known playback state per player
+	lastState   map[string]PlaybackStatus
+	lastStateMu sync.RWMutex
 
 	// heartbeat to update Position of playing players
 	heartbeat *Heartbeat
@@ -35,22 +39,10 @@ type MPRISBackend struct {
 	events chan events.Event
 }
 
-// Listener listens to MPRIS changes via D-Bus signals
-type Listener struct {
-	backend *MPRISBackend
-	ctx     context.Context
-	cancel  context.CancelFunc
-
-	// Deduplication: last known state per player
-	lastState   map[string]PlaybackStatus
-	lastStateMu sync.RWMutex
-}
-
 // Player represents an MPRIS media player
 type Player struct {
 	backend    *MPRISBackend // Parent backend (not exported)
 	conn       *dbus.Conn    // D-Bus connection (not exported)
-	timeout    time.Duration // Timeout for D-Bus calls (not exported)
 	uniqueName string        // Unique D-Bus connection name (e.g., :1.107)
 
 	BusName string `json:"bus_name"`

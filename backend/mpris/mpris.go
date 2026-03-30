@@ -7,6 +7,7 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
+	idbus "github.com/b0bbywan/go-odio-api/backend/internal/dbus"
 	"github.com/b0bbywan/go-odio-api/cache"
 	"github.com/b0bbywan/go-odio-api/config"
 	"github.com/b0bbywan/go-odio-api/events"
@@ -14,22 +15,23 @@ import (
 )
 
 // New creates a new MPRIS backend
-func New(ctx context.Context, cfg *config.MPRISConfig) (*MPRISBackend, error) {
+func New(ctx context.Context, cfg *config.MPRISConfig, d *idbus.DBusBackend) (*MPRISBackend, error) {
 	if cfg == nil || !cfg.Enabled {
 		return nil, nil
 	}
 
-	conn, err := dbus.ConnectSessionBus()
+	conn, err := d.SessionConn()
 	if err != nil {
 		return nil, err
 	}
 
 	return &MPRISBackend{
-		conn:    conn,
-		ctx:     ctx,
-		timeout: cfg.Timeout,
-		cache:   cache.New[[]Player](0), // TTL=0 = no expiration
-		events:  make(chan events.Event, 64),
+		dbus:      d,
+		conn:      conn,
+		ctx:       ctx,
+		cache:     cache.New[[]Player](0), // TTL=0 = no expiration
+		lastState: make(map[string]PlaybackStatus),
+		events:    make(chan events.Event, 64),
 	}, nil
 }
 
@@ -44,10 +46,21 @@ func (m *MPRISBackend) Start() error {
 	}
 
 	// Start the listener for MPRIS changes
-	m.listener = NewListener(m)
-	if err := m.listener.Start(); err != nil {
+	matchRules := []string{
+		"type='signal',interface='" + DBUS_PROP_IFACE + "',member='PropertiesChanged',arg0namespace='" + MPRIS_PREFIX + "'",
+		"type='signal',interface='" + DBUS_INTERFACE + "',member='NameOwnerChanged',arg0namespace='" + MPRIS_PREFIX + "'",
+	}
+	ch, err := m.dbus.Subscribe(idbus.SessionBus, matchRules, nil)
+	if err != nil {
 		return err
 	}
+	m.sigCh = ch
+	go func() {
+		for sig := range ch {
+			m.handleSignal(sig)
+		}
+	}()
+	logger.Info("[mpris] listener started (D-Bus signal-based)")
 
 	// Start the heartbeat (will auto-stop if no player is Playing)
 	m.heartbeat = NewHeartbeat(m)
@@ -175,34 +188,34 @@ func (m *MPRISBackend) UpdatePlayerProperties(busName string, changed map[string
 		for key, variant := range changed {
 			switch key {
 			case "PlaybackStatus":
-				if val, ok := extractString(variant); ok {
+				if val, ok := idbus.ExtractString(variant); ok {
 					players[i].PlaybackStatus = PlaybackStatus(val)
 				}
 			case "LoopStatus":
-				if val, ok := extractString(variant); ok {
+				if val, ok := idbus.ExtractString(variant); ok {
 					players[i].LoopStatus = LoopStatus(val)
 				}
 			case "Shuffle":
-				if val, ok := extractBool(variant); ok {
+				if val, ok := idbus.ExtractBool(variant); ok {
 					players[i].Shuffle = val
 				}
 			case "Volume":
-				if val, ok := extractFloat64(variant); ok {
+				if val, ok := idbus.ExtractFloat64(variant); ok {
 					players[i].Volume = val
 				}
 			case "Metadata":
-				if metaMap, ok := extractMetadataMap(variant); ok {
+				if metaMap, ok := idbus.ExtractVariantMap(variant); ok {
 					players[i].Metadata = make(map[string]string)
 					for k, v := range metaMap {
 						players[i].Metadata[k] = formatMetadataValue(v.Value())
 					}
 				}
 			case "Rate":
-				if val, ok := extractFloat64(variant); ok {
+				if val, ok := idbus.ExtractFloat64(variant); ok {
 					players[i].Rate = val
 				}
 			case "Position":
-				if val, ok := extractInt64(variant); ok && val > 0 {
+				if val, ok := idbus.ExtractInt64(variant); ok && val > 0 {
 					players[i].Position = val
 				}
 			}
@@ -517,22 +530,17 @@ func (m *MPRISBackend) InvalidateCache() {
 	m.cache.Delete(CACHE_KEY)
 }
 
-// Close cleanly closes connections and stops the listener
+// Close cleanly stops the backend. The D-Bus connection is owned by DBusBackend.
 func (m *MPRISBackend) Close() {
 	if m.heartbeat != nil {
 		m.heartbeat.Stop()
 		m.heartbeat = nil
 	}
-	if m.listener != nil {
-		m.listener.Stop()
-		m.listener = nil
+	if m.sigCh != nil {
+		m.dbus.Unsubscribe(idbus.SessionBus, m.sigCh)
+		m.sigCh = nil
 	}
-	if m.conn != nil {
-		if err := m.conn.Close(); err != nil {
-			logger.Info("Failed to close D-Bus connection: %v", err)
-		}
-		m.conn = nil
-	}
+	m.conn = nil
 	close(m.events)
 }
 

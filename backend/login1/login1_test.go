@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	idbus "github.com/b0bbywan/go-odio-api/backend/internal/dbus"
 	"github.com/b0bbywan/go-odio-api/config"
 	"github.com/b0bbywan/go-odio-api/events"
 )
@@ -12,7 +13,7 @@ import (
 // --- Tests pour New() ---
 
 func TestNew_NilConfig(t *testing.T) {
-	b, err := New(context.Background(), nil)
+	b, err := New(context.Background(), nil, nil)
 	if err != nil {
 		t.Errorf("New(nil) should return nil error, got: %v", err)
 	}
@@ -23,7 +24,7 @@ func TestNew_NilConfig(t *testing.T) {
 
 func TestNew_DisabledConfig(t *testing.T) {
 	cfg := &config.Login1Config{Enabled: false}
-	b, err := New(context.Background(), cfg)
+	b, err := New(context.Background(), cfg, nil)
 	if err != nil {
 		t.Errorf("New(disabled) should return nil error, got: %v", err)
 	}
@@ -40,7 +41,7 @@ func TestNew_DisabledConfig_WithCapabilities(t *testing.T) {
 			CanPoweroff: true,
 		},
 	}
-	b, err := New(context.Background(), cfg)
+	b, err := New(context.Background(), cfg, nil)
 	if err != nil {
 		t.Errorf("New(disabled with capabilities) should return nil error, got: %v", err)
 	}
@@ -169,14 +170,14 @@ func TestCapabilityError_ErrorMessage(t *testing.T) {
 }
 
 func TestDbusTimeoutError_ErrorMessage(t *testing.T) {
-	err := &dbusTimeoutError{}
+	err := &idbus.TimeoutError{}
 	msg := err.Error()
 	if msg == "" {
-		t.Error("dbusTimeoutError.Error() should not be empty")
+		t.Error("TimeoutError.Error() should not be empty")
 	}
-	expected := "D-Bus call timeout"
+	expected := "dbus: call timed out"
 	if msg != expected {
-		t.Errorf("dbusTimeoutError.Error() = %q, want %q", msg, expected)
+		t.Errorf("TimeoutError.Error() = %q, want %q", msg, expected)
 	}
 }
 
@@ -184,7 +185,7 @@ func TestDbusTimeoutError_ErrorMessage(t *testing.T) {
 // implement the error interface, making the intent explicit without triggering SA4023.
 var (
 	_ error = (*CapabilityError)(nil)
-	_ error = (*dbusTimeoutError)(nil)
+	_ error = (*idbus.TimeoutError)(nil)
 )
 
 // --- Tests pour les constantes ---
