@@ -5,6 +5,9 @@
 [![CI](https://github.com/b0bbywan/go-odio-api/actions/workflows/ci.yml/badge.svg)](https://github.com/b0bbywan/go-odio-api/actions/workflows/ci.yml)
 [![Build](https://github.com/b0bbywan/go-odio-api/actions/workflows/build.yml/badge.svg)](https://github.com/b0bbywan/go-odio-api/actions/workflows/build.yml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/b0bbywan/go-odio-api)](https://goreportcard.com/report/github.com/b0bbywan/go-odio-api)
+[![GitHub Sponsors](https://img.shields.io/github/sponsors/b0bbywan?label=Sponsor&logo=GitHub)](https://github.com/sponsors/b0bbywan)
+
+> Part of the [odio](https://odio.love/) project.
 
 Odio is an ultra-lightweight Go daemon that exposes a single clean REST API over your Linux user session's D-Bus: MPRIS players (Spotify, VLC, Firefox, MPD, Kodi), PulseAudio/PipeWire, systemd user services, and power management. No root. No hacks. Just Linux primitives.
 
@@ -17,21 +20,21 @@ Works without any system tweak.
 
 ## Quick Start
 
-Start Spotify, VLC, or any MPRIS player first, then:
-
 ```bash
-# 1. Config (bind: all required for Docker)
-cp share/config.yaml config.yaml
+# 1. Install
+curl -fsSL https://apt.odio.love/key.gpg | sudo gpg --dearmor -o /usr/share/keyrings/odio.gpg
+echo "deb [signed-by=/usr/share/keyrings/odio.gpg] https://apt.odio.love stable main" | sudo tee /etc/apt/sources.list.d/odio.list
+sudo apt update && sudo apt install odio-api
 
 # 2. Start
-docker compose up -d
+systemctl --user enable --now odio-api.service
 
-# 3. Test
+# 3. Test (start any MPRIS player first — Spotify, VLC, MPD…)
 curl http://localhost:8018/players
 curl http://localhost:8018/audio/server
 ```
 
-→ See [Installation](#installation) for systemd service, packages, or running from source.
+→ See [Installation](#installation) for RPM, Docker, or building from source.
 
 ## User Interface
 
@@ -252,6 +255,15 @@ Pre-built packages (amd64, arm64, armv7hf, armhf/ARMv6) and a multi-arch Docker 
 - Wayland Remote Control, Authentication, Photos Casting...
 
 ## Installation
+
+### APT Repository (Debian / Raspberry Pi OS)
+
+```bash
+curl -fsSL https://apt.odio.love/key.gpg | sudo gpg --dearmor -o /usr/share/keyrings/odio.gpg
+echo "deb [signed-by=/usr/share/keyrings/odio.gpg] https://apt.odio.love stable main" | sudo tee /etc/apt/sources.list.d/odio.list
+sudo apt update
+sudo apt install odio-api
+```
 
 ### Packages (deb / rpm)
 
