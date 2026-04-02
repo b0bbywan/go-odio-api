@@ -1,10 +1,7 @@
 [Unit]
 Description=Odio Remote Api
 Documentation=https://github.com/b0bbywan/go-odio-api
-Wants=sound.target
-After=sound.target
-Wants=network-online.target
-After=network-online.target
+After=default.target
 
 [Service]
 ExecStart=/usr/bin/odio-api
