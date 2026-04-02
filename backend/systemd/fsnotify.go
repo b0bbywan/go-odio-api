@@ -112,11 +112,12 @@ func (l *Listener) dispatchFSNotify(event fsnotify.Event) {
 }
 
 func (l *Listener) waitForStableState(service string) {
-	ctx, cancel := context.WithTimeout(l.backend.ctx, 65*time.Second)
+	timeout := l.backend.config.Timeout
+	ctx, cancel := context.WithTimeout(l.backend.ctx, timeout)
 	defer func() {
 		l.watcherMap.Delete(service)
 		if ctx.Err() == context.DeadlineExceeded {
-			logger.Warn("[systemd] %s failed to start in less than 60s, cache might be out ouf sync", service)
+			logger.Warn("[systemd] %s failed to start in less than %s, cache might be out of sync", service, timeout)
 		}
 		cancel()
 	}()

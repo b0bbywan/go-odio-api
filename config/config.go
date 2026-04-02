@@ -83,6 +83,7 @@ type SystemdConfig struct {
 	UserServices   []string
 	SupportsUTMP   bool
 	XDGRuntimeDir  string
+	Timeout        time.Duration
 }
 
 type BluetoothConfig struct {
@@ -296,6 +297,7 @@ func New(cfgFile *string) (*Config, error) {
 	viper.SetDefault("systemd.enabled", false)
 	viper.SetDefault("systemd.system", []string{})
 	viper.SetDefault("systemd.user", []string{})
+	viper.SetDefault("systemd.timeout", "90s")
 
 	viper.SetDefault("zeroconf.enabled", true)
 
@@ -399,12 +401,17 @@ func New(cfgFile *string) (*Config, error) {
 		ServeCookie:   viper.GetBool("pulseaudio.serve_cookie"),
 	}
 
+	systemdTimeout := viper.GetDuration("systemd.timeout")
+	if systemdTimeout <= 0 {
+		systemdTimeout = 90 * time.Second
+	}
 	syscfg := SystemdConfig{
 		Enabled:        viper.GetBool("systemd.enabled"),
 		SystemServices: viper.GetStringSlice("systemd.system"),
 		UserServices:   viper.GetStringSlice("systemd.user"),
 		SupportsUTMP:   systemdHasUTMP(),
 		XDGRuntimeDir:  xdgRuntimeDir,
+		Timeout:        systemdTimeout,
 	}
 
 	interfaces := getZeroconfInterfaces(binds)
