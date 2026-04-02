@@ -20,6 +20,7 @@ zeroconf:
 
 systemd:
   enabled: false
+  timeout: 90s
   system:
     - bluetooth.service
     - upmpdcli.service

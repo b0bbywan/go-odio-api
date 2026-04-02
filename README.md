@@ -425,6 +425,7 @@ bind: lo                      # loopback only (default)
 ```yaml
 systemd:
   enabled: true
+  timeout: 90s                          # fsnotify stable state timeout (default: 90s)
   system:
     - bluetooth.service
     - upmpdcli.service
