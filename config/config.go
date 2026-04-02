@@ -225,6 +225,13 @@ func getAllActiveNonLoopback() []net.Interface {
 	return result
 }
 
+func getDuration(key string, fallback time.Duration) time.Duration {
+	if d := viper.GetDuration(key); d > 0 {
+		return d
+	}
+	return fallback
+}
+
 func systemdHasUTMP() bool {
 	_, err := os.Stat("/run/utmp")
 	return err == nil
@@ -363,36 +370,16 @@ func New(cfgFile *string) (*Config, error) {
 		Capabilities: &loginCapabilities,
 	}
 
-	mprisTimeout := viper.GetDuration("mpris.timeout")
-	if mprisTimeout <= 0 {
-		mprisTimeout = 5 * time.Second
-	}
-
 	mpriscfg := MPRISConfig{
 		Enabled: viper.GetBool("mpris.enabled"),
-		Timeout: mprisTimeout,
-	}
-
-	bluetoothTimeout := viper.GetDuration("bluetooth.timeout")
-	if bluetoothTimeout <= 0 {
-		bluetoothTimeout = 5 * time.Second
-	}
-
-	bluetoothPairingTimeout := viper.GetDuration("bluetooth.pairingtimeout")
-	if bluetoothPairingTimeout <= 0 {
-		bluetoothPairingTimeout = 60 * time.Second
-	}
-
-	bluetoothIdleTimeout := viper.GetDuration("bluetooth.idletimeout")
-	if bluetoothIdleTimeout <= 0 {
-		bluetoothIdleTimeout = 30 * time.Minute
+		Timeout: getDuration("mpris.timeout", 5*time.Second),
 	}
 
 	bluetoothcfg := BluetoothConfig{
 		Enabled:        viper.GetBool("bluetooth.enabled"),
-		Timeout:        bluetoothTimeout,
-		PairingTimeout: bluetoothPairingTimeout,
-		IdleTimeout:    bluetoothIdleTimeout,
+		Timeout:        getDuration("bluetooth.timeout", 5*time.Second),
+		PairingTimeout: getDuration("bluetooth.pairingtimeout", 60*time.Second),
+		IdleTimeout:    getDuration("bluetooth.idletimeout", 30*time.Minute),
 	}
 
 	pulsecfg := PulseAudioConfig{
@@ -401,17 +388,13 @@ func New(cfgFile *string) (*Config, error) {
 		ServeCookie:   viper.GetBool("pulseaudio.serve_cookie"),
 	}
 
-	systemdTimeout := viper.GetDuration("systemd.timeout")
-	if systemdTimeout <= 0 {
-		systemdTimeout = 90 * time.Second
-	}
 	syscfg := SystemdConfig{
 		Enabled:        viper.GetBool("systemd.enabled"),
 		SystemServices: viper.GetStringSlice("systemd.system"),
 		UserServices:   viper.GetStringSlice("systemd.user"),
 		SupportsUTMP:   systemdHasUTMP(),
 		XDGRuntimeDir:  xdgRuntimeDir,
-		Timeout:        systemdTimeout,
+		Timeout:        getDuration("systemd.timeout", 90*time.Second),
 	}
 
 	interfaces := getZeroconfInterfaces(binds)
