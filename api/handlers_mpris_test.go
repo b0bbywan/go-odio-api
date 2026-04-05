@@ -3,11 +3,111 @@ package api
 import (
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/b0bbywan/go-odio-api/backend/mpris"
 )
+
+func TestCoverHandler(t *testing.T) {
+	// Create a temp file to serve as local cover art
+	tmpDir := t.TempDir()
+	coverPath := filepath.Join(tmpDir, "cover.jpg")
+	if err := os.WriteFile(coverPath, []byte("fake-image-data"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		name           string
+		busName        string
+		getPlayer      func(string) (*mpris.Player, error)
+		wantStatusCode int
+		wantLocation   string
+		wantBody       string
+	}{
+		{
+			name:    "player not found returns error",
+			busName: "org.mpris.MediaPlayer2.missing",
+			getPlayer: func(busName string) (*mpris.Player, error) {
+				return nil, &mpris.PlayerNotFoundError{BusName: busName}
+			},
+			wantStatusCode: http.StatusNotFound,
+			wantBody:       "player not found",
+		},
+		{
+			name:    "no artUrl returns 404",
+			busName: "org.mpris.MediaPlayer2.mpd",
+			getPlayer: func(string) (*mpris.Player, error) {
+				return &mpris.Player{Metadata: map[string]string{}}, nil
+			},
+			wantStatusCode: http.StatusNotFound,
+		},
+		{
+			name:    "file:// URL serves file",
+			busName: "org.mpris.MediaPlayer2.mpd",
+			getPlayer: func(string) (*mpris.Player, error) {
+				return &mpris.Player{Metadata: map[string]string{
+					"mpris:artUrl": "file://" + coverPath,
+				}}, nil
+			},
+			wantStatusCode: http.StatusOK,
+			wantBody:       "fake-image-data",
+		},
+		{
+			name:    "http:// URL redirects",
+			busName: "org.mpris.MediaPlayer2.spotify",
+			getPlayer: func(string) (*mpris.Player, error) {
+				return &mpris.Player{Metadata: map[string]string{
+					"mpris:artUrl": "https://i.scdn.co/image/abc123",
+				}}, nil
+			},
+			wantStatusCode: http.StatusTemporaryRedirect,
+			wantLocation:   "https://i.scdn.co/image/abc123",
+		},
+		{
+			name:    "unknown scheme returns 404",
+			busName: "org.mpris.MediaPlayer2.vlc",
+			getPlayer: func(string) (*mpris.Player, error) {
+				return &mpris.Player{Metadata: map[string]string{
+					"mpris:artUrl": "ftp://example.com/cover.jpg",
+				}}, nil
+			},
+			wantStatusCode: http.StatusNotFound,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			handler := CoverHandler(tt.getPlayer)
+
+			req := httptest.NewRequest("GET", "/players/"+tt.busName+"/cover", nil)
+			req.SetPathValue("player", tt.busName)
+			w := httptest.NewRecorder()
+
+			handler(w, req)
+
+			if w.Code != tt.wantStatusCode {
+				t.Errorf("status = %d, want %d", w.Code, tt.wantStatusCode)
+			}
+
+			if tt.wantLocation != "" {
+				got := w.Header().Get("Location")
+				if got != tt.wantLocation {
+					t.Errorf("Location = %q, want %q", got, tt.wantLocation)
+				}
+			}
+
+			if tt.wantBody != "" {
+				body := w.Body.String()
+				if !strings.Contains(body, tt.wantBody) {
+					t.Errorf("body = %q, want to contain %q", body, tt.wantBody)
+				}
+			}
+		})
+	}
+}
 
 // TestHandleMPRISError tests the MPRIS error mapping function
 func TestHandleMPRISError(t *testing.T) {
