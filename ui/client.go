@@ -66,9 +66,9 @@ func convertPlayers(raw []Player, cacheUpdatedAt string) []PlayerView {
 	views := make([]PlayerView, 0, len(raw))
 	for _, p := range raw {
 		displayName := strings.TrimPrefix(p.Name, "org.mpris.MediaPlayer2.")
-		artUrl := p.Metadata["mpris:artUrl"]
-		if !strings.HasPrefix(artUrl, "http://") && !strings.HasPrefix(artUrl, "https://") {
-			artUrl = ""
+		artUrl := ""
+		if p.Metadata["mpris:artUrl"] != "" {
+			artUrl = "/players/" + p.Name + "/cover"
 		}
 		views = append(views, PlayerView{
 			Name:           p.Name,

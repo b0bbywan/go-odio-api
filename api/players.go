@@ -3,6 +3,7 @@ package api
 import (
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/b0bbywan/go-odio-api/backend/mpris"
 )
@@ -130,5 +131,27 @@ func SetShuffleHandler(m *mpris.MPRISBackend) http.HandlerFunc {
 		withBody(nil, func(w http.ResponseWriter, r *http.Request, req *mpris.ShuffleRequest) {
 			handleMPRISError(w, m.SetShuffle(busName, req.Shuffle))
 		})(w, r)
+	})
+}
+
+func CoverHandler(getPlayer func(string) (*mpris.Player, error)) http.HandlerFunc {
+	return withPlayer(func(w http.ResponseWriter, r *http.Request, busName string) {
+		player, err := getPlayer(busName)
+		if err != nil {
+			handleMPRISError(w, err)
+			return
+		}
+
+		artUrl := player.Metadata["mpris:artUrl"]
+		switch {
+		case artUrl == "":
+			http.NotFound(w, r)
+		case strings.HasPrefix(artUrl, "file://"):
+			http.ServeFile(w, r, strings.TrimPrefix(artUrl, "file://"))
+		case strings.HasPrefix(artUrl, "http://"), strings.HasPrefix(artUrl, "https://"):
+			http.Redirect(w, r, artUrl, http.StatusTemporaryRedirect)
+		default:
+			http.NotFound(w, r)
+		}
 	})
 }
