@@ -161,6 +161,10 @@ func (s *Server) registerMPRISRoutes(b *mpris.MPRISBackend) {
 		listHandler(b.ListPlayers, b.CacheUpdatedAt),
 	)
 	s.mux.HandleFunc(
+		"GET /players/{player}/cover",
+		CoverHandler(b.GetPlayerFromCache),
+	)
+	s.mux.HandleFunc(
 		"POST /players/{player}/play",
 		PlayHandler(b),
 	)
