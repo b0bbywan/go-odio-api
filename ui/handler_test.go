@@ -263,14 +263,15 @@ func TestConvertPlayers(t *testing.T) {
 					Name:   "org.mpris.MediaPlayer2.mpd",
 					Status: "Playing",
 					Metadata: map[string]string{
-						"mpris:artUrl": "file:///tmp/cover.jpg",
+						"mpris:artUrl":  "file:///tmp/cover.jpg",
+						"mpris:trackid": "/org/mpd/track/1",
 					},
 				},
 			},
 			expected: []PlayerView{
 				{
 					Name:   "org.mpris.MediaPlayer2.mpd",
-					ArtUrl: "/players/org.mpris.MediaPlayer2.mpd/cover",
+					ArtUrl: "/players/org.mpris.MediaPlayer2.mpd/cover?v=%2Forg%2Fmpd%2Ftrack%2F1",
 					State:  "Playing",
 				},
 			},
@@ -282,14 +283,15 @@ func TestConvertPlayers(t *testing.T) {
 					Name:   "org.mpris.MediaPlayer2.spotify",
 					Status: "Playing",
 					Metadata: map[string]string{
-						"mpris:artUrl": "https://i.scdn.co/image/abc123",
+						"mpris:artUrl":  "https://i.scdn.co/image/abc123",
+						"mpris:trackid": "/com/spotify/track/abc123",
 					},
 				},
 			},
 			expected: []PlayerView{
 				{
 					Name:   "org.mpris.MediaPlayer2.spotify",
-					ArtUrl: "/players/org.mpris.MediaPlayer2.spotify/cover",
+					ArtUrl: "/players/org.mpris.MediaPlayer2.spotify/cover?v=%2Fcom%2Fspotify%2Ftrack%2Fabc123",
 					State:  "Playing",
 				},
 			},
@@ -299,16 +301,27 @@ func TestConvertPlayers(t *testing.T) {
 			input: []Player{
 				{
 					Name:     "org.mpris.MediaPlayer2.vlc",
-					Status:   "Stopped",
+					Status:   "Playing",
 					Metadata: map[string]string{},
 				},
 			},
 			expected: []PlayerView{
 				{
 					Name:  "org.mpris.MediaPlayer2.vlc",
-					State: "Stopped",
+					State: "Playing",
 				},
 			},
+		},
+		{
+			name: "stopped player is filtered out",
+			input: []Player{
+				{
+					Name:     "org.mpris.MediaPlayer2.vlc",
+					Status:   "Stopped",
+					Metadata: map[string]string{},
+				},
+			},
+			expected: []PlayerView{},
 		},
 	}
 

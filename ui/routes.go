@@ -8,7 +8,10 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/ui", h.Dashboard)
 	mux.HandleFunc("/ui/", h.Dashboard)
 
-	// Section fragments for HTMX updates/polling
+	// SSE event stream (HTML fragments)
+	mux.HandleFunc("GET /ui/events", h.SSEEvents)
+
+	// Section fragments (fallback / initial load)
 	mux.HandleFunc("/ui/sections/mpris", h.MPRISSection)
 	mux.HandleFunc("/ui/sections/audio", h.AudioSection)
 	mux.HandleFunc("/ui/sections/systemd", h.SystemdSection)

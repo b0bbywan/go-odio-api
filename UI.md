@@ -20,6 +20,8 @@ api:
   port: 8018
   ui:
     enabled: true
+  sse:
+    enabled: true
 ```
 
 Note: Necessary cors for the PWA are included by default but can be overridden.
@@ -45,9 +47,9 @@ Note: Necessary cors for the PWA are included by default but can be overridden.
   - **Services**: systemd user service status, stop/restart from the UI
   - **Power Management**: poweroff/restart (via systemd-logind, configurable capacities, disabled by default in odio-api config.)
 
-- **Lightweight**
+- **Lightweight & Real-Time**
   - Low CPU and RAM usage, even with dashboard open
-  - SSE planned for reduced overhead
+  - SSE-powered live updates — sections refresh only when state changes, no polling
 
 ### Real-World Examples
 
@@ -93,24 +95,37 @@ https://github.com/user-attachments/assets/07e0f04e-8758-452e-9561-4984c1dee554
 <img width="441" height="927" alt="image" src="https://github.com/user-attachments/assets/6a4a005d-68c8-4aca-ad8f-cb9e3d966e52" />
 
 
-### Known issues
-The first version of the UI is fully based on polling, it creates some issues with volume and position sliders which will be solved in the next UI release.
+### How SSE live updates work
 
-To save resources, polling is disabled when a section is collapsed, or when the UI is hidden.
+The backend streams real-time events to the UI via Server-Sent Events (`/ui/events`). Each event maps to a UI section (Audio, MPRIS, Systemd, Bluetooth) and triggers a targeted `innerHTML` swap via the HTMX SSE extension.
+
+- **Debouncing**: events are batched in 200ms windows to avoid redundant renders when multiple properties change at once (e.g. track change + playback status + audio cork)
+- **Section state preservation**: collapsible `<details>` sections remember their open/closed state across swaps — folding a section keeps it folded even as updates arrive
+- **Position handling**: MPRIS position updates (`player.position`) are emitted every 5s by a heartbeat that polls D-Bus for playing players. Between updates, the seek bar is interpolated client-side at 500ms intervals for smooth progress display
+- **Cover art cache-busting**: cover art URLs include the current track ID as a query parameter so the browser fetches the new image on track change
+- **Dropdown protection**: the audio sink dropdown blocks SSE swaps on its section while open, preventing loss of user selection mid-interaction
+
+### Known issues
+Position seekers may lag up to 5s behind external seeks (e.g. seeking directly in Spotify) since D-Bus does not emit a signal for position changes.
 
 ### Stack
 
-- built-in UI: HTMX + Tailwind + go:embed.
+- built-in UI: HTMX 2 + HTMX SSE extension + Tailwind + go:embed.
   Every static file is served directly by the api, no external access necessary.
 - [Progressive Web Application](https://github.com/b0bbywan/odio-pwa) Svelte + Vite + Vercel.
   Odio-UI are embedded as iframes
 
 ### Roadmap Highlights for the UI
 
-- SSE for instant live updates
 - Notifications
 
-The UI is currently in v0.6.0 – feedback, issues & PRs are super welcome on GitHub!
+#### What's new in v0.11.0
+- **SSE live updates**: the UI now uses Server-Sent Events via the HTMX SSE extension. Sections update in real-time when state changes — no more polling.
+- **HTMX 2 upgrade**: migrated from HTMX 1.9 to 2.0 with SSE extension v2
+- **Section state preservation**: collapsed sections stay collapsed across SSE updates
+- **Position & cover accuracy**: track changes reset the seek bar correctly, cover art updates immediately via cache-busting
+
+Feedback, issues & PRs are super welcome on GitHub!
 
 Try it now: http://localhost:8018/ui
-Central PWA app: https://odio-pwa.vercel.app/
+Central PWA app: https://pwa.odio.love/

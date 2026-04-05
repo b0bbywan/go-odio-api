@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -68,7 +69,7 @@ func convertPlayers(raw []Player, cacheUpdatedAt string) []PlayerView {
 		displayName := strings.TrimPrefix(p.Name, "org.mpris.MediaPlayer2.")
 		artUrl := ""
 		if p.Metadata["mpris:artUrl"] != "" {
-			artUrl = "/players/" + p.Name + "/cover"
+			artUrl = "/players/" + p.Name + "/cover?v=" + url.QueryEscape(p.Metadata["mpris:trackid"])
 		}
 		views = append(views, PlayerView{
 			Name:           p.Name,

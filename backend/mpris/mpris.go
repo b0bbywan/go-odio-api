@@ -192,9 +192,14 @@ func (m *MPRISBackend) UpdatePlayerProperties(busName string, changed map[string
 				}
 			case "Metadata":
 				if metaMap, ok := extractMetadataMap(variant); ok {
+					oldTrackID := players[i].Metadata["mpris:trackid"]
 					players[i].Metadata = make(map[string]string)
 					for k, v := range metaMap {
 						players[i].Metadata[k] = formatMetadataValue(v.Value())
+					}
+					// Track changed — reset stale position from previous track
+					if players[i].Metadata["mpris:trackid"] != oldTrackID {
+						players[i].Position = 0
 					}
 				}
 			case "Rate":
