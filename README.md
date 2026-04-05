@@ -498,6 +498,7 @@ GET    /server                             # {"hostname":"","os_platform":"","os
 
 ```
 GET    /players                           # List all media players
+GET    /players/{player}/cover            # Cover art (serves file:// or redirects http(s)://)
 POST   /players/{player}/play             # Play
 POST   /players/{player}/pause            # Pause
 POST   /players/{player}/play_pause       # Toggle play/pause
