@@ -256,6 +256,60 @@ func TestConvertPlayers(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "player with file:// artUrl gets cover proxy URL",
+			input: []Player{
+				{
+					Name:   "org.mpris.MediaPlayer2.mpd",
+					Status: "Playing",
+					Metadata: map[string]string{
+						"mpris:artUrl": "file:///tmp/cover.jpg",
+					},
+				},
+			},
+			expected: []PlayerView{
+				{
+					Name:   "org.mpris.MediaPlayer2.mpd",
+					ArtUrl: "/players/org.mpris.MediaPlayer2.mpd/cover",
+					State:  "Playing",
+				},
+			},
+		},
+		{
+			name: "player with https:// artUrl gets cover proxy URL",
+			input: []Player{
+				{
+					Name:   "org.mpris.MediaPlayer2.spotify",
+					Status: "Playing",
+					Metadata: map[string]string{
+						"mpris:artUrl": "https://i.scdn.co/image/abc123",
+					},
+				},
+			},
+			expected: []PlayerView{
+				{
+					Name:   "org.mpris.MediaPlayer2.spotify",
+					ArtUrl: "/players/org.mpris.MediaPlayer2.spotify/cover",
+					State:  "Playing",
+				},
+			},
+		},
+		{
+			name: "player without artUrl has empty ArtUrl",
+			input: []Player{
+				{
+					Name:     "org.mpris.MediaPlayer2.vlc",
+					Status:   "Stopped",
+					Metadata: map[string]string{},
+				},
+			},
+			expected: []PlayerView{
+				{
+					Name:  "org.mpris.MediaPlayer2.vlc",
+					State: "Stopped",
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -270,6 +324,9 @@ func TestConvertPlayers(t *testing.T) {
 				}
 				if result[i].State != tt.expected[i].State {
 					t.Errorf("Player %d: expected state '%s', got '%s'", i, tt.expected[i].State, result[i].State)
+				}
+				if result[i].ArtUrl != tt.expected[i].ArtUrl {
+					t.Errorf("Player %d: expected ArtUrl '%s', got '%s'", i, tt.expected[i].ArtUrl, result[i].ArtUrl)
 				}
 			}
 		})
