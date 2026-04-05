@@ -110,15 +110,36 @@ function setDefaultOutput(name) {
 
 function closeSinkDropdown() {
 	document.querySelectorAll('.sink-dropdown ul').forEach(ul => ul.classList.add('hidden'));
-	// Trigger an immediate HTMX refresh on the audio section
-	const el = document.querySelector('[hx-get="/ui/sections/audio"]');
-	if (el) htmx.trigger(el, 'refreshAudio');
 }
 
 // Close sink dropdown when clicking outside
 document.addEventListener('click', function(e) {
 	if (!e.target.closest('.sink-dropdown')) {
 		closeSinkDropdown();
+	}
+});
+
+// Preserve <details> open/closed state across SSE innerHTML swaps.
+// Capture state in sseBeforeMessage (fires before swap), restore in afterSwap.
+var detailsState = {};
+document.addEventListener('htmx:sseBeforeMessage', function(e) {
+	document.querySelectorAll('details[id]').forEach(function(d) {
+		detailsState[d.id] = d.open;
+	});
+});
+document.addEventListener('htmx:afterSwap', function(e) {
+	Object.keys(detailsState).forEach(function(id) {
+		var el = document.getElementById(id);
+		if (el && el.open !== detailsState[id]) {
+			el.open = detailsState[id];
+		}
+	});
+});
+
+// Block SSE swaps on the audio section while the sink dropdown is open
+document.addEventListener('htmx:sseBeforeMessage', function(e) {
+	if (e.detail.elt && e.detail.elt.querySelector('.sink-dropdown ul:not(.hidden)')) {
+		e.preventDefault();
 	}
 });
 

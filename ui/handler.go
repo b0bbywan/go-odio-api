@@ -1,11 +1,16 @@
 package ui
 
 import (
+	"bytes"
 	"embed"
 	"fmt"
 	"html/template"
 	"net/http"
+	"strings"
+	"time"
 
+	"github.com/b0bbywan/go-odio-api/backend"
+	"github.com/b0bbywan/go-odio-api/events"
 	"github.com/b0bbywan/go-odio-api/logger"
 )
 
@@ -51,15 +56,17 @@ func LoadTemplates() *template.Template {
 
 // Handler manages UI routes and rendering
 type Handler struct {
-	tmpl   *template.Template
-	client *APIClient
+	tmpl        *template.Template
+	client      *APIClient
+	broadcaster *backend.Broadcaster
 }
 
-// NewHandler creates a new UI handler with API client
-func NewHandler(apiPort int) *Handler {
+// NewHandler creates a new UI handler with API client and event broadcaster
+func NewHandler(apiPort int, broadcaster *backend.Broadcaster) *Handler {
 	return &Handler{
-		tmpl:   LoadTemplates(),
-		client: NewAPIClient(apiPort),
+		tmpl:        LoadTemplates(),
+		client:      NewAPIClient(apiPort),
+		broadcaster: broadcaster,
 	}
 }
 
@@ -208,6 +215,134 @@ func (h *Handler) BluetoothSection(w http.ResponseWriter, r *http.Request) {
 		logger.Error("[ui] Template execution failed: %v", err)
 		http.Error(w, "Failed to render section", http.StatusInternalServerError)
 	}
+}
+
+// sseSection maps an event type to the SSE event name and the section data fetcher.
+type sseSection struct {
+	name    string
+	fetchFn func(h *Handler) (string, any, error)
+}
+
+var eventToSection = map[string]*sseSection{
+	events.TypePlayerUpdated:  {name: "section-mpris"},
+	events.TypePlayerAdded:    {name: "section-mpris"},
+	events.TypePlayerRemoved:  {name: "section-mpris"},
+	events.TypePlayerPosition: {name: "section-mpris"},
+
+	events.TypeAudioUpdated:       {name: "section-audio"},
+	events.TypeAudioRemoved:       {name: "section-audio"},
+	events.TypeAudioOutputUpdated: {name: "section-audio"},
+	events.TypeAudioOutputRemoved: {name: "section-audio"},
+
+	events.TypeServiceUpdated:   {name: "section-systemd"},
+	events.TypeBluetoothUpdated: {name: "section-bluetooth"},
+}
+
+func init() {
+	mpris := eventToSection[events.TypePlayerUpdated]
+	mpris.fetchFn = func(h *Handler) (string, any, error) {
+		players, err := h.client.GetPlayers()
+		return "section-mpris", players, err
+	}
+	// Share the same sseSection pointer for all mpris events
+	eventToSection[events.TypePlayerAdded] = mpris
+	eventToSection[events.TypePlayerRemoved] = mpris
+	eventToSection[events.TypePlayerPosition] = mpris
+
+	audio := eventToSection[events.TypeAudioUpdated]
+	audio.fetchFn = func(h *Handler) (string, any, error) {
+		data, err := h.client.GetAudio()
+		return "section-pulseaudio", data, err
+	}
+	eventToSection[events.TypeAudioRemoved] = audio
+	eventToSection[events.TypeAudioOutputUpdated] = audio
+	eventToSection[events.TypeAudioOutputRemoved] = audio
+
+	systemd := eventToSection[events.TypeServiceUpdated]
+	systemd.fetchFn = func(h *Handler) (string, any, error) {
+		services, err := h.client.GetServices()
+		return "section-systemd", services, err
+	}
+
+	bt := eventToSection[events.TypeBluetoothUpdated]
+	bt.fetchFn = func(h *Handler) (string, any, error) {
+		status, err := h.client.GetBluetoothStatus()
+		return "section-bluetooth", status, err
+	}
+}
+
+// SSEEvents streams HTML section fragments as SSE events.
+func (h *Handler) SSEEvents(w http.ResponseWriter, r *http.Request) {
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "streaming unsupported", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Accel-Buffering", "no")
+
+	ch := h.broadcaster.Subscribe()
+	defer h.broadcaster.Unsubscribe(ch)
+
+	// Debounce: collect dirty sections, flush on tick
+	const debounceInterval = 200 * time.Millisecond
+	ticker := time.NewTicker(debounceInterval)
+	defer ticker.Stop()
+
+	dirty := make(map[*sseSection]bool)
+
+	for {
+		select {
+		case <-r.Context().Done():
+			return
+		case e, ok := <-ch:
+			if !ok {
+				return
+			}
+			if sec, found := eventToSection[e.Type]; found {
+				dirty[sec] = true
+			}
+		case <-ticker.C:
+			for sec := range dirty {
+				if err := h.sendSection(w, flusher, sec); err != nil {
+					return
+				}
+			}
+			clear(dirty)
+		}
+	}
+}
+
+func (h *Handler) sendSection(w http.ResponseWriter, flusher http.Flusher, sec *sseSection) error {
+	tmplName, data, err := sec.fetchFn(h)
+	if err != nil {
+		logger.Warn("[ui/sse] failed to fetch data for %s: %v", sec.name, err)
+		return nil // skip, don't close connection
+	}
+
+	var buf bytes.Buffer
+	if err := h.tmpl.ExecuteTemplate(&buf, tmplName, data); err != nil {
+		logger.Warn("[ui/sse] failed to render %s: %v", tmplName, err)
+		return nil
+	}
+
+	// SSE data lines cannot contain bare newlines — send each line as a separate data: field
+	if _, err := fmt.Fprintf(w, "event: %s\n", sec.name); err != nil {
+		return err
+	}
+	for _, line := range strings.Split(buf.String(), "\n") {
+		if _, err := fmt.Fprintf(w, "data: %s\n", line); err != nil {
+			return err
+		}
+	}
+	if _, err := fmt.Fprint(w, "\n"); err != nil {
+		return err
+	}
+	flusher.Flush()
+	return nil
 }
 
 // boolToInt converts bool to int for counting

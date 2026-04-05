@@ -128,7 +128,7 @@ func (l *Listener) handlePropertiesChanged(sig *dbus.Signal) {
 	}
 	logger.Debug("[mpris] updating %s properties: %v", busName, propNames)
 
-	// Update properties directly from signal (no D-Bus calls!)
+	// Update properties in cache from signal data
 	if err := l.backend.UpdatePlayerProperties(busName, changed); err != nil {
 		logger.Error("[mpris] failed to update player %s properties: %v", busName, err)
 	}

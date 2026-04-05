@@ -7,7 +7,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/b0bbywan/go-odio-api)](https://goreportcard.com/report/github.com/b0bbywan/go-odio-api)
 [![GitHub Sponsors](https://img.shields.io/github/sponsors/b0bbywan?label=Sponsor&logo=GitHub)](https://github.com/sponsors/b0bbywan)
 
-> Part of the [odio](https://odio.love/) project.
+> Part of the [odio](https://beta.odio.love/) project.
 
 Odio is an ultra-lightweight Go daemon that exposes a single clean REST API over your Linux user session's D-Bus: MPRIS players (Spotify, VLC, Firefox, MPD, Kodi), PulseAudio/PipeWire, systemd user services, and power management. No root. No hacks. Just Linux primitives.
 
@@ -400,6 +400,8 @@ api:
   enabled: true
   port: 8018
   ui:
+    enabled: true
+  sse:
     enabled: true
   cors:
     origins: ["https://odio-pwa.vercel.app"] # default for PWA
