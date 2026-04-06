@@ -2,6 +2,10 @@ package ui
 
 import (
 	"bytes"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"strconv"
 	"testing"
 	"time"
 )
@@ -321,13 +325,19 @@ func TestConvertPlayers(t *testing.T) {
 					Metadata: map[string]string{},
 				},
 			},
-			expected: []PlayerView{},
+			expected: nil,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := convertPlayers(tt.input, "")
+			if tt.expected == nil {
+				if len(result) != 0 {
+					t.Fatalf("Expected no players, got %d", len(result))
+				}
+				return
+			}
 			if len(result) != len(tt.expected) {
 				t.Fatalf("Expected %d players, got %d", len(tt.expected), len(result))
 			}
@@ -343,6 +353,41 @@ func TestConvertPlayers(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TestGetAudio_FilterCorked verifies that corked audio clients are excluded
+func TestGetAudio_FilterCorked(t *testing.T) {
+	apiMux := http.NewServeMux()
+	apiMux.HandleFunc("/audio", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if _, err := w.Write([]byte(`{
+			"kind": "pipewire",
+			"clients": [
+				{"index": 1, "name": "Spotify", "app": "spotify", "volume": 1.0, "muted": false, "corked": false},
+				{"index": 2, "name": "Firefox", "app": "firefox", "volume": 0.5, "muted": false, "corked": true}
+			],
+			"outputs": []
+		}`)); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	})
+	server := httptest.NewServer(apiMux)
+	defer server.Close()
+
+	u, _ := url.Parse(server.URL)
+	port, _ := strconv.Atoi(u.Port())
+	client := NewAPIClient(port)
+
+	data, err := client.GetAudio()
+	if err != nil {
+		t.Fatalf("GetAudio failed: %v", err)
+	}
+	if len(data.Clients) != 1 {
+		t.Fatalf("expected 1 client, got %d", len(data.Clients))
+	}
+	if data.Clients[0].Name != "Spotify" {
+		t.Errorf("expected Spotify, got %s", data.Clients[0].Name)
 	}
 }
 
