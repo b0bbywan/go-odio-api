@@ -223,53 +223,47 @@ type sseSection struct {
 	fetchFn func(h *Handler) (string, any, error)
 }
 
-var eventToSection = map[string]*sseSection{
-	events.TypePlayerUpdated:  {name: "section-mpris"},
-	events.TypePlayerAdded:    {name: "section-mpris"},
-	events.TypePlayerRemoved:  {name: "section-mpris"},
-	events.TypePlayerPosition: {name: "section-mpris"},
-
-	events.TypeAudioUpdated:       {name: "section-audio"},
-	events.TypeAudioRemoved:       {name: "section-audio"},
-	events.TypeAudioOutputUpdated: {name: "section-audio"},
-	events.TypeAudioOutputRemoved: {name: "section-audio"},
-
-	events.TypeServiceUpdated:   {name: "section-systemd"},
-	events.TypeBluetoothUpdated: {name: "section-bluetooth"},
+func fetchMPRIS(h *Handler) (string, any, error) {
+	players, err := h.client.GetPlayers()
+	return "section-mpris", players, err
 }
 
-func init() {
-	mpris := eventToSection[events.TypePlayerUpdated]
-	mpris.fetchFn = func(h *Handler) (string, any, error) {
-		players, err := h.client.GetPlayers()
-		return "section-mpris", players, err
-	}
-	// Share the same sseSection pointer for all mpris events
-	eventToSection[events.TypePlayerAdded] = mpris
-	eventToSection[events.TypePlayerRemoved] = mpris
-	eventToSection[events.TypePlayerPosition] = mpris
-
-	audio := eventToSection[events.TypeAudioUpdated]
-	audio.fetchFn = func(h *Handler) (string, any, error) {
-		data, err := h.client.GetAudio()
-		return "section-pulseaudio", data, err
-	}
-	eventToSection[events.TypeAudioRemoved] = audio
-	eventToSection[events.TypeAudioOutputUpdated] = audio
-	eventToSection[events.TypeAudioOutputRemoved] = audio
-
-	systemd := eventToSection[events.TypeServiceUpdated]
-	systemd.fetchFn = func(h *Handler) (string, any, error) {
-		services, err := h.client.GetServices()
-		return "section-systemd", services, err
-	}
-
-	bt := eventToSection[events.TypeBluetoothUpdated]
-	bt.fetchFn = func(h *Handler) (string, any, error) {
-		status, err := h.client.GetBluetoothStatus()
-		return "section-bluetooth", status, err
-	}
+func fetchAudio(h *Handler) (string, any, error) {
+	data, err := h.client.GetAudio()
+	return "section-pulseaudio", data, err
 }
+
+func fetchSystemd(h *Handler) (string, any, error) {
+	services, err := h.client.GetServices()
+	return "section-systemd", services, err
+}
+
+func fetchBluetooth(h *Handler) (string, any, error) {
+	status, err := h.client.GetBluetoothStatus()
+	return "section-bluetooth", status, err
+}
+
+var (
+	mprisSection     = &sseSection{name: "section-mpris", fetchFn: fetchMPRIS}
+	audioSection     = &sseSection{name: "section-audio", fetchFn: fetchAudio}
+	systemdSection   = &sseSection{name: "section-systemd", fetchFn: fetchSystemd}
+	bluetoothSection = &sseSection{name: "section-bluetooth", fetchFn: fetchBluetooth}
+
+	eventToSection = map[string]*sseSection{
+		events.TypePlayerUpdated:  mprisSection,
+		events.TypePlayerAdded:    mprisSection,
+		events.TypePlayerRemoved:  mprisSection,
+		events.TypePlayerPosition: mprisSection,
+
+		events.TypeAudioUpdated:       audioSection,
+		events.TypeAudioRemoved:       audioSection,
+		events.TypeAudioOutputUpdated: audioSection,
+		events.TypeAudioOutputRemoved: audioSection,
+
+		events.TypeServiceUpdated:   systemdSection,
+		events.TypeBluetoothUpdated: bluetoothSection,
+	}
+)
 
 // SSEEvents streams HTML section fragments as SSE events.
 func (h *Handler) SSEEvents(w http.ResponseWriter, r *http.Request) {
