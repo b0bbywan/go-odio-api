@@ -76,6 +76,7 @@ type AudioClient struct {
 	Application string  `json:"app"` // API returns "app", not "application"
 	Volume      float64 `json:"volume"`
 	Muted       bool    `json:"muted"`
+	Corked      bool    `json:"corked"`
 }
 
 // AudioData holds the combined audio state from GET /audio

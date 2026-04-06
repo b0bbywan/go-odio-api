@@ -66,6 +66,9 @@ func (c *APIClient) GetPlayers() ([]PlayerView, error) {
 func convertPlayers(raw []Player, cacheUpdatedAt string) []PlayerView {
 	views := make([]PlayerView, 0, len(raw))
 	for _, p := range raw {
+		if p.Status != "Playing" && p.Status != "Paused" {
+			continue
+		}
 		displayName := strings.TrimPrefix(p.Name, "org.mpris.MediaPlayer2.")
 		artUrl := ""
 		if p.Metadata["mpris:artUrl"] != "" {
@@ -109,9 +112,15 @@ func (c *APIClient) GetAudio() (*AudioData, error) {
 	if err := c.get("/audio", &raw); err != nil {
 		return nil, err
 	}
+	clients := make([]AudioClient, 0, len(raw.Clients))
+	for _, cl := range raw.Clients {
+		if !cl.Corked {
+			clients = append(clients, cl)
+		}
+	}
 	data := &AudioData{
 		Kind:    raw.Kind,
-		Clients: raw.Clients,
+		Clients: clients,
 		Outputs: raw.Outputs,
 	}
 	for i := range raw.Outputs {
