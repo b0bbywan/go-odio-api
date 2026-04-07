@@ -7,7 +7,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/b0bbywan/go-odio-api)](https://goreportcard.com/report/github.com/b0bbywan/go-odio-api)
 [![GitHub Sponsors](https://img.shields.io/github/sponsors/b0bbywan?label=Sponsor&logo=GitHub)](https://github.com/sponsors/b0bbywan)
 
-> Part of the [odio](https://beta.odio.love/) project.
+> Part of the [odio](https://beta.odio.love/) project — [full documentation](https://docs.odio.love/api/).
 
 Odio is an ultra-lightweight Go daemon that exposes a single clean REST API over your Linux user session's D-Bus: MPRIS players (Spotify, VLC, Firefox, MPD, Kodi), PulseAudio/PipeWire, systemd user services, and power management. No root. No hacks. Just Linux primitives.
 
@@ -203,6 +203,24 @@ Bonus: You get to control it through `/pulseaudio/clients` or `/players/` and in
 ### Power Management
 
 Remote reboot and power-off via the REST API — no SSH needed for day-to-day operations. Disabled by default. Uses `org.freedesktop.login1` D-Bus interface.
+
+On desktop systems with a graphical session, logind handles permissions automatically — no extra configuration needed.
+
+On **headless systems**, you need a polkit rule to allow your user to reboot/power-off via D-Bus. Create `/etc/polkit-1/rules.d/10-allow-shutdown.rules`:
+
+```javascript
+polkit.addRule(function(action, subject) {
+    if ((action.id == "org.freedesktop.login1.power-off" ||
+         action.id == "org.freedesktop.login1.power-off-multiple-sessions" ||
+         action.id == "org.freedesktop.login1.reboot" ||
+         action.id == "org.freedesktop.login1.reboot-multiple-sessions") &&
+        subject.user == "<user>") {
+        return polkit.Result.YES;
+    }
+});
+```
+
+Replace `<user>` with the username running odio-api.
 
 ### Real-time Event Stream (SSE)
 
@@ -471,6 +489,14 @@ power:
     reboot: true
 ```
 
+#### PulseAudio
+
+```yaml
+pulseaudio:
+  enabled: true
+  serve_cookie: true  # exposes GET /audio/cookie for network audio clients
+```
+
 #### Zeroconf / mDNS
 
 ```yaml
@@ -657,11 +683,7 @@ Systemd control is disabled by default and requires an explicit whitelist. Odio 
 - **Root forbidden by design** — Odio refuses to run as root.
 - **No preconfigured units** — nothing managed unless explicitly listed.
 
-- **MPRIS Backend**: Communicates with media players via D-Bus, implements smart caching and real-time updates through D-Bus signals
-- **PulseAudio Backend**: Interacts with PulseAudio/PipeWire for audio control, supports real-time event monitoring
-- **Systemd Backend**: Manages systemd services via D-Bus with native signal-based monitoring
 **You must knowingly enable this at your own risk.** Odio is free software and comes with no warranty.
-- **Bluetooth Backend**: Act as a Bluetooth audio receiver (A2DP sink) via D-Bus
 
 ### REST API
 
