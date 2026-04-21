@@ -1,15 +1,42 @@
-# Odio API
+  <p align="center">
+    <a href="https://odio.love"> 
+      <img src="https://odio.love/logo.png" alt="odio" width="160" />
+    </a>   
+  </p>
+  <h1 align="center">go-odio-api</h1>
+  <p align="center"><em>The universal remote for your Linux multimedia server.</em></p>
+  <p align="center">       
+    <a href="https://github.com/b0bbywan/go-odio-api/releases"><img src="https://img.shields.io/github/v/release/b0bbywan/go-odio-api?include_prereleases" alt="Release" /></a>
+    <a href="https://github.com/b0bbywan/go-odio-api/blob/main/LICENSE"><img src="https://img.shields.io/github/license/b0bbywan/go-odio-api" alt="License" /></a>
+    <a href="https://github.com/b0bbywan/go-odio-api/actions/workflows/ci.yml"><img src="https://github.com/b0bbywan/go-odio-api/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+    <a href="https://github.com/b0bbywan/go-odio-api/actions/workflows/build.yml"><img src="https://github.com/b0bbywan/go-odio-api/actions/workflows/build.yml/badge.svg" alt="Build" /></a>
+    <a href="https://goreportcard.com/report/github.com/b0bbywan/go-odio-api"><img src="https://goreportcard.com/badge/github.com/b0bbywan/go-odio-api" alt="Go Report Card" /></a>
+    <a href="https://github.com/sponsors/b0bbywan"><img src="https://img.shields.io/github/sponsors/b0bbywan?label=Sponsor&logo=GitHub" alt="GitHub Sponsors" /></a>   
+  </p>
+  <p align="center">
+    <a href="https://docs.odio.love/api/mpris/"><img src="https://img.shields.io/badge/MPRIS-003399" alt="MPRIS" /></a>
+    <a href="https://docs.odio.love/api/pulseaudio/"><img src="https://img.shields.io/badge/PulseAudio-0055AA" alt="PulseAudio" /></a>
+    <a href="https://docs.odio.love/api/bluetooth/"><img src="https://img.shields.io/badge/Bluetooth-0082FC?logo=bluetooth&logoColor=white" alt="Bluetooth" /></a>
+    <a href="https://docs.odio.love/api/systemd/"><img src="https://img.shields.io/badge/systemd-FF6B35" alt="systemd" /></a>
+    <a href="https://docs.odio.love/api/power/"><img src="https://img.shields.io/badge/Power-10B981" alt="Power" /></a>
+    <a href="https://docs.odio.love/api/zeroconf/"><img src="https://img.shields.io/badge/Zeroconf-6B21A8" alt="Zeroconf" /></a>
+    <a href="https://docs.odio.love/api/events/"><img src="https://img.shields.io/badge/SSE%20Events-F97316" alt="SSE Events" /></a>   
+  </p>
+  <p align="center">   
+    Part of the <a href="https://odio.love">odio</a> project — <a href="https://docs.odio.love/api/">full documentation</a>.
+  </p>
+  <p align="center">
+    <a href="https://go.dev/"><img src="https://img.shields.io/badge/Go-00ADD8?logo=go&logoColor=white" alt="Go" /></a>
+    <a href="https://htmx.org/"><img src="https://img.shields.io/badge/htmx-3366CC?logo=htmx&logoColor=white" alt="htmx" /></a>
+    <a href="https://tailwindcss.com/"><img src="https://img.shields.io/badge/Tailwind%20CSS-06B6D4?logo=tailwindcss&logoColor=white" alt="Tailwind CSS" /></a>
+    <a href="https://github.com/features/actions"><img src="https://img.shields.io/badge/GitHub%20Actions-2088FF?logo=githubactions&logoColor=white" alt="GitHub Actions" /></a>
+    <a href="https://github.com/b0bbywan/go-odio-api/pkgs/container/go-odio-api"><img src="https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white" alt="Docker" /></a>     
+    <a href="https://docs.odio.love/api/installation/"><img src="https://img.shields.io/badge/deb-A81D33?logo=debian&logoColor=white" alt="deb" /></a>
+    <a href="https://docs.odio.love/api/installation/"><img src="https://img.shields.io/badge/rpm-294172?logo=redhat&logoColor=white" alt="rpm" /></a>
+  </p>
 
-> The universal remote for your Linux multimedia server
-
-[![CI](https://github.com/b0bbywan/go-odio-api/actions/workflows/ci.yml/badge.svg)](https://github.com/b0bbywan/go-odio-api/actions/workflows/ci.yml)
-[![Build](https://github.com/b0bbywan/go-odio-api/actions/workflows/build.yml/badge.svg)](https://github.com/b0bbywan/go-odio-api/actions/workflows/build.yml)
-[![Go Report Card](https://goreportcard.com/badge/github.com/b0bbywan/go-odio-api)](https://goreportcard.com/report/github.com/b0bbywan/go-odio-api)
-[![GitHub Sponsors](https://img.shields.io/github/sponsors/b0bbywan?label=Sponsor&logo=GitHub)](https://github.com/sponsors/b0bbywan)
-
-> Part of the [odio](https://beta.odio.love/) project — [full documentation](https://docs.odio.love/api/).
-
-Odio is an ultra-lightweight Go daemon that exposes a single clean REST API over your Linux user session's D-Bus: MPRIS players (Spotify, VLC, Firefox, MPD, Kodi), PulseAudio/PipeWire, systemd user services, and power management. No root. No hacks. Just Linux primitives.
+# odio-api
+odio is an ultra-lightweight Go daemon that exposes a single clean REST API over your Linux user session's D-Bus: MPRIS players (Spotify, VLC, Firefox, MPD, Kodi), PulseAudio/PipeWire, systemd user services, and power management. No root. No hacks. Just Linux primitives.
 
 Building a Linux multimedia setup is easy. Integrating it cleanly into Home Assistant always felt hacky, scattered integrations, SSH scripts, and fragile glue.
 
