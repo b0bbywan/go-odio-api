@@ -42,7 +42,10 @@ jobs:
       run: go mod verify
 
     - name: Install Task
-      run: go install github.com/go-task/task/v3/cmd/task@latest
+      uses: arduino/setup-task@v2
+      with:
+        version: 3.x
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Compile CSS (required for embed)
       run: task css
@@ -92,7 +95,10 @@ jobs:
         go-version: '1.24'
 
     - name: Install Task
-      run: go install github.com/go-task/task/v3/cmd/task@latest
+      uses: arduino/setup-task@v2
+      with:
+        version: 3.x
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Compile CSS (required for embed)
       run: task css
