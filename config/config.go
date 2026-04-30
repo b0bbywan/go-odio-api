@@ -5,11 +5,13 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/go-viper/mapstructure/v2"
 	"github.com/spf13/viper"
 
 	"github.com/b0bbywan/go-odio-api/logger"
@@ -78,10 +80,15 @@ type PulseAudioConfig struct {
 	ServeCookie   bool
 }
 
+type SystemdService struct {
+	Name string
+	URL  string
+}
+
 type SystemdConfig struct {
 	Enabled        bool
-	SystemServices []string
-	UserServices   []string
+	SystemServices []SystemdService
+	UserServices   []SystemdService
 	SupportsUTMP   bool
 	XDGRuntimeDir  string
 	Timeout        time.Duration
@@ -257,6 +264,49 @@ func validateConfigPath(path string) error {
 	}
 
 	return nil
+}
+
+// parseSystemdServices accepts viper's raw value for a service list and
+// supports two YAML shapes interchangeably within the same list:
+//   - bare string  →  SystemdService{Name: s}
+//   - object       →  SystemdService{Name: name, URL: url}
+//
+// A mapstructure DecodeHook routes both shapes to SystemdService in one pass;
+// the post-decode loop enforces the non-empty Name invariant the hook can't.
+func parseSystemdServices(raw any) ([]SystemdService, error) {
+	if raw == nil {
+		return nil, nil
+	}
+
+	var services []SystemdService
+	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
+		Result:     &services,
+		DecodeHook: stringToSystemdServiceHook,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if err := decoder.Decode(raw); err != nil {
+		return nil, err
+	}
+	for i, s := range services {
+		if s.Name == "" {
+			return nil, fmt.Errorf("entry %d: missing or empty 'name' field", i)
+		}
+	}
+	return services, nil
+}
+
+var systemdServiceType = reflect.TypeOf(SystemdService{})
+
+// stringToSystemdServiceHook lets a YAML scalar stand in for a {name, url}
+// object inside a []SystemdService. mapstructure handles the map → struct case
+// natively; this hook only patches the string → struct edge.
+func stringToSystemdServiceHook(from, to reflect.Type, data any) (any, error) {
+	if to != systemdServiceType || from.Kind() != reflect.String {
+		return data, nil
+	}
+	return SystemdService{Name: data.(string)}, nil
 }
 
 func mergeConfDir(mainConfigPath string) error {
@@ -435,10 +485,18 @@ func New(cfgFile *string) (*Config, error) {
 		ServeCookie:   viper.GetBool("pulseaudio.serve_cookie"),
 	}
 
+	sysServices, err := parseSystemdServices(viper.Get("systemd.system"))
+	if err != nil {
+		return nil, fmt.Errorf("invalid systemd.system: %w", err)
+	}
+	userServices, err := parseSystemdServices(viper.Get("systemd.user"))
+	if err != nil {
+		return nil, fmt.Errorf("invalid systemd.user: %w", err)
+	}
 	syscfg := SystemdConfig{
 		Enabled:        viper.GetBool("systemd.enabled"),
-		SystemServices: viper.GetStringSlice("systemd.system"),
-		UserServices:   viper.GetStringSlice("systemd.user"),
+		SystemServices: sysServices,
+		UserServices:   userServices,
 		SupportsUTMP:   systemdHasUTMP(),
 		XDGRuntimeDir:  xdgRuntimeDir,
 		Timeout:        getDuration("systemd.timeout", 90*time.Second),

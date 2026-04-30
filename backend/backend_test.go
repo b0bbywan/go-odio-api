@@ -60,8 +60,8 @@ func TestBackendDisabled(t *testing.T) {
 			// Add empty services for systemd to ensure it returns nil when enabled without services
 			systemdCfg := &config.SystemdConfig{
 				Enabled:        tt.systemdEnabled,
-				SystemServices: []string{},
-				UserServices:   []string{},
+				SystemServices: []config.SystemdService{},
+				UserServices:   []config.SystemdService{},
 			}
 			zeroconfCfg := &config.ZeroConfig{Enabled: tt.zeroconfEnabled}
 
@@ -111,8 +111,8 @@ func TestSystemdWithEmptyConfig(t *testing.T) {
 
 	systemdCfg := &config.SystemdConfig{
 		Enabled:        true,
-		SystemServices: []string{}, // No services
-		UserServices:   []string{}, // No services
+		SystemServices: []config.SystemdService{}, // No services
+		UserServices:   []config.SystemdService{}, // No services
 	}
 
 	backend, err := New(
@@ -272,7 +272,7 @@ func TestBackendNew_Login1FieldInitialisedToNil(t *testing.T) {
 		&config.Login1Config{Enabled: false},
 		&config.MPRISConfig{Enabled: false},
 		&config.PulseAudioConfig{Enabled: false},
-		&config.SystemdConfig{Enabled: false, SystemServices: []string{}, UserServices: []string{}},
+		&config.SystemdConfig{Enabled: false, SystemServices: []config.SystemdService{}, UserServices: []config.SystemdService{}},
 		&config.ZeroConfig{Enabled: false},
 	)
 	if err != nil {

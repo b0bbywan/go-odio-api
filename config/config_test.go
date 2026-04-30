@@ -69,8 +69,8 @@ func TestConfigStructFields(t *testing.T) {
 
 func TestSystemdConfigStructFields(t *testing.T) {
 	sysCfg := &SystemdConfig{
-		SystemServices: []string{"service1", "service2"},
-		UserServices:   []string{"user-service1"},
+		SystemServices: []SystemdService{{Name: "service1"}, {Name: "service2"}},
+		UserServices:   []SystemdService{{Name: "user-service1"}},
 	}
 
 	if len(sysCfg.SystemServices) != 2 {
@@ -807,7 +807,7 @@ func TestNew_SystemdExplicitlyEnabled(t *testing.T) {
 		t.Error("Systemd.Enabled should be true when explicitly enabled")
 	}
 
-	if len(cfg.Systemd.UserServices) != 1 || cfg.Systemd.UserServices[0] != "test.service" {
+	if len(cfg.Systemd.UserServices) != 1 || cfg.Systemd.UserServices[0].Name != "test.service" {
 		t.Errorf("Systemd.UserServices = %v, want [test.service]", cfg.Systemd.UserServices)
 	}
 }
@@ -1059,6 +1059,261 @@ func TestNew_CORSEmptyOriginsStaysNil(t *testing.T) {
 	}
 	if cfg.Api.CORS != nil {
 		t.Errorf("Api.CORS should be nil for empty origins list, got %+v", cfg.Api.CORS)
+	}
+}
+
+// --- Tests SystemdService parsing (string OR object) ---
+
+func TestParseSystemdServices_Nil(t *testing.T) {
+	got, err := parseSystemdServices(nil)
+	if err != nil {
+		t.Fatalf("parseSystemdServices(nil) error: %v", err)
+	}
+	if got != nil {
+		t.Errorf("parseSystemdServices(nil) = %v, want nil", got)
+	}
+}
+
+func TestParseSystemdServices_StringSlice(t *testing.T) {
+	// Backward-compat path: viper.Set / GetStringSlice may yield []string.
+	got, err := parseSystemdServices([]string{"a.service", "b.service"})
+	if err != nil {
+		t.Fatalf("parseSystemdServices() error: %v", err)
+	}
+	want := []SystemdService{{Name: "a.service"}, {Name: "b.service"}}
+	if len(got) != len(want) {
+		t.Fatalf("len = %d, want %d", len(got), len(want))
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("[%d] = %+v, want %+v", i, got[i], want[i])
+		}
+	}
+}
+
+func TestParseSystemdServices_StringEntries(t *testing.T) {
+	// Post-YAML viper shape: []any of strings.
+	got, err := parseSystemdServices([]any{"a.service", "b.service"})
+	if err != nil {
+		t.Fatalf("parseSystemdServices() error: %v", err)
+	}
+	if len(got) != 2 || got[0].Name != "a.service" || got[1].Name != "b.service" {
+		t.Errorf("got %+v", got)
+	}
+	if got[0].URL != "" || got[1].URL != "" {
+		t.Error("string entries must yield empty URLs")
+	}
+}
+
+func TestParseSystemdServices_ObjectEntries(t *testing.T) {
+	got, err := parseSystemdServices([]any{
+		map[string]any{"name": "mympd.service", "url": ":8080"},
+	})
+	if err != nil {
+		t.Fatalf("parseSystemdServices() error: %v", err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("len = %d, want 1", len(got))
+	}
+	if got[0].Name != "mympd.service" {
+		t.Errorf("Name = %q, want mympd.service", got[0].Name)
+	}
+	if got[0].URL != ":8080" {
+		t.Errorf("URL = %q, want :8080", got[0].URL)
+	}
+}
+
+func TestParseSystemdServices_MixedEntries(t *testing.T) {
+	got, err := parseSystemdServices([]any{
+		"mpd.service",
+		map[string]any{"name": "mympd.service", "url": ":8080"},
+		"pipewire-pulse.service",
+	})
+	if err != nil {
+		t.Fatalf("parseSystemdServices() error: %v", err)
+	}
+	want := []SystemdService{
+		{Name: "mpd.service"},
+		{Name: "mympd.service", URL: ":8080"},
+		{Name: "pipewire-pulse.service"},
+	}
+	if len(got) != len(want) {
+		t.Fatalf("len = %d, want %d", len(got), len(want))
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("[%d] = %+v, want %+v", i, got[i], want[i])
+		}
+	}
+}
+
+func TestParseSystemdServices_ObjectWithoutURL(t *testing.T) {
+	// Object form without a URL is equivalent to the bare-string form.
+	got, err := parseSystemdServices([]any{
+		map[string]any{"name": "mpd.service"},
+	})
+	if err != nil {
+		t.Fatalf("parseSystemdServices() error: %v", err)
+	}
+	if len(got) != 1 || got[0].Name != "mpd.service" || got[0].URL != "" {
+		t.Errorf("got %+v, want [{mpd.service }]", got)
+	}
+}
+
+func TestParseSystemdServices_EmptyName(t *testing.T) {
+	tests := []struct {
+		name  string
+		entry any
+	}{
+		{"empty string", ""},
+		{"object missing name", map[string]any{"url": ":8080"}},
+		{"object empty name", map[string]any{"name": "", "url": ":8080"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := parseSystemdServices([]any{tt.entry})
+			if err == nil {
+				t.Errorf("expected error for %v, got nil", tt.entry)
+			}
+		})
+	}
+}
+
+func TestParseSystemdServices_InvalidEntryType(t *testing.T) {
+	// Numbers / lists / bools should be rejected.
+	tests := []any{42, true, []any{"nested"}, 3.14}
+	for _, e := range tests {
+		_, err := parseSystemdServices([]any{e})
+		if err == nil {
+			t.Errorf("expected error for entry %T (%v), got nil", e, e)
+		}
+	}
+}
+
+func TestParseSystemdServices_WrongFieldType(t *testing.T) {
+	// `url: 8080` is a number, not a string. mapstructure should reject it
+	// rather than silently producing an empty URL.
+	_, err := parseSystemdServices([]any{
+		map[string]any{"name": "mympd.service", "url": 8080},
+	})
+	if err == nil {
+		t.Error("expected error when 'url' is not a string")
+	}
+}
+
+func TestParseSystemdServices_TopLevelNotAList(t *testing.T) {
+	_, err := parseSystemdServices("not a list")
+	if err == nil {
+		t.Error("expected error when top-level value is not a list")
+	}
+}
+
+// End-to-end: URL declared in YAML flows through to SystemdConfig.
+func TestNew_SystemdServicesWithURLFromConfigFile(t *testing.T) {
+	viper.Reset()
+
+	tmpDir := t.TempDir()
+	configFile := tmpDir + "/config.yaml"
+	configContent := `
+systemd:
+  enabled: true
+  user:
+    - mpd.service
+    - name: mympd.service
+      url: ":8080"
+    - pipewire-pulse.service
+`
+	if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
+		t.Fatalf("Failed to create config file: %v", err)
+	}
+
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
+
+	cfg, err := New(&configFile)
+	if err != nil {
+		t.Fatalf("New() returned error: %v", err)
+	}
+
+	want := []SystemdService{
+		{Name: "mpd.service"},
+		{Name: "mympd.service", URL: ":8080"},
+		{Name: "pipewire-pulse.service"},
+	}
+	if len(cfg.Systemd.UserServices) != len(want) {
+		t.Fatalf("UserServices = %+v, want %+v", cfg.Systemd.UserServices, want)
+	}
+	for i := range want {
+		if cfg.Systemd.UserServices[i] != want[i] {
+			t.Errorf("[%d] = %+v, want %+v", i, cfg.Systemd.UserServices[i], want[i])
+		}
+	}
+}
+
+// End-to-end: a conf.d snippet may also use the object form.
+func TestNew_SystemdServicesWithURLFromConfD(t *testing.T) {
+	viper.Reset()
+
+	tmpDir := t.TempDir()
+	mainConfig := tmpDir + "/config.yaml"
+	if err := os.WriteFile(mainConfig, []byte("systemd:\n  enabled: true\n  user: [mpd.service]\n"), 0644); err != nil {
+		t.Fatalf("Failed to write main config: %v", err)
+	}
+
+	confDir := tmpDir + "/conf.d"
+	if err := os.Mkdir(confDir, 0755); err != nil {
+		t.Fatalf("Failed to create conf.d: %v", err)
+	}
+	override := `
+systemd:
+  user:
+    - name: mympd.service
+      url: ":8080"
+`
+	if err := os.WriteFile(confDir+"/10-override.yaml", []byte(override), 0644); err != nil {
+		t.Fatalf("Failed to write override: %v", err)
+	}
+
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
+
+	cfg, err := New(&mainConfig)
+	if err != nil {
+		t.Fatalf("New() returned error: %v", err)
+	}
+
+	if len(cfg.Systemd.UserServices) != 1 {
+		t.Fatalf("UserServices len = %d, want 1 (conf.d replaces). Got: %+v",
+			len(cfg.Systemd.UserServices), cfg.Systemd.UserServices)
+	}
+	got := cfg.Systemd.UserServices[0]
+	if got.Name != "mympd.service" {
+		t.Errorf("Name = %q, want mympd.service", got.Name)
+	}
+	if got.URL != ":8080" {
+		t.Errorf("URL = %q, want :8080", got.URL)
+	}
+}
+
+// Surface a malformed YAML entry as an error from New() rather than silent drop.
+func TestNew_SystemdInvalidEntryType(t *testing.T) {
+	viper.Reset()
+
+	tmpDir := t.TempDir()
+	configFile := tmpDir + "/config.yaml"
+	if err := os.WriteFile(configFile, []byte("systemd:\n  enabled: true\n  user: [42]\n"), 0644); err != nil {
+		t.Fatalf("Failed to create config file: %v", err)
+	}
+
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
+
+	cfg, err := New(&configFile)
+	if err == nil {
+		t.Fatalf("expected error for invalid entry type, got cfg: %+v", cfg)
+	}
+	if !strings.Contains(err.Error(), "systemd.user") {
+		t.Errorf("error should mention systemd.user, got: %v", err)
 	}
 }
 
@@ -1354,8 +1609,8 @@ systemd:
 			len(cfg.Systemd.SystemServices), len(want), cfg.Systemd.SystemServices)
 	}
 	for i, s := range want {
-		if cfg.Systemd.SystemServices[i] != s {
-			t.Errorf("SystemServices[%d] = %q, want %q", i, cfg.Systemd.SystemServices[i], s)
+		if cfg.Systemd.SystemServices[i].Name != s {
+			t.Errorf("SystemServices[%d] = %q, want %q", i, cfg.Systemd.SystemServices[i].Name, s)
 		}
 	}
 
@@ -1367,8 +1622,8 @@ systemd:
 			len(cfg.Systemd.UserServices), len(wantUser), cfg.Systemd.UserServices)
 	}
 	for i, s := range wantUser {
-		if cfg.Systemd.UserServices[i] != s {
-			t.Errorf("UserServices[%d] = %q, want %q", i, cfg.Systemd.UserServices[i], s)
+		if cfg.Systemd.UserServices[i].Name != s {
+			t.Errorf("UserServices[%d] = %q, want %q", i, cfg.Systemd.UserServices[i].Name, s)
 		}
 	}
 }
@@ -1419,8 +1674,8 @@ systemd:
 			len(cfg.Systemd.UserServices), len(want), cfg.Systemd.UserServices)
 	}
 	for i, s := range want {
-		if cfg.Systemd.UserServices[i] != s {
-			t.Errorf("UserServices[%d] = %q, want %q", i, cfg.Systemd.UserServices[i], s)
+		if cfg.Systemd.UserServices[i].Name != s {
+			t.Errorf("UserServices[%d] = %q, want %q", i, cfg.Systemd.UserServices[i].Name, s)
 		}
 	}
 
@@ -1431,8 +1686,8 @@ systemd:
 			len(cfg.Systemd.SystemServices), len(wantSystem), cfg.Systemd.SystemServices)
 	}
 	for i, s := range wantSystem {
-		if cfg.Systemd.SystemServices[i] != s {
-			t.Errorf("SystemServices[%d] = %q, want %q", i, cfg.Systemd.SystemServices[i], s)
+		if cfg.Systemd.SystemServices[i].Name != s {
+			t.Errorf("SystemServices[%d] = %q, want %q", i, cfg.Systemd.SystemServices[i].Name, s)
 		}
 	}
 }
@@ -1513,8 +1768,8 @@ func TestNew_ConfDSystemdMultipleSnippetsLastWins(t *testing.T) {
 			len(cfg.Systemd.SystemServices), len(want), cfg.Systemd.SystemServices)
 	}
 	for i, s := range want {
-		if cfg.Systemd.SystemServices[i] != s {
-			t.Errorf("SystemServices[%d] = %q, want %q", i, cfg.Systemd.SystemServices[i], s)
+		if cfg.Systemd.SystemServices[i].Name != s {
+			t.Errorf("SystemServices[%d] = %q, want %q", i, cfg.Systemd.SystemServices[i].Name, s)
 		}
 	}
 }
