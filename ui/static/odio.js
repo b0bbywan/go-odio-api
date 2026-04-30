@@ -102,6 +102,22 @@ function updatePositions() {
 document.addEventListener('DOMContentLoaded', () => setInterval(updatePositions, 500));
 document.addEventListener('htmx:afterSwap', updatePositions);
 
+// Open a service URL declared in the systemd config. Accepts ":port" /
+// "/path" / "//host/..." / full URLs and resolves the missing parts against
+// the page's current location so the link works from any host the dashboard
+// is reachable from.
+function openServiceUrl(u) {
+	if (!u) return;
+	if (u.startsWith(':')) {
+		u = window.location.protocol + '//' + window.location.hostname + u;
+	} else if (u.startsWith('/') && !u.startsWith('//')) {
+		u = window.location.protocol + '//' + window.location.host + u;
+	} else if (u.startsWith('//')) {
+		u = window.location.protocol + u;
+	}
+	window.open(u, '_blank', 'noopener,noreferrer');
+}
+
 function setDefaultOutput(name) {
 	fetch(`/audio/outputs/${encodeURIComponent(name)}/default`, {
 		method: 'POST'

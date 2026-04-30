@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 )
@@ -185,6 +186,18 @@ func TestComponentTemplates(t *testing.T) {
 				Name:   "test.service",
 				Active: false,
 				State:  "stopped",
+			},
+		},
+		{
+			name:     "Systemd unit with URL",
+			template: "systemd-unit",
+			data: ServiceView{
+				Name:        "mympd.service",
+				Description: "myMPD",
+				Active:      true,
+				State:       "running",
+				IsUser:      true,
+				URL:         ":8080",
 			},
 		},
 	}
@@ -449,6 +462,52 @@ func TestConvertBluetooth(t *testing.T) {
 	})
 }
 
+// TestSystemdUnitTemplate_URLLink asserts that when a service has a URL, the
+// description is rendered as a clickable <a> wired to openServiceUrl, and
+// without one the description stays plain text.
+func TestSystemdUnitTemplate_URLLink(t *testing.T) {
+	tmpl := LoadTemplates()
+
+	tests := []struct {
+		name    string
+		view    ServiceView
+		wantSub string
+		denySub string
+	}{
+		{
+			name:    "with URL renders link",
+			view:    ServiceView{Name: "mympd.service", Description: "myMPD", Active: true, URL: ":8080"},
+			wantSub: `onclick="openServiceUrl(':8080'); return false;"`,
+		},
+		{
+			name:    "with URL has tooltip",
+			view:    ServiceView{Name: "mympd.service", Description: "myMPD", Active: true, URL: ":8080"},
+			wantSub: `title=":8080"`,
+		},
+		{
+			name:    "without URL renders no anchor",
+			view:    ServiceView{Name: "mpd.service", Description: "MPD", Active: true},
+			denySub: "openServiceUrl",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			if err := tmpl.ExecuteTemplate(&buf, "systemd-unit", tt.view); err != nil {
+				t.Fatalf("ExecuteTemplate: %v", err)
+			}
+			out := buf.String()
+			if tt.wantSub != "" && !strings.Contains(out, tt.wantSub) {
+				t.Errorf("expected %q in output, got:\n%s", tt.wantSub, out)
+			}
+			if tt.denySub != "" && strings.Contains(out, tt.denySub) {
+				t.Errorf("did not expect %q in output, got:\n%s", tt.denySub, out)
+			}
+		})
+	}
+}
+
 // TestConvertServices verifies service conversion logic
 func TestConvertServices(t *testing.T) {
 	tests := []struct {
@@ -481,6 +540,29 @@ func TestConvertServices(t *testing.T) {
 			},
 		},
 		{
+			name: "service with URL",
+			input: []Service{
+				{
+					Name:        "mympd.service",
+					Description: "myMPD",
+					ActiveState: "active",
+					SubState:    "running",
+					Scope:       "user",
+					URL:         ":8080",
+				},
+			},
+			expected: []ServiceView{
+				{
+					Name:        "mympd.service",
+					Description: "myMPD",
+					Active:      true,
+					State:       "running",
+					IsUser:      true,
+					URL:         ":8080",
+				},
+			},
+		},
+		{
 			name: "inactive service",
 			input: []Service{
 				{
@@ -508,6 +590,9 @@ func TestConvertServices(t *testing.T) {
 			for i := range result {
 				if result[i].Active != tt.expected[i].Active {
 					t.Errorf("Service %d: expected active=%v, got %v", i, tt.expected[i].Active, result[i].Active)
+				}
+				if result[i].URL != tt.expected[i].URL {
+					t.Errorf("Service %d: expected URL=%q, got %q", i, tt.expected[i].URL, result[i].URL)
 				}
 			}
 		})
