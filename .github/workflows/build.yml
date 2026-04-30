@@ -158,7 +158,7 @@ jobs:
         with:
           files: dist/*
           generate_release_notes: true
-          prerelease: ${{ contains(github.ref_name, '-rc') || contains(github.ref_name, '-beta') || contains(github.ref_name, '-alpha') }}
+          prerelease: ${{ contains(github.ref_name, '-') }}
 
 # Add this job at the end of your existing release workflow in
 # go-odio-api and go-mpd-discplayer (.github/workflows/build.yml)
