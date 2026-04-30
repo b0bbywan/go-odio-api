@@ -5,6 +5,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -258,6 +259,46 @@ func validateConfigPath(path string) error {
 	return nil
 }
 
+func mergeConfDir(mainConfigPath string) error {
+	confDir := filepath.Join(filepath.Dir(mainConfigPath), "conf.d")
+	entries, err := os.ReadDir(confDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("cannot read conf.d directory %s: %w", confDir, err)
+	}
+
+	var files []string
+	for _, e := range entries {
+		if e.IsDir() || strings.HasPrefix(e.Name(), ".") {
+			continue
+		}
+		ext := filepath.Ext(e.Name())
+		if ext != ".yaml" && ext != ".yml" {
+			continue
+		}
+		files = append(files, filepath.Join(confDir, e.Name()))
+	}
+	sort.Strings(files)
+
+	for _, path := range files {
+		f, err := os.Open(path)
+		if err != nil {
+			return fmt.Errorf("cannot open conf.d snippet %s: %w", path, err)
+		}
+		mergeErr := viper.MergeConfig(f)
+		if closeErr := f.Close(); closeErr != nil {
+			logger.Warn("[%s] failed to close conf.d snippet %s: %v", AppName, path, closeErr)
+		}
+		if mergeErr != nil {
+			return fmt.Errorf("failed to merge conf.d snippet %s: %w", path, mergeErr)
+		}
+		logger.Info("[%s] merged config snippet: %s", AppName, path)
+	}
+	return nil
+}
+
 func readConfig(cfgFile *string) error {
 	if cfgFile != nil && *cfgFile != "" {
 		if err := validateConfigPath(*cfgFile); err != nil {
@@ -314,6 +355,12 @@ func New(cfgFile *string) (*Config, error) {
 	if err := readConfig(cfgFile); err != nil {
 		if _, isNotFound := err.(viper.ConfigFileNotFoundError); !isNotFound {
 			return nil, fmt.Errorf("failed to read config file: %w", err)
+		}
+	}
+
+	if used := viper.ConfigFileUsed(); used != "" {
+		if err := mergeConfDir(used); err != nil {
+			return nil, err
 		}
 	}
 

@@ -3,6 +3,7 @@ package config
 import (
 	"net"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/spf13/viper"
@@ -1058,5 +1059,495 @@ func TestNew_CORSEmptyOriginsStaysNil(t *testing.T) {
 	}
 	if cfg.Api.CORS != nil {
 		t.Errorf("Api.CORS should be nil for empty origins list, got %+v", cfg.Api.CORS)
+	}
+}
+
+// --- Tests conf.d merging ---
+
+func TestMergeConfDir_NoDirectory(t *testing.T) {
+	viper.Reset()
+	viper.SetConfigType("yaml")
+
+	tmpDir := t.TempDir()
+	mainConfig := tmpDir + "/config.yaml"
+
+	if err := mergeConfDir(mainConfig); err != nil {
+		t.Errorf("mergeConfDir() with no conf.d should return nil, got: %v", err)
+	}
+}
+
+func TestMergeConfDir_EmptyDirectory(t *testing.T) {
+	viper.Reset()
+	viper.SetConfigType("yaml")
+
+	tmpDir := t.TempDir()
+	if err := os.Mkdir(tmpDir+"/conf.d", 0755); err != nil {
+		t.Fatalf("Failed to create conf.d: %v", err)
+	}
+
+	if err := mergeConfDir(tmpDir + "/config.yaml"); err != nil {
+		t.Errorf("mergeConfDir() with empty conf.d should return nil, got: %v", err)
+	}
+}
+
+func TestMergeConfDir_AlphabeticalOrder(t *testing.T) {
+	viper.Reset()
+	viper.SetConfigType("yaml")
+
+	tmpDir := t.TempDir()
+	confDir := tmpDir + "/conf.d"
+	if err := os.Mkdir(confDir, 0755); err != nil {
+		t.Fatalf("Failed to create conf.d: %v", err)
+	}
+
+	if err := os.WriteFile(confDir+"/10-base.yaml", []byte("api:\n  port: 1111\n"), 0644); err != nil {
+		t.Fatalf("Failed to write 10-base.yaml: %v", err)
+	}
+	if err := os.WriteFile(confDir+"/99-final.yaml", []byte("api:\n  port: 7777\n"), 0644); err != nil {
+		t.Fatalf("Failed to write 99-final.yaml: %v", err)
+	}
+
+	if err := mergeConfDir(tmpDir + "/config.yaml"); err != nil {
+		t.Fatalf("mergeConfDir() returned error: %v", err)
+	}
+
+	if got := viper.GetInt("api.port"); got != 7777 {
+		t.Errorf("api.port = %d, want 7777 (99-final should win over 10-base)", got)
+	}
+}
+
+func TestMergeConfDir_OverridesExistingValues(t *testing.T) {
+	viper.Reset()
+	viper.SetConfigType("yaml")
+
+	// Pre-populate viper at the "config" precedence level (same level as
+	// ReadInConfig in production). Using viper.Set here would place values at
+	// the "override" level, which sits above MergeConfig and would mask the
+	// behavior we want to test.
+	mainContent := "api:\n  port: 8018\n  enabled: true\n"
+	if err := viper.ReadConfig(strings.NewReader(mainContent)); err != nil {
+		t.Fatalf("Failed to seed main config: %v", err)
+	}
+
+	tmpDir := t.TempDir()
+	confDir := tmpDir + "/conf.d"
+	if err := os.Mkdir(confDir, 0755); err != nil {
+		t.Fatalf("Failed to create conf.d: %v", err)
+	}
+	if err := os.WriteFile(confDir+"/override.yaml", []byte("api:\n  port: 9999\n"), 0644); err != nil {
+		t.Fatalf("Failed to write override.yaml: %v", err)
+	}
+
+	if err := mergeConfDir(tmpDir + "/config.yaml"); err != nil {
+		t.Fatalf("mergeConfDir() returned error: %v", err)
+	}
+
+	if got := viper.GetInt("api.port"); got != 9999 {
+		t.Errorf("api.port = %d, want 9999 (conf.d should override)", got)
+	}
+	// Untouched keys must survive the merge.
+	if !viper.GetBool("api.enabled") {
+		t.Error("api.enabled should remain true after merge")
+	}
+}
+
+func TestMergeConfDir_IgnoresNonYAMLAndHidden(t *testing.T) {
+	viper.Reset()
+	viper.SetConfigType("yaml")
+	viper.Set("api.port", 8018)
+
+	tmpDir := t.TempDir()
+	confDir := tmpDir + "/conf.d"
+	if err := os.Mkdir(confDir, 0755); err != nil {
+		t.Fatalf("Failed to create conf.d: %v", err)
+	}
+
+	// Files that should be ignored — if any were merged, port would change.
+	if err := os.WriteFile(confDir+"/notes.txt", []byte("api:\n  port: 1111\n"), 0644); err != nil {
+		t.Fatalf("Failed to write notes.txt: %v", err)
+	}
+	if err := os.WriteFile(confDir+"/config.json", []byte(`{"api":{"port":2222}}`), 0644); err != nil {
+		t.Fatalf("Failed to write config.json: %v", err)
+	}
+	if err := os.WriteFile(confDir+"/.hidden.yaml", []byte("api:\n  port: 3333\n"), 0644); err != nil {
+		t.Fatalf("Failed to write .hidden.yaml: %v", err)
+	}
+
+	if err := mergeConfDir(tmpDir + "/config.yaml"); err != nil {
+		t.Fatalf("mergeConfDir() returned error: %v", err)
+	}
+
+	if got := viper.GetInt("api.port"); got != 8018 {
+		t.Errorf("api.port = %d, want 8018 (non-YAML and hidden files must be ignored)", got)
+	}
+}
+
+func TestMergeConfDir_AcceptsBothYamlAndYmlExtensions(t *testing.T) {
+	viper.Reset()
+	viper.SetConfigType("yaml")
+
+	tmpDir := t.TempDir()
+	confDir := tmpDir + "/conf.d"
+	if err := os.Mkdir(confDir, 0755); err != nil {
+		t.Fatalf("Failed to create conf.d: %v", err)
+	}
+
+	if err := os.WriteFile(confDir+"/10-a.yaml", []byte("api:\n  port: 1111\n"), 0644); err != nil {
+		t.Fatalf("Failed to write 10-a.yaml: %v", err)
+	}
+	if err := os.WriteFile(confDir+"/20-b.yml", []byte("logLevel: DEBUG\n"), 0644); err != nil {
+		t.Fatalf("Failed to write 20-b.yml: %v", err)
+	}
+
+	if err := mergeConfDir(tmpDir + "/config.yaml"); err != nil {
+		t.Fatalf("mergeConfDir() returned error: %v", err)
+	}
+
+	if got := viper.GetInt("api.port"); got != 1111 {
+		t.Errorf("api.port = %d, want 1111 (.yaml file should be merged)", got)
+	}
+	if got := viper.GetString("logLevel"); got != "DEBUG" {
+		t.Errorf("logLevel = %q, want DEBUG (.yml file should be merged)", got)
+	}
+}
+
+func TestMergeConfDir_IgnoresSubdirectories(t *testing.T) {
+	viper.Reset()
+	viper.SetConfigType("yaml")
+	viper.Set("api.port", 8018)
+
+	tmpDir := t.TempDir()
+	confDir := tmpDir + "/conf.d"
+	subDir := confDir + "/subdir.yaml" // dir whose name has a YAML extension
+	if err := os.MkdirAll(subDir, 0755); err != nil {
+		t.Fatalf("Failed to create nested dir: %v", err)
+	}
+
+	if err := mergeConfDir(tmpDir + "/config.yaml"); err != nil {
+		t.Errorf("mergeConfDir() with only a subdirectory should return nil, got: %v", err)
+	}
+	if got := viper.GetInt("api.port"); got != 8018 {
+		t.Errorf("api.port = %d, want 8018 (subdirectory must not be parsed)", got)
+	}
+}
+
+func TestMergeConfDir_InvalidYAMLFailsFast(t *testing.T) {
+	viper.Reset()
+	viper.SetConfigType("yaml")
+
+	tmpDir := t.TempDir()
+	confDir := tmpDir + "/conf.d"
+	if err := os.Mkdir(confDir, 0755); err != nil {
+		t.Fatalf("Failed to create conf.d: %v", err)
+	}
+
+	badPath := confDir + "/bad.yaml"
+	if err := os.WriteFile(badPath, []byte("api:\n  port: [unclosed\n"), 0644); err != nil {
+		t.Fatalf("Failed to write bad.yaml: %v", err)
+	}
+
+	err := mergeConfDir(tmpDir + "/config.yaml")
+	if err == nil {
+		t.Fatal("mergeConfDir() with malformed YAML should return error, got nil")
+	}
+	if !strings.Contains(err.Error(), "bad.yaml") {
+		t.Errorf("error should mention the offending file, got: %v", err)
+	}
+}
+
+func TestNew_ConfDOverridesMainConfig(t *testing.T) {
+	viper.Reset()
+
+	tmpDir := t.TempDir()
+	mainConfig := tmpDir + "/config.yaml"
+	mainContent := `
+api:
+  port: 8018
+  enabled: true
+logLevel: INFO
+`
+	if err := os.WriteFile(mainConfig, []byte(mainContent), 0644); err != nil {
+		t.Fatalf("Failed to write main config: %v", err)
+	}
+
+	confDir := tmpDir + "/conf.d"
+	if err := os.Mkdir(confDir, 0755); err != nil {
+		t.Fatalf("Failed to create conf.d: %v", err)
+	}
+	override := `
+api:
+  port: 9999
+logLevel: DEBUG
+`
+	if err := os.WriteFile(confDir+"/10-override.yaml", []byte(override), 0644); err != nil {
+		t.Fatalf("Failed to write 10-override.yaml: %v", err)
+	}
+
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
+
+	cfg, err := New(&mainConfig)
+	if err != nil {
+		t.Fatalf("New() returned error: %v", err)
+	}
+
+	if cfg.Api.Port != 9999 {
+		t.Errorf("Api.Port = %d, want 9999 (conf.d override should win)", cfg.Api.Port)
+	}
+	if cfg.LogLevel != logger.DEBUG {
+		t.Errorf("LogLevel = %d, want %d (DEBUG from conf.d)", cfg.LogLevel, logger.DEBUG)
+	}
+	// Untouched key from main config must survive.
+	if !cfg.Api.Enabled {
+		t.Error("Api.Enabled should remain true (not set in conf.d)")
+	}
+}
+
+// Array merge behavior: viper.MergeConfig replaces a slice value entirely
+// rather than appending. These tests pin that contract for the systemd
+// services lists so any future viper upgrade that flips the behavior is
+// caught immediately.
+
+func TestNew_ConfDSystemdServicesReplacedNotAppended(t *testing.T) {
+	viper.Reset()
+
+	tmpDir := t.TempDir()
+	mainConfig := tmpDir + "/config.yaml"
+	mainContent := `
+systemd:
+  enabled: true
+  system:
+    - bluetooth.service
+    - upmpdcli.service
+  user:
+    - mpd.service
+    - pipewire-pulse.service
+`
+	if err := os.WriteFile(mainConfig, []byte(mainContent), 0644); err != nil {
+		t.Fatalf("Failed to write main config: %v", err)
+	}
+
+	confDir := tmpDir + "/conf.d"
+	if err := os.Mkdir(confDir, 0755); err != nil {
+		t.Fatalf("Failed to create conf.d: %v", err)
+	}
+	override := `
+systemd:
+  system:
+    - shairport-sync.service
+`
+	if err := os.WriteFile(confDir+"/10-override.yaml", []byte(override), 0644); err != nil {
+		t.Fatalf("Failed to write 10-override.yaml: %v", err)
+	}
+
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
+
+	cfg, err := New(&mainConfig)
+	if err != nil {
+		t.Fatalf("New() returned error: %v", err)
+	}
+
+	want := []string{"shairport-sync.service"}
+	if len(cfg.Systemd.SystemServices) != len(want) {
+		t.Fatalf("SystemServices len = %d, want %d (slices are replaced, not appended). Got: %v",
+			len(cfg.Systemd.SystemServices), len(want), cfg.Systemd.SystemServices)
+	}
+	for i, s := range want {
+		if cfg.Systemd.SystemServices[i] != s {
+			t.Errorf("SystemServices[%d] = %q, want %q", i, cfg.Systemd.SystemServices[i], s)
+		}
+	}
+
+	// The user services list was NOT mentioned in the override, so it must
+	// keep the values from the main config.
+	wantUser := []string{"mpd.service", "pipewire-pulse.service"}
+	if len(cfg.Systemd.UserServices) != len(wantUser) {
+		t.Fatalf("UserServices len = %d, want %d. Got: %v",
+			len(cfg.Systemd.UserServices), len(wantUser), cfg.Systemd.UserServices)
+	}
+	for i, s := range wantUser {
+		if cfg.Systemd.UserServices[i] != s {
+			t.Errorf("UserServices[%d] = %q, want %q", i, cfg.Systemd.UserServices[i], s)
+		}
+	}
+}
+
+func TestNew_ConfDSystemdUserServicesReplacedNotAppended(t *testing.T) {
+	viper.Reset()
+
+	tmpDir := t.TempDir()
+	mainConfig := tmpDir + "/config.yaml"
+	mainContent := `
+systemd:
+  enabled: true
+  system:
+    - bluetooth.service
+    - upmpdcli.service
+  user:
+    - mpd.service
+    - pipewire-pulse.service
+`
+	if err := os.WriteFile(mainConfig, []byte(mainContent), 0644); err != nil {
+		t.Fatalf("Failed to write main config: %v", err)
+	}
+
+	confDir := tmpDir + "/conf.d"
+	if err := os.Mkdir(confDir, 0755); err != nil {
+		t.Fatalf("Failed to create conf.d: %v", err)
+	}
+	override := `
+systemd:
+  user:
+    - shairport-sync.service
+`
+	if err := os.WriteFile(confDir+"/10-override.yaml", []byte(override), 0644); err != nil {
+		t.Fatalf("Failed to write 10-override.yaml: %v", err)
+	}
+
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
+
+	cfg, err := New(&mainConfig)
+	if err != nil {
+		t.Fatalf("New() returned error: %v", err)
+	}
+
+	want := []string{"shairport-sync.service"}
+	if len(cfg.Systemd.UserServices) != len(want) {
+		t.Fatalf("UserServices len = %d, want %d (slices are replaced, not appended). Got: %v",
+			len(cfg.Systemd.UserServices), len(want), cfg.Systemd.UserServices)
+	}
+	for i, s := range want {
+		if cfg.Systemd.UserServices[i] != s {
+			t.Errorf("UserServices[%d] = %q, want %q", i, cfg.Systemd.UserServices[i], s)
+		}
+	}
+
+	// Symmetric to the system test: untouched system list survives.
+	wantSystem := []string{"bluetooth.service", "upmpdcli.service"}
+	if len(cfg.Systemd.SystemServices) != len(wantSystem) {
+		t.Fatalf("SystemServices len = %d, want %d. Got: %v",
+			len(cfg.Systemd.SystemServices), len(wantSystem), cfg.Systemd.SystemServices)
+	}
+	for i, s := range wantSystem {
+		if cfg.Systemd.SystemServices[i] != s {
+			t.Errorf("SystemServices[%d] = %q, want %q", i, cfg.Systemd.SystemServices[i], s)
+		}
+	}
+}
+
+func TestNew_ConfDSystemdEmptyArrayClearsList(t *testing.T) {
+	viper.Reset()
+
+	tmpDir := t.TempDir()
+	mainConfig := tmpDir + "/config.yaml"
+	mainContent := `
+systemd:
+  enabled: true
+  system:
+    - bluetooth.service
+    - upmpdcli.service
+`
+	if err := os.WriteFile(mainConfig, []byte(mainContent), 0644); err != nil {
+		t.Fatalf("Failed to write main config: %v", err)
+	}
+
+	confDir := tmpDir + "/conf.d"
+	if err := os.Mkdir(confDir, 0755); err != nil {
+		t.Fatalf("Failed to create conf.d: %v", err)
+	}
+	// Explicit empty list — admin wants to wipe the inherited list.
+	override := `
+systemd:
+  system: []
+`
+	if err := os.WriteFile(confDir+"/99-clear.yaml", []byte(override), 0644); err != nil {
+		t.Fatalf("Failed to write 99-clear.yaml: %v", err)
+	}
+
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
+
+	cfg, err := New(&mainConfig)
+	if err != nil {
+		t.Fatalf("New() returned error: %v", err)
+	}
+
+	if len(cfg.Systemd.SystemServices) != 0 {
+		t.Errorf("SystemServices = %v, want [] (explicit empty list should clear)", cfg.Systemd.SystemServices)
+	}
+}
+
+func TestNew_ConfDSystemdMultipleSnippetsLastWins(t *testing.T) {
+	viper.Reset()
+
+	tmpDir := t.TempDir()
+	mainConfig := tmpDir + "/config.yaml"
+	if err := os.WriteFile(mainConfig, []byte("systemd:\n  enabled: true\n  system: [a.service]\n"), 0644); err != nil {
+		t.Fatalf("Failed to write main config: %v", err)
+	}
+
+	confDir := tmpDir + "/conf.d"
+	if err := os.Mkdir(confDir, 0755); err != nil {
+		t.Fatalf("Failed to create conf.d: %v", err)
+	}
+	if err := os.WriteFile(confDir+"/10-first.yaml", []byte("systemd:\n  system: [b.service, c.service]\n"), 0644); err != nil {
+		t.Fatalf("Failed to write 10-first.yaml: %v", err)
+	}
+	if err := os.WriteFile(confDir+"/20-second.yaml", []byte("systemd:\n  system: [d.service]\n"), 0644); err != nil {
+		t.Fatalf("Failed to write 20-second.yaml: %v", err)
+	}
+
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
+
+	cfg, err := New(&mainConfig)
+	if err != nil {
+		t.Fatalf("New() returned error: %v", err)
+	}
+
+	want := []string{"d.service"}
+	if len(cfg.Systemd.SystemServices) != len(want) {
+		t.Fatalf("SystemServices len = %d, want %d. Got: %v",
+			len(cfg.Systemd.SystemServices), len(want), cfg.Systemd.SystemServices)
+	}
+	for i, s := range want {
+		if cfg.Systemd.SystemServices[i] != s {
+			t.Errorf("SystemServices[%d] = %q, want %q", i, cfg.Systemd.SystemServices[i], s)
+		}
+	}
+}
+
+func TestNew_ConfDAlphabeticalOrderEndToEnd(t *testing.T) {
+	viper.Reset()
+
+	tmpDir := t.TempDir()
+	mainConfig := tmpDir + "/config.yaml"
+	if err := os.WriteFile(mainConfig, []byte("api:\n  port: 8018\n"), 0644); err != nil {
+		t.Fatalf("Failed to write main config: %v", err)
+	}
+
+	confDir := tmpDir + "/conf.d"
+	if err := os.Mkdir(confDir, 0755); err != nil {
+		t.Fatalf("Failed to create conf.d: %v", err)
+	}
+	if err := os.WriteFile(confDir+"/10-base.yaml", []byte("api:\n  port: 1111\n"), 0644); err != nil {
+		t.Fatalf("Failed to write 10-base.yaml: %v", err)
+	}
+	if err := os.WriteFile(confDir+"/99-final.yaml", []byte("api:\n  port: 7777\n"), 0644); err != nil {
+		t.Fatalf("Failed to write 99-final.yaml: %v", err)
+	}
+
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
+
+	cfg, err := New(&mainConfig)
+	if err != nil {
+		t.Fatalf("New() returned error: %v", err)
+	}
+
+	if cfg.Api.Port != 7777 {
+		t.Errorf("Api.Port = %d, want 7777 (last alphabetical conf.d wins)", cfg.Api.Port)
 	}
 }
