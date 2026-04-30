@@ -3,7 +3,14 @@
 	<!-- Service info -->
 	<div class="content-area">
 		<div class="player-name mb-1">
+			{{ if .URL }}
+			<a href="#"
+			   onclick="openServiceUrl('{{ .URL }}'); return false;"
+			   title="{{ .URL }}"
+			   class="hover:underline">{{ if .Description }}{{ .Description }}{{ else }}{{ .Name }}{{ end }} <span class="text-xs opacity-60">↗</span></a>
+			{{ else }}
 			{{ if .Description }}{{ .Description }}{{ else }}{{ .Name }}{{ end }}
+			{{ end }}
 		</div>
 		<div class="flex items-center gap-2">
 			<div class="player-meta-small">{{ .Name }}</div>

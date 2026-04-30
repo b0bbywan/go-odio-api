@@ -181,6 +181,7 @@ func convertServices(raw []Service) []ServiceView {
 			Active:      s.ActiveState == "active",
 			State:       s.SubState,
 			IsUser:      s.Scope == "user",
+			URL:         s.URL,
 		})
 	}
 	return views
