@@ -14,13 +14,13 @@ func NewListener(backend *SystemdBackend) *Listener {
 
 	// Map for fast filtering
 	sysWatched := make(map[string]bool, len(backend.config.SystemServices))
-	for _, name := range backend.config.SystemServices {
-		sysWatched[name] = true
+	for _, svc := range backend.config.SystemServices {
+		sysWatched[svc.Name] = true
 	}
 
 	userWatched := make(map[string]bool, len(backend.config.UserServices))
-	for _, name := range backend.config.UserServices {
-		userWatched[name] = true
+	for _, svc := range backend.config.UserServices {
+		userWatched[svc.Name] = true
 	}
 
 	return &Listener{

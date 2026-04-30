@@ -31,6 +31,9 @@ systemd:
     - shairport-sync.service
     - snapclient.service
     - spotifyd.service
+    # Each entry may also be an object to attach a URL exposed in the API:
+    # - name: mympd.service
+    #   url: ":8080"
 
 power:
   enabled: false
