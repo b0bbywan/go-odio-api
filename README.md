@@ -435,6 +435,16 @@ Configuration file locations (in order of precedence):
 - `/etc/odio-api/config.yaml` (system-wide)
 - A default configuration is available in `share/config.yaml`
 
+**Drop-in overrides (`conf.d/`):** any `*.yaml` / `*.yml` file dropped in a `conf.d/` directory next to the loaded config is merged on top of the main config in alphabetical order. Snippets override the main file, so `99-local.yaml` wins over `10-base.yaml`. Use this to layer per-host overrides without touching the base config — typical layout:
+
+```
+/etc/odio-api/
+├── config.yaml
+└── conf.d/
+    ├── 10-services.yaml
+    └── 99-local.yaml
+```
+
 Disabling a backend disables the backend and all its routes.
 
 ```yaml
@@ -481,7 +491,8 @@ systemd:
     - pulseaudio.service
     - mpd.service                       # see [1]
     - shairport-sync.service            # see [2]
-    - snapclient.service                # incompatible with mpris
+    - name: "snapclient.service"        # incompatible with mpris
+      url: "http://<snapserver>:1780"
     - spotifyd.service                  # see [3]
     - firefox-kiosk@netflix.com.service # default support for mpris
     - firefox-kiosk@youtube.com.service # default support for mpris
@@ -489,12 +500,16 @@ systemd:
     - kodi.service                      # see [4]
     - vlc.service                       # default support for mpris
     - plex.service                      # see [5]
+    - name: mympd.service               # object form: optional URL exposed in the dashboard
+      url: ":8080"
 ```
 [1] Install `mpd-mpris` or `mpDris2` for MPRIS support
 [2] Check my [article on Medium: Shairport Sync/Airplay with PulseAudio and MPRIS support](https://medium.com/@mathieu-requillart/set-up-a-b83d9c980e75)
 [3] Default on desktop; on headless, your spotifyd version [must be built with MPRIS support](https://docs.spotifyd.rs/advanced/dbus.html)
 [4] Install [Kodi Add-on: MPRIS D-Bus interface](https://github.com/wastis/MediaPlayerRemoteInterface#)
 [5] Maybe supported, untested
+
+Each entry can be a bare service name (string) or an object `{name, url}`; the two forms can be mixed in the same list. When `url` is set, the dashboard renders the service description as a clickable link. The shorthand `:8080` resolves to `<protocol>//<current-host>:8080` client-side, so the link works from any host the dashboard is reached on. `/path` and full URLs are also accepted.
 
 #### Bluetooth
 
