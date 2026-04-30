@@ -230,10 +230,18 @@ func (s *SystemdBackend) listServices(
 	ctx context.Context,
 	conn *dbus.Conn,
 	scope UnitScope,
-	names []string,
+	configured []config.SystemdService,
 ) ([]Service, error) {
 	if conn == nil {
 		return nil, nil
+	}
+	names := make([]string, len(configured))
+	urls := make(map[string]string, len(configured))
+	for i, svc := range configured {
+		names[i] = svc.Name
+		if svc.URL != "" {
+			urls[svc.Name] = svc.URL
+		}
 	}
 	services := make([]Service, 0, len(names))
 	units, err := conn.ListUnitsByNamesContext(ctx, names)
@@ -249,6 +257,7 @@ func (s *SystemdBackend) listServices(
 				ActiveState: unit.ActiveState,
 				Running:     unit.SubState == "running",
 				Exists:      loaded,
+				URL:         urls[unit.Name],
 			}
 			enabled, err := conn.GetUnitPropertyContext(ctx, unit.Name, "UnitFileState")
 			if err != nil {

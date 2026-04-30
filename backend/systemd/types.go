@@ -57,6 +57,7 @@ type Service struct {
 	Enabled     bool      `json:"enabled"`
 	Exists      bool      `json:"exists"`
 	Description string    `json:"description,omitempty"`
+	URL         string    `json:"url,omitempty"`
 }
 
 type unitActionFunc func(ctx context.Context, conn *dbus.Conn, name string) error
