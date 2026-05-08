@@ -3,16 +3,58 @@
 function showToast(message, kind = 'error') {
 	const container = document.getElementById('toast-container');
 	if (!container) return;
+	const promo = document.getElementById('pwa-promo');
 	const toast = document.createElement('div');
-	toast.className = `toast toast-${kind}`;
+	// Class names spelled out so Tailwind's content scanner picks them up.
+	const variant = kind === 'success' ? 'toast-success' : 'toast-error';
+	toast.className = `toast ${variant}`;
 	toast.textContent = message;
 	container.appendChild(toast);
+	// Toast and PWA promo share the header centre slot — fully remove the
+	// promo from layout (display:none, not visibility:hidden) so the toast
+	// takes its place instead of stacking under it. Restore on last toast end.
+	const promoWasVisible = promo && promo.style.display === 'flex';
+	if (promoWasVisible) promo.style.display = 'none';
 	requestAnimationFrame(() => toast.classList.add('toast-visible'));
 	setTimeout(() => {
 		toast.classList.remove('toast-visible');
-		setTimeout(() => toast.remove(), 200);
+		setTimeout(() => {
+			toast.remove();
+			if (promoWasVisible && container.children.length === 0) {
+				promo.style.display = 'flex';
+			}
+		}, 200);
 	}, 4000);
 }
+
+// ── PWA promo ───────────────────────────────────────────────────────────────
+
+const PWA_PROMO_DISMISSED = 'odio.pwa-promo.dismissed';
+
+// The promo stays `hidden` by default to avoid a flash on load if dismissed.
+// We override with inline `display: flex` rather than a class because
+// Tailwind compiles `.hidden` after `.flex` in output.css, so a plain `flex`
+// utility would lose the cascade.
+function dismissPwaPromo() {
+	localStorage.setItem(PWA_PROMO_DISMISSED, '1');
+	const el = document.getElementById('pwa-promo');
+	if (el) el.style.display = '';
+}
+
+function goToPwa() {
+	let path = `/#/i/${window.location.hostname}`;
+	if (window.location.port && window.location.port !== '8018') {
+		path += `/${window.location.port}`;
+	}
+	dismissPwaPromo();
+	window.open(`https://pwa.odio.love${path}`, '_blank', 'noopener,noreferrer');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+	if (localStorage.getItem(PWA_PROMO_DISMISSED) === '1') return;
+	const el = document.getElementById('pwa-promo');
+	if (el) el.style.display = 'flex';
+});
 
 // HTMX errors: 4xx/5xx and network failures. Shuffle/loop also wire their own
 // hx-on::*-error to revert the optimistic icon — that runs independently.

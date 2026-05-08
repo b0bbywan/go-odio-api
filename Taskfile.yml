@@ -64,6 +64,7 @@ tasks:
     sources:
       - "{{.CSS_INPUT}}"
       - ui/templates/**/*.gohtml
+      - ui/static/odio.js
       - tailwind.config.js
     generates:
       - "{{.CSS_OUTPUT}}"

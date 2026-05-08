@@ -24,7 +24,7 @@
 	<!-- Responsive sticky header -->
 	<header class="sticky top-0 z-10 border-b border-zinc-800 bg-zinc-900/95 backdrop-blur">
 		<div class="mx-auto max-w-7xl px-4 py-3 sm:px-6 lg:px-8">
-			<div class="flex items-center justify-between">
+			<div class="flex items-center justify-between gap-3">
 				<div class="flex items-center gap-3">
 					<a href="https://docs.odio.love" target="_blank" rel="noopener noreferrer" title="odio documentation">
 						<img src="/ui/static/logo.png" alt="odio logo" class="h-10 w-10 object-contain">
@@ -39,6 +39,12 @@
 						</p>
 						{{ end }}
 					</div>
+				</div>
+
+				<!-- Centre slot: PWA promo + transient toasts, naturally centred between title and right block -->
+				<div class="flex flex-1 flex-col items-center min-w-0">
+					{{ template "pwa-promo" }}
+					<div id="toast-container" class="pointer-events-none flex flex-col items-center gap-2"></div>
 				</div>
 
 				{{ if .ServerInfo }}
@@ -111,8 +117,6 @@
 		</div>
 	</footer>
 	{{ end }}
-
-	<div id="toast-container" class="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2 pointer-events-none"></div>
 
 	<script src="/ui/static/odio.js"></script>
 </body>

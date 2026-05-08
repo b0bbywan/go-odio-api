@@ -2,6 +2,7 @@
 module.exports = {
   content: [
     "./ui/templates/**/*.gohtml",
+    "./ui/static/odio.js",
   ],
   theme: {
     extend: {
