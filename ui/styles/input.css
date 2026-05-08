@@ -152,8 +152,30 @@ button.htmx-request {
 	}
 
 	.player-card {
-		@apply flex flex-col gap-3 rounded-lg bg-zinc-900/50 p-3 transition-colors hover:bg-zinc-900;
+		@apply rounded-lg bg-zinc-900/50 p-3 transition-colors hover:bg-zinc-900;
 		container-type: inline-size;
+	}
+
+	/* When the player-card is a <details>, give it the same vertical rhythm
+	   as a <div> with flex flex-col gap-3 used to provide. */
+	details.player-card[open] > *:not(summary) {
+		@apply mt-3;
+	}
+
+	.player-summary {
+		@apply flex items-center cursor-pointer;
+	}
+
+	details[open] > summary.player-summary {
+		@apply mb-1;
+	}
+
+	.player-toggle {
+		@apply text-zinc-500 transition-transform duration-200;
+	}
+
+	details[open] > summary .player-toggle {
+		@apply rotate-180;
 	}
 
 	.player-art {
