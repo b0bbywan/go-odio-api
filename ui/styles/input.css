@@ -271,9 +271,15 @@ button.htmx-request {
 	.empty-state-icon {
 		@apply mb-2 text-4xl opacity-50;
 	}
+	.empty-state-icon svg {
+		@apply h-9 w-9;
+	}
 
 	.empty-state-icon-large {
 		@apply mb-4 text-6xl;
+	}
+	.empty-state-icon-large svg {
+		@apply h-14 w-14;
 	}
 
 	.empty-state-title {

@@ -1,16 +1,20 @@
 {{ define "volume-slider" }}
 <div class="flex items-center gap-2">
 	{{ if .ShowMute }}
-	<button class="text-base"
+	<button class="text-base group"
+			data-muted="{{ .Muted }}"
 			{{ if eq .Type "audio-server" }}hx-post="/audio/server/mute"
 			{{ else if eq .Type "audio-client" }}hx-post="/audio/clients/{{ .Target }}/mute"
 			{{ end }}hx-swap="none"
 			hx-on:click="optimisticToggleMute(this)"
 			hx-on::response-error="revertMute(this)"
 			hx-on::send-error="revertMute(this)"
-			title="Toggle mute">{{ if .Muted }}🔇{{ else }}🔊{{ end }}</button>
+			title="Toggle mute">
+		<span class="group-data-[muted=true]:hidden">{{ template "icon-volume" }}</span>
+		<span class="hidden group-data-[muted=true]:inline">{{ template "icon-volume-x" }}</span>
+	</button>
 	{{ else }}
-	<span class="text-xs text-zinc-400">🔊</span>
+	<span class="text-zinc-400">{{ template "icon-volume" }}</span>
 	{{ end }}
 	<input type="range"
 	       class="volume-slider flex-1"
