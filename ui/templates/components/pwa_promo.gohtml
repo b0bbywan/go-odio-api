@@ -1,0 +1,18 @@
+{{/*
+	Dismissible promo for the multi-node PWA. Lives in the header centre flex
+	slot alongside the toast container. Stays `hidden` by default to avoid a
+	flash on dismissed reloads; odio.js sets inline `display: flex` on
+	DOMContentLoaded if localStorage doesn't carry the `odio.pwa-promo.dismissed`
+	flag, and clears the inline style on dismiss so the base `hidden` re-applies.
+	Label is shortened on mobile to fit between the title block and the power buttons.
+*/}}
+{{ define "pwa-promo" }}
+<div id="pwa-promo" class="hidden items-center gap-1 rounded-full bg-gold/20 px-3 py-2 text-sm text-gold">
+	<a href="#" onclick="goToPwa(); return false;" class="hover:underline" title="Open the odio multi-node application">
+		<span class="sm:hidden">📲 App</span>
+		<span class="hidden sm:inline">Multi-node application</span>
+		<span class="text-xs opacity-60">↗</span>
+	</a>
+	<button onclick="dismissPwaPromo()" class="ml-1 text-gold/60 hover:text-gold leading-none" title="Dismiss">×</button>
+</div>
+{{ end }}
