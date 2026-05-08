@@ -69,7 +69,7 @@ func convertPlayers(raw []Player) []PlayerView {
 		if p.Status != "Playing" && p.Status != "Paused" {
 			continue
 		}
-		displayName := strings.TrimPrefix(p.Name, "org.mpris.MediaPlayer2.")
+		displayName := playerDisplayName(p)
 		artUrl := ""
 		if rawArt := p.Metadata["mpris:artUrl"]; rawArt != "" {
 			// Cache-bust on trackid AND artUrl: trackid alone misses Chrome's
@@ -109,6 +109,25 @@ func convertPlayers(raw []Player) []PlayerView {
 func parseMicros(s string) int64 {
 	v, _ := strconv.ParseInt(s, 10, 64)
 	return v
+}
+
+// playerDisplayName picks the cleanest available label for a player. Identity
+// (set by the player itself, e.g. "Chrome", "Spotify") is already user-readable
+// per the MPRIS spec, so we use it as-is. Only when Identity is missing do we
+// fall back to stripping the org.mpris.MediaPlayer2. prefix and any
+// .instanceXXX suffix, then capitalizing the first letter.
+func playerDisplayName(p Player) string {
+	if p.Identity != "" {
+		return p.Identity
+	}
+	name := strings.TrimPrefix(p.Name, "org.mpris.MediaPlayer2.")
+	if i := strings.Index(name, "."); i >= 0 {
+		name = name[:i]
+	}
+	if len(name) > 0 && name[0] >= 'a' && name[0] <= 'z' {
+		name = string(name[0]-32) + name[1:]
+	}
+	return name
 }
 
 func (c *APIClient) GetAudio() (*AudioData, error) {

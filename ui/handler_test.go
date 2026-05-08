@@ -369,6 +369,44 @@ func TestConvertPlayers(t *testing.T) {
 	}
 }
 
+// TestPlayerDisplayName verifies the precedence Identity > cleaned bus_name
+// and capitalization of the first letter.
+func TestPlayerDisplayName(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    Player
+		expected string
+	}{
+		{
+			name:     "identity wins over bus_name and is returned as-is",
+			input:    Player{Name: "org.mpris.MediaPlayer2.chromium.instance5961", Identity: "Chrome"},
+			expected: "Chrome",
+		},
+		{
+			name:     "identity is not re-capitalized",
+			input:    Player{Identity: "audacious"},
+			expected: "audacious",
+		},
+		{
+			name:     "fallback strips instance suffix and capitalizes",
+			input:    Player{Name: "org.mpris.MediaPlayer2.chromium.instance5961"},
+			expected: "Chromium",
+		},
+		{
+			name:     "fallback for plain bus_name",
+			input:    Player{Name: "org.mpris.MediaPlayer2.spotify"},
+			expected: "Spotify",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := playerDisplayName(tt.input); got != tt.expected {
+				t.Errorf("playerDisplayName(%+v) = %q, want %q", tt.input, got, tt.expected)
+			}
+		})
+	}
+}
+
 // TestGetAudio_FilterCorked verifies that corked audio clients are excluded
 func TestGetAudio_FilterCorked(t *testing.T) {
 	apiMux := http.NewServeMux()
