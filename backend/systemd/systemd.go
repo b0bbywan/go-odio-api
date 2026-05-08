@@ -217,6 +217,9 @@ func (s *SystemdBackend) RefreshService(ctx context.Context, name string, scope 
 	}
 
 	svc := serviceFromProps(name, scope, props)
+	// URL is config-derived, not D-Bus-derived, so serviceFromProps can't know
+	// about it. Without this lookup, every refresh wipes the URL from cache.
+	svc.URL = s.configuredURL(name, scope)
 
 	if err := s.UpdateService(svc); err != nil {
 		logger.Debug("[systemd] failed to update %s: %v", name, err)
@@ -224,6 +227,24 @@ func (s *SystemdBackend) RefreshService(ctx context.Context, name string, scope 
 	}
 
 	return &svc, nil
+}
+
+// configuredURL returns the URL declared in the config for this service, or
+// "" if the service has no URL or isn't in the configured list.
+func (s *SystemdBackend) configuredURL(name string, scope UnitScope) string {
+	var configured []config.SystemdService
+	switch scope {
+	case ScopeSystem:
+		configured = s.config.SystemServices
+	case ScopeUser:
+		configured = s.config.UserServices
+	}
+	for _, svc := range configured {
+		if svc.Name == name {
+			return svc.URL
+		}
+	}
+	return ""
 }
 
 func (s *SystemdBackend) listServices(
