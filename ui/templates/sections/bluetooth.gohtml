@@ -1,7 +1,7 @@
 {{ define "section-bluetooth" }}
 <details id="section-bluetooth" open class="section-card">
     <summary class="section-header">
-        <h2 class="section-title">🔵 Bluetooth</h2>
+        <h2 class="section-title flex items-center gap-2">{{ template "icon-bluetooth" }} Bluetooth</h2>
         <div class="flex items-center gap-2">
             {{ if and . .ConnectedCount }}
             <span class="badge badge-blue">{{ .ConnectedCount }} connected</span>

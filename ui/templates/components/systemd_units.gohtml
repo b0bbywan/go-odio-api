@@ -15,15 +15,15 @@
 		<div class="flex items-center gap-2">
 			<div class="player-meta-small">{{ .Name }}</div>
 			{{ if .IsUser }}
-			<button class="text-sm hover:scale-110 transition-transform"
+			<button class="hover:scale-110 transition-transform [&_svg]:h-4 [&_svg]:w-4"
 			        hx-post="/services/user/{{ .Name }}/restart"
 			        hx-swap="none"
-			        title="Restart service">🔄</button>
+			        title="Restart service">{{ template "icon-rotate-cw" }}</button>
 			{{ if .Active }}
-			<button class="text-sm hover:scale-110 transition-transform"
+			<button class="hover:scale-110 transition-transform [&_svg]:h-4 [&_svg]:w-4"
 			        hx-post="/services/user/{{ .Name }}/stop"
 			        hx-swap="none"
-			        title="Stop service">🛑</button>
+			        title="Stop service">{{ template "icon-ban" }}</button>
 			{{ end }}
 			{{ end }}
 		</div>

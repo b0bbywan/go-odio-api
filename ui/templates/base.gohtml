@@ -71,20 +71,20 @@
 					{{ if .ServerInfo.Power }}
 					<div class="flex items-center gap-1">
 						{{ if .ServerInfo.Power.PowerOff }}
-						<button class="text-lg hover:scale-110 transition-transform"
+						<button class="hover:scale-110 transition-transform"
 						        hx-post="/power/power_off"
 						        hx-swap="none"
 						        hx-confirm="Power off the system?"
-						        title="Power off"> 🔌 </button>
+						        title="Power off">{{ template "icon-power" }}</button>
 						{{ end }}
 
 
 						{{ if .ServerInfo.Power.Reboot }}
-						<button class="text-lg hover:scale-110 transition-transform"
+						<button class="hover:scale-110 transition-transform"
 						        hx-post="/power/reboot"
 						        hx-swap="none"
 						        hx-confirm="Reboot the system?"
-						        title="Reboot"> 🔄 </button>
+						        title="Reboot">{{ template "icon-rotate-cw" }}</button>
 						{{ end }}
 					</div>
 					{{ end }}
@@ -107,7 +107,7 @@
 				<div class="flex items-center gap-2">
 					{{ .ServerInfo.APISW }} {{ .ServerInfo.APIVersion }}
 					{{ if .ServerInfo.Backends.Zeroconf }}
-					<span class="rounded-full bg-zinc-700/40 px-2 py-0.5 text-zinc-500">📡 zeroconf</span>
+					<span class="inline-flex items-center gap-1 rounded-full bg-zinc-700/40 px-2 py-0.5 text-zinc-500 [&_svg]:h-3 [&_svg]:w-3">{{ template "icon-radio" }} zeroconf</span>
 					{{ end }}
 				</div>
 				<div>

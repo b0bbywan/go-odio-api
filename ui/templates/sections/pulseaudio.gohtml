@@ -2,7 +2,7 @@
 <details id="section-audio" open class="section-card">
 	<summary class="section-header">
 		<div class="flex items-center gap-2">
-			<h2 class="section-title">🔊 Audio Server</h2>
+			<h2 class="section-title flex items-center gap-2">{{ template "icon-volume" }} Audio Server</h2>
 			{{ if .Kind }}
 			<span class="badge badge-blue text-xs">{{ .Kind }}</span>
 			{{ end }}
@@ -60,7 +60,7 @@
 	{{ end }}
 	{{ else }}
 	<div class="empty-state">
-		<div class="empty-state-icon">🔊</div>
+		<div class="empty-state-icon">{{ template "icon-volume" }}</div>
 		<p class="text-sm text-muted">Audio info unavailable</p>
 	</div>
 	{{ end }}

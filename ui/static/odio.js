@@ -108,17 +108,15 @@ function revertShuffle(btn) {
 	btn.title = `Shuffle ${prev ? 'on' : 'off'}`;
 }
 
+// data-loop drives both the icon swap (via group-data-[loop=Track]: variants)
+// and the active highlight (.btn-active when loop !== "None").
 const LOOP_CYCLE = {None: 'Playlist', Playlist: 'Track', Track: 'None'};
-const ICON_REPEAT = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg>';
-const ICON_REPEAT_ONE = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/><path d="M11 10h1v4"/></svg>';
-const LOOP_ICON = {None: ICON_REPEAT, Playlist: ICON_REPEAT, Track: ICON_REPEAT_ONE};
 
 function optimisticCycleLoop(btn) {
 	const prev = btn.dataset.loop || 'None';
 	const next = LOOP_CYCLE[prev] || 'Playlist';
 	btn.dataset.loopPrev = prev;
 	btn.dataset.loop = next;
-	btn.innerHTML = LOOP_ICON[next];
 	btn.classList.toggle('btn-active', next !== 'None');
 	btn.title = `Repeat: ${next}`;
 }
@@ -126,7 +124,6 @@ function optimisticCycleLoop(btn) {
 function revertLoop(btn) {
 	const prev = btn.dataset.loopPrev || 'None';
 	btn.dataset.loop = prev;
-	btn.innerHTML = LOOP_ICON[prev];
 	btn.classList.toggle('btn-active', prev !== 'None');
 	btn.title = `Repeat: ${prev}`;
 }
@@ -225,11 +222,32 @@ document.addEventListener('htmx:sseBeforeMessage', function(e) {
 	}
 });
 
+// Both icons are rendered in the button; toggling data-muted on the button
+// flips which one is visible via Tailwind's group-data-[muted=true]: variants.
+// Reverting an optimistic toggle is the same operation: flip data-muted again.
 function optimisticToggleMute(button) {
-	button.dataset.prevText = button.textContent.trim();
-	button.textContent = button.textContent.trim() === '🔇' ? '🔊' : '🔇';
+	button.dataset.muted = button.dataset.muted === 'true' ? 'false' : 'true';
 }
+const revertMute = optimisticToggleMute;
 
-function revertMute(button) {
-	if (button.dataset.prevText) button.textContent = button.dataset.prevText;
+// MPRIS has no backend mute property: we simulate it by sending volume=0 and
+// remembering the previous volume in data-prev-volume so unmute can restore it.
+// The sibling slider is moved optimistically so the change is immediate.
+// data-target-volume is read by the button's hx-vals to build the POST body.
+function optimisticToggleMuteMpris(button) {
+	const slider = button.parentElement.querySelector('.volume-slider');
+	if (!slider) return;
+	const isMuted = button.dataset.muted === 'true';
+	if (isMuted) {
+		const prev = parseFloat(button.dataset.prevVolume) || 1;
+		slider.value = Math.round(prev * 100);
+		button.dataset.targetVolume = prev;
+	} else {
+		const current = parseInt(slider.value) / 100;
+		if (current > 0) button.dataset.prevVolume = current;
+		slider.value = 0;
+		button.dataset.targetVolume = 0;
+	}
+	button.dataset.muted = isMuted ? 'false' : 'true';
 }
+const revertMuteMpris = optimisticToggleMuteMpris;
