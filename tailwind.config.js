@@ -20,8 +20,9 @@ module.exports = {
           950: '#060c08',
         },
         leaf: '#4a7c59',
-        moss:  '#2a4e35',
-        gold:  '#c8963a',
+        moss: '#2a4e35',
+        lime: '#5ab81e', // bright "active" accent — matches the CTA on odio.love
+        gold: '#c8963a',
       },
     },
   },

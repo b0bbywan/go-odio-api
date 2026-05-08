@@ -28,7 +28,9 @@
 			<ul class="hidden absolute left-0 right-0 mt-1 bg-zinc-800 border border-zinc-700 rounded shadow-lg z-10 max-h-48 overflow-y-auto">
 				{{ range .Outputs }}
 				<li>
-					<button onclick="setDefaultOutput('{{ .Name }}'); closeSinkDropdown()"
+					<button hx-post="/audio/outputs/{{ .Name }}/default"
+						hx-swap="none"
+						hx-on:click="closeSinkDropdown()"
 						class="w-full text-left px-3 py-2 text-sm hover:bg-zinc-700 cursor-pointer truncate {{ if .Default }}text-leaf font-medium{{ else }}text-zinc-300{{ end }}">
 						{{ .Description }}
 					</button>

@@ -1,9 +1,14 @@
 {{ define "volume-slider" }}
 <div class="flex items-center gap-2">
 	{{ if .ShowMute }}
-	<button class="text-base" onclick="toggleMute(this, '{{ .Target }}', '{{ .Type }}')" title="Toggle mute">
-		{{ if .Muted }}🔇{{ else }}🔊{{ end }}
-	</button>
+	<button class="text-base"
+			{{ if eq .Type "audio-server" }}hx-post="/audio/server/mute"
+			{{ else if eq .Type "audio-client" }}hx-post="/audio/clients/{{ .Target }}/mute"
+			{{ end }}hx-swap="none"
+			hx-on:click="optimisticToggleMute(this)"
+			hx-on::response-error="revertMute(this)"
+			hx-on::send-error="revertMute(this)"
+			title="Toggle mute">{{ if .Muted }}🔇{{ else }}🔊{{ end }}</button>
 	{{ else }}
 	<span class="text-xs text-zinc-400">🔊</span>
 	{{ end }}
@@ -12,7 +17,13 @@
 	       min="0"
 	       max="100"
 	       value="{{ printf "%.0f" (mul .Volume 100) }}"
-	       oninput="updateVolume(this, '{{ .Target }}', '{{ .Type }}')"
+	       hx-ext="json-enc"
+	       {{ if eq .Type "mpris" }}hx-post="/players/{{ .Target }}/volume"
+	       {{ else if eq .Type "audio-server" }}hx-post="/audio/server/volume"
+	       {{ else if eq .Type "audio-client" }}hx-post="/audio/clients/{{ .Target }}/volume"
+	       {{ end }}hx-trigger="input changed delay:100ms"
+	       hx-swap="none"
+	       hx-vals='js:{volume: parseInt(this.value) / 100}'
 	       title="{{ if .Title }}{{ .Title }}{{ else }}Volume{{ end }}">
 </div>
 {{ end }}

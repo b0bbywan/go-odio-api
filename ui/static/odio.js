@@ -1,55 +1,92 @@
-function togglePlayPause(button, playerName) {
-	const currentIcon = button.textContent.trim();
-	const isPlaying = currentIcon === '⏸';
+// ── Toasts ──────────────────────────────────────────────────────────────────
 
-	const newIcon = isPlaying ? '▶' : '⏸';
-	const newTitle = isPlaying ? 'Play' : 'Pause';
+function showToast(message, kind = 'error') {
+	const container = document.getElementById('toast-container');
+	if (!container) return;
+	const toast = document.createElement('div');
+	toast.className = `toast toast-${kind}`;
+	toast.textContent = message;
+	container.appendChild(toast);
+	requestAnimationFrame(() => toast.classList.add('toast-visible'));
+	setTimeout(() => {
+		toast.classList.remove('toast-visible');
+		setTimeout(() => toast.remove(), 200);
+	}, 4000);
+}
 
-	button.textContent = newIcon;
-	button.title = newTitle;
+// HTMX errors: 4xx/5xx and network failures. Shuffle/loop also wire their own
+// hx-on::*-error to revert the optimistic icon — that runs independently.
+document.body.addEventListener('htmx:responseError', e => {
+	const xhr = e.detail.xhr;
+	const text = (xhr.responseText || '').trim();
+	showToast(text || `${xhr.status} ${xhr.statusText}`);
+});
+document.body.addEventListener('htmx:sendError', () => {
+	showToast('Network error');
+});
 
-	// Update data-playing immediately so the seeker stops/starts without
-	// waiting for the next HTMX poll.
+// ── Transport buttons ───────────────────────────────────────────────────────
+
+// Both icons live in the button as <span>; group-data-[playing=true]: variants
+// flip which one is visible. JS only flips data-playing, the title and the
+// matching seeker so its interpolation stops/starts without waiting for the
+// next HTMX poll. Reverting an optimistic toggle is the same operation.
+function optimisticTogglePlayPause(button, playerName) {
+	const next = button.dataset.playing !== 'true';
+	button.dataset.playing = next;
+	button.title = next ? 'Pause' : 'Play';
 	const slider = document.querySelector(`.seek-slider[data-player="${CSS.escape(playerName)}"]`);
 	if (slider) {
-		const val = isPlaying ? 'false' : 'true';
+		const val = next ? 'true' : 'false';
 		slider.dataset.playing = val;
 		const span = slider.previousElementSibling;
 		if (span) span.dataset.playing = val;
 	}
+}
+const revertPlayPause = optimisticTogglePlayPause;
 
-	fetch(`/players/${playerName}/play_pause`, {
-		method: 'POST'
-	}).catch(() => {
-		button.textContent = currentIcon;
-		button.title = isPlaying ? 'Pause' : 'Play';
-		if (slider) {
-			const val = isPlaying ? 'true' : 'false';
-			slider.dataset.playing = val;
-			const span = slider.previousElementSibling;
-			if (span) span.dataset.playing = val;
-		}
-		console.error('Failed to toggle play/pause');
-	});
+// Shuffle / loop are wired with HTMX (hx-post + hx-vals), but the button still
+// flips its visual state in this onclick handler so the icon doesn't lag behind
+// the SSE refresh. The previous state is stashed in a data attribute so the
+// hx-on::*-error revert can restore it without re-querying the server.
+
+function optimisticToggleShuffle(btn) {
+	const prev = btn.dataset.shuffle === 'true';
+	btn.dataset.shufflePrev = prev;
+	const next = !prev;
+	btn.dataset.shuffle = next;
+	btn.classList.toggle('btn-active', next);
+	btn.title = `Shuffle ${next ? 'on' : 'off'}`;
 }
 
-function updateVolume(slider, target, type) {
-	const volume = slider.value / 100;
+function revertShuffle(btn) {
+	const prev = btn.dataset.shufflePrev === 'true';
+	btn.dataset.shuffle = prev;
+	btn.classList.toggle('btn-active', prev);
+	btn.title = `Shuffle ${prev ? 'on' : 'off'}`;
+}
 
-	let url;
-	if (type === 'mpris') {
-		url = `/players/${target}/volume`;
-	} else if (type === 'audio-server') {
-		url = '/audio/server/volume';
-	} else if (type === 'audio-client') {
-		url = `/audio/clients/${target}/volume`;
-	}
+const LOOP_CYCLE = {None: 'Playlist', Playlist: 'Track', Track: 'None'};
+const ICON_REPEAT = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg>';
+const ICON_REPEAT_ONE = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/><path d="M11 10h1v4"/></svg>';
+const LOOP_ICON = {None: ICON_REPEAT, Playlist: ICON_REPEAT, Track: ICON_REPEAT_ONE};
 
-	fetch(url, {
-		method: 'POST',
-		headers: {'Content-Type': 'application/json'},
-		body: JSON.stringify({volume: volume})
-	}).catch(err => console.error('Failed to set volume:', err));
+function optimisticCycleLoop(btn) {
+	const prev = btn.dataset.loop || 'None';
+	const next = LOOP_CYCLE[prev] || 'Playlist';
+	btn.dataset.loopPrev = prev;
+	btn.dataset.loop = next;
+	btn.innerHTML = LOOP_ICON[next];
+	btn.classList.toggle('btn-active', next !== 'None');
+	btn.title = `Repeat: ${next}`;
+}
+
+function revertLoop(btn) {
+	const prev = btn.dataset.loopPrev || 'None';
+	btn.dataset.loop = prev;
+	btn.innerHTML = LOOP_ICON[prev];
+	btn.classList.toggle('btn-active', prev !== 'None');
+	btn.title = `Repeat: ${prev}`;
 }
 
 // ── Position seeker ──────────────────────────────────────────────────────────
@@ -75,19 +112,12 @@ function onSeekerInput(slider) {
 	slider.previousElementSibling.textContent = fmtMicros(parseInt(slider.value));
 }
 
-// On release: send absolute target position; the backend resolves the track ID
-// and computes the relative offset if needed.
-function onSeekerChange(slider) {
-	const position = parseInt(slider.value);
-	// Optimistically update data attributes so updatePositions interpolates
-	// from the new position instead of snapping back to the old cached one.
-	slider.dataset.position = position;
+// On release: optimistically update data attributes so updatePositions
+// interpolates from the new position instead of snapping back to the old
+// cached one. The HTMX hx-post on the slider handles the server call.
+function optimisticSeek(slider) {
+	slider.dataset.position = parseInt(slider.value);
 	slider.dataset.positionUpdatedAt = new Date().toISOString();
-	fetch(`/players/${slider.dataset.player}/position`, {
-		method: 'POST',
-		headers: {'Content-Type': 'application/json'},
-		body: JSON.stringify({position: position})
-	}).catch(err => console.error('Seek failed:', err));
 }
 
 // Tick all seekers every 500 ms. Queries the live DOM each time so HTMX
@@ -116,12 +146,6 @@ function openServiceUrl(u) {
 		u = window.location.protocol + u;
 	}
 	window.open(u, '_blank', 'noopener,noreferrer');
-}
-
-function setDefaultOutput(name) {
-	fetch(`/audio/outputs/${encodeURIComponent(name)}/default`, {
-		method: 'POST'
-	}).catch(err => console.error('Failed to set default output:', err));
 }
 
 function closeSinkDropdown() {
@@ -159,17 +183,11 @@ document.addEventListener('htmx:sseBeforeMessage', function(e) {
 	}
 });
 
-function toggleMute(button, target, type) {
-	let url;
-	if (type === 'audio-server') {
-		url = '/audio/server/mute';
-	} else if (type === 'audio-client') {
-		url = `/audio/clients/${target}/mute`;
-	}
+function optimisticToggleMute(button) {
+	button.dataset.prevText = button.textContent.trim();
+	button.textContent = button.textContent.trim() === '🔇' ? '🔊' : '🔇';
+}
 
-	fetch(url, {method: 'POST'})
-		.then(() => {
-			button.textContent = button.textContent === '🔇' ? '🔊' : '🔇';
-		})
-		.catch(err => console.error('Failed to toggle mute:', err));
+function revertMute(button) {
+	if (button.dataset.prevText) button.textContent = button.dataset.prevText;
 }
