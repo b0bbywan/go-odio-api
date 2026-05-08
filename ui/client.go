@@ -71,8 +71,16 @@ func convertPlayers(raw []Player) []PlayerView {
 		}
 		displayName := strings.TrimPrefix(p.Name, "org.mpris.MediaPlayer2.")
 		artUrl := ""
-		if p.Metadata["mpris:artUrl"] != "" {
-			artUrl = "/players/" + p.Name + "/cover?v=" + url.QueryEscape(p.Metadata["mpris:trackid"])
+		if rawArt := p.Metadata["mpris:artUrl"]; rawArt != "" {
+			// Cache-bust on trackid AND artUrl: trackid alone misses Chrome's
+			// case where it keeps a stable trackid across track changes but
+			// rotates the art file path; artUrl alone misses players that
+			// reuse the same art file across distinct tracks.
+			q := url.Values{
+				"t": {p.Metadata["mpris:trackid"]},
+				"a": {rawArt},
+			}
+			artUrl = "/players/" + p.Name + "/cover?" + q.Encode()
 		}
 		views = append(views, PlayerView{
 			Name:              p.Name,
