@@ -165,6 +165,26 @@ button.htmx-request {
 		@apply rounded-lg bg-zinc-700/50 px-3 py-2 text-sm transition-colors hover:bg-zinc-700 active:scale-95;
 	}
 
+	.btn-active {
+		@apply text-lime;
+	}
+
+	.toast {
+		@apply rounded-lg px-4 py-2 text-sm shadow-lg pointer-events-auto opacity-0 transition-opacity duration-200 max-w-md;
+	}
+
+	.toast-visible {
+		@apply opacity-100;
+	}
+
+	.toast-error {
+		@apply bg-red-500/20 text-red-400 border border-red-500/30;
+	}
+
+	.toast-success {
+		@apply bg-leaf/20 text-leaf border border-leaf/30;
+	}
+
 	.text-muted {
 		@apply text-zinc-400;
 	}

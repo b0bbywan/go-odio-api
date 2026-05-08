@@ -37,7 +37,12 @@
 			data-position-updated-at="{{ .PositionUpdatedAt }}"
 			data-playing="{{ eq .State "Playing" }}"
 			oninput="onSeekerInput(this)"
-			onchange="onSeekerChange(this)">
+			hx-ext="json-enc"
+			hx-post="/players/{{ .Name }}/position"
+			hx-trigger="change"
+			hx-swap="none"
+			hx-vals='js:{position: parseInt(this.value)}'
+			hx-on:change="optimisticSeek(this)">
 		<span class="dur-time">{{ fmtMicros .Duration }}</span>
 	</div>
 	{{ end }}
@@ -49,21 +54,72 @@
 	</div>
 	{{ end }}
 
-	<!-- Control buttons (centered) — hidden when no capability is available -->
-	{{ if or .CanPrev (or .CanPlay .CanPause) .CanNext }}
-	<div class="flex justify-center gap-2">
+	<!-- Transport controls — single row, hidden when nothing is available -->
+	{{ if or (or .CanShuffle .CanPrev) (or (or .CanPlay .CanPause) .CanStop) (or .CanNext .CanLoop) }}
+	<div class="flex justify-center items-center gap-2">
+		{{ if .CanShuffle }}
+		<button class="btn{{ if .Shuffle }} btn-active{{ end }}"
+				data-shuffle="{{ .Shuffle }}"
+				hx-ext="json-enc"
+				hx-post="/players/{{ .Name }}/shuffle"
+				hx-swap="none"
+				hx-vals='js:{shuffle: this.dataset.shuffle === "true"}'
+				hx-on:click="optimisticToggleShuffle(this)"
+				hx-on::response-error="revertShuffle(this)"
+				hx-on::send-error="revertShuffle(this)"
+				title="Shuffle {{ if .Shuffle }}on{{ else }}off{{ end }}">{{ template "icon-shuffle" }}</button>
+		{{ end }}
 		{{ if .CanPrev }}
-		<button class="btn" hx-post="/players/{{ .Name }}/previous" hx-swap="none" title="Previous track">⏮</button>
+		<button class="btn" hx-post="/players/{{ .Name }}/previous" hx-swap="none" title="Previous track">{{ template "icon-prev" }}</button>
 		{{ end }}
 		{{ if or .CanPlay .CanPause }}
-		<button class="btn" onclick="togglePlayPause(this, '{{ .Name }}')" title="{{ if eq .State "Playing" }}Pause{{ else }}Play{{ end }}">
-			{{ if eq .State "Playing" }}⏸{{ else }}▶{{ end }}
+		<button class="btn group"
+				data-playing="{{ eq .State "Playing" }}"
+				hx-post="/players/{{ .Name }}/play_pause"
+				hx-swap="none"
+				hx-on:click="optimisticTogglePlayPause(this, '{{ .Name }}')"
+				hx-on::response-error="revertPlayPause(this, '{{ .Name }}')"
+				hx-on::send-error="revertPlayPause(this, '{{ .Name }}')"
+				title="{{ if eq .State "Playing" }}Pause{{ else }}Play{{ end }}">
+			<span class="group-data-[playing=true]:hidden">{{ template "icon-play" }}</span>
+			<span class="hidden group-data-[playing=true]:inline">{{ template "icon-pause" }}</span>
 		</button>
 		{{ end }}
+		{{ if .CanStop }}
+		<button class="btn" hx-post="/players/{{ .Name }}/stop" hx-swap="none" title="Stop">{{ template "icon-stop" }}</button>
+		{{ end }}
 		{{ if .CanNext }}
-		<button class="btn" hx-post="/players/{{ .Name }}/next" hx-swap="none" title="Next track">⏭</button>
+		<button class="btn" hx-post="/players/{{ .Name }}/next" hx-swap="none" title="Next track">{{ template "icon-next" }}</button>
+		{{ end }}
+		{{ if .CanLoop }}
+		<button class="btn{{ if ne .LoopStatus "None" }} btn-active{{ end }}"
+				data-loop="{{ .LoopStatus }}"
+				hx-ext="json-enc"
+				hx-post="/players/{{ .Name }}/loop"
+				hx-swap="none"
+				hx-vals='js:{loop: this.dataset.loop}'
+				hx-on:click="optimisticCycleLoop(this)"
+				hx-on::response-error="revertLoop(this)"
+				hx-on::send-error="revertLoop(this)"
+				title="Repeat: {{ .LoopStatus }}">{{ if eq .LoopStatus "Track" }}{{ template "icon-repeat-one" }}{{ else }}{{ template "icon-repeat" }}{{ end }}</button>
 		{{ end }}
 	</div>
 	{{ end }}
 </div>
 {{ end }}
+
+{{ define "icon-shuffle" }}<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 18h1.4c1.3 0 2.5-.6 3.3-1.7l6.1-8.6c.7-1.1 2-1.7 3.3-1.7H22"/><path d="m18 2 4 4-4 4"/><path d="M2 6h1.9c1.5 0 2.9.9 3.6 2.2"/><path d="M22 18h-5.9c-1.3 0-2.6-.7-3.3-1.8l-.5-.8"/><path d="m18 14 4 4-4 4"/></svg>{{ end }}
+
+{{ define "icon-prev" }}<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="19" x2="5" y2="5"/></svg>{{ end }}
+
+{{ define "icon-play" }}<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg>{{ end }}
+
+{{ define "icon-pause" }}<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>{{ end }}
+
+{{ define "icon-stop" }}<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="14" height="14" rx="1"/></svg>{{ end }}
+
+{{ define "icon-next" }}<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/></svg>{{ end }}
+
+{{ define "icon-repeat" }}<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg>{{ end }}
+
+{{ define "icon-repeat-one" }}<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/><path d="M11 10h1v4"/></svg>{{ end }}

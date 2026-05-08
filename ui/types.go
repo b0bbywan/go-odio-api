@@ -53,6 +53,8 @@ type Player struct {
 	PositionUpdatedAt time.Time          `json:"position_updated_at"`
 	Rate              float64            `json:"rate"`
 	Volume            *float64           `json:"volume"`
+	Shuffle           bool               `json:"shuffle"`     // omitted by backend when false (omitempty)
+	LoopStatus        *string            `json:"loop_status"` // pointer: nil ⇒ player doesn't expose LoopStatus
 	Capabilities      PlayerCapabilities `json:"capabilities"`
 }
 
@@ -146,6 +148,14 @@ type PlayerView struct {
 	CanPause    bool
 	CanNext     bool
 	CanPrev     bool
+	CanStop     bool // alias for CanControl on the API side
+	// Shuffle / repeat — visibility is gated on LoopStatus presence: most
+	// players that expose LoopStatus also expose Shuffle, and the backend's
+	// omitempty on Shuffle prevents reliable detection on its own.
+	CanShuffle bool
+	Shuffle    bool
+	CanLoop    bool
+	LoopStatus string // "None", "Track", "Playlist" — empty when CanLoop is false
 	// Seeker fields
 	Position          int64   // Current position in microseconds (as of PositionUpdatedAt)
 	Duration          int64   // Track duration in microseconds (from mpris:length)

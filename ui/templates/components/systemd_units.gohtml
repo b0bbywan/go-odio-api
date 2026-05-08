@@ -32,8 +32,8 @@
 	<!-- Status indicator -->
 	<div class="meta-area">
 		<span class="flex items-center gap-1.5 text-xs">
-			<span class="status-dot {{ if .Active }}bg-green-500{{ else }}bg-red-500{{ end }}"></span>
-			<span class="{{ if .Active }}text-green-400{{ else }}text-red-400{{ end }}">
+			<span class="status-dot {{ if .Active }}bg-lime{{ else }}bg-red-500{{ end }}"></span>
+			<span class="{{ if .Active }}text-lime{{ else }}text-red-400{{ end }}">
 				{{ .State }}
 			</span>
 		</span>

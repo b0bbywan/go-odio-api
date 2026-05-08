@@ -82,6 +82,11 @@ func convertPlayers(raw []Player) []PlayerView {
 			}
 			artUrl = "/players/" + p.Name + "/cover?" + q.Encode()
 		}
+		hasLoop := p.LoopStatus != nil
+		loopVal := ""
+		if hasLoop {
+			loopVal = *p.LoopStatus
+		}
 		views = append(views, PlayerView{
 			Name:              p.Name,
 			DisplayName:       displayName,
@@ -95,6 +100,11 @@ func convertPlayers(raw []Player) []PlayerView {
 			CanPause:          p.Capabilities.CanPause,
 			CanNext:           p.Capabilities.CanGoNext,
 			CanPrev:           p.Capabilities.CanGoPrevious,
+			CanStop:           p.Capabilities.CanControl,
+			CanShuffle:        hasLoop,
+			Shuffle:           p.Shuffle,
+			CanLoop:           hasLoop,
+			LoopStatus:        loopVal,
 			Position:          p.Position,
 			Duration:          parseMicros(p.Metadata["mpris:length"]),
 			Rate:              p.Rate,
