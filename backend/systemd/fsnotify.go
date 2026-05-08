@@ -118,12 +118,17 @@ func (l *Listener) waitForStableState(service string) {
 		l.watcherMap.Delete(service)
 		if ctx.Err() == context.DeadlineExceeded {
 			logger.Warn("[systemd] %s failed to start in less than %s, cache might be out of sync", service, timeout)
+			refreshCtx, refreshCancel := context.WithTimeout(l.backend.ctx, 5*time.Second)
+			if unit, err := l.backend.RefreshService(refreshCtx, service, ScopeUser); err == nil {
+				l.backend.notify(events.Event{Type: events.TypeServiceUpdated, Data: *unit})
+			}
+			refreshCancel()
 		}
 		cancel()
 	}()
 
 	logger.Debug("[systemd] waitForStableState %s", service)
-	waitTime := 1 * time.Minute
+	waitTime := 1 * time.Second
 	maxWait := 8 * time.Second
 	factor := 1.5
 
