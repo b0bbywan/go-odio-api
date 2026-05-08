@@ -288,7 +288,7 @@ func TestConvertPlayers(t *testing.T) {
 			expected: []PlayerView{
 				{
 					Name:   "org.mpris.MediaPlayer2.mpd",
-					ArtUrl: "/players/org.mpris.MediaPlayer2.mpd/cover?v=%2Forg%2Fmpd%2Ftrack%2F1",
+					ArtUrl: "/players/org.mpris.MediaPlayer2.mpd/cover?a=file%3A%2F%2F%2Ftmp%2Fcover.jpg&t=%2Forg%2Fmpd%2Ftrack%2F1",
 					State:  "Playing",
 				},
 			},
@@ -308,7 +308,7 @@ func TestConvertPlayers(t *testing.T) {
 			expected: []PlayerView{
 				{
 					Name:   "org.mpris.MediaPlayer2.spotify",
-					ArtUrl: "/players/org.mpris.MediaPlayer2.spotify/cover?v=%2Fcom%2Fspotify%2Ftrack%2Fabc123",
+					ArtUrl: "/players/org.mpris.MediaPlayer2.spotify/cover?a=https%3A%2F%2Fi.scdn.co%2Fimage%2Fabc123&t=%2Fcom%2Fspotify%2Ftrack%2Fabc123",
 					State:  "Playing",
 				},
 			},
