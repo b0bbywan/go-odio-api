@@ -3,6 +3,7 @@ package mpris
 import (
 	"fmt"
 	"reflect"
+	"time"
 
 	"github.com/godbus/dbus/v5"
 )
@@ -138,6 +139,8 @@ func (p *Player) loadFromDBus() error {
 
 	// Load capabilities from already retrieved properties
 	p.Capabilities = p.loadCapabilitiesFromProps(propsPlayer)
+
+	p.PositionUpdatedAt = time.Now()
 
 	return nil
 }

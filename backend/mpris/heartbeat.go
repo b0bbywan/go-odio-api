@@ -117,6 +117,14 @@ func (h *Heartbeat) updatePlayingPositions() bool {
 			continue
 		}
 
+		// Bluez/AVRCP often returns a stale Position (the value latched at the
+		// last AVRCP report). Skip to avoid re-bumping the cache timestamp with
+		// no real change.
+		if pos == player.Position {
+			logger.Debug("[mpris] skipping unchanged position for %s (%d)", player.BusName, pos)
+			continue
+		}
+
 		positions[player.BusName] = positionUpdate{
 			position:  pos,
 			trackID:   player.Metadata["mpris:trackid"],

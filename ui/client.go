@@ -60,10 +60,10 @@ func (c *APIClient) GetPlayers() ([]PlayerView, error) {
 	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
 		return nil, fmt.Errorf("/players: decode failed: %w", err)
 	}
-	return convertPlayers(raw, resp.Header.Get("X-Cache-Updated-At")), nil
+	return convertPlayers(raw), nil
 }
 
-func convertPlayers(raw []Player, cacheUpdatedAt string) []PlayerView {
+func convertPlayers(raw []Player) []PlayerView {
 	views := make([]PlayerView, 0, len(raw))
 	for _, p := range raw {
 		if p.Status != "Playing" && p.Status != "Paused" {
@@ -75,23 +75,23 @@ func convertPlayers(raw []Player, cacheUpdatedAt string) []PlayerView {
 			artUrl = "/players/" + p.Name + "/cover?v=" + url.QueryEscape(p.Metadata["mpris:trackid"])
 		}
 		views = append(views, PlayerView{
-			Name:           p.Name,
-			DisplayName:    displayName,
-			Artist:         p.Metadata["xesam:artist"],
-			Title:          p.Metadata["xesam:title"],
-			Album:          p.Metadata["xesam:album"],
-			ArtUrl:         artUrl,
-			State:          p.Status,
-			Volume:         p.Volume,
-			CanPlay:        p.Capabilities.CanPlay,
-			CanPause:       p.Capabilities.CanPause,
-			CanNext:        p.Capabilities.CanGoNext,
-			CanPrev:        p.Capabilities.CanGoPrevious,
-			Position:       p.Position,
-			Duration:       parseMicros(p.Metadata["mpris:length"]),
-			Rate:           p.Rate,
-			CanSeek:        p.Capabilities.CanSeek,
-			CacheUpdatedAt: cacheUpdatedAt,
+			Name:              p.Name,
+			DisplayName:       displayName,
+			Artist:            p.Metadata["xesam:artist"],
+			Title:             p.Metadata["xesam:title"],
+			Album:             p.Metadata["xesam:album"],
+			ArtUrl:            artUrl,
+			State:             p.Status,
+			Volume:            p.Volume,
+			CanPlay:           p.Capabilities.CanPlay,
+			CanPause:          p.Capabilities.CanPause,
+			CanNext:           p.Capabilities.CanGoNext,
+			CanPrev:           p.Capabilities.CanGoPrevious,
+			Position:          p.Position,
+			Duration:          parseMicros(p.Metadata["mpris:length"]),
+			Rate:              p.Rate,
+			CanSeek:           p.Capabilities.CanSeek,
+			PositionUpdatedAt: p.PositionUpdatedAt.Format(time.RFC3339Nano),
 		})
 	}
 	return views

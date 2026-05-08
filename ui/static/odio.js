@@ -65,8 +65,8 @@ function fmtMicros(us) {
 // the cache timestamp embedded in the element's data attributes.
 function currentPos(el) {
 	const base = parseInt(el.dataset.position);
-	if (el.dataset.playing !== 'true' || !el.dataset.cacheUpdatedAt) return base;
-	const elapsed = Date.now() - new Date(el.dataset.cacheUpdatedAt).getTime(); // ms
+	if (el.dataset.playing !== 'true' || !el.dataset.positionUpdatedAt) return base;
+	const elapsed = Date.now() - new Date(el.dataset.positionUpdatedAt).getTime(); // ms
 	return base + elapsed * 1000 * (parseFloat(el.dataset.rate) || 1.0); // → µs
 }
 
@@ -82,7 +82,7 @@ function onSeekerChange(slider) {
 	// Optimistically update data attributes so updatePositions interpolates
 	// from the new position instead of snapping back to the old cached one.
 	slider.dataset.position = position;
-	slider.dataset.cacheUpdatedAt = new Date().toISOString();
+	slider.dataset.positionUpdatedAt = new Date().toISOString();
 	fetch(`/players/${slider.dataset.player}/position`, {
 		method: 'POST',
 		headers: {'Content-Type': 'application/json'},

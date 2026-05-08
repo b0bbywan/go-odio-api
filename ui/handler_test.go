@@ -344,7 +344,7 @@ func TestConvertPlayers(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := convertPlayers(tt.input, "")
+			result := convertPlayers(tt.input)
 			if tt.expected == nil {
 				if len(result) != 0 {
 					t.Fatalf("Expected no players, got %d", len(result))
