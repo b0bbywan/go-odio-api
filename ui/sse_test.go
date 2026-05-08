@@ -65,7 +65,10 @@ func TestSSEEvents_ContentType(t *testing.T) {
 	}
 }
 
-func TestSSEEvents_PlayerPositionTriggersMPRIS(t *testing.T) {
+// player.position events are intentionally NOT mapped to a section refresh:
+// the seeker is interpolated client-side, so re-rendering on every heartbeat
+// tick (5s) would just make the card flicker.
+func TestSSEEvents_PlayerPositionDoesNotTriggerMPRIS(t *testing.T) {
 	upstream := make(chan events.Event, 4)
 	b := backend.NewBroadcaster(context.Background(), upstream)
 
@@ -102,8 +105,8 @@ func TestSSEEvents_PlayerPositionTriggersMPRIS(t *testing.T) {
 	<-done
 
 	body := w.Body.String()
-	if !strings.Contains(body, "event: section-mpris") {
-		t.Errorf("expected section-mpris SSE event for player.position, got: %s", body)
+	if strings.Contains(body, "event: section-mpris") {
+		t.Errorf("expected no section-mpris SSE event for player.position, got: %s", body)
 	}
 }
 
