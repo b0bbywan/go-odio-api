@@ -198,8 +198,11 @@ func (m *MPRISBackend) UpdatePlayerProperties(busName string, changed map[string
 						players[i].Metadata[k] = formatMetadataValue(v.Value())
 					}
 					// Track changed — reset stale position from previous track
-					if players[i].Metadata["mpris:trackid"] != oldTrackID {
+					newTrackID := players[i].Metadata["mpris:trackid"]
+					if newTrackID != oldTrackID {
+						logger.Debug("[mpris] %s trackid changed %q -> %q, resetting position", busName, oldTrackID, newTrackID)
 						players[i].Position = 0
+						players[i].PositionUpdatedAt = time.Now()
 					}
 				}
 			case "Rate":
@@ -209,6 +212,7 @@ func (m *MPRISBackend) UpdatePlayerProperties(busName string, changed map[string
 			case "Position":
 				if val, ok := extractInt64(variant); ok && val > 0 {
 					players[i].Position = val
+					players[i].PositionUpdatedAt = time.Now()
 				}
 			}
 		}
@@ -241,6 +245,7 @@ func (m *MPRISBackend) UpdatePositions(positions map[string]positionUpdate) {
 	for i, player := range players {
 		if u, ok := positions[player.BusName]; ok {
 			players[i].Position = u.position
+			players[i].PositionUpdatedAt = time.UnixMilli(u.emittedAt)
 			updates = append(updates, map[string]any{
 				"bus_name":   player.BusName,
 				"track_id":   u.trackID,

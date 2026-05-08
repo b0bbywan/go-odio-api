@@ -45,13 +45,14 @@ type PlayerCapabilities struct {
 
 // Player represents an MPRIS player from /players
 type Player struct {
-	Name         string             `json:"bus_name"` // API returns "bus_name", not "name"
-	Metadata     map[string]string  `json:"metadata"`
-	Status       string             `json:"playback_status"` // API returns "playback_status", not "status"
-	Position     int64              `json:"position"`
-	Rate         float64            `json:"rate"`
-	Volume       *float64           `json:"volume"`
-	Capabilities PlayerCapabilities `json:"capabilities"`
+	Name              string             `json:"bus_name"` // API returns "bus_name", not "name"
+	Metadata          map[string]string  `json:"metadata"`
+	Status            string             `json:"playback_status"` // API returns "playback_status", not "status"
+	Position          int64              `json:"position"`
+	PositionUpdatedAt time.Time          `json:"position_updated_at"`
+	Rate              float64            `json:"rate"`
+	Volume            *float64           `json:"volume"`
+	Capabilities      PlayerCapabilities `json:"capabilities"`
 }
 
 // AudioOutput represents a PulseAudio/PipeWire sink from /audio
@@ -145,11 +146,11 @@ type PlayerView struct {
 	CanNext     bool
 	CanPrev     bool
 	// Seeker fields
-	Position       int64   // Current position in microseconds (as of CacheUpdatedAt)
-	Duration       int64   // Track duration in microseconds (from mpris:length)
-	Rate           float64 // Playback rate (1.0 = normal speed)
-	CanSeek        bool
-	CacheUpdatedAt string // RFC3339 timestamp of the last cache write (from X-Cache-Updated-At header)
+	Position          int64   // Current position in microseconds (as of PositionUpdatedAt)
+	Duration          int64   // Track duration in microseconds (from mpris:length)
+	Rate              float64 // Playback rate (1.0 = normal speed)
+	CanSeek           bool
+	PositionUpdatedAt string // RFC3339 timestamp of the last per-player position write
 }
 
 // ServiceView is a view-optimized version of Service for templates
