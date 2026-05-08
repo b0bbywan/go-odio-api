@@ -250,10 +250,14 @@ var (
 	bluetoothSection = &sseSection{name: "section-bluetooth", fetchFn: fetchBluetooth}
 
 	eventToSection = map[string]*sseSection{
-		events.TypePlayerUpdated:  mprisSection,
-		events.TypePlayerAdded:    mprisSection,
-		events.TypePlayerRemoved:  mprisSection,
-		events.TypePlayerPosition: mprisSection,
+		events.TypePlayerUpdated: mprisSection,
+		events.TypePlayerAdded:   mprisSection,
+		events.TypePlayerRemoved: mprisSection,
+		// player.position is intentionally NOT mapped here: re-rendering the
+		// whole section every heartbeat tick (5s) made the card flicker. The
+		// seeker is interpolated client-side from data-position +
+		// data-position-updated-at, so the cache update alone (no UI fetch)
+		// is enough to keep things accurate.
 
 		events.TypeAudioUpdated:       audioSection,
 		events.TypeAudioRemoved:       audioSection,
