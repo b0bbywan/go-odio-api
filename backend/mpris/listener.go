@@ -113,6 +113,17 @@ func (l *Listener) handlePropertiesChanged(sig *dbus.Signal) {
 
 				logger.Debug("[mpris] player %s changed status: %s -> %s", busName, lastStatus, newStatus)
 
+				// Refresh Position alongside the status change so the SSE
+				// we're about to broadcast carries a fresh timestamp. The
+				// heartbeat only polls every 5 s, so without this the client
+				// receives the cached position (up to 5 s stale) and jumps
+				// when its interpolation snaps back to that older anchor.
+				if posVariant, err := l.backend.getProperty(busName, MPRIS_PLAYER_IFACE, "Position"); err == nil {
+					if _, ok := changed["Position"]; !ok {
+						changed["Position"] = posVariant
+					}
+				}
+
 				// If player switches to Playing, ensure heartbeat is running
 				if newStatus == StatusPlaying {
 					l.backend.heartbeat.Start()

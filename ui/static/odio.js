@@ -70,19 +70,30 @@ document.body.addEventListener('htmx:sendError', () => {
 // ── Transport buttons ───────────────────────────────────────────────────────
 
 // Both icons live in the button as <span>; group-data-[playing=true]: variants
-// flip which one is visible. JS only flips data-playing, the title and the
-// matching seeker so its interpolation stops/starts without waiting for the
-// next HTMX poll. Reverting an optimistic toggle is the same operation.
+// flip which one is visible. JS flips data-playing, the title and the matching
+// seeker so its interpolation stops/starts without waiting for the next HTMX
+// poll. Position is also snapshotted to the visible slider value: data-position
+// only refreshes on player.updated swaps (not heartbeat ticks), so without
+// the snapshot the slider would briefly snap back to a stale base on pause.
+// Revert is the same operation (idempotent).
 function optimisticTogglePlayPause(button, playerName) {
 	const next = button.dataset.playing !== 'true';
 	button.dataset.playing = next;
 	button.title = next ? 'Pause' : 'Play';
 	const slider = document.querySelector(`.seek-slider[data-player="${CSS.escape(playerName)}"]`);
 	if (slider) {
+		const frozen = slider.value;
+		const now = new Date().toISOString();
 		const val = next ? 'true' : 'false';
+		slider.dataset.position = frozen;
+		slider.dataset.positionUpdatedAt = now;
 		slider.dataset.playing = val;
 		const span = slider.previousElementSibling;
-		if (span) span.dataset.playing = val;
+		if (span) {
+			span.dataset.position = frozen;
+			span.dataset.positionUpdatedAt = now;
+			span.dataset.playing = val;
+		}
 	}
 }
 const revertPlayPause = optimisticTogglePlayPause;

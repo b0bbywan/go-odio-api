@@ -3,6 +3,7 @@ package mpris
 import (
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/b0bbywan/go-odio-api/cache"
 	"github.com/godbus/dbus/v5"
@@ -1130,6 +1131,215 @@ func TestLoadCapabilitiesFromProps(t *testing.T) {
 			}
 			if got.CanControl != tt.want.CanControl {
 				t.Errorf("CanControl = %v, want %v", got.CanControl, tt.want.CanControl)
+			}
+		})
+	}
+}
+
+func TestShouldAcceptPosition(t *testing.T) {
+	tests := []struct {
+		name   string
+		player Player
+		pos    int64
+		want   bool
+	}{
+		{
+			name:   "positive value, no cache, no length",
+			player: Player{BusName: "test"},
+			pos:    42_000_000,
+			want:   true,
+		},
+		{
+			name:   "zero is rejected",
+			player: Player{BusName: "test"},
+			pos:    0,
+			want:   false,
+		},
+		{
+			name:   "negative is rejected",
+			player: Player{BusName: "test"},
+			pos:    -1,
+			want:   false,
+		},
+		{
+			name:   "value equal to cached position is rejected (Bluez/AVRCP latch)",
+			player: Player{BusName: "test", Position: 42_000_000},
+			pos:    42_000_000,
+			want:   false,
+		},
+		{
+			name:   "value differing from cached position is accepted",
+			player: Player{BusName: "test", Position: 30_000_000},
+			pos:    42_000_000,
+			want:   true,
+		},
+		{
+			name: "value equal to mpris:length is rejected (Chrome quirk)",
+			player: Player{
+				BusName:  "test",
+				Position: 30_000_000,
+				Metadata: map[string]string{"mpris:length": "185600000"},
+			},
+			pos:  185_600_000,
+			want: false,
+		},
+		{
+			name: "value below length is accepted",
+			player: Player{
+				BusName:  "test",
+				Position: 30_000_000,
+				Metadata: map[string]string{"mpris:length": "185600000"},
+			},
+			pos:  100_000_000,
+			want: true,
+		},
+		{
+			name: "non-numeric mpris:length disables the length filter",
+			player: Player{
+				BusName:  "test",
+				Position: 30_000_000,
+				Metadata: map[string]string{"mpris:length": "not-a-number"},
+			},
+			pos:  185_600_000,
+			want: true,
+		},
+		{
+			name: "missing mpris:length disables the length filter",
+			player: Player{
+				BusName:  "test",
+				Position: 30_000_000,
+				Metadata: map[string]string{},
+			},
+			pos:  185_600_000,
+			want: true,
+		},
+		{
+			name: "zero mpris:length disables the length filter (length not yet known)",
+			player: Player{
+				BusName:  "test",
+				Position: 30_000_000,
+				Metadata: map[string]string{"mpris:length": "0"},
+			},
+			pos:  185_600_000,
+			want: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := tt.player
+			got := shouldAcceptPosition(&p, tt.pos)
+			if got != tt.want {
+				t.Errorf("shouldAcceptPosition(%d) = %v, want %v", tt.pos, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestUpdatePlayerPropertiesPosition(t *testing.T) {
+	const busName = "org.mpris.MediaPlayer2.test"
+
+	newBackend := func(initial Player) *MPRISBackend {
+		b := &MPRISBackend{cache: cache.New[[]Player](0)}
+		b.cache.Set(CACHE_KEY, []Player{initial})
+		return b
+	}
+
+	tests := []struct {
+		name         string
+		initial      Player
+		changed      map[string]dbus.Variant
+		wantPosition int64
+		wantBumped   bool // PositionUpdatedAt should advance past the initial value
+	}{
+		{
+			name: "fresh non-zero position is written",
+			initial: Player{
+				BusName:  busName,
+				Position: 30_000_000,
+				Metadata: map[string]string{"mpris:length": "185600000"},
+			},
+			changed: map[string]dbus.Variant{
+				"Position": dbus.MakeVariant(int64(42_000_000)),
+			},
+			wantPosition: 42_000_000,
+			wantBumped:   true,
+		},
+		{
+			name: "zero position is rejected, cache untouched",
+			initial: Player{
+				BusName:  busName,
+				Position: 30_000_000,
+				Metadata: map[string]string{"mpris:length": "185600000"},
+			},
+			changed: map[string]dbus.Variant{
+				"Position": dbus.MakeVariant(int64(0)),
+			},
+			wantPosition: 30_000_000,
+			wantBumped:   false,
+		},
+		{
+			name: "repeated cached value is rejected (Bluez/AVRCP latch)",
+			initial: Player{
+				BusName:  busName,
+				Position: 42_000_000,
+				Metadata: map[string]string{"mpris:length": "185600000"},
+			},
+			changed: map[string]dbus.Variant{
+				"Position": dbus.MakeVariant(int64(42_000_000)),
+			},
+			wantPosition: 42_000_000,
+			wantBumped:   false,
+		},
+		{
+			name: "Position == Length is rejected (Chrome quirk)",
+			initial: Player{
+				BusName:  busName,
+				Position: 30_000_000,
+				Metadata: map[string]string{"mpris:length": "185600000"},
+			},
+			changed: map[string]dbus.Variant{
+				"Position": dbus.MakeVariant(int64(185_600_000)),
+			},
+			wantPosition: 30_000_000,
+			wantBumped:   false,
+		},
+		{
+			name: "non-int64 variant is ignored",
+			initial: Player{
+				BusName:  busName,
+				Position: 30_000_000,
+				Metadata: map[string]string{"mpris:length": "185600000"},
+			},
+			changed: map[string]dbus.Variant{
+				"Position": dbus.MakeVariant("not-an-int"),
+			},
+			wantPosition: 30_000_000,
+			wantBumped:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Stamp an initial PositionUpdatedAt strictly in the past so the
+			// "bumped" assertion below is unambiguous.
+			tt.initial.PositionUpdatedAt = time.Unix(0, 0)
+			b := newBackend(tt.initial)
+
+			if err := b.UpdatePlayerProperties(busName, tt.changed); err != nil {
+				t.Fatalf("UpdatePlayerProperties failed: %v", err)
+			}
+
+			got, err := b.GetPlayerFromCache(busName)
+			if err != nil {
+				t.Fatalf("GetPlayerFromCache: %v", err)
+			}
+			if got.Position != tt.wantPosition {
+				t.Errorf("Position = %d, want %d", got.Position, tt.wantPosition)
+			}
+			bumped := got.PositionUpdatedAt.After(tt.initial.PositionUpdatedAt)
+			if bumped != tt.wantBumped {
+				t.Errorf("PositionUpdatedAt bumped = %v, want %v (got %v)", bumped, tt.wantBumped, got.PositionUpdatedAt)
 			}
 		})
 	}
