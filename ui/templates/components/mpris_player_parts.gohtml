@@ -1,0 +1,103 @@
+{{ define "mpris-track-info" }}
+<!-- Cover + track info (centered) -->
+<div class="text-center mb-3">
+	{{ if .ArtUrl }}
+	<img src="{{ .ArtUrl }}" alt="cover" class="player-art">
+	{{ end }}
+	{{ if or .Artist .Title }}
+	<div class="player-meta" title="{{ if .Artist }}{{ .Artist }}{{ end }}{{ if and .Artist .Title }} – {{ end }}{{ if .Title }}{{ .Title }}{{ end }}">
+		{{ if .Artist }}{{ .Artist }}{{ end }}{{ if and .Artist .Title }} – {{ end }}{{ if .Title }}{{ .Title }}{{ end }}
+	</div>
+	{{ else if or (eq .State "Playing") (eq .State "Paused") }}
+	<div class="text-sm text-subtle">Unknown track</div>
+	{{ else }}
+	<div class="text-sm text-subtle">No media playing</div>
+	{{ end }}
+	{{ if .Album }}
+	<div class="player-meta-small" title="{{ .Album }}">{{ .Album }}</div>
+	{{ end }}
+</div>
+{{ end }}
+
+{{ define "mpris-seeker" }}
+{{ if and .CanSeek (gt .Duration 0) }}
+<div class="seeker-row mb-3 px-2">
+	<span class="pos-time"
+		data-position="{{ .Position }}"
+		data-rate="{{ printf "%.4f" .Rate }}"
+		data-position-updated-at="{{ .PositionUpdatedAt }}"
+		data-playing="{{ eq .State "Playing" }}">{{ fmtMicros .Position }}</span>
+	<input type="range" class="seek-slider"
+		min="0" max="{{ .Duration }}" value="{{ .Position }}"
+		data-player="{{ .Name }}"
+		data-position="{{ .Position }}"
+		data-rate="{{ printf "%.4f" .Rate }}"
+		data-position-updated-at="{{ .PositionUpdatedAt }}"
+		data-playing="{{ eq .State "Playing" }}"
+		oninput="onSeekerInput(this)"
+		hx-ext="json-enc"
+		hx-post="/players/{{ .Name }}/position"
+		hx-trigger="change"
+		hx-swap="none"
+		hx-vals='js:{position: parseInt(this.value)}'
+		hx-on:change="optimisticSeek(this)">
+	<span class="dur-time">{{ fmtMicros .Duration }}</span>
+</div>
+{{ end }}
+{{ end }}
+
+{{ define "mpris-transport" }}
+{{ if or (or .CanShuffle .CanPrev) (or (or .CanPlay .CanPause) .CanStop) (or .CanNext .CanLoop) }}
+<div class="flex justify-center items-center gap-2">
+	{{ if .CanShuffle }}
+	<button class="btn{{ if .Shuffle }} btn-active{{ end }}"
+			data-shuffle="{{ .Shuffle }}"
+			hx-ext="json-enc"
+			hx-post="/players/{{ .Name }}/shuffle"
+			hx-swap="none"
+			hx-vals='js:{shuffle: this.dataset.shuffle === "true"}'
+			hx-on:click="optimisticToggleShuffle(this)"
+			hx-on::response-error="revertShuffle(this)"
+			hx-on::send-error="revertShuffle(this)"
+			title="Shuffle {{ if .Shuffle }}on{{ else }}off{{ end }}">{{ template "icon-shuffle" }}</button>
+	{{ end }}
+	{{ if .CanPrev }}
+	<button class="btn" hx-post="/players/{{ .Name }}/previous" hx-swap="none" title="Previous track">{{ template "icon-prev" }}</button>
+	{{ end }}
+	{{ if or .CanPlay .CanPause }}
+	<button class="btn group"
+			data-playing="{{ eq .State "Playing" }}"
+			hx-post="/players/{{ .Name }}/play_pause"
+			hx-swap="none"
+			hx-on:click="optimisticTogglePlayPause(this, '{{ .Name }}')"
+			hx-on::response-error="revertPlayPause(this, '{{ .Name }}')"
+			hx-on::send-error="revertPlayPause(this, '{{ .Name }}')"
+			title="{{ if eq .State "Playing" }}Pause{{ else }}Play{{ end }}">
+		<span class="group-data-[playing=true]:hidden">{{ template "icon-play" }}</span>
+		<span class="hidden group-data-[playing=true]:inline">{{ template "icon-pause" }}</span>
+	</button>
+	{{ end }}
+	{{ if and .CanStop (or .CanPlay .CanPause) }}
+	<button class="btn" hx-post="/players/{{ .Name }}/stop" hx-swap="none" title="Stop">{{ template "icon-stop" }}</button>
+	{{ end }}
+	{{ if .CanNext }}
+	<button class="btn" hx-post="/players/{{ .Name }}/next" hx-swap="none" title="Next track">{{ template "icon-next" }}</button>
+	{{ end }}
+	{{ if .CanLoop }}
+	<button class="btn group{{ if ne .LoopStatus "None" }} btn-active{{ end }}"
+			data-loop="{{ .LoopStatus }}"
+			hx-ext="json-enc"
+			hx-post="/players/{{ .Name }}/loop"
+			hx-swap="none"
+			hx-vals='js:{loop: this.dataset.loop}'
+			hx-on:click="optimisticCycleLoop(this)"
+			hx-on::response-error="revertLoop(this)"
+			hx-on::send-error="revertLoop(this)"
+			title="Repeat: {{ .LoopStatus }}">
+		<span class="group-data-[loop=Track]:hidden">{{ template "icon-repeat" }}</span>
+		<span class="hidden group-data-[loop=Track]:inline">{{ template "icon-repeat-one" }}</span>
+	</button>
+	{{ end }}
+</div>
+{{ end }}
+{{ end }}
