@@ -2,6 +2,7 @@ package mpris
 
 import (
 	"context"
+	"strconv"
 	"strings"
 	"time"
 
@@ -157,6 +158,31 @@ func (m *MPRISBackend) UpdatePlayer(updated Player) error {
 	return nil
 }
 
+// shouldAcceptPosition decides whether a freshly-reported MPRIS position
+// should overwrite the cache. Single source of truth for the per-player
+// guards used by both the heartbeat poller and the listener path:
+//   - drop zero/negative values (some players, like go-librespot, report 0
+//     mid-playback)
+//   - drop Bluez/AVRCP-style latched repeats (no real change)
+//   - drop Position == Length (Chrome briefly reports the previous track's
+//     duration as the new track's starting position, which would otherwise
+//     snap the seeker to the end of the new track for ~5 s)
+func shouldAcceptPosition(p *Player, pos int64) bool {
+	if pos <= 0 {
+		logger.Debug("[mpris] skipping zero/invalid position for %s", p.BusName)
+		return false
+	}
+	if pos == p.Position {
+		logger.Debug("[mpris] skipping unchanged position for %s (%d)", p.BusName, pos)
+		return false
+	}
+	if length, _ := strconv.ParseInt(p.Metadata["mpris:length"], 10, 64); length > 0 && pos == length {
+		logger.Debug("[mpris] skipping suspicious Position == Length for %s (%d)", p.BusName, pos)
+		return false
+	}
+	return true
+}
+
 // UpdatePlayerProperties selectively updates player properties in the cache.
 // Mainly used by the listener to update cache upon receiving
 // D-Bus PropertiesChanged signals. Does NOT make D-Bus calls.
@@ -210,7 +236,7 @@ func (m *MPRISBackend) UpdatePlayerProperties(busName string, changed map[string
 					players[i].Rate = val
 				}
 			case "Position":
-				if val, ok := extractInt64(variant); ok && val > 0 {
+				if val, ok := extractInt64(variant); ok && shouldAcceptPosition(&players[i], val) {
 					players[i].Position = val
 					players[i].PositionUpdatedAt = time.Now()
 				}
