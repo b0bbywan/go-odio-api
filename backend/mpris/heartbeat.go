@@ -108,20 +108,8 @@ func (h *Heartbeat) updatePlayingPositions() bool {
 			continue
 		}
 
-		// Some MPRIS implementations (e.g. go-librespot) return 0 for Position
-		// even during active playback. Skip the update to avoid resetting the
-		// seeker to the beginning of the track.
 		pos, ok := extractInt64(variant)
-		if !ok || pos <= 0 {
-			logger.Debug("[mpris] skipping zero/invalid position for %s", player.BusName)
-			continue
-		}
-
-		// Bluez/AVRCP often returns a stale Position (the value latched at the
-		// last AVRCP report). Skip to avoid re-bumping the cache timestamp with
-		// no real change.
-		if pos == player.Position {
-			logger.Debug("[mpris] skipping unchanged position for %s (%d)", player.BusName, pos)
+		if !ok || !shouldAcceptPosition(&player, pos) {
 			continue
 		}
 
