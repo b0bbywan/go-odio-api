@@ -179,7 +179,7 @@ button.htmx-request {
 	}
 
 	.player-art {
-		@apply mx-auto max-w-[75%] rounded-md mb-2;
+		@apply mx-auto w-full max-w-[75%] rounded-md mb-2;
 		max-height: 75cqw;
 	}
 
