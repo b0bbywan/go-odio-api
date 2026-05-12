@@ -134,18 +134,19 @@ func TestUpdatePlayer(t *testing.T) {
 	}
 
 	// Initial cache state
+	half, full, eightyPct := 0.5, 1.0, 0.8
 	initialPlayers := []Player{
 		{
 			BusName:        "org.mpris.MediaPlayer2.spotify",
 			Identity:       "Spotify",
 			PlaybackStatus: StatusPaused,
-			Volume:         0.5,
+			Volume:         &half,
 		},
 		{
 			BusName:        "org.mpris.MediaPlayer2.vlc",
 			Identity:       "VLC",
 			PlaybackStatus: StatusStopped,
-			Volume:         1.0,
+			Volume:         &full,
 		},
 	}
 	backend.cache.Set(CACHE_KEY, initialPlayers)
@@ -155,7 +156,7 @@ func TestUpdatePlayer(t *testing.T) {
 		BusName:        "org.mpris.MediaPlayer2.spotify",
 		Identity:       "Spotify",
 		PlaybackStatus: StatusPlaying,
-		Volume:         0.8,
+		Volume:         &eightyPct,
 		Capabilities: Capabilities{
 			CanPlay:  true,
 			CanPause: true,
@@ -175,8 +176,8 @@ func TestUpdatePlayer(t *testing.T) {
 	if player.PlaybackStatus != StatusPlaying {
 		t.Errorf("PlaybackStatus = %q, want %q", player.PlaybackStatus, StatusPlaying)
 	}
-	if player.Volume != 0.8 {
-		t.Errorf("Volume = %.2f, want %.2f", player.Volume, 0.8)
+	if player.Volume == nil || *player.Volume != 0.8 {
+		t.Errorf("Volume = %v, want %.2f", player.Volume, 0.8)
 	}
 
 	// Verify other player wasn't affected
