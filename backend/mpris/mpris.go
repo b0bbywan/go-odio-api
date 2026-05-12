@@ -214,7 +214,7 @@ func (m *MPRISBackend) UpdatePlayerProperties(busName string, changed map[string
 				}
 			case "Volume":
 				if val, ok := extractFloat64(variant); ok {
-					players[i].Volume = val
+					players[i].Volume = &val
 				}
 			case "Metadata":
 				if metaMap, ok := extractMetadataMap(variant); ok {

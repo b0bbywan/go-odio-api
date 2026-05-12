@@ -124,6 +124,15 @@ func (p *Player) loadFromDBus() error {
 				field.SetFloat(val)
 			}
 
+		case reflect.Ptr:
+			// Volume is *float64 so we can distinguish "muted to 0" from
+			// "player does not expose the property" (nil → JSON-omitted).
+			if field.Type().Elem().Kind() == reflect.Float64 {
+				if val, ok := extractFloat64(variant); ok {
+					field.Set(reflect.ValueOf(&val))
+				}
+			}
+
 		case reflect.Int64:
 			if val, ok := extractInt64(variant); ok {
 				field.SetInt(val)
