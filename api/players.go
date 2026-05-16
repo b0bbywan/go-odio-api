@@ -3,6 +3,7 @@ package api
 import (
 	"errors"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/b0bbywan/go-odio-api/backend/mpris"
@@ -147,7 +148,15 @@ func CoverHandler(getPlayer func(string) (*mpris.Player, error)) http.HandlerFun
 		case artUrl == "":
 			http.NotFound(w, r)
 		case strings.HasPrefix(artUrl, "file://"):
-			http.ServeFile(w, r, strings.TrimPrefix(artUrl, "file://"))
+			// Standards-compliant MPRIS daemons percent-encode reserved
+			// characters in file:// URIs (RFC 3986). Parse to recover the
+			// decoded filesystem path.
+			u, err := url.Parse(artUrl)
+			if err != nil {
+				http.NotFound(w, r)
+				return
+			}
+			http.ServeFile(w, r, u.Path)
 		case strings.HasPrefix(artUrl, "http://"), strings.HasPrefix(artUrl, "https://"):
 			http.Redirect(w, r, artUrl, http.StatusTemporaryRedirect)
 		default:

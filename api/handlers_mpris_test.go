@@ -19,6 +19,17 @@ func TestCoverHandler(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Path containing a space — MPRIS daemons percent-encode it per RFC 3986.
+	encodedDir := filepath.Join(tmpDir, "Transmission pirate")
+	if err := os.Mkdir(encodedDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	encodedCoverPath := filepath.Join(encodedDir, "folder.jpg")
+	if err := os.WriteFile(encodedCoverPath, []byte("encoded-image-data"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	encodedArtUrl := "file://" + strings.ReplaceAll(encodedCoverPath, " ", "%20")
+
 	tests := []struct {
 		name           string
 		busName        string
@@ -54,6 +65,17 @@ func TestCoverHandler(t *testing.T) {
 			},
 			wantStatusCode: http.StatusOK,
 			wantBody:       "fake-image-data",
+		},
+		{
+			name:    "file:// URL with percent-encoded path serves file",
+			busName: "org.mpris.MediaPlayer2.mpd",
+			getPlayer: func(string) (*mpris.Player, error) {
+				return &mpris.Player{Metadata: map[string]string{
+					"mpris:artUrl": encodedArtUrl,
+				}}, nil
+			},
+			wantStatusCode: http.StatusOK,
+			wantBody:       "encoded-image-data",
 		},
 		{
 			name:    "http:// URL redirects",
