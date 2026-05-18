@@ -33,7 +33,7 @@ func parseLogLevel(levelStr string) logger.Level {
 }
 
 func getDuration(key string, fallback time.Duration) time.Duration {
-	if d := viper.GetDuration(key); d > 0 {
+	if d := viper.GetDuration(key); d >= 0 {
 		return d
 	}
 	return fallback
