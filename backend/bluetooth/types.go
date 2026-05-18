@@ -17,6 +17,7 @@ type BluetoothBackend struct {
 	timeout        time.Duration
 	pairingTimeout time.Duration
 	idleTimeout    time.Duration
+	powerOnStart   bool
 	agent          *bluezAgent
 	idleTimer      *time.Timer
 	idleTimerMu    sync.Mutex

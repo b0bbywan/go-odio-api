@@ -71,6 +71,12 @@ func (b *Backend) Broadcaster() *Broadcaster {
 }
 
 func (b *Backend) Start() error {
+	if b.Bluetooth != nil {
+		if err := b.Bluetooth.Start(); err != nil {
+			return err
+		}
+	}
+
 	if b.MPRIS != nil {
 		if err := b.MPRIS.Start(); err != nil {
 			return err
