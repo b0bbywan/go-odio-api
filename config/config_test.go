@@ -1806,3 +1806,39 @@ func TestNew_ConfDAlphabeticalOrderEndToEnd(t *testing.T) {
 		t.Errorf("Api.Port = %d, want 7777 (last alphabetical conf.d wins)", cfg.Api.Port)
 	}
 }
+
+func TestNew_BluetoothPowerOnStartDisabledByDefault(t *testing.T) {
+	viper.Reset()
+
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
+
+	cfg, err := New(nil)
+	if err != nil {
+		t.Fatalf("New(nil) returned error: %v", err)
+	}
+
+	if cfg.Bluetooth == nil {
+		t.Fatal("Bluetooth config should not be nil")
+	}
+	if cfg.Bluetooth.PowerOnStart {
+		t.Error("Bluetooth.PowerOnStart should be false by default")
+	}
+}
+
+func TestNew_BluetoothPowerOnStartExplicitlyEnabled(t *testing.T) {
+	viper.Reset()
+	viper.Set("bluetooth.poweronstart", true)
+
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
+
+	cfg, err := New(nil)
+	if err != nil {
+		t.Fatalf("New(nil) returned error: %v", err)
+	}
+
+	if !cfg.Bluetooth.PowerOnStart {
+		t.Error("Bluetooth.PowerOnStart should be true when explicitly enabled")
+	}
+}

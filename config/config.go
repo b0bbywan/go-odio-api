@@ -94,6 +94,7 @@ type SystemdConfig struct {
 
 type BluetoothConfig struct {
 	Enabled        bool
+	PowerOnStart   bool
 	PairingTimeout time.Duration
 	Timeout        time.Duration
 	IdleTimeout    time.Duration
@@ -199,6 +200,7 @@ func New(cfgFile *string) (*Config, error) {
 	viper.SetDefault("api.sse.enabled", true)
 
 	viper.SetDefault("bluetooth.enabled", true)
+	viper.SetDefault("bluetooth.poweronstart", false)
 	viper.SetDefault("bluetooth.timeout", "5s")
 	viper.SetDefault("bluetooth.pairingtimeout", "60s")
 	viper.SetDefault("bluetooth.idletimeout", "30m")
@@ -295,6 +297,7 @@ func New(cfgFile *string) (*Config, error) {
 
 	bluetoothcfg := BluetoothConfig{
 		Enabled:        viper.GetBool("bluetooth.enabled"),
+		PowerOnStart:   viper.GetBool("bluetooth.poweronstart"),
 		Timeout:        getDuration("bluetooth.timeout", 5*time.Second),
 		PairingTimeout: getDuration("bluetooth.pairingtimeout", 60*time.Second),
 		IdleTimeout:    getDuration("bluetooth.idletimeout", 30*time.Minute),
