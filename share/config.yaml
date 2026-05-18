@@ -50,6 +50,7 @@ mpris:
 
 bluetooth:
   enabled: true
+  powerOnStart: false   # power on adapter at service startup
   timeout: 5s
   pairingTimeout: 60s
   idleTimeout: 30m

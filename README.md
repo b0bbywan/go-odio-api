@@ -209,10 +209,11 @@ févr. 27 13:17:33 rasponkyold systemd[559]: Started mpris-proxy.service - Bluet
 
 #### Usage
 
-Bluetooth is intentionally not left in an automatic or always-on state.
+Bluetooth is intentionally not left in an automatic or always-on state by default.
 
 - **Power up**:
-  Bluetooth is enabled, but the device is not discoverable. You can connect to it if your phone is already paired
+  Bluetooth is enabled, but the device is not discoverable. You can connect to it if your phone is already paired.
+  Set `bluetooth.powerOnStart: true` to power the adapter up automatically when the service starts.
 - **Power Down** Default 30min of inactivity (= no connected clients)
 - **Pairing mode**:
   The device becomes visible to nearby Bluetooth devices and accepts new pairings.
@@ -516,6 +517,7 @@ Each entry can be a bare service name (string) or an object `{name, url}`; the t
 ```yaml
 bluetooth:
   enabled: true
+  powerOnStart: false # power on adapter at service startup
   timeout: 5s
   pairingTimeout: 60s
   idleTimeout: 30m # 0 for no autopoweroff
