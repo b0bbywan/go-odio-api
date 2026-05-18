@@ -29,6 +29,7 @@ func New(ctx context.Context, cfg *config.BluetoothConfig) (*BluetoothBackend, e
 		timeout:        cfg.Timeout,
 		pairingTimeout: cfg.PairingTimeout,
 		idleTimeout:    cfg.IdleTimeout,
+		powerOnStart:   cfg.PowerOnStart,
 		statusCache:    cache.New[BluetoothStatus](0), // no expiration
 		events:         make(chan events.Event, 16),
 	}
@@ -41,6 +42,13 @@ func New(ctx context.Context, cfg *config.BluetoothConfig) (*BluetoothBackend, e
 
 	backend.syncAdapterState()
 	return &backend, nil
+}
+
+func (b *BluetoothBackend) Start() error {
+	if !b.powerOnStart {
+		return nil
+	}
+	return b.PowerUp()
 }
 
 func (b *BluetoothBackend) syncAdapterState() {
