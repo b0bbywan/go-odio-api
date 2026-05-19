@@ -240,6 +240,30 @@ func (m *MPRISBackend) UpdatePlayerProperties(busName string, changed map[string
 					players[i].Position = val
 					players[i].PositionUpdatedAt = time.Now()
 				}
+			case "CanPlay":
+				if val, ok := extractBool(variant); ok {
+					players[i].Capabilities.CanPlay = val
+				}
+			case "CanPause":
+				if val, ok := extractBool(variant); ok {
+					players[i].Capabilities.CanPause = val
+				}
+			case "CanGoNext":
+				if val, ok := extractBool(variant); ok {
+					players[i].Capabilities.CanGoNext = val
+				}
+			case "CanGoPrevious":
+				if val, ok := extractBool(variant); ok {
+					players[i].Capabilities.CanGoPrevious = val
+				}
+			case "CanSeek":
+				if val, ok := extractBool(variant); ok {
+					players[i].Capabilities.CanSeek = val
+				}
+			case "CanControl":
+				if val, ok := extractBool(variant); ok {
+					players[i].Capabilities.CanControl = val
+				}
 			}
 		}
 

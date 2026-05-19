@@ -1345,3 +1345,101 @@ func TestUpdatePlayerPropertiesPosition(t *testing.T) {
 		})
 	}
 }
+
+func TestUpdatePlayerPropertiesCapabilities(t *testing.T) {
+	const busName = "org.mpris.MediaPlayer2.test"
+
+	newBackend := func(initial Player) *MPRISBackend {
+		b := &MPRISBackend{cache: cache.New[[]Player](0)}
+		b.cache.Set(CACHE_KEY, []Player{initial})
+		return b
+	}
+
+	allFalse := Capabilities{}
+	allTrue := Capabilities{
+		CanPlay:       true,
+		CanPause:      true,
+		CanGoNext:     true,
+		CanGoPrevious: true,
+		CanSeek:       true,
+		CanControl:    true,
+	}
+
+	tests := []struct {
+		name    string
+		initial Capabilities
+		changed map[string]dbus.Variant
+		want    Capabilities
+	}{
+		{
+			name:    "CanSeek toggles true",
+			initial: allFalse,
+			changed: map[string]dbus.Variant{
+				"CanSeek": dbus.MakeVariant(true),
+			},
+			want: Capabilities{CanSeek: true},
+		},
+		{
+			name:    "CanSeek toggles false",
+			initial: allTrue,
+			changed: map[string]dbus.Variant{
+				"CanSeek": dbus.MakeVariant(false),
+			},
+			want: Capabilities{
+				CanPlay:       true,
+				CanPause:      true,
+				CanGoNext:     true,
+				CanGoPrevious: true,
+				CanSeek:       false,
+				CanControl:    true,
+			},
+		},
+		{
+			name:    "all capabilities flipped on at once",
+			initial: allFalse,
+			changed: map[string]dbus.Variant{
+				"CanPlay":       dbus.MakeVariant(true),
+				"CanPause":      dbus.MakeVariant(true),
+				"CanGoNext":     dbus.MakeVariant(true),
+				"CanGoPrevious": dbus.MakeVariant(true),
+				"CanSeek":       dbus.MakeVariant(true),
+				"CanControl":    dbus.MakeVariant(true),
+			},
+			want: allTrue,
+		},
+		{
+			name:    "non-bool variant is ignored, other fields unchanged",
+			initial: allTrue,
+			changed: map[string]dbus.Variant{
+				"CanSeek": dbus.MakeVariant("not-a-bool"),
+			},
+			want: allTrue,
+		},
+		{
+			name:    "unrelated capabilities are not touched",
+			initial: Capabilities{CanPlay: true, CanControl: true},
+			changed: map[string]dbus.Variant{
+				"CanGoNext": dbus.MakeVariant(true),
+			},
+			want: Capabilities{CanPlay: true, CanGoNext: true, CanControl: true},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b := newBackend(Player{BusName: busName, Capabilities: tt.initial})
+
+			if err := b.UpdatePlayerProperties(busName, tt.changed); err != nil {
+				t.Fatalf("UpdatePlayerProperties failed: %v", err)
+			}
+
+			got, err := b.GetPlayerFromCache(busName)
+			if err != nil {
+				t.Fatalf("GetPlayerFromCache: %v", err)
+			}
+			if got.Capabilities != tt.want {
+				t.Errorf("Capabilities = %+v, want %+v", got.Capabilities, tt.want)
+			}
+		})
+	}
+}
