@@ -53,6 +53,28 @@ func (s *Server) registerBluetoothRoutes(b *bluetooth.BluetoothBackend) {
 		"POST /bluetooth/pairing_mode",
 		withBluetoothAction(b.NewPairing),
 	)
+	s.mux.HandleFunc(
+		"GET /bluetooth/devices",
+		JSONHandler(func(w http.ResponseWriter, r *http.Request) (any, error) {
+			return b.GetDevices(), nil
+		}),
+	)
+	s.mux.HandleFunc(
+		"POST /bluetooth/scan",
+		withBluetoothAction(b.StartScan),
+	)
+	s.mux.HandleFunc(
+		"POST /bluetooth/scan/stop",
+		withBluetoothAction(b.StopScan),
+	)
+	s.mux.HandleFunc(
+		"POST /bluetooth/connect",
+		withBluetoothAddress(b.Connect),
+	)
+	s.mux.HandleFunc(
+		"POST /bluetooth/disconnect",
+		withBluetoothAddress(b.Disconnect),
+	)
 }
 
 func (s *Server) registerLogin1Routes(b *login1.Login1Backend) {
