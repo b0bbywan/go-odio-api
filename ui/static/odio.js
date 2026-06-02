@@ -247,6 +247,16 @@ document.addEventListener('htmx:afterSwap', function(e) {
 	});
 });
 
+// Open the bluetooth devices dropdown when a scan starts. The dropdown may not
+// exist yet (no devices), so we record the intent in detailsState — the same map
+// the preservation above uses — so it opens as soon as the first device renders,
+// and stays open as more stream in.
+function openBluetoothDevices() {
+	detailsState['bluetooth-devices'] = true;
+	const el = document.getElementById('bluetooth-devices');
+	if (el) el.open = true;
+}
+
 // Block SSE swaps on the audio section while the sink dropdown is open
 document.addEventListener('htmx:sseBeforeMessage', function(e) {
 	if (e.detail.elt && e.detail.elt.querySelector('.sink-dropdown ul:not(.hidden)')) {
