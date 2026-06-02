@@ -120,6 +120,21 @@ func changedAny(changed map[string]dbus.Variant, keys ...BluetoothState) bool {
 	return false
 }
 
+// upsertDevice returns a copy of devices with d replacing any entry sharing its
+// address, or appended if new. It copies rather than mutating in place because
+// the slice is shared with the cached status read by other goroutines.
+func upsertDevice(devices []BluetoothDevice, d BluetoothDevice) []BluetoothDevice {
+	out := make([]BluetoothDevice, len(devices), len(devices)+1)
+	copy(out, devices)
+	for i := range out {
+		if out[i].Address == d.Address {
+			out[i] = d
+			return out
+		}
+	}
+	return append(out, d)
+}
+
 func changedKeys(changed map[string]dbus.Variant) []string {
 	keys := make([]string, 0, len(changed))
 	for k := range changed {
