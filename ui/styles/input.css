@@ -42,6 +42,22 @@ button.htmx-request {
 	animation: pulse-opacity 1s ease-in-out infinite;
 }
 
+/* Inline spinner (e.g. bluetooth connect in progress) */
+@keyframes spin {
+	to { transform: rotate(360deg); }
+}
+
+.spinner {
+	display: inline-block;
+	width: 0.85rem;
+	height: 0.85rem;
+	border: 2px solid currentColor;
+	border-top-color: transparent;
+	border-radius: 9999px;
+	animation: spin 0.6s linear infinite;
+	vertical-align: middle;
+}
+
 /* Volume & seek sliders */
 .volume-slider,
 .seek-slider {
