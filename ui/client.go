@@ -195,6 +195,7 @@ func convertBluetooth(raw *BluetoothStatus) *BluetoothView {
 		Powered:        raw.Powered,
 		PairingActive:  raw.PairingActive,
 		PairingUntilMs: untilMs,
+		Scanning:       raw.Scanning,
 		ConnectedCount: connected,
 	}
 }
