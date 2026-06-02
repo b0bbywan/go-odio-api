@@ -183,4 +183,5 @@ type BluetoothView struct {
 	PairingUntilMs int64 // pairing deadline as epoch millis, for the client-side countdown
 	Scanning       bool
 	ConnectedCount int
+	Devices        []BluetoothDevice
 }

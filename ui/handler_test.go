@@ -495,6 +495,60 @@ func TestConvertBluetooth(t *testing.T) {
 			t.Errorf("expected PairingUntilMs=0, got %d", got.PairingUntilMs)
 		}
 	})
+
+	t.Run("sorts connected first, then discovered, then known by label", func(t *testing.T) {
+		got := convertBluetooth(&BluetoothStatus{
+			Powered: true,
+			KnownDevices: []BluetoothDevice{
+				{Address: "AA:BB:CC:DD:EE:02", Name: "Bose", Trusted: true},                 // known, idle
+				{Address: "AA:BB:CC:DD:EE:01", Name: "JBL", Trusted: true, Connected: true}, // connected
+				{Address: "AA:BB:CC:DD:EE:03", Name: "Newbie"},                              // freshly discovered
+			},
+		})
+		want := []string{"JBL", "Newbie", "Bose"}
+		for i, w := range want {
+			if got.Devices[i].Name != w {
+				t.Errorf("device order = [%s %s %s], want %v",
+					got.Devices[0].Name, got.Devices[1].Name, got.Devices[2].Name, want)
+				break
+			}
+		}
+	})
+}
+
+// TestBluetoothDevicesTemplate renders the device dropdown and asserts the
+// connect/disconnect buttons carry the device address in hx-vals (html/template
+// must not mangle the embedded JSON), and that a nameless device falls back to
+// its address.
+func TestBluetoothDevicesTemplate(t *testing.T) {
+	tmpl := LoadTemplates()
+	view := &BluetoothView{
+		Powered: true,
+		Devices: []BluetoothDevice{
+			{Address: "40:C1:F6:D4:67:88", Name: "JBL Go 3", Connected: true},
+			{Address: "2C:41:A1:BD:D1:45", Name: "Bose Solo 5", Trusted: true},
+			{Address: "A8:71:16:71:A0:9B"}, // discovered, no name
+		},
+	}
+	var buf bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&buf, "section-bluetooth", view); err != nil {
+		t.Fatalf("ExecuteTemplate: %v", err)
+	}
+	out := buf.String()
+
+	wants := []string{
+		"JBL Go 3",
+		"Bose Solo 5",
+		"A8:71:16:71:A0:9B",                // nameless device falls back to its address
+		`hx-post="/bluetooth/disconnect"`,  // connected device → disconnect
+		`hx-post="/bluetooth/connect"`,     // others → connect
+		`{"address": "40:C1:F6:D4:67:88"}`, // hx-vals JSON survives html/template
+	}
+	for _, w := range wants {
+		if !strings.Contains(out, w) {
+			t.Errorf("expected %q in rendered section, got:\n%s", w, out)
+		}
+	}
 }
 
 // TestSystemdUnitTemplate_URLLink asserts that when a service has a URL, the
