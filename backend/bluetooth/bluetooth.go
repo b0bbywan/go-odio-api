@@ -2,6 +2,7 @@ package bluetooth
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/godbus/dbus/v5"
@@ -29,6 +30,7 @@ func New(ctx context.Context, cfg *config.BluetoothConfig) (*BluetoothBackend, e
 		timeout:        cfg.Timeout,
 		pairingTimeout: cfg.PairingTimeout,
 		idleTimeout:    cfg.IdleTimeout,
+		scanTimeout:    cfg.ScanTimeout,
 		powerOnStart:   cfg.PowerOnStart,
 		statusCache:    cache.New[BluetoothStatus](0), // no expiration
 		events:         make(chan events.Event, 16),
@@ -64,7 +66,7 @@ func (b *BluetoothBackend) syncAdapterState() {
 	logger.Info("[bluetooth] backend started (powered=%v pairable=%v discoverable=%v)", powered, pairable, discoverable)
 
 	if powered {
-		b.refreshKnownDevices()
+		b.refreshDevices()
 		b.startListener()
 	}
 }
@@ -87,7 +89,7 @@ func (b *BluetoothBackend) PowerUp() error {
 	b.updateStatus(func(s *BluetoothStatus) {
 		s.Powered = true
 	})
-	b.refreshKnownDevices()
+	b.refreshDevices()
 	b.startListener()
 
 	logger.Info("[bluetooth] Bluetooth ready to connect to already known devices")
@@ -140,6 +142,13 @@ func (b *BluetoothBackend) PowerDown() error {
 }
 
 func (b *BluetoothBackend) cleanupPoweredState() {
+	// Tear down the scan resources directly: powering off makes BlueZ stop
+	// discovery on its own, so the user-facing StopScan (BlueZ call, refresh,
+	// idle re-arm) doesn't belong here.
+	b.scanMu.Lock()
+	b.stopDiscoveryListener()
+	b.scanMu.Unlock()
+
 	b.stopListener()
 	b.updateStatus(func(s *BluetoothStatus) {
 		s.Powered = false
@@ -147,6 +156,7 @@ func (b *BluetoothBackend) cleanupPoweredState() {
 		s.Pairable = false
 		s.PairingActive = false
 		s.PairingUntil = nil
+		s.Scanning = false
 	})
 }
 
@@ -201,6 +211,43 @@ func (b *BluetoothBackend) NewPairing() error {
 	return nil
 }
 
+// Connect opens an outbound connection to a device by address and blocks until
+// BlueZ answers, so the caller gets the real outcome. BlueZ may take a few
+// seconds and trigger pairing; the device's Connected state also propagates
+// through bluetooth.updated events from the listener.
+func (b *BluetoothBackend) Connect(address string) error {
+	if err := validateAddress(address); err != nil {
+		return err
+	}
+	path := devicePath(address)
+	logger.Info("[bluetooth] connecting to %s", address)
+	if err := b.connectDevice(path); err != nil {
+		logger.Warn("[bluetooth] failed to connect to %s: %v", address, err)
+		return fmt.Errorf("could not connect to %s: %w", address, err)
+	}
+	if !b.trustDevice(path) {
+		logger.Warn("[bluetooth] connected to %s but failed to trust it", address)
+	}
+	logger.Info("[bluetooth] connected to %s", address)
+	// We have a target now; stop any active scan to free the adapter.
+	if err := b.StopScan(); err != nil {
+		logger.Warn("[bluetooth] failed to stop scan after connect: %v", err)
+	}
+	return nil
+}
+
+// Disconnect tears down the connection to a device by address.
+func (b *BluetoothBackend) Disconnect(address string) error {
+	if err := validateAddress(address); err != nil {
+		return err
+	}
+	if err := b.disconnectDevice(devicePath(address)); err != nil {
+		logger.Warn("[bluetooth] failed to disconnect %s: %v", address, err)
+		return fmt.Errorf("could not disconnect from %s: %w", address, err)
+	}
+	return nil
+}
+
 func (b *BluetoothBackend) onPropertiesChanged(sig *dbus.Signal) bool {
 	if sig == nil {
 		return true // channel closed
@@ -223,10 +270,15 @@ func (b *BluetoothBackend) onPropertiesChanged(sig *dbus.Signal) bool {
 }
 
 func (b *BluetoothBackend) onDevicePropertiesChanged(path dbus.ObjectPath, changed map[string]dbus.Variant) {
+	// Ignore the RSSI/TxPower churn a scan generates.
+	if !changedAny(changed, BT_STATE_CONNECTED, BT_STATE_PAIRED) {
+		return
+	}
+
 	refresh := false
 	defer func() {
 		if refresh {
-			b.refreshKnownDevices()
+			b.refreshDevices()
 		}
 	}()
 
@@ -345,18 +397,28 @@ func (b *BluetoothBackend) Events() <-chan events.Event {
 	return b.events
 }
 
-func (b *BluetoothBackend) refreshKnownDevices() {
+// refreshDevices rebuilds the device list from BlueZ, the source of truth.
+func (b *BluetoothBackend) refreshDevices() {
 	if b.conn == nil {
 		return
 	}
-	devices, err := b.listKnownDevices()
+	devices, err := b.listDevices()
 	if err != nil {
-		logger.Warn("[bluetooth] failed to list known devices: %v", err)
+		logger.Warn("[bluetooth] failed to list devices: %v", err)
 		return
 	}
 	b.updateStatus(func(s *BluetoothStatus) {
 		s.KnownDevices = devices
 	})
+}
+
+// GetDevices returns the current device list.
+func (b *BluetoothBackend) GetDevices() []BluetoothDevice {
+	devices := b.GetStatus().KnownDevices
+	if devices == nil {
+		return []BluetoothDevice{}
+	}
+	return devices
 }
 
 func (b *BluetoothBackend) registerAgent() error {
