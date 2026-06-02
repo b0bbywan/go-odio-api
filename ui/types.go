@@ -107,8 +107,18 @@ type BluetoothDevice struct {
 	Address   string `json:"address"`
 	Name      string `json:"name"`
 	Paired    bool   `json:"paired"`
+	Bonded    bool   `json:"bonded"`
 	Trusted   bool   `json:"trusted"`
 	Connected bool   `json:"connected"`
+}
+
+// Label is the display label: the name, falling back to the address. Used as
+// both the sort key and the rendered label so the two never diverge.
+func (d BluetoothDevice) Label() string {
+	if d.Name != "" {
+		return d.Name
+	}
+	return d.Address
 }
 
 // BluetoothStatus represents the current Bluetooth state from /bluetooth
@@ -183,4 +193,5 @@ type BluetoothView struct {
 	PairingUntilMs int64 // pairing deadline as epoch millis, for the client-side countdown
 	Scanning       bool
 	ConnectedCount int
+	Devices        []BluetoothDevice
 }
