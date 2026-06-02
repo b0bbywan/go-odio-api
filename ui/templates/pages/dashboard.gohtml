@@ -1,11 +1,20 @@
 {{ define "content" }}
-{{- $g1 := .ServerInfo.Backends.PulseAudio -}}
+{{- $g1 := or .ServerInfo.Backends.Bluetooth .ServerInfo.Backends.PulseAudio -}}
 {{- $g2 := .ServerInfo.Backends.MPRIS -}}
-{{- $g3 := or .ServerInfo.Backends.Bluetooth .ServerInfo.Backends.Systemd -}}
+{{- $g3 := .ServerInfo.Backends.Systemd -}}
 <div hx-ext="sse" sse-connect="/ui/events" class="grid gap-4{{ if or (and $g1 $g2) (and $g1 $g3) (and $g2 $g3) }} sm:grid-cols-2{{ end }}{{ if and $g1 $g2 $g3 }} lg:grid-cols-3{{ end }}">
-	{{ if .ServerInfo.Backends.PulseAudio }}
-	<div class="min-w-0" sse-swap="section-audio" hx-swap="innerHTML">
-		{{ template "section-pulseaudio" .AudioData }}
+	{{ if or .ServerInfo.Backends.Bluetooth .ServerInfo.Backends.PulseAudio }}
+	<div class="min-w-0 flex flex-col gap-4">
+		{{ if .ServerInfo.Backends.Bluetooth }}
+		<div sse-swap="section-bluetooth" hx-swap="innerHTML">
+			{{ template "section-bluetooth" .Bluetooth }}
+		</div>
+		{{ end }}
+		{{ if .ServerInfo.Backends.PulseAudio }}
+		<div sse-swap="section-audio" hx-swap="innerHTML">
+			{{ template "section-pulseaudio" .AudioData }}
+		</div>
+		{{ end }}
 	</div>
 	{{ end }}
 
@@ -15,18 +24,9 @@
 	</div>
 	{{ end }}
 
-	{{ if or .ServerInfo.Backends.Bluetooth .ServerInfo.Backends.Systemd }}
-	<div class="min-w-0 flex flex-col gap-4">
-		{{ if .ServerInfo.Backends.Bluetooth }}
-		<div sse-swap="section-bluetooth" hx-swap="innerHTML">
-			{{ template "section-bluetooth" .Bluetooth }}
-		</div>
-		{{ end }}
-		{{ if .ServerInfo.Backends.Systemd }}
-		<div sse-swap="section-systemd" hx-swap="innerHTML">
-			{{ template "section-systemd" .Services }}
-		</div>
-		{{ end }}
+	{{ if .ServerInfo.Backends.Systemd }}
+	<div class="min-w-0" sse-swap="section-systemd" hx-swap="innerHTML">
+		{{ template "section-systemd" .Services }}
 	</div>
 	{{ end }}
 </div>
