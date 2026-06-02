@@ -30,9 +30,18 @@
                         hx-post="/bluetooth/pairing_mode"
                         hx-swap="none">Pairing</button>
                 {{ end }}
+                {{ if .Scanning }}
+                <button class="btn text-xs"
+                        hx-post="/bluetooth/scan/stop"
+                        hx-swap="none">Stop scan</button>
+                {{ else }}
+                <button class="btn text-xs"
+                        hx-post="/bluetooth/scan"
+                        hx-swap="none">Scan</button>
+                {{ end }}
             </div>
             <div class="meta-area">
-                <span class="status-dot {{ if .PairingActive }}bg-blue-400 animate-pulse{{ else if .Powered }}bg-green-500{{ else }}bg-red-500{{ end }}"></span>
+                <span class="status-dot {{ if or .PairingActive .Scanning }}bg-blue-400 animate-pulse{{ else if .Powered }}bg-green-500{{ else }}bg-red-500{{ end }}"></span>
             </div>
         </div>
 

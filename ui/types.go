@@ -118,6 +118,7 @@ type BluetoothStatus struct {
 	Pairable      bool              `json:"pairable"`
 	PairingActive bool              `json:"pairing_active"`
 	PairingUntil  *time.Time        `json:"pairing_until,omitempty"`
+	Scanning      bool              `json:"scanning"`
 	KnownDevices  []BluetoothDevice `json:"known_devices,omitempty"`
 }
 
@@ -180,5 +181,6 @@ type BluetoothView struct {
 	Powered        bool
 	PairingActive  bool
 	PairingUntilMs int64 // pairing deadline as epoch millis, for the client-side countdown
+	Scanning       bool
 	ConnectedCount int
 }
