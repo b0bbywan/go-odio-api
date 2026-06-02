@@ -107,7 +107,7 @@ func TestSectionTemplates(t *testing.T) {
 		{
 			name:     "Bluetooth section pairing active",
 			template: "section-bluetooth",
-			data:     &BluetoothView{Powered: true, PairingActive: true, PairingSecondsLeft: 42},
+			data:     &BluetoothView{Powered: true, PairingActive: true, PairingUntilMs: 1_700_000_000_000},
 		},
 	}
 
@@ -474,7 +474,7 @@ func TestConvertBluetooth(t *testing.T) {
 		}
 	})
 
-	t.Run("pairing active with future deadline", func(t *testing.T) {
+	t.Run("pairing active exposes the deadline", func(t *testing.T) {
 		until := time.Now().Add(45 * time.Second)
 		got := convertBluetooth(&BluetoothStatus{
 			PairingActive: true,
@@ -483,19 +483,16 @@ func TestConvertBluetooth(t *testing.T) {
 		if !got.PairingActive {
 			t.Error("expected PairingActive=true")
 		}
-		if got.PairingSecondsLeft <= 0 || got.PairingSecondsLeft > 45 {
-			t.Errorf("expected PairingSecondsLeft in (0,45], got %d", got.PairingSecondsLeft)
+		// The raw deadline is passed through; clamping/decrement is client-side.
+		if got.PairingUntilMs != until.UnixMilli() {
+			t.Errorf("expected PairingUntilMs=%d, got %d", until.UnixMilli(), got.PairingUntilMs)
 		}
 	})
 
-	t.Run("pairing active with expired deadline", func(t *testing.T) {
-		until := time.Now().Add(-5 * time.Second)
-		got := convertBluetooth(&BluetoothStatus{
-			PairingActive: true,
-			PairingUntil:  &until,
-		})
-		if got.PairingSecondsLeft != 0 {
-			t.Errorf("expected PairingSecondsLeft=0, got %d", got.PairingSecondsLeft)
+	t.Run("no pairing leaves the deadline zero", func(t *testing.T) {
+		got := convertBluetooth(&BluetoothStatus{PairingActive: false})
+		if got.PairingUntilMs != 0 {
+			t.Errorf("expected PairingUntilMs=0, got %d", got.PairingUntilMs)
 		}
 	})
 }

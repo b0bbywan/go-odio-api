@@ -187,17 +187,15 @@ func convertBluetooth(raw *BluetoothStatus) *BluetoothView {
 			connected++
 		}
 	}
-	secsLeft := 0
+	var untilMs int64
 	if raw.PairingActive && raw.PairingUntil != nil {
-		if d := time.Until(*raw.PairingUntil); d > 0 {
-			secsLeft = int(d.Seconds())
-		}
+		untilMs = raw.PairingUntil.UnixMilli()
 	}
 	return &BluetoothView{
-		Powered:            raw.Powered,
-		PairingActive:      raw.PairingActive,
-		PairingSecondsLeft: secsLeft,
-		ConnectedCount:     connected,
+		Powered:        raw.Powered,
+		PairingActive:  raw.PairingActive,
+		PairingUntilMs: untilMs,
+		ConnectedCount: connected,
 	}
 }
 

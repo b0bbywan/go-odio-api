@@ -177,8 +177,8 @@ type ServiceView struct {
 
 // BluetoothView is the view model for the bluetooth section
 type BluetoothView struct {
-	Powered            bool
-	PairingActive      bool
-	PairingSecondsLeft int
-	ConnectedCount     int
+	Powered        bool
+	PairingActive  bool
+	PairingUntilMs int64 // pairing deadline as epoch millis, for the client-side countdown
+	ConnectedCount int
 }
