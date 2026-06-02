@@ -125,10 +125,11 @@ func (b *BluetoothBackend) onInterfacesAdded(sig *dbus.Signal) bool {
 	return false
 }
 
-// handleDiscoveredDevice reacts to a device appearing during a scan by pushing
-// it as a discovery event, built straight from the signal's properties. The
-// settled known_devices list is reconciled with BlueZ on the next real
-// transition (connect/disconnect/pair) and when the scan stops.
+// handleDiscoveredDevice reacts to a device appearing during a scan: it merges
+// the device (built straight from the signal's properties, no extra D-Bus call)
+// into the device list and pushes a discovery event. The list is reconciled with
+// BlueZ on the next real transition (connect/disconnect/pair) and when the scan
+// stops.
 func (b *BluetoothBackend) handleDiscoveredDevice(path dbus.ObjectPath, props map[string]dbus.Variant) {
 	// Ignore devices belonging to another adapter.
 	if adapterVar, ok := props[BT_PROP_ADAPTER]; ok {
@@ -144,20 +145,25 @@ func (b *BluetoothBackend) handleDiscoveredDevice(path dbus.ObjectPath, props ma
 		return
 	}
 
-	// Hold scanMu across the check and the emit so a concurrent StopScan can't
-	// slip a discovered event out after the scan is reported stopped.
-	b.scanMu.Lock()
-	defer b.scanMu.Unlock()
-	if !b.GetStatus().Scanning {
-		return
-	}
-	b.notifyDiscovered(BluetoothDevice{
+	device := BluetoothDevice{
 		Address:   address,
 		Name:      extractString(props, BT_PROP_NAME),
 		Paired:    extractBoolProp(props, BT_STATE_PAIRED),
 		Trusted:   extractBoolProp(props, BT_STATE_TRUSTED),
 		Connected: extractBoolProp(props, BT_STATE_CONNECTED),
+	}
+
+	// Hold scanMu across the check and the updates so a concurrent StopScan can't
+	// slip a device in after the scan is reported stopped.
+	b.scanMu.Lock()
+	defer b.scanMu.Unlock()
+	if !b.GetStatus().Scanning {
+		return
+	}
+	b.updateStatus(func(s *BluetoothStatus) {
+		s.KnownDevices = upsertDevice(s.KnownDevices, device)
 	})
+	b.notifyDiscovered(device)
 }
 
 func (b *BluetoothBackend) notifyDiscovered(device BluetoothDevice) {
