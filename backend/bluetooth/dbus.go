@@ -2,6 +2,8 @@ package bluetooth
 
 import (
 	"fmt"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/godbus/dbus/v5"
@@ -9,6 +11,8 @@ import (
 
 	"github.com/b0bbywan/go-odio-api/logger"
 )
+
+var macRegex = regexp.MustCompile(`^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$`)
 
 func filterSignal(sig *dbus.Signal) (map[string]dbus.Variant, string, error) {
 	if sig == nil {
@@ -107,6 +111,15 @@ func extractMapBool(v map[string]dbus.Variant, value BluetoothState) (bool, bool
 	return false, false
 }
 
+func changedAny(changed map[string]dbus.Variant, keys ...BluetoothState) bool {
+	for _, k := range keys {
+		if _, ok := changed[k.String()]; ok {
+			return true
+		}
+	}
+	return false
+}
+
 func changedKeys(changed map[string]dbus.Variant) []string {
 	keys := make([]string, 0, len(changed))
 	for k := range changed {
@@ -180,21 +193,20 @@ func (b *BluetoothBackend) iterateAdapterDevices(fn func(path dbus.ObjectPath, p
 	return nil
 }
 
-func (b *BluetoothBackend) listKnownDevices() ([]BluetoothDevice, error) {
+// listDevices returns the adapter's devices straight from BlueZ, which is the
+// single source of truth for their state. The paired/trusted/connected flags
+// let callers tell a known speaker from a freshly scanned one.
+func (b *BluetoothBackend) listDevices() ([]BluetoothDevice, error) {
 	devices := []BluetoothDevice{}
 
 	err := b.iterateAdapterDevices(func(path dbus.ObjectPath, props map[string]dbus.Variant) bool {
-		// Only keep trusted devices
-		if trusted, ok := extractMapBool(props, BT_STATE_TRUSTED); ok && trusted {
-			// Extract device info
-			device := BluetoothDevice{
-				Address:   extractString(props, BT_PROP_ADDRESS),
-				Name:      extractString(props, BT_PROP_NAME),
-				Trusted:   trusted,
-				Connected: extractBoolProp(props, BT_STATE_CONNECTED),
-			}
-			devices = append(devices, device)
-		}
+		devices = append(devices, BluetoothDevice{
+			Address:   extractString(props, BT_PROP_ADDRESS),
+			Name:      extractString(props, BT_PROP_NAME),
+			Paired:    extractBoolProp(props, BT_STATE_PAIRED),
+			Trusted:   extractBoolProp(props, BT_STATE_TRUSTED),
+			Connected: extractBoolProp(props, BT_STATE_CONNECTED),
+		})
 		return true
 	})
 
@@ -217,6 +229,89 @@ func extractBoolProp(props map[string]dbus.Variant, key BluetoothState) bool {
 		}
 	}
 	return false
+}
+
+// validateAddress checks that address is a well-formed Bluetooth MAC.
+func validateAddress(address string) error {
+	if !macRegex.MatchString(address) {
+		return fmt.Errorf("%w: %q", ErrInvalidAddress, address)
+	}
+	return nil
+}
+
+// devicePath derives the BlueZ object path for a device on our adapter:
+// AA:BB:CC:DD:EE:FF -> /org/bluez/hci0/dev_AA_BB_CC_DD_EE_FF
+func devicePath(address string) dbus.ObjectPath {
+	mac := strings.ReplaceAll(strings.ToUpper(address), ":", "_")
+	return dbus.ObjectPath(BLUETOOTH_PATH + "/dev_" + mac)
+}
+
+// addressFromPath is the inverse of devicePath; returns "" if path is not a device path.
+func addressFromPath(path dbus.ObjectPath) string {
+	s := string(path)
+	idx := strings.LastIndex(s, "/dev_")
+	if idx == -1 {
+		return ""
+	}
+	return strings.ReplaceAll(s[idx+len("/dev_"):], "_", ":")
+}
+
+// parseInterfacesAdded extracts the device path and Device1 properties from an
+// InterfacesAdded signal. ok is false when the signal is not about a Device1.
+func parseInterfacesAdded(sig *dbus.Signal) (dbus.ObjectPath, map[string]dbus.Variant, bool) {
+	if sig == nil || len(sig.Body) < 2 {
+		return "", nil, false
+	}
+	path, ok := sig.Body[0].(dbus.ObjectPath)
+	if !ok {
+		return "", nil, false
+	}
+	ifaces, ok := sig.Body[1].(map[string]map[string]dbus.Variant)
+	if !ok {
+		return "", nil, false
+	}
+	dev, ok := ifaces[BLUETOOTH_DEVICE]
+	if !ok {
+		return "", nil, false
+	}
+	return path, dev, true
+}
+
+func (b *BluetoothBackend) startDiscovery() error {
+	if err := b.callMethod(b.adapter(), ADAPTER_START_DISCOVERY); err != nil {
+		logger.Warn("[bluetooth] failed to start discovery: %v", err)
+		return err
+	}
+	return nil
+}
+
+func (b *BluetoothBackend) stopDiscovery() error {
+	if err := b.callMethod(b.adapter(), ADAPTER_STOP_DISCOVERY); err != nil {
+		logger.Warn("[bluetooth] failed to stop discovery: %v", err)
+		return err
+	}
+	return nil
+}
+
+// setDiscoveryFilter restricts discovery to BR/EDR (classic) transport, which
+// is what audio speakers/headphones use, and cuts down on BLE noise.
+func (b *BluetoothBackend) setDiscoveryFilter() error {
+	filter := map[string]dbus.Variant{
+		"Transport": dbus.MakeVariant("bredr"),
+	}
+	if err := b.callMethod(b.adapter(), ADAPTER_DISCOVERY_FILTER, filter); err != nil {
+		logger.Warn("[bluetooth] failed to set discovery filter: %v", err)
+		return err
+	}
+	return nil
+}
+
+func (b *BluetoothBackend) connectDevice(path dbus.ObjectPath) error {
+	return b.callMethod(b.getObj(BLUETOOTH_PREFIX, string(path)), DEVICE_CONNECT)
+}
+
+func (b *BluetoothBackend) disconnectDevice(path dbus.ObjectPath) error {
+	return b.callMethod(b.getObj(BLUETOOTH_PREFIX, string(path)), DEVICE_DISCONNECT)
 }
 
 func (b *BluetoothBackend) getAdapterBoolProp(prop BluetoothState) bool {

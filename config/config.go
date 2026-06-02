@@ -98,6 +98,7 @@ type BluetoothConfig struct {
 	PairingTimeout time.Duration
 	Timeout        time.Duration
 	IdleTimeout    time.Duration
+	ScanTimeout    time.Duration
 }
 
 type ZeroConfig struct {
@@ -204,6 +205,7 @@ func New(cfgFile *string) (*Config, error) {
 	viper.SetDefault("bluetooth.timeout", "5s")
 	viper.SetDefault("bluetooth.pairingtimeout", "60s")
 	viper.SetDefault("bluetooth.idletimeout", "30m")
+	viper.SetDefault("bluetooth.scantimeout", "60s")
 
 	viper.SetDefault("power.enabled", false)
 	viper.SetDefault("power.capabilities.reboot", false)
@@ -301,6 +303,7 @@ func New(cfgFile *string) (*Config, error) {
 		Timeout:        getDuration("bluetooth.timeout", 5*time.Second),
 		PairingTimeout: getDuration("bluetooth.pairingtimeout", 60*time.Second),
 		IdleTimeout:    getDuration("bluetooth.idletimeout", 30*time.Minute),
+		ScanTimeout:    getDuration("bluetooth.scantimeout", 60*time.Second),
 	}
 
 	pulsecfg := PulseAudioConfig{

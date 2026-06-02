@@ -2,6 +2,7 @@ package bluetooth
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"time"
 
@@ -10,6 +11,9 @@ import (
 	"github.com/b0bbywan/go-odio-api/cache"
 	"github.com/b0bbywan/go-odio-api/events"
 )
+
+// ErrInvalidAddress is returned when a Bluetooth address is malformed.
+var ErrInvalidAddress = errors.New("invalid bluetooth address")
 
 // managedTimer is a self-locking one-shot timer handle shared by the idle and
 // scan auto-stop timers.
@@ -51,10 +55,16 @@ type BluetoothBackend struct {
 	timeout        time.Duration
 	pairingTimeout time.Duration
 	idleTimeout    time.Duration
+	scanTimeout    time.Duration
 	powerOnStart   bool
 	agent          *bluezAgent
 	idleTimer      managedTimer
 	listener       *DBusListener
+	// discovery (active scan) state guarded by scanMu; the scan flag itself
+	// lives in BluetoothStatus.Scanning (the published source of truth)
+	scanMu            sync.Mutex
+	scanTimer         managedTimer
+	discoveryListener *DBusListener
 	// permanent cache (no expiration) for status tracking
 	statusCache *cache.Cache[BluetoothStatus]
 	events      chan events.Event
@@ -72,10 +82,14 @@ func (e *bluetoothUnsupportedError) Error() string {
 	return "bluetooth not supported"
 }
 
-// BluetoothDevice represents a known Bluetooth device
+// BluetoothDevice represents a Bluetooth device, whether already paired/trusted
+// or freshly seen during an active scan. The boolean flags tell the two apart:
+// a paired speaker has Paired/Trusted set, a device that just appeared in a scan
+// has them both false.
 type BluetoothDevice struct {
 	Address   string `json:"address"`
 	Name      string `json:"name"`
+	Paired    bool   `json:"paired"`
 	Trusted   bool   `json:"trusted"`
 	Connected bool   `json:"connected"`
 }
@@ -87,5 +101,6 @@ type BluetoothStatus struct {
 	Pairable      bool              `json:"pairable"`
 	PairingActive bool              `json:"pairing_active"`
 	PairingUntil  *time.Time        `json:"pairing_until,omitempty"`
+	Scanning      bool              `json:"scanning"`
 	KnownDevices  []BluetoothDevice `json:"known_devices,omitempty"`
 }

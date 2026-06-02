@@ -102,10 +102,11 @@ type Service struct {
 	URL         string `json:"url,omitempty"`
 }
 
-// BluetoothDevice represents a known Bluetooth device from /bluetooth
+// BluetoothDevice represents a Bluetooth device from /bluetooth
 type BluetoothDevice struct {
 	Address   string `json:"address"`
 	Name      string `json:"name"`
+	Paired    bool   `json:"paired"`
 	Trusted   bool   `json:"trusted"`
 	Connected bool   `json:"connected"`
 }
