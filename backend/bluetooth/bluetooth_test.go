@@ -1,7 +1,6 @@
 package bluetooth
 
 import (
-	"sync"
 	"testing"
 	"time"
 
@@ -383,32 +382,9 @@ func TestOnPropertiesChangedNeverStops(t *testing.T) {
 }
 
 func TestCancelIdleTimer(t *testing.T) {
-	t.Run("cancels running timer", func(t *testing.T) {
-		b := &BluetoothBackend{}
-		b.idleTimer = time.AfterFunc(time.Hour, func() {
-			t.Error("timer should have been cancelled")
-		})
-
-		b.cancelIdleTimer()
-
-		if b.idleTimer != nil {
-			t.Error("idleTimer should be nil after cancel")
-		}
-	})
-
-	t.Run("noop when no timer", func(t *testing.T) {
-		b := &BluetoothBackend{}
-		b.cancelIdleTimer() // should not panic
-		if b.idleTimer != nil {
-			t.Error("idleTimer should remain nil")
-		}
-	})
-
 	t.Run("connected signal cancels idle timer", func(t *testing.T) {
-		b := &BluetoothBackend{
-			idleTimerMu: sync.Mutex{},
-		}
-		b.idleTimer = time.AfterFunc(time.Hour, func() {
+		b := &BluetoothBackend{}
+		b.idleTimer.Start(time.Hour, func() {
 			t.Error("timer should have been cancelled by connected signal")
 		})
 
@@ -424,8 +400,64 @@ func TestCancelIdleTimer(t *testing.T) {
 
 		b.onPropertiesChanged(sig)
 
-		if b.idleTimer != nil {
+		if b.idleTimer.timer != nil {
 			t.Error("idleTimer should be nil after connected=true signal")
+		}
+	})
+}
+
+func TestManagedTimer(t *testing.T) {
+	t.Run("Start arms when duration is non-zero", func(t *testing.T) {
+		var mt managedTimer
+		if !mt.Start(time.Hour, func() {}) {
+			t.Error("Start should report it armed the timer")
+		}
+		if mt.timer == nil {
+			t.Error("timer should be set")
+		}
+		mt.Cancel()
+	})
+
+	t.Run("Start is a no-op for zero duration", func(t *testing.T) {
+		var mt managedTimer
+		if mt.Start(0, func() { t.Error("zero-duration timer should not run") }) {
+			t.Error("Start should report nothing armed")
+		}
+		if mt.timer != nil {
+			t.Error("timer should stay nil for zero duration")
+		}
+	})
+
+	t.Run("Start does not reset an armed timer", func(t *testing.T) {
+		var mt managedTimer
+		mt.Start(time.Hour, func() {})
+		first := mt.timer
+		if mt.Start(time.Hour, func() {}) {
+			t.Error("Start should report no-op when already armed")
+		}
+		if mt.timer != first {
+			t.Error("already-armed timer should be left untouched")
+		}
+		mt.Cancel()
+	})
+
+	t.Run("Cancel stops and clears", func(t *testing.T) {
+		var mt managedTimer
+		mt.timer = time.AfterFunc(time.Hour, func() {
+			t.Error("timer should have been cancelled")
+		})
+		if !mt.Cancel() {
+			t.Error("Cancel should report it cancelled a timer")
+		}
+		if mt.timer != nil {
+			t.Error("timer should be nil after Cancel")
+		}
+	})
+
+	t.Run("Cancel is a no-op when not armed", func(t *testing.T) {
+		var mt managedTimer
+		if mt.Cancel() {
+			t.Error("Cancel should report nothing to cancel")
 		}
 	})
 }
