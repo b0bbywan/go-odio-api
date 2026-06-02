@@ -58,7 +58,8 @@
             </summary>
             <ul class="space-y-1 max-h-48 overflow-y-auto">
                 {{ range .Devices }}
-                <li class="flex items-center justify-between gap-2 py-1">
+                <li class="flex items-center justify-between gap-2 py-1"
+                    data-address="{{ .Address }}" data-connected="{{ .Connected }}">
                     <span class="flex items-center gap-2 min-w-0">
                         <span class="status-dot {{ if .Connected }}bg-green-500{{ else if .Bonded }}bg-blue-400{{ else }}bg-zinc-500{{ end }}"></span>
                         <span class="truncate text-sm">{{ .Label }}</span>
@@ -74,7 +75,9 @@
                             hx-post="/bluetooth/connect"
                             hx-ext="json-enc"
                             hx-vals='{"address": "{{ .Address }}"}'
-                            hx-swap="none">Connect</button>
+                            hx-swap="none"
+                            hx-on:click="btConnect(this, '{{ .Address }}')"
+                            hx-on::response-error="btConnectFailed(this, '{{ .Address }}')">Connect</button>
                     {{ end }}
                 </li>
                 {{ end }}
