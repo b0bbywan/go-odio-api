@@ -279,42 +279,27 @@ func (b *BluetoothBackend) onAdapterPropertiesChanged(changed map[string]dbus.Va
 }
 
 func (b *BluetoothBackend) cancelIdleTimer() {
-	b.idleTimerMu.Lock()
-	defer b.idleTimerMu.Unlock()
-
-	if b.idleTimer != nil {
-		b.idleTimer.Stop()
-		b.idleTimer = nil
+	if b.idleTimer.Cancel() {
 		logger.Info("[bluetooth] idle timer cancelled")
 	}
 }
 
 func (b *BluetoothBackend) checkAndStartIdleTimer() {
-	if b.idleTimeout == 0 {
-		return
-	}
-
 	if b.hasConnectedDevices() {
 		logger.Debug("[bluetooth] still has connected devices, skipping idle timer")
 		return
 	}
 
-	b.idleTimerMu.Lock()
-	defer b.idleTimerMu.Unlock()
-
-	if b.idleTimer != nil {
-		logger.Debug("[bluetooth] idle timer already running, skipping")
-		return
-	}
-
-	b.idleTimer = time.AfterFunc(b.idleTimeout, func() {
+	armed := b.idleTimer.Start(b.idleTimeout, func() {
 		logger.Info("[bluetooth] idle timeout reached after %v, powering down", b.idleTimeout)
 		if err := b.PowerOnAdapter(false); err != nil {
 			logger.Warn("[bluetooth] failed to power down: %v", err)
 		}
 		b.cleanupPoweredState()
 	})
-	logger.Info("[bluetooth] idle timer started (%v)", b.idleTimeout)
+	if armed {
+		logger.Info("[bluetooth] idle timer started (%v)", b.idleTimeout)
+	}
 }
 
 func (b *BluetoothBackend) Close() {
