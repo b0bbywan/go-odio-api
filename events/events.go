@@ -1,18 +1,19 @@
 package events
 
 const (
-	TypeServerInfo         = "server.info"
-	TypePlayerUpdated      = "player.updated"
-	TypePlayerAdded        = "player.added"
-	TypePlayerRemoved      = "player.removed"
-	TypePlayerPosition     = "player.position"
-	TypeAudioUpdated       = "audio.updated"
-	TypeAudioRemoved       = "audio.removed"
-	TypeAudioOutputUpdated = "audio.output.updated"
-	TypeAudioOutputRemoved = "audio.output.removed"
-	TypeServiceUpdated     = "service.updated"
-	TypeBluetoothUpdated   = "bluetooth.updated"
-	TypePowerAction        = "power.action"
+	TypeServerInfo          = "server.info"
+	TypePlayerUpdated       = "player.updated"
+	TypePlayerAdded         = "player.added"
+	TypePlayerRemoved       = "player.removed"
+	TypePlayerPosition      = "player.position"
+	TypeAudioUpdated        = "audio.updated"
+	TypeAudioRemoved        = "audio.removed"
+	TypeAudioOutputUpdated  = "audio.output.updated"
+	TypeAudioOutputRemoved  = "audio.output.removed"
+	TypeServiceUpdated      = "service.updated"
+	TypeBluetoothUpdated    = "bluetooth.updated"
+	TypeBluetoothDiscovered = "bluetooth.discovered"
+	TypePowerAction         = "power.action"
 )
 
 type Event struct {
@@ -25,7 +26,7 @@ var BackendTypes = map[string][]string{
 	"mpris":     {TypePlayerUpdated, TypePlayerAdded, TypePlayerRemoved, TypePlayerPosition},
 	"audio":     {TypeAudioUpdated, TypeAudioRemoved, TypeAudioOutputUpdated, TypeAudioOutputRemoved},
 	"systemd":   {TypeServiceUpdated},
-	"bluetooth": {TypeBluetoothUpdated},
+	"bluetooth": {TypeBluetoothUpdated, TypeBluetoothDiscovered},
 	"power":     {TypePowerAction},
 }
 
