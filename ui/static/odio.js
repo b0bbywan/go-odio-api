@@ -257,6 +257,41 @@ function openBluetoothDevices() {
 	if (el) el.open = true;
 }
 
+// Bluetooth connect is synchronous and can take seconds; the section also
+// re-renders as a scan streams in, which would swap away the in-flight button.
+// Track connecting addresses and reapply the "Connecting…" state after each swap
+// (same idea as detailsState), clearing it once the row reports connected.
+var btConnecting = new Set();
+
+function btShowConnecting(btn) {
+	btn.innerHTML = '<span class="spinner"></span>';
+	btn.classList.add('pointer-events-none');
+}
+
+function btConnect(btn, address) {
+	btConnecting.add(address);
+	btShowConnecting(btn);
+}
+
+function btConnectFailed(btn, address) {
+	btConnecting.delete(address);
+	btn.textContent = 'Connect';
+	btn.classList.remove('pointer-events-none');
+}
+
+document.addEventListener('htmx:afterSwap', function() {
+	if (btConnecting.size === 0) return;
+	document.querySelectorAll('#bluetooth-devices li[data-address]').forEach(function(li) {
+		if (!btConnecting.has(li.dataset.address)) return;
+		if (li.dataset.connected === 'true') {
+			btConnecting.delete(li.dataset.address); // connected → row now shows Disconnect
+			return;
+		}
+		const btn = li.querySelector('button');
+		if (btn) btShowConnecting(btn);
+	});
+});
+
 // Block SSE swaps on the audio section while the sink dropdown is open
 document.addEventListener('htmx:sseBeforeMessage', function(e) {
 	if (e.detail.elt && e.detail.elt.querySelector('.sink-dropdown ul:not(.hidden)')) {
