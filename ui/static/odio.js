@@ -182,6 +182,27 @@ function updatePositions() {
 document.addEventListener('DOMContentLoaded', () => setInterval(updatePositions, 500));
 document.addEventListener('htmx:afterSwap', updatePositions);
 
+// ── Countdowns ───────────────────────────────────────────────────────────────
+
+// Sections only re-render on SSE events, so a server-rendered deadline (e.g. the
+// pairing timer) would freeze between events. Tick it down client-side from the
+// absolute deadline in data-until. Queries the live DOM each time so HTMX
+// section replacements need no re-initialisation (same approach as
+// updatePositions). The element disappears on its own when the backend emits the
+// state change that ends the countdown.
+function updateCountdowns() {
+	document.querySelectorAll('.countdown[data-until]').forEach(el => {
+		const until = parseInt(el.dataset.until);
+		const left = Math.max(0, Math.ceil((until - Date.now()) / 1000));
+		el.textContent = `⏱ ${left}s`;
+	});
+}
+document.addEventListener('DOMContentLoaded', () => {
+	updateCountdowns();
+	setInterval(updateCountdowns, 1000);
+});
+document.addEventListener('htmx:afterSwap', updateCountdowns);
+
 // Open a service URL declared in the systemd config. Accepts ":port" /
 // "/path" / "//host/..." / full URLs and resolves the missing parts against
 // the page's current location so the link works from any host the dashboard

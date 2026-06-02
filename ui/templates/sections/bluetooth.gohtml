@@ -24,7 +24,7 @@
                         hx-swap="none">On</button>
                 {{ end }}
                 {{ if .PairingActive }}
-                <span class="text-xs text-blue-400">⏱ {{ .PairingSecondsLeft }}s</span>
+                <span class="text-xs text-blue-400 countdown" data-until="{{ .PairingUntilMs }}">⏱</span>
                 {{ else }}
                 <button class="btn text-xs"
                         hx-post="/bluetooth/pairing_mode"
