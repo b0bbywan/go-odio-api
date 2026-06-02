@@ -228,6 +228,16 @@ Odio automatically unblocks soft-blocked Bluetooth rfkill devices on power-up, s
 
 Bonus: You get to control it through `/pulseaudio/clients` or `/players/` and in the UI !
 
+#### Bluetooth output (speakers & headphones)
+
+Odio can also work the other way around: connect *to* nearby Bluetooth speakers or headphones and use them as an audio output.
+
+- **Scan**: `POST /bluetooth/scan` starts active discovery (powering the adapter up if needed) and filters for classic audio devices. Found devices stream live through `bluetooth.discovered` SSE events and are consolidated into `GET /bluetooth/devices` when the scan stops. Stop with `POST /bluetooth/scan/stop`, or let it auto-stop after `scanTimeout` (default 60s, `0` to disable).
+- **Connect**: `POST /bluetooth/connect` with `{"address": "AA:BB:CC:DD:EE:FF"}`. The address is validated first (malformed → `400`), then the call blocks until BlueZ answers (it can take a few seconds and may trigger pairing) and returns the real success/failure. The device is trusted on success and any active scan is stopped to free the adapter. The `connected` state also propagates through `bluetooth.updated` SSE events.
+- **Disconnect**: `POST /bluetooth/disconnect` with the same `{"address": ...}` body.
+
+Devices are exposed as a single list — `GET /bluetooth/devices` (and the `known_devices` field of `GET /bluetooth`) returns every device BlueZ knows about with `paired`, `trusted` and `connected` flags, so a paired speaker and a freshly scanned one share the same shape. Connected output devices then route through PulseAudio/PipeWire as a regular output sink.
+
 ### Power Management
 
 Remote reboot and power-off via the REST API — no SSH needed for day-to-day operations. Disabled by default. Uses `org.freedesktop.login1` D-Bus interface.
@@ -521,6 +531,7 @@ bluetooth:
   timeout: 5s
   pairingTimeout: 60s
   idleTimeout: 30m # 0 for no autopoweroff
+  scanTimeout: 60s # auto-stop a scan after this delay (0 to disable)
 ```
 
 #### Power Management
@@ -612,14 +623,26 @@ POST   /services/{scope}/{unit}/enable    # Enable service (scope: system|user)
 POST   /services/{scope}/{unit}/disable   # Disable service
 ```
 
-### Bluetooth Sink
+### Bluetooth
+
+Sink (receive audio from phones/computers):
 ```
-GET    /bluetooth                         # Get Bluetooth status (powered, pairing mode state)
+GET    /bluetooth                         # Get Bluetooth status (powered, pairing/scan state, known_devices list)
 POST   /bluetooth/power_up                # Turns Bluetooth on and makes the device ready to connect to already paired devices.
 POST   /bluetooth/power_down              # Turns Bluetooth off and disconnects any active Bluetooth connections.
 POST   /bluetooth/pairing_mode            # Enables Bluetooth pairing mode for 60s (configurable).
                                           # Returns to non-discoverable state after timeout or successful pairing.
+```
 
+Output (connect to Bluetooth speakers/headphones):
+```
+GET    /bluetooth/devices                 # List devices: [{"address","name","paired","trusted","connected"}, ...]
+POST   /bluetooth/scan                    # Start scanning for nearby devices (powers the adapter up if needed).
+                                          # Discovered devices stream through bluetooth.discovered SSE events.
+POST   /bluetooth/scan/stop               # Stop scanning (idempotent).
+POST   /bluetooth/connect                 # Connect to a device (body: {"address": "AA:BB:CC:DD:EE:FF"}).
+                                          # Blocks until BlueZ answers, then returns success/failure.
+POST   /bluetooth/disconnect              # Disconnect a device (body: {"address": "AA:BB:CC:DD:EE:FF"}).
 ```
 
 ### Power Management
