@@ -157,6 +157,10 @@ func (b *BluetoothBackend) cleanupPoweredState() {
 		s.PairingActive = false
 		s.PairingUntil = nil
 		s.Scanning = false
+		// Drop the device list: nothing is reachable while powered off, and the
+		// disconnect events that would clear it may arrive after the listener is
+		// gone. refreshDevices repopulates it on power-up.
+		s.KnownDevices = nil
 	})
 }
 
