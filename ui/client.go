@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -191,13 +192,36 @@ func convertBluetooth(raw *BluetoothStatus) *BluetoothView {
 	if raw.PairingActive && raw.PairingUntil != nil {
 		untilMs = raw.PairingUntil.UnixMilli()
 	}
+	// The backend lists devices in BlueZ map order (non-deterministic), so sort
+	// for a stable display that doesn't jump on every SSE re-render: connected
+	// first, then paired, then by name.
+	devices := raw.KnownDevices
+	sort.SliceStable(devices, func(i, j int) bool {
+		a, b := devices[i], devices[j]
+		if a.Connected != b.Connected {
+			return a.Connected
+		}
+		if a.Paired != b.Paired {
+			return a.Paired
+		}
+		return btDeviceLabel(a) < btDeviceLabel(b)
+	})
 	return &BluetoothView{
 		Powered:        raw.Powered,
 		PairingActive:  raw.PairingActive,
 		PairingUntilMs: untilMs,
 		Scanning:       raw.Scanning,
 		ConnectedCount: connected,
+		Devices:        devices,
 	}
+}
+
+// btDeviceLabel is the display label: the name, falling back to the address.
+func btDeviceLabel(d BluetoothDevice) string {
+	if d.Name != "" {
+		return d.Name
+	}
+	return d.Address
 }
 
 func (c *APIClient) GetServices() ([]ServiceView, error) {

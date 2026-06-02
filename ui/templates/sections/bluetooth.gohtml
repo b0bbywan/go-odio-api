@@ -37,13 +37,50 @@
                 {{ else }}
                 <button class="btn text-xs"
                         hx-post="/bluetooth/scan"
-                        hx-swap="none">Scan</button>
+                        hx-swap="none"
+                        hx-on:click="openBluetoothDevices()">Scan</button>
                 {{ end }}
             </div>
             <div class="meta-area">
                 <span class="status-dot {{ if or .PairingActive .Scanning }}bg-blue-400 animate-pulse{{ else if .Powered }}bg-green-500{{ else }}bg-red-500{{ end }}"></span>
             </div>
         </div>
+
+        {{ if .Devices }}
+        {{/* <details> so the open state survives the frequent SSE re-renders
+             during a scan (preserved by odio.js), letting devices stream in live.
+             player-card stacks the summary above the list (service-card would
+             lay them side by side). */}}
+        <details id="bluetooth-devices" class="player-card">
+            <summary class="player-summary justify-between">
+                <span class="text-sm">Devices ({{ len .Devices }})</span>
+                <span class="player-toggle text-xs">▾</span>
+            </summary>
+            <ul class="space-y-1 max-h-48 overflow-y-auto">
+                {{ range .Devices }}
+                <li class="flex items-center justify-between gap-2 py-1">
+                    <span class="flex items-center gap-2 min-w-0">
+                        <span class="status-dot {{ if .Connected }}bg-green-500{{ else if .Paired }}bg-blue-400{{ else }}bg-zinc-500{{ end }}"></span>
+                        <span class="truncate text-sm">{{ if .Name }}{{ .Name }}{{ else }}{{ .Address }}{{ end }}</span>
+                    </span>
+                    {{ if .Connected }}
+                    <button class="btn text-xs"
+                            hx-post="/bluetooth/disconnect"
+                            hx-ext="json-enc"
+                            hx-vals='{"address": "{{ .Address }}"}'
+                            hx-swap="none">Disconnect</button>
+                    {{ else }}
+                    <button class="btn text-xs"
+                            hx-post="/bluetooth/connect"
+                            hx-ext="json-enc"
+                            hx-vals='{"address": "{{ .Address }}"}'
+                            hx-swap="none">Connect</button>
+                    {{ end }}
+                </li>
+                {{ end }}
+            </ul>
+        </details>
+        {{ end }}
 
     </div>
 </details>
