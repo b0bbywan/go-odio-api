@@ -82,14 +82,14 @@ func (e *bluetoothUnsupportedError) Error() string {
 	return "bluetooth not supported"
 }
 
-// BluetoothDevice represents a Bluetooth device, whether already paired/trusted
-// or freshly seen during an active scan. The boolean flags tell the two apart:
-// a paired speaker has Paired/Trusted set, a device that just appeared in a scan
-// has them both false.
+// BluetoothDevice represents a Bluetooth device, known or freshly scanned.
+// Bonded tells them apart: a bonded device reconnects without needing the
+// adapter or the target speaker to be pairable.
 type BluetoothDevice struct {
 	Address   string `json:"address"`
 	Name      string `json:"name"`
 	Paired    bool   `json:"paired"`
+	Bonded    bool   `json:"bonded"`
 	Trusted   bool   `json:"trusted"`
 	Connected bool   `json:"connected"`
 }

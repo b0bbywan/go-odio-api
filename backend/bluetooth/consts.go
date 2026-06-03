@@ -49,6 +49,7 @@ const (
 type BluetoothState string
 
 const (
+	BT_STATE_BONDED       BluetoothState = "Bonded"
 	BT_STATE_CONNECTED    BluetoothState = "Connected"
 	BT_STATE_DISCOVERABLE BluetoothState = "Discoverable"
 	BT_STATE_PAIRABLE     BluetoothState = "Pairable"
