@@ -65,9 +65,10 @@ func (b *BluetoothBackend) syncAdapterState() {
 	})
 	logger.Info("[bluetooth] backend started (powered=%v pairable=%v discoverable=%v)", powered, pairable, discoverable)
 
+	b.startListener()
 	if powered {
 		b.refreshDevices()
-		b.startListener()
+		b.checkAndStartIdleTimer()
 	}
 }
 
@@ -86,27 +87,18 @@ func (b *BluetoothBackend) PowerUp() error {
 		return err
 	}
 
-	b.updateStatus(func(s *BluetoothStatus) {
-		s.Powered = true
-	})
-	b.refreshDevices()
-	b.startListener()
-
+	// status and refresh follow the Powered=true signal.
 	logger.Info("[bluetooth] Bluetooth ready to connect to already known devices")
 	return nil
 }
 
 func (b *BluetoothBackend) startListener() {
-	if b.listener != nil {
-		logger.Debug("[bluetooth] listener already running, skipping")
-		return
+	rules := []string{
+		fmt.Sprintf("type='signal',interface='%s',member='PropertiesChanged',arg0='%s'", DBUS_PROP_IFACE, BLUETOOTH_ADAPTER),
+		fmt.Sprintf("type='signal',interface='%s',member='PropertiesChanged',arg0='%s'", DBUS_PROP_IFACE, BLUETOOTH_DEVICE),
+		fmt.Sprintf("type='signal',sender='%s',interface='%s',member='InterfacesAdded'", BLUETOOTH_PREFIX, DBUS_OBJ_MANAGER),
 	}
-	matchRules := []string{
-		"type='signal',interface='org.freedesktop.DBus.Properties',member='PropertiesChanged',arg0='org.bluez.Device1'",
-		"type='signal',interface='org.freedesktop.DBus.Properties',member='PropertiesChanged',arg0='org.bluez.Adapter1'",
-	}
-	logger.Debug("[bluetooth] starting listener (device + adapter)")
-	listener := NewDBusListener(b.conn, b.ctx, matchRules, b.onPropertiesChanged)
+	listener := NewDBusListener(b.conn, b.ctx, rules, b.onSignal)
 	if err := listener.Start(); err != nil {
 		listener.Stop()
 		logger.Warn("[bluetooth] failed to start listener: %v", err)
@@ -114,42 +106,41 @@ func (b *BluetoothBackend) startListener() {
 	}
 	b.listener = listener
 	go listener.Listen()
-	logger.Debug("[bluetooth] listener started")
-	b.checkAndStartIdleTimer()
 }
 
 func (b *BluetoothBackend) stopListener() {
 	if b.listener != nil {
 		b.listener.Stop()
 		b.listener = nil
-		logger.Debug("[bluetooth] listener stopped")
 	}
-	b.cancelIdleTimer()
 }
 
 func (b *BluetoothBackend) PowerDown() error {
 	if powered := b.isAdapterOn(); !powered {
 		return nil
 	}
-
-	if err := b.PowerOnAdapter(false); err != nil {
+	if err := b.PowerOffAdapter(); err != nil {
 		return err
 	}
-
-	b.cleanupPoweredState()
 	logger.Info("[bluetooth] Powered down")
 	return nil
 }
 
-func (b *BluetoothBackend) cleanupPoweredState() {
-	// Tear down the scan resources directly: powering off makes BlueZ stop
-	// discovery on its own, so the user-facing StopScan (BlueZ call, refresh,
-	// idle re-arm) doesn't belong here.
+// PowerOffAdapter powers the adapter down; the status reset follows the
+// Powered=false signal.
+func (b *BluetoothBackend) PowerOffAdapter() error {
+	// BlueZ stops discovery on its own when off; just cancel the auto-stop timer
+	// rather than going through the user-facing StopScan (refresh, idle re-arm).
 	b.scanMu.Lock()
-	b.stopDiscoveryListener()
+	b.cancelScanTimer()
 	b.scanMu.Unlock()
 
-	b.stopListener()
+	return b.PowerOnAdapter(false)
+}
+
+// cleanupPoweredState resets the in-memory status to off; refreshDevices
+// repopulates KnownDevices on the next power-up.
+func (b *BluetoothBackend) cleanupPoweredState() {
 	b.updateStatus(func(s *BluetoothStatus) {
 		s.Powered = false
 		s.Discoverable = false
@@ -157,9 +148,6 @@ func (b *BluetoothBackend) cleanupPoweredState() {
 		s.PairingActive = false
 		s.PairingUntil = nil
 		s.Scanning = false
-		// Drop the device list: nothing is reachable while powered off, and the
-		// disconnect events that would clear it may arrive after the listener is
-		// gone. refreshDevices repopulates it on power-up.
 		s.KnownDevices = nil
 	})
 }
@@ -187,7 +175,7 @@ func (b *BluetoothBackend) NewPairing() error {
 		if err := b.PowerOnAdapter(true); err != nil {
 			return err
 		}
-		b.startListener()
+		// status and refresh follow the resulting Powered=true signal.
 	}
 
 	// Set BlueZ native timeouts
@@ -285,88 +273,8 @@ func (b *BluetoothBackend) Disconnect(address string) error {
 	return nil
 }
 
-func (b *BluetoothBackend) onPropertiesChanged(sig *dbus.Signal) bool {
-	if sig == nil {
-		return true // channel closed
-	}
-	changed, iface, err := filterSignal(sig)
-	if err != nil {
-		logger.Debug("[bluetooth] signal filtered out: %v", err)
-		return false
-	}
-
-	logger.Debug("[bluetooth] signal from %s (%s): changed properties=%v", sig.Path, iface, changedKeys(changed))
-	switch iface {
-	case BLUETOOTH_DEVICE:
-		b.onDevicePropertiesChanged(sig.Path, changed)
-	case BLUETOOTH_ADAPTER:
-		b.onAdapterPropertiesChanged(changed)
-	}
-
-	return false
-}
-
-func (b *BluetoothBackend) onDevicePropertiesChanged(path dbus.ObjectPath, changed map[string]dbus.Variant) {
-	// Ignore the RSSI/TxPower churn a scan generates.
-	if !changedAny(changed, BT_STATE_CONNECTED, BT_STATE_PAIRED) {
-		return
-	}
-
-	refresh := false
-	defer func() {
-		if refresh {
-			b.refreshDevices()
-		}
-	}()
-
-	if connected, ok := extractMapBool(changed, BT_STATE_CONNECTED); ok {
-		logger.Info("[bluetooth] device %s Connected=%v", path, connected)
-		if connected {
-			b.cancelIdleTimer()
-			refresh = true
-			return
-		}
-		b.checkAndStartIdleTimer()
-		refresh = true
-		return
-	}
-
-	if paired, ok := extractMapBool(changed, BT_STATE_PAIRED); ok && paired {
-		logger.Info("[bluetooth] device %s paired successfully", path)
-		if ok = b.trustDevice(path); !ok {
-			logger.Warn("[bluetooth] failed to trust device %s", path)
-			return
-		}
-
-		logger.Info("[bluetooth] device %s trusted", path)
-		refresh = true
-		if err := b.SetDiscoverableAndPairable(false); err != nil {
-			logger.Warn("[bluetooth] failed to stop pairing mode: %v", err)
-		}
-	}
-}
-
-func (b *BluetoothBackend) onAdapterPropertiesChanged(changed map[string]dbus.Variant) {
-	if discoverable, ok := extractMapBool(changed, BT_STATE_DISCOVERABLE); ok {
-		logger.Debug("[bluetooth] adapter Discoverable=%v", discoverable)
-		b.updateStatus(func(s *BluetoothStatus) {
-			s.Discoverable = discoverable
-		})
-	}
-
-	if pairable, ok := extractMapBool(changed, BT_STATE_PAIRABLE); ok {
-		logger.Debug("[bluetooth] adapter Pairable=%v", pairable)
-		b.updateStatus(func(s *BluetoothStatus) {
-			s.Pairable = pairable
-			if !pairable {
-				logger.Info("[bluetooth] pairing mode ended")
-				s.PairingActive = false
-				s.PairingUntil = nil
-			}
-		})
-	}
-}
-
+// onSignal dispatches PropertiesChanged (adapter/device) and InterfacesAdded
+// (scan discovery) signals to their handlers.
 func (b *BluetoothBackend) cancelIdleTimer() {
 	if b.idleTimer.Cancel() {
 		logger.Info("[bluetooth] idle timer cancelled")
@@ -374,6 +282,9 @@ func (b *BluetoothBackend) cancelIdleTimer() {
 }
 
 func (b *BluetoothBackend) checkAndStartIdleTimer() {
+	if !b.GetStatus().Powered {
+		return
+	}
 	if b.hasConnectedDevices() {
 		logger.Debug("[bluetooth] still has connected devices, skipping idle timer")
 		return
@@ -381,10 +292,9 @@ func (b *BluetoothBackend) checkAndStartIdleTimer() {
 
 	armed := b.idleTimer.Start(b.idleTimeout, func() {
 		logger.Info("[bluetooth] idle timeout reached after %v, powering down", b.idleTimeout)
-		if err := b.PowerOnAdapter(false); err != nil {
+		if err := b.PowerOffAdapter(); err != nil {
 			logger.Warn("[bluetooth] failed to power down: %v", err)
 		}
-		b.cleanupPoweredState()
 	})
 	if armed {
 		logger.Info("[bluetooth] idle timer started (%v)", b.idleTimeout)
@@ -396,6 +306,7 @@ func (b *BluetoothBackend) Close() {
 	if err := b.PowerDown(); err != nil {
 		logger.Warn("[bluetooth] Failed power off adapter at shutdown: %v", err)
 	}
+	b.stopListener()
 
 	if b.conn != nil {
 		if err := b.conn.Close(); err != nil {
@@ -434,9 +345,12 @@ func (b *BluetoothBackend) Events() <-chan events.Event {
 	return b.events
 }
 
-// refreshDevices rebuilds the device list from BlueZ, the source of truth.
+// refreshDevices rebuilds the device list from BlueZ. Skipped when powered off.
 func (b *BluetoothBackend) refreshDevices() {
 	if b.conn == nil {
+		return
+	}
+	if !b.GetStatus().Powered {
 		return
 	}
 	devices, err := b.listDevices()

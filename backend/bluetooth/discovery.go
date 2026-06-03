@@ -1,8 +1,6 @@
 package bluetooth
 
 import (
-	"fmt"
-
 	"github.com/godbus/dbus/v5"
 
 	"github.com/b0bbywan/go-odio-api/events"
@@ -35,7 +33,6 @@ func (b *BluetoothBackend) StartScan() error {
 		return err
 	}
 
-	b.startDiscoveryListener()
 	b.startScanTimer()
 	// A scan is activity: don't let the idle timer power the adapter off mid-scan.
 	b.cancelIdleTimer()
@@ -59,7 +56,7 @@ func (b *BluetoothBackend) StopScan() error {
 		return nil
 	}
 
-	b.stopDiscoveryListener()
+	b.cancelScanTimer()
 	err := b.stopDiscovery()
 	b.updateStatus(func(s *BluetoothStatus) {
 		s.Scanning = false
@@ -88,41 +85,6 @@ func (b *BluetoothBackend) startScanTimer() {
 // cancelScanTimer stops the auto-stop timer.
 func (b *BluetoothBackend) cancelScanTimer() {
 	b.scanTimer.Cancel()
-}
-
-func (b *BluetoothBackend) startDiscoveryListener() {
-	rules := []string{
-		fmt.Sprintf("type='signal',interface='%s',member='InterfacesAdded'", DBUS_OBJ_MANAGER),
-	}
-	listener := NewDBusListener(b.conn, b.ctx, rules, b.onInterfacesAdded)
-	if err := listener.Start(); err != nil {
-		listener.Stop()
-		logger.Warn("[bluetooth] failed to start discovery listener: %v", err)
-		return
-	}
-	b.discoveryListener = listener
-	go listener.Listen()
-}
-
-func (b *BluetoothBackend) stopDiscoveryListener() {
-	if b.discoveryListener != nil {
-		b.discoveryListener.Stop()
-		b.discoveryListener = nil
-		logger.Debug("[bluetooth] listener stopped")
-	}
-	b.cancelScanTimer()
-}
-
-func (b *BluetoothBackend) onInterfacesAdded(sig *dbus.Signal) bool {
-	if sig == nil {
-		return true // channel closed
-	}
-	path, props, ok := parseInterfacesAdded(sig)
-	if !ok {
-		return false
-	}
-	b.handleDiscoveredDevice(path, props)
-	return false
 }
 
 // handleDiscoveredDevice reacts to a device appearing during a scan: it merges

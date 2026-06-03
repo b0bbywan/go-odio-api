@@ -59,12 +59,13 @@ type BluetoothBackend struct {
 	powerOnStart   bool
 	agent          *bluezAgent
 	idleTimer      managedTimer
-	listener       *DBusListener
+	// Permanent (New → Close): watches adapter + device PropertiesChanged and
+	// BlueZ InterfacesAdded (scan discovery).
+	listener *DBusListener
 	// discovery (active scan) state guarded by scanMu; the scan flag itself
 	// lives in BluetoothStatus.Scanning (the published source of truth)
-	scanMu            sync.Mutex
-	scanTimer         managedTimer
-	discoveryListener *DBusListener
+	scanMu    sync.Mutex
+	scanTimer managedTimer
 	// permanent cache (no expiration) for status tracking
 	statusCache *cache.Cache[BluetoothStatus]
 	events      chan events.Event
