@@ -131,25 +131,34 @@ func (b *BluetoothBackend) PowerDown() error {
 	if powered := b.isAdapterOn(); !powered {
 		return nil
 	}
-
-	if err := b.PowerOnAdapter(false); err != nil {
+	if err := b.PowerOffAdapter(); err != nil {
 		return err
 	}
-
-	b.cleanupPoweredState()
 	logger.Info("[bluetooth] Powered down")
 	return nil
 }
 
-func (b *BluetoothBackend) cleanupPoweredState() {
-	// Tear down the scan resources directly: powering off makes BlueZ stop
-	// discovery on its own, so the user-facing StopScan (BlueZ call, refresh,
-	// idle re-arm) doesn't belong here.
+// PowerOffAdapter powers the adapter down and resets the powered state. Listeners
+// are stopped before the BlueZ power-off so its Connected=false events aren't
+// processed — they would refreshDevices and repopulate the list we then clear.
+func (b *BluetoothBackend) PowerOffAdapter() error {
+	// BlueZ stops discovery on its own when off, so tear the scan resources down
+	// directly rather than via the user-facing StopScan (refresh, idle re-arm).
 	b.scanMu.Lock()
 	b.stopDiscoveryListener()
 	b.scanMu.Unlock()
+	b.stopStateListener()
 
-	b.stopListener()
+	if err := b.PowerOnAdapter(false); err != nil {
+		return err
+	}
+	b.cleanupPoweredState()
+	return nil
+}
+
+// cleanupPoweredState resets the in-memory status to off; refreshDevices
+// repopulates KnownDevices on the next power-up.
+func (b *BluetoothBackend) cleanupPoweredState() {
 	b.updateStatus(func(s *BluetoothStatus) {
 		s.Powered = false
 		s.Discoverable = false
@@ -157,9 +166,6 @@ func (b *BluetoothBackend) cleanupPoweredState() {
 		s.PairingActive = false
 		s.PairingUntil = nil
 		s.Scanning = false
-		// Drop the device list: nothing is reachable while powered off, and the
-		// disconnect events that would clear it may arrive after the listener is
-		// gone. refreshDevices repopulates it on power-up.
 		s.KnownDevices = nil
 	})
 }
@@ -381,10 +387,9 @@ func (b *BluetoothBackend) checkAndStartIdleTimer() {
 
 	armed := b.idleTimer.Start(b.idleTimeout, func() {
 		logger.Info("[bluetooth] idle timeout reached after %v, powering down", b.idleTimeout)
-		if err := b.PowerOnAdapter(false); err != nil {
+		if err := b.PowerOffAdapter(); err != nil {
 			logger.Warn("[bluetooth] failed to power down: %v", err)
 		}
-		b.cleanupPoweredState()
 	})
 	if armed {
 		logger.Info("[bluetooth] idle timer started (%v)", b.idleTimeout)
