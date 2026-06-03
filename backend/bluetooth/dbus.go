@@ -14,28 +14,6 @@ import (
 
 var macRegex = regexp.MustCompile(`^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$`)
 
-func filterSignal(sig *dbus.Signal) (map[string]dbus.Variant, string, error) {
-	if sig == nil {
-		return nil, "", fmt.Errorf("channel closed")
-	}
-
-	if len(sig.Body) < 2 {
-		return nil, "", fmt.Errorf("signal from %s ignored: body too short", sig.Path)
-	}
-
-	iface, ok := sig.Body[0].(string)
-	if !ok {
-		return nil, "", fmt.Errorf("failed to parse iface")
-	}
-
-	changed, ok := sig.Body[1].(map[string]dbus.Variant)
-	if !ok {
-		return nil, "", fmt.Errorf("signal from %s ignored: body[1] is not map[string]Variant", sig.Path)
-	}
-
-	return changed, iface, nil
-}
-
 // callWithTimeout executes a D-Bus call with timeout
 func callWithTimeout(call *dbus.Call, timeout time.Duration) error {
 	done := make(chan error, 1)
@@ -104,22 +82,6 @@ func extractBool(v dbus.Variant) (bool, bool) {
 	return val, ok
 }
 
-func extractMapBool(v map[string]dbus.Variant, value BluetoothState) (bool, bool) {
-	if extractVar, ok := v[value.String()]; ok {
-		return extractBool(extractVar)
-	}
-	return false, false
-}
-
-func changedAny(changed map[string]dbus.Variant, keys ...BluetoothState) bool {
-	for _, k := range keys {
-		if _, ok := changed[k.String()]; ok {
-			return true
-		}
-	}
-	return false
-}
-
 // upsertDevice returns a copy of devices with d replacing any entry sharing its
 // address, or appended if new. It copies rather than mutating in place because
 // the slice is shared with the cached status read by other goroutines.
@@ -133,14 +95,6 @@ func upsertDevice(devices []BluetoothDevice, d BluetoothDevice) []BluetoothDevic
 		}
 	}
 	return append(out, d)
-}
-
-func changedKeys(changed map[string]dbus.Variant) []string {
-	keys := make([]string, 0, len(changed))
-	for k := range changed {
-		keys = append(keys, k)
-	}
-	return keys
 }
 
 func (b *BluetoothBackend) exportAgent(agent *bluezAgent) error {
@@ -270,27 +224,6 @@ func addressFromPath(path dbus.ObjectPath) string {
 		return ""
 	}
 	return strings.ReplaceAll(s[idx+len("/dev_"):], "_", ":")
-}
-
-// parseInterfacesAdded extracts the device path and Device1 properties from an
-// InterfacesAdded signal. ok is false when the signal is not about a Device1.
-func parseInterfacesAdded(sig *dbus.Signal) (dbus.ObjectPath, map[string]dbus.Variant, bool) {
-	if sig == nil || len(sig.Body) < 2 {
-		return "", nil, false
-	}
-	path, ok := sig.Body[0].(dbus.ObjectPath)
-	if !ok {
-		return "", nil, false
-	}
-	ifaces, ok := sig.Body[1].(map[string]map[string]dbus.Variant)
-	if !ok {
-		return "", nil, false
-	}
-	dev, ok := ifaces[BLUETOOTH_DEVICE]
-	if !ok {
-		return "", nil, false
-	}
-	return path, dev, true
 }
 
 func (b *BluetoothBackend) startDiscovery() error {
