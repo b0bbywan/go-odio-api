@@ -219,6 +219,7 @@ func (b *BluetoothBackend) listDevices() ([]BluetoothDevice, error) {
 			Address:   extractString(props, BT_PROP_ADDRESS),
 			Name:      extractString(props, BT_PROP_NAME),
 			Paired:    extractBoolProp(props, BT_STATE_PAIRED),
+			Bonded:    extractBoolProp(props, BT_STATE_BONDED),
 			Trusted:   extractBoolProp(props, BT_STATE_TRUSTED),
 			Connected: extractBoolProp(props, BT_STATE_CONNECTED),
 		})

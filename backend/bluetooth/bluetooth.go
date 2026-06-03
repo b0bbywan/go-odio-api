@@ -215,6 +215,19 @@ func (b *BluetoothBackend) NewPairing() error {
 	return nil
 }
 
+// isDeviceBonded reports whether we still hold the device's pairing key, read
+// from the cached device list — the same Bonded flag the UI shows, so the
+// connect decision matches what the user saw. A bonded device reconnects
+// without the adapter being pairable; only a new bond needs the pairable window.
+func (b *BluetoothBackend) isDeviceBonded(address string) bool {
+	for _, d := range b.GetStatus().KnownDevices {
+		if d.Address == address {
+			return d.Bonded
+		}
+	}
+	return false
+}
+
 // Connect opens an outbound connection to a device by address and blocks until
 // BlueZ answers, so the caller gets the real outcome. BlueZ may take a few
 // seconds and trigger pairing; the device's Connected state also propagates
@@ -225,6 +238,26 @@ func (b *BluetoothBackend) Connect(address string) error {
 	}
 	path := devicePath(address)
 	logger.Info("[bluetooth] connecting to %s", address)
+	// An unbonded target needs a fresh bond, so open the pairable window for the
+	// connect only. A bonded device already has its key and reconnects without
+	// the adapter ever being pairable. If pairing mode is already active the
+	// adapter is pairable and the pairing-mode machinery owns that flag — leave
+	// it alone, or disabling it here would cancel the user's pairing session.
+	if !b.isDeviceBonded(address) && !b.GetStatus().PairingActive {
+		if err := b.SetPairable(true); err != nil {
+			logger.Warn("[bluetooth] failed to enable pairable before connect: %v", err)
+		}
+		defer func() {
+			// Pairing mode may have started during the (seconds-long) connect; if
+			// so it now owns Pairable, so don't pull it out from under it.
+			if b.GetStatus().PairingActive {
+				return
+			}
+			if err := b.SetPairable(false); err != nil {
+				logger.Warn("[bluetooth] failed to disable pairable after connect: %v", err)
+			}
+		}()
+	}
 	if err := b.connectDevice(path); err != nil {
 		logger.Warn("[bluetooth] failed to connect to %s: %v", address, err)
 		return fmt.Errorf("could not connect to %s: %w", address, err)
