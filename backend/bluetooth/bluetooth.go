@@ -67,7 +67,7 @@ func (b *BluetoothBackend) syncAdapterState() {
 
 	if powered {
 		b.refreshDevices()
-		b.startListener()
+		b.startStateListener()
 	}
 }
 
@@ -90,39 +90,39 @@ func (b *BluetoothBackend) PowerUp() error {
 		s.Powered = true
 	})
 	b.refreshDevices()
-	b.startListener()
+	b.startStateListener()
 
 	logger.Info("[bluetooth] Bluetooth ready to connect to already known devices")
 	return nil
 }
 
-func (b *BluetoothBackend) startListener() {
-	if b.listener != nil {
-		logger.Debug("[bluetooth] listener already running, skipping")
+func (b *BluetoothBackend) startStateListener() {
+	if b.stateListener != nil {
+		logger.Debug("[bluetooth] state listener already running, skipping")
 		return
 	}
 	matchRules := []string{
 		"type='signal',interface='org.freedesktop.DBus.Properties',member='PropertiesChanged',arg0='org.bluez.Device1'",
 		"type='signal',interface='org.freedesktop.DBus.Properties',member='PropertiesChanged',arg0='org.bluez.Adapter1'",
 	}
-	logger.Debug("[bluetooth] starting listener (device + adapter)")
+	logger.Debug("[bluetooth] starting state listener (device + adapter)")
 	listener := NewDBusListener(b.conn, b.ctx, matchRules, b.onPropertiesChanged)
 	if err := listener.Start(); err != nil {
 		listener.Stop()
-		logger.Warn("[bluetooth] failed to start listener: %v", err)
+		logger.Warn("[bluetooth] failed to start state listener: %v", err)
 		return
 	}
-	b.listener = listener
+	b.stateListener = listener
 	go listener.Listen()
-	logger.Debug("[bluetooth] listener started")
+	logger.Debug("[bluetooth] state listener started")
 	b.checkAndStartIdleTimer()
 }
 
-func (b *BluetoothBackend) stopListener() {
-	if b.listener != nil {
-		b.listener.Stop()
-		b.listener = nil
-		logger.Debug("[bluetooth] listener stopped")
+func (b *BluetoothBackend) stopStateListener() {
+	if b.stateListener != nil {
+		b.stateListener.Stop()
+		b.stateListener = nil
+		logger.Debug("[bluetooth] state listener stopped")
 	}
 	b.cancelIdleTimer()
 }
@@ -187,7 +187,7 @@ func (b *BluetoothBackend) NewPairing() error {
 		if err := b.PowerOnAdapter(true); err != nil {
 			return err
 		}
-		b.startListener()
+		b.startStateListener()
 	}
 
 	// Set BlueZ native timeouts

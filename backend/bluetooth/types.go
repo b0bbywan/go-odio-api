@@ -59,7 +59,7 @@ type BluetoothBackend struct {
 	powerOnStart   bool
 	agent          *bluezAgent
 	idleTimer      managedTimer
-	listener       *DBusListener
+	stateListener  *DBusListener
 	// discovery (active scan) state guarded by scanMu; the scan flag itself
 	// lives in BluetoothStatus.Scanning (the published source of truth)
 	scanMu            sync.Mutex
