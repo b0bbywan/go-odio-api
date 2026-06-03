@@ -232,11 +232,11 @@ Bonus: You get to control it through `/pulseaudio/clients` or `/players/` and in
 
 Odio can also work the other way around: connect *to* nearby Bluetooth speakers or headphones and use them as an audio output.
 
-- **Scan**: `POST /bluetooth/scan` starts active discovery (powering the adapter up if needed) and filters for classic audio devices. Found devices stream live through `bluetooth.discovered` SSE events and are consolidated into `GET /bluetooth/devices` when the scan stops. Stop with `POST /bluetooth/scan/stop`, or let it auto-stop after `scanTimeout` (default 60s, `0` to disable).
+- **Scan**: `POST /bluetooth/scan` starts active discovery (powering the adapter up if needed) and filters for classic audio devices. Found devices stream live through `bluetooth.discovered` SSE events, are merged into the `known_devices` list as they appear (also pushed via `bluetooth.updated`), and reconciled with BlueZ when the scan stops. Stop with `POST /bluetooth/scan/stop`, or let it auto-stop after `scanTimeout` (default 60s, `0` to disable).
 - **Connect**: `POST /bluetooth/connect` with `{"address": "AA:BB:CC:DD:EE:FF"}`. The address is validated first (malformed → `400`), then the call blocks until BlueZ answers (it can take a few seconds and may trigger pairing) and returns the real success/failure. The device is trusted on success and any active scan is stopped to free the adapter. The `connected` state also propagates through `bluetooth.updated` SSE events.
 - **Disconnect**: `POST /bluetooth/disconnect` with the same `{"address": ...}` body.
 
-Devices are exposed as a single list — `GET /bluetooth/devices` (and the `known_devices` field of `GET /bluetooth`) returns every device BlueZ knows about with `paired`, `trusted` and `connected` flags, so a paired speaker and a freshly scanned one share the same shape. Connected output devices then route through PulseAudio/PipeWire as a regular output sink.
+Devices are exposed as a single list — `GET /bluetooth/devices` (and the `known_devices` field of `GET /bluetooth`) returns every device BlueZ knows about with `paired`, `bonded`, `trusted` and `connected` flags, so a paired speaker and a freshly scanned one share the same shape. Connected output devices then route through PulseAudio/PipeWire as a regular output sink.
 
 ### Power Management
 
@@ -636,7 +636,7 @@ POST   /bluetooth/pairing_mode            # Enables Bluetooth pairing mode for 6
 
 Output (connect to Bluetooth speakers/headphones):
 ```
-GET    /bluetooth/devices                 # List devices: [{"address","name","paired","trusted","connected"}, ...]
+GET    /bluetooth/devices                 # List devices: [{"address","name","paired","bonded","trusted","connected"}, ...]
 POST   /bluetooth/scan                    # Start scanning for nearby devices (powers the adapter up if needed).
                                           # Discovered devices stream through bluetooth.discovered SSE events.
 POST   /bluetooth/scan/stop               # Stop scanning (idempotent).
@@ -700,7 +700,7 @@ event: service.updated
 data: {"name":"mpd.service","scope":"user","active_state":"active","running":true,...}
 
 event: bluetooth.updated
-data: {"powered":true,"discoverable":false,"pairable":false,"pairing_active":false,"known_devices":[{"address":"AA:BB:CC:DD:EE:FF","name":"My Phone","trusted":true,"connected":true}]}
+data: {"powered":true,"discoverable":false,"pairable":false,"pairing_active":false,"scanning":false,"known_devices":[{"address":"AA:BB:CC:DD:EE:FF","name":"My Phone","bonded":true,"trusted":true,"connected":true}]}
 
 event: power.action
 data: {"action":"reboot"}
