@@ -5,7 +5,23 @@ import (
 	"time"
 
 	"github.com/godbus/dbus/v5"
+
+	"github.com/b0bbywan/go-odio-api/cache"
+	"github.com/b0bbywan/go-odio-api/events"
 )
+
+// newTestBackend builds a backend with the in-memory state a handler touches
+// (status cache + events channel), without a D-Bus connection.
+func newTestBackend() *BluetoothBackend {
+	return &BluetoothBackend{
+		statusCache: cache.New[BluetoothStatus](0),
+		events:      make(chan events.Event, 16),
+	}
+}
+
+func (b *BluetoothBackend) seedStatus(s BluetoothStatus) {
+	b.statusCache.Set("current", s)
+}
 
 func TestExtractString(t *testing.T) {
 	tests := []struct {
@@ -213,7 +229,7 @@ func TestBluetoothStateToString(t *testing.T) {
 	}
 }
 
-// onPropertiesChanged tests — signal parsing paths that don't touch D-Bus
+// onSignal tests — signal parsing paths that don't touch D-Bus
 func TestOnPropertiesChangedPaired(t *testing.T) {
 	b := &BluetoothBackend{}
 
@@ -288,15 +304,15 @@ func TestOnPropertiesChangedPaired(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := b.onPropertiesChanged(tt.signal)
+			result := b.onSignal(tt.signal)
 			if result != tt.expected {
-				t.Errorf("onPropertiesChanged() = %v, want %v", result, tt.expected)
+				t.Errorf("onSignal() = %v, want %v", result, tt.expected)
 			}
 		})
 	}
 }
 
-// onPropertiesChanged Connected signal parsing tests
+// onSignal Connected signal parsing tests
 func TestOnPropertiesChangedConnected(t *testing.T) {
 	b := &BluetoothBackend{}
 
@@ -353,15 +369,15 @@ func TestOnPropertiesChangedConnected(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := b.onPropertiesChanged(tt.signal)
+			result := b.onSignal(tt.signal)
 			if result != tt.expected {
-				t.Errorf("onPropertiesChanged() = %v, want %v", result, tt.expected)
+				t.Errorf("onSignal() = %v, want %v", result, tt.expected)
 			}
 		})
 	}
 }
 
-// onPropertiesChanged always returns false for valid signals (never stops the listener)
+// onSignal always returns false for valid signals (never stops the listener)
 func TestOnPropertiesChangedNeverStops(t *testing.T) {
 	b := &BluetoothBackend{}
 
@@ -375,9 +391,9 @@ func TestOnPropertiesChangedNeverStops(t *testing.T) {
 		},
 	}
 
-	result := b.onPropertiesChanged(sig)
+	result := b.onSignal(sig)
 	if result != false {
-		t.Errorf("onPropertiesChanged(connected=true) = %v, want false", result)
+		t.Errorf("onSignal(connected=true) = %v, want false", result)
 	}
 }
 
@@ -398,7 +414,7 @@ func TestCancelIdleTimer(t *testing.T) {
 			},
 		}
 
-		b.onPropertiesChanged(sig)
+		b.onSignal(sig)
 
 		if b.idleTimer.timer != nil {
 			t.Error("idleTimer should be nil after connected=true signal")
@@ -460,4 +476,115 @@ func TestManagedTimer(t *testing.T) {
 			t.Error("Cancel should report nothing to cancel")
 		}
 	})
+}
+
+// adapterSignal builds a PropertiesChanged signal on the adapter interface.
+func adapterSignal(changed map[string]dbus.Variant) *dbus.Signal {
+	return &dbus.Signal{
+		Name: DBUS_PROP_IFACE + ".PropertiesChanged",
+		Path: BLUETOOTH_PATH,
+		Body: []interface{}{BLUETOOTH_ADAPTER, changed},
+	}
+}
+
+// TestOnSignalAdapterPoweredOff: an external power-off (adapter Powered=false)
+// resets the published status, not just the Powered flag.
+func TestOnSignalAdapterPoweredOff(t *testing.T) {
+	b := newTestBackend()
+	b.seedStatus(BluetoothStatus{
+		Powered:      true,
+		Scanning:     true,
+		KnownDevices: []BluetoothDevice{{Address: "AA:BB:CC:DD:EE:FF"}},
+	})
+
+	b.onSignal(adapterSignal(map[string]dbus.Variant{
+		"Powered": dbus.MakeVariant(false),
+	}))
+
+	got := b.GetStatus()
+	if got.Powered {
+		t.Error("Powered should be false after power-off")
+	}
+	if got.Scanning {
+		t.Error("Scanning should be cleared after power-off")
+	}
+	if got.KnownDevices != nil {
+		t.Errorf("KnownDevices should be cleared after power-off, got %v", got.KnownDevices)
+	}
+}
+
+// TestCheckAndStartIdleTimerNotPowered: the idle timer never arms while powered
+// off (the guard also keeps it from reaching the D-Bus connected-devices check).
+func TestCheckAndStartIdleTimerNotPowered(t *testing.T) {
+	b := newTestBackend()
+	b.idleTimeout = time.Hour
+	b.seedStatus(BluetoothStatus{Powered: false})
+
+	b.checkAndStartIdleTimer()
+
+	if b.idleTimer.timer != nil {
+		t.Error("idle timer must not arm when powered off")
+	}
+}
+
+// interfacesAddedSignal builds an InterfacesAdded signal for a device.
+func interfacesAddedSignal(path string, dev map[string]dbus.Variant) *dbus.Signal {
+	return &dbus.Signal{
+		Name: DBUS_OBJ_MANAGER + ".InterfacesAdded",
+		Path: "/",
+		Body: []interface{}{
+			dbus.ObjectPath(path),
+			map[string]map[string]dbus.Variant{BLUETOOTH_DEVICE: dev},
+		},
+	}
+}
+
+func TestOnSignalDiscovered(t *testing.T) {
+	dev := map[string]dbus.Variant{
+		"Address": dbus.MakeVariant("AA:BB:CC:DD:EE:FF"),
+		"Name":    dbus.MakeVariant("Speaker"),
+	}
+
+	t.Run("merges device and emits event while scanning", func(t *testing.T) {
+		b := newTestBackend()
+		b.seedStatus(BluetoothStatus{Powered: true, Scanning: true})
+
+		b.onSignal(interfacesAddedSignal("/org/bluez/hci0/dev_AA_BB_CC_DD_EE_FF", dev))
+
+		known := b.GetStatus().KnownDevices
+		if len(known) != 1 || known[0].Address != "AA:BB:CC:DD:EE:FF" {
+			t.Fatalf("discovered device should be merged, got %v", known)
+		}
+		if !drainHasEvent(b, events.TypeBluetoothDiscovered) {
+			t.Errorf("expected a %s event", events.TypeBluetoothDiscovered)
+		}
+	})
+
+	t.Run("ignores discovery when not scanning", func(t *testing.T) {
+		b := newTestBackend()
+		b.seedStatus(BluetoothStatus{Powered: true, Scanning: false})
+
+		b.onSignal(interfacesAddedSignal("/org/bluez/hci0/dev_AA_BB_CC_DD_EE_FF", dev))
+
+		if known := b.GetStatus().KnownDevices; known != nil {
+			t.Errorf("no device should be merged when not scanning, got %v", known)
+		}
+		if drainHasEvent(b, events.TypeBluetoothDiscovered) {
+			t.Error("no discovered event expected when not scanning")
+		}
+	})
+}
+
+// drainHasEvent reports whether any buffered event has the given type.
+func drainHasEvent(b *BluetoothBackend, eventType string) bool {
+	for {
+		select {
+		case ev := <-b.events:
+			if ev.Type == eventType {
+				return true
+			}
+		default:
+			return false
+		}
+	}
 }
