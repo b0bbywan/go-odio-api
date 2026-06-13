@@ -22,6 +22,15 @@ type Event struct {
 	Data any
 }
 
+// Stream is the read side of the event bus a backend can subscribe to in order
+// to react to other backends' events. It is satisfied by backend.Broadcaster;
+// declaring it here lets sub-backends consume the bus without importing their
+// parent package (which would be an import cycle).
+type Stream interface {
+	SubscribeFunc(filter func(Event) bool) chan Event
+	Unsubscribe(ch chan Event)
+}
+
 // BackendTypes maps backend names to their event type constants.
 var BackendTypes = map[string][]string{
 	"mpris":     {TypePlayerUpdated, TypePlayerAdded, TypePlayerRemoved, TypePlayerPosition},
