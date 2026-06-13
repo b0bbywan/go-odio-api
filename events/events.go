@@ -20,6 +20,18 @@ const (
 type Event struct {
 	Type string
 	Data any
+	// Internal events ride the bus for inter-backend reactions but are not
+	// forwarded to external clients; the SSE stream drops them.
+	Internal bool
+}
+
+// Stream is the read side of the event bus a backend can subscribe to in order
+// to react to other backends' events. It is satisfied by backend.Broadcaster;
+// declaring it here lets sub-backends consume the bus without importing their
+// parent package (which would be an import cycle).
+type Stream interface {
+	SubscribeFunc(filter func(Event) bool) chan Event
+	Unsubscribe(ch chan Event)
 }
 
 // BackendTypes maps backend names to their event type constants.
