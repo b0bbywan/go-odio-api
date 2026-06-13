@@ -153,7 +153,7 @@ func (s *Server) registerPulseRoutes(b *pulseaudio.PulseAudioBackend) {
 func (s *Server) registerSystemdRoutes(b *systemd.SystemdBackend) {
 	s.mux.HandleFunc(
 		"/services",
-		listHandler(b.ListServices, b.CacheUpdatedAt),
+		listHandler(b.PublicServices, b.CacheUpdatedAt),
 	)
 	s.mux.HandleFunc(
 		"POST /services/{scope}/{unit}/enable",
