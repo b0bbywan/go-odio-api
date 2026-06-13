@@ -32,6 +32,16 @@ type Progress struct {
 	Success *bool  `json:"success,omitempty"`
 }
 
+// RunState is the live progress of an in-flight upgrade. It rides under the
+// status endpoint's "run" key so the endpoint reflects an ongoing run, and is
+// nil whenever no upgrade is running. Percent/Step are present only once the
+// script streams them.
+type RunState struct {
+	State   string  `json:"state"` // always "running" while in flight
+	Percent *int    `json:"percent,omitempty"`
+	Step    *string `json:"step,omitempty"`
+}
+
 // Status is the detector result. The typed fields are the contract odio relies
 // on; UnmarshalJSON routes everything else the detector writes (roles, manifest,
 // future fields) verbatim into Extra, kept apart under "extra".
@@ -74,6 +84,13 @@ func (s *Status) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+// StatusResponse is the GET /upgrade payload: the detector Status fields plus
+// the live run state, nil unless an upgrade is in flight.
+type StatusResponse struct {
+	Status
+	Run *RunState `json:"run,omitempty"`
+}
+
 // UpgradeBackend is an agnostic upgrade frontend: it reads and watches a result
 // file written by an external detector, and triggers external systemd user
 // units through the systemd backend. It does not know how detection or upgrade
@@ -89,8 +106,12 @@ type UpgradeBackend struct {
 	cache    *cache.Cache[*Status]
 	lastRaw  []byte // last accepted result file bytes, for change dedup
 	watcher  *fsnotify.Watcher
-	listener net.Listener // unix socket the upgrade script streams progress to
-	running  atomic.Bool  // guards against concurrent upgrades
+	listener net.Listener             // unix socket the upgrade script streams progress to
+	running  atomic.Bool              // guards against concurrent upgrades
+	runState atomic.Pointer[RunState] // live run progress for the status endpoint; nil when idle
 	wg       sync.WaitGroup
 	events   chan events.Event
+
+	stream events.Stream     // shared event bus; tracks the run unit's lifecycle
+	sub    chan events.Event // our subscription to stream
 }

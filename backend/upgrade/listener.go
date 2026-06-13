@@ -83,39 +83,58 @@ func (u *UpgradeBackend) readProgress(conn net.Conn) {
 		if len(line) == 0 {
 			continue
 		}
-		if !validProgress(line) {
+		p, ok := parseProgress(line)
+		if !ok {
 			logger.Warn("[upgrade] progress line does not match the event contract, ignoring")
 			continue
 		}
+		u.applyRunProgress(p)
 		raw := make(json.RawMessage, len(line)) // scanner reuses its buffer; copy before async send
 		copy(raw, line)
-		u.notify(events.Event{Type: events.TypeUpgradeInfo, Data: raw})
+		u.notify(events.Event{Type: events.TypeUpgradeProgress, Data: raw})
 	}
 }
 
-// validProgress enforces the begin/progress/end contract odio-api relies on;
-// the ansible-flavoured roles/changed fields are not required and pass through
+// progressLine is the begin/progress/end contract odio-api relies on; the
+// ansible-flavoured roles/changed fields are not required and pass through
 // verbatim. Typed pointers reject both absence and wrong type.
-func validProgress(line []byte) bool {
-	var p struct {
-		Event   *string `json:"event"`
-		Total   *int    `json:"total"`
-		Percent *int    `json:"percent"`
-		Current *int    `json:"current"`
-		Step    *string `json:"step"`
-		Success *bool   `json:"success"`
-	}
+type progressLine struct {
+	Event   *string `json:"event"`
+	Total   *int    `json:"total"`
+	Percent *int    `json:"percent"`
+	Current *int    `json:"current"`
+	Step    *string `json:"step"`
+	Success *bool   `json:"success"`
+}
+
+// parseProgress parses and validates a streamed progress line.
+func parseProgress(line []byte) (progressLine, bool) {
+	var p progressLine
 	if err := json.Unmarshal(line, &p); err != nil || p.Event == nil {
-		return false
+		return p, false
 	}
 	switch *p.Event {
 	case "begin":
-		return p.Total != nil
+		return p, p.Total != nil
 	case "progress":
-		return p.Percent != nil && p.Current != nil && p.Step != nil
+		return p, p.Percent != nil && p.Current != nil && p.Step != nil
 	case "end":
-		return p.Success != nil
+		return p, p.Success != nil
 	default:
-		return false
+		return p, false
+	}
+}
+
+// applyRunProgress advances the live run state from a streamed progress line so
+// the status endpoint reflects it. "begin" resets to 0%, "progress" carries the
+// percent/step; "end" leaves the run flagged until the unit reaches its terminal
+// state (which clears it).
+func (u *UpgradeBackend) applyRunProgress(p progressLine) {
+	switch *p.Event {
+	case "begin":
+		zero := 0
+		u.runState.Store(&RunState{State: "running", Percent: &zero})
+	case "progress":
+		u.runState.Store(&RunState{State: "running", Percent: p.Percent, Step: p.Step})
 	}
 }
