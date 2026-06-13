@@ -100,10 +100,11 @@ type SystemdConfig struct {
 // UpgradeConfig drives the agnostic upgrade backend: it reads a result file
 // written by an external detector and triggers external systemd user units.
 type UpgradeConfig struct {
-	Enabled     bool
-	ResultFile  string // upgrades.json to read and watch
-	CheckUnit   string // user unit to (re)run detection; empty disables /upgrade/check
-	UpgradeUnit string // user unit to run the upgrade; empty disables /upgrade/start
+	Enabled        bool
+	ResultFile     string // upgrades.json to read and watch
+	CheckUnit      string // user unit to (re)run detection; empty disables /upgrade/check
+	UpgradeUnit    string // user unit to run the upgrade; empty disables /upgrade/start
+	ProgressSocket string // unix socket the upgrade script streams run progress to
 }
 
 type BluetoothConfig struct {
@@ -343,11 +344,18 @@ func New(cfgFile *string) (*Config, error) {
 		Timeout:        getDuration("systemd.timeout", 90*time.Second),
 	}
 
+	// Progress streams over a socket, not a file, to avoid SD-card writes; default
+	// it into the tmpfs runtime dir.
+	progressSocket := viper.GetString("upgrade.progressSocket")
+	if progressSocket == "" {
+		progressSocket = filepath.Join(xdgRuntimeDir, "odio-api", "upgrade.sock")
+	}
 	upgradecfg := UpgradeConfig{
-		Enabled:     viper.GetBool("upgrade.enabled"),
-		ResultFile:  viper.GetString("upgrade.resultFile"),
-		CheckUnit:   viper.GetString("upgrade.checkUnit"),
-		UpgradeUnit: viper.GetString("upgrade.upgradeUnit"),
+		Enabled:        viper.GetBool("upgrade.enabled"),
+		ResultFile:     viper.GetString("upgrade.resultFile"),
+		CheckUnit:      viper.GetString("upgrade.checkUnit"),
+		UpgradeUnit:    viper.GetString("upgrade.upgradeUnit"),
+		ProgressSocket: progressSocket,
 	}
 
 	interfaces := getZeroconfInterfaces(binds)
