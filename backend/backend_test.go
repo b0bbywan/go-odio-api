@@ -20,6 +20,7 @@ func TestBackendDisabled(t *testing.T) {
 		mprisEnabled     bool
 		pulseEnabled     bool
 		systemdEnabled   bool
+		upgradeEnabled   bool
 		zeroconfEnabled  bool
 	}{
 		{
@@ -29,6 +30,7 @@ func TestBackendDisabled(t *testing.T) {
 			mprisEnabled:     false,
 			pulseEnabled:     false,
 			systemdEnabled:   false,
+			upgradeEnabled:   false,
 			zeroconfEnabled:  false,
 		},
 		{
@@ -38,6 +40,7 @@ func TestBackendDisabled(t *testing.T) {
 			mprisEnabled:     false,
 			pulseEnabled:     false,
 			systemdEnabled:   false,
+			upgradeEnabled:   false,
 			zeroconfEnabled:  false,
 		},
 		{
@@ -47,6 +50,7 @@ func TestBackendDisabled(t *testing.T) {
 			mprisEnabled:     false,
 			pulseEnabled:     false,
 			systemdEnabled:   true,
+			upgradeEnabled:   false,
 			zeroconfEnabled:  false,
 		},
 	}
@@ -64,8 +68,9 @@ func TestBackendDisabled(t *testing.T) {
 				UserServices:   []config.SystemdService{},
 			}
 			zeroconfCfg := &config.ZeroConfig{Enabled: tt.zeroconfEnabled}
+			upgradeCfg := &config.UpgradeConfig{Enabled: tt.upgradeEnabled}
 
-			backend, err := New(ctx, bluetoothCfg, login1Cfg, mprisCfg, pulseCfg, systemdCfg, zeroconfCfg)
+			backend, err := New(ctx, bluetoothCfg, login1Cfg, mprisCfg, pulseCfg, systemdCfg, upgradeCfg, zeroconfCfg)
 
 			// Bluetooth and other D-Bus backends may fail in test environment
 			// This is expected and we should skip the test
@@ -97,6 +102,11 @@ func TestBackendDisabled(t *testing.T) {
 			}
 			// Note: With empty services, systemd will be nil even when enabled
 
+			// Check Upgrade
+			if !tt.upgradeEnabled && backend.Upgrade != nil {
+				t.Error("Upgrade should be nil when disabled")
+			}
+
 			// Check Zeroconf
 			if !tt.zeroconfEnabled && backend.Zeroconf != nil {
 				t.Error("Zeroconf should be nil when disabled")
@@ -122,6 +132,7 @@ func TestSystemdWithEmptyConfig(t *testing.T) {
 		&config.MPRISConfig{Enabled: false},
 		&config.PulseAudioConfig{Enabled: false},
 		systemdCfg,
+		&config.UpgradeConfig{Enabled: false},
 		&config.ZeroConfig{Enabled: false},
 	)
 
@@ -150,6 +161,7 @@ func TestZeroconfWithLocalhostBind(t *testing.T) {
 		&config.MPRISConfig{Enabled: false},
 		&config.PulseAudioConfig{Enabled: false},
 		&config.SystemdConfig{Enabled: false},
+		&config.UpgradeConfig{Enabled: false},
 		zeroconfCfg,
 	)
 
@@ -206,6 +218,7 @@ func TestLogin1DisabledInBackend(t *testing.T) {
 		&config.MPRISConfig{Enabled: false},
 		&config.PulseAudioConfig{Enabled: false},
 		&config.SystemdConfig{Enabled: false},
+		&config.UpgradeConfig{Enabled: false},
 		&config.ZeroConfig{Enabled: false},
 	)
 	if err != nil {
@@ -237,6 +250,7 @@ func TestLogin1DisabledWithCapabilities(t *testing.T) {
 		&config.MPRISConfig{Enabled: false},
 		&config.PulseAudioConfig{Enabled: false},
 		&config.SystemdConfig{Enabled: false},
+		&config.UpgradeConfig{Enabled: false},
 		&config.ZeroConfig{Enabled: false},
 	)
 	if err != nil {
@@ -273,6 +287,7 @@ func TestBackendNew_Login1FieldInitialisedToNil(t *testing.T) {
 		&config.MPRISConfig{Enabled: false},
 		&config.PulseAudioConfig{Enabled: false},
 		&config.SystemdConfig{Enabled: false, SystemServices: []config.SystemdService{}, UserServices: []config.SystemdService{}},
+		&config.UpgradeConfig{Enabled: false},
 		&config.ZeroConfig{Enabled: false},
 	)
 	if err != nil {
