@@ -15,8 +15,8 @@ import (
 )
 
 // New creates the upgrade backend, or returns nil when disabled or no result
-// file is configured. Unit triggers are delegated to sysd (the configured
-// units must be listed in systemd.user); detection works even when sysd is nil.
+// file is configured. Triggers are delegated to sysd, with which the units are
+// registered as internal; detection works even when sysd is nil.
 func New(ctx context.Context, cfg *config.UpgradeConfig, sysd *systemd.SystemdBackend) (*UpgradeBackend, error) {
 	if cfg == nil || !cfg.Enabled {
 		return nil, nil
@@ -25,8 +25,14 @@ func New(ctx context.Context, cfg *config.UpgradeConfig, sysd *systemd.SystemdBa
 		logger.Warn("[upgrade] enabled but no resultFile configured, disabling backend")
 		return nil, nil
 	}
-	if (cfg.CheckUnit != "" || cfg.UpgradeUnit != "") && sysd == nil {
-		logger.Warn("[upgrade] units configured but systemd backend disabled; triggers unavailable")
+
+	// Register the units as internal so they are triggerable and hidden from
+	// /services. Done before the systemd backend starts (its listener snapshots
+	// the unit list then), so no manual systemd.user config is needed.
+	if sysd != nil {
+		sysd.AddInternalUserUnits(cfg.CheckUnit, cfg.UpgradeUnit)
+	} else if cfg.CheckUnit != "" || cfg.UpgradeUnit != "" {
+		logger.Warn("[upgrade] systemd backend disabled; triggers unavailable")
 	}
 
 	return &UpgradeBackend{
