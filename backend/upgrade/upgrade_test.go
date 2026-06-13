@@ -9,9 +9,17 @@ import (
 	"testing"
 	"time"
 
+	"github.com/b0bbywan/go-odio-api/backend/systemd"
 	"github.com/b0bbywan/go-odio-api/config"
 	"github.com/b0bbywan/go-odio-api/events"
 )
+
+// fakeStream is a minimal events.Stream: the test pushes events onto ch, which
+// the backend reads through its subscription.
+type fakeStream struct{ ch chan events.Event }
+
+func (f *fakeStream) SubscribeFunc(func(events.Event) bool) chan events.Event { return f.ch }
+func (f *fakeStream) Unsubscribe(ch chan events.Event)                        { close(ch) }
 
 const validResult = `{"current":"dev","latest":"2026.6.0b1","upgrade_available":true}`
 
@@ -185,6 +193,50 @@ func TestProgressSocketRelaysLines(t *testing.T) {
 	}
 	if got := string(e.Data.(json.RawMessage)); got != progress {
 		t.Fatalf("event data = %q, want verbatim %q", got, progress)
+	}
+}
+
+func TestBusTerminalStateEmitsFinished(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "upgrades.json")
+	writeFile(t, path, validResult)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+
+	u, err := New(ctx, &config.UpgradeConfig{
+		Enabled:     true,
+		ResultFile:  path,
+		UpgradeUnit: "odio-upgrade.service",
+	}, nil)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	stream := &fakeStream{ch: make(chan events.Event, 8)}
+	u.UseEventStream(stream)
+	t.Cleanup(u.Close)
+	if err := u.Start(); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	recv(t, u.Events(), time.Second) // drain the initial result-read event
+
+	// Simulate an in-progress run, then its unit reaching a terminal success state.
+	u.running.Store(true)
+	stream.ch <- events.Event{
+		Type: events.TypeServiceUpdated,
+		Data: systemd.Service{Name: "odio-upgrade.service", Scope: systemd.ScopeUser, ActiveState: "inactive"},
+	}
+
+	e, ok := recv(t, u.Events(), 2*time.Second)
+	if !ok {
+		t.Fatal("expected an upgrade.info finished event, got none")
+	}
+	prog, ok := e.Data.(Progress)
+	if !ok {
+		t.Fatalf("event data = %T, want Progress", e.Data)
+	}
+	if prog.State != "finished" || prog.Success == nil || !*prog.Success {
+		t.Fatalf("got %+v, want state=finished success=true", prog)
 	}
 }
 

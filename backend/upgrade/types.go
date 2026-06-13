@@ -49,4 +49,7 @@ type UpgradeBackend struct {
 	running  atomic.Bool  // guards against concurrent upgrades
 	wg       sync.WaitGroup
 	events   chan events.Event
+
+	stream events.Stream     // shared event bus; tracks the run unit's lifecycle
+	sub    chan events.Event // our subscription to stream
 }
