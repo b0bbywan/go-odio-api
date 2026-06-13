@@ -8,6 +8,7 @@ import (
 	"github.com/b0bbywan/go-odio-api/backend/mpris"
 	"github.com/b0bbywan/go-odio-api/backend/pulseaudio"
 	"github.com/b0bbywan/go-odio-api/backend/systemd"
+	"github.com/b0bbywan/go-odio-api/backend/upgrade"
 	"github.com/b0bbywan/go-odio-api/backend/zeroconf"
 	"github.com/b0bbywan/go-odio-api/config"
 )
@@ -18,6 +19,7 @@ type Backend struct {
 	MPRIS     *mpris.MPRISBackend
 	Pulse     *pulseaudio.PulseAudioBackend
 	Systemd   *systemd.SystemdBackend
+	Upgrade   *upgrade.UpgradeBackend
 	Zeroconf  *zeroconf.ZeroConfBackend
 
 	broadcaster *Broadcaster
@@ -30,6 +32,7 @@ func New(
 	mpriscfg *config.MPRISConfig,
 	pulscfg *config.PulseAudioConfig,
 	syscfg *config.SystemdConfig,
+	upgcfg *config.UpgradeConfig,
 	zerocfg *config.ZeroConfig,
 ) (*Backend, error) {
 	var b Backend
@@ -52,6 +55,12 @@ func New(
 	}
 
 	if b.Systemd, err = systemd.New(ctx, syscfg); err != nil {
+		return nil, err
+	}
+
+	// Upgrade delegates unit triggers to the systemd backend, so it must be
+	// created after it.
+	if b.Upgrade, err = upgrade.New(ctx, upgcfg, b.Systemd); err != nil {
 		return nil, err
 	}
 
@@ -95,6 +104,12 @@ func (b *Backend) Start() error {
 		}
 	}
 
+	if b.Upgrade != nil {
+		if err := b.Upgrade.Start(); err != nil {
+			return err
+		}
+	}
+
 	if b.Zeroconf != nil {
 		if err := b.Zeroconf.Start(); err != nil {
 			return err
@@ -119,6 +134,9 @@ func (b *Backend) Close() {
 	}
 	if b.Systemd != nil {
 		b.Systemd.Close()
+	}
+	if b.Upgrade != nil {
+		b.Upgrade.Close()
 	}
 	if b.Zeroconf != nil {
 		b.Zeroconf.Close()

@@ -51,6 +51,7 @@ func main() {
 		cfg.MPRIS,
 		cfg.Pulseaudio,
 		cfg.Systemd,
+		cfg.Upgrade,
 		cfg.Zeroconf,
 	)
 	if err != nil {
