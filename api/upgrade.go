@@ -11,7 +11,7 @@ func (s *Server) registerUpgradeRoutes(b *upgrade.UpgradeBackend) {
 	s.mux.HandleFunc(
 		"GET /upgrade",
 		JSONHandler(func(w http.ResponseWriter, r *http.Request) (any, error) {
-			return b.GetStatus(), nil
+			return b.StatusResponse(), nil
 		}),
 	)
 	s.mux.HandleFunc(

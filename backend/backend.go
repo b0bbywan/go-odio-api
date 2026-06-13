@@ -70,6 +70,12 @@ func New(
 
 	b.broadcaster = newBroadcasterFromBackend(ctx, &b)
 
+	// Upgrade consumes the bus to track its run unit's lifecycle (a service.updated
+	// event); wired here, once the broadcaster exists.
+	if b.Upgrade != nil {
+		b.Upgrade.UseEventStream(b.broadcaster)
+	}
+
 	return &b, nil
 }
 

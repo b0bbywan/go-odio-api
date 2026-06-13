@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io"
 	"os"
+	"time"
 
 	"github.com/b0bbywan/go-odio-api/backend/systemd"
 	"github.com/b0bbywan/go-odio-api/cache"
@@ -48,12 +49,19 @@ func New(ctx context.Context, cfg *config.UpgradeConfig, sysd *systemd.SystemdBa
 	}, nil
 }
 
-// Start reads the current result file, watches it for changes, and listens for
-// run progress streamed by the upgrade script.
+// UseEventStream wires the shared event bus, which the backend subscribes to in
+// Start to track its run unit's lifecycle. Wired by Backend.New once the
+// broadcaster exists.
+func (u *UpgradeBackend) UseEventStream(s events.Stream) { u.stream = s }
+
+// Start reads the current result file, watches it for changes, listens for run
+// progress streamed by the upgrade script, and subscribes to the event bus to
+// track its run unit.
 func (u *UpgradeBackend) Start() error {
 	u.readResult() // best-effort; a missing file is not an error
 	u.startWatcher()
 	u.startListener()
+	u.subscribeEvents()
 	logger.Info("[upgrade] backend started successfully")
 	return nil
 }
@@ -73,6 +81,11 @@ func (u *UpgradeBackend) Close() {
 			logger.Warn("[upgrade] closing progress listener: %v", err)
 		}
 	}
+	// Unsubscribe closes u.sub, unblocking consumeEvents (which also exits on the
+	// already-cancelled ctx).
+	if u.sub != nil && u.stream != nil {
+		u.stream.Unsubscribe(u.sub)
+	}
 	u.wg.Wait()
 	close(u.events)
 	u.watcher = nil
@@ -86,6 +99,22 @@ func (u *UpgradeBackend) Events() <-chan events.Event { return u.events }
 func (u *UpgradeBackend) GetStatus() *Status {
 	status, _ := u.cache.Get(statusKey)
 	return status
+}
+
+// StatusResponse is the GET /upgrade payload: the detector result plus live run
+// progress while an upgrade is in flight, so the endpoint reflects an ongoing
+// run. Returns nil when nothing is known yet.
+func (u *UpgradeBackend) StatusResponse() any {
+	status := u.GetStatus()
+	run := u.runState.Load()
+	if status == nil && run == nil {
+		return nil
+	}
+	resp := StatusResponse{Run: run}
+	if status != nil {
+		resp.Status = *status
+	}
+	return resp
 }
 
 func (u *UpgradeBackend) notify(e events.Event) {
@@ -138,9 +167,9 @@ func (u *UpgradeBackend) CheckNow() error {
 	return u.systemd.StartService(u.checkUnit, systemd.ScopeUser)
 }
 
-// StartUpgrade triggers the configured upgrade unit and tracks it in the
-// background: the request returns immediately while a goroutine waits for the
-// oneshot to finish and emits the run lifecycle. Whether the unit needs
+// StartUpgrade triggers the configured upgrade unit without blocking. The run
+// verdict (finished/success) is reported asynchronously from the unit's
+// service.updated events on the bus (see onServiceEvent). Whether the unit needs
 // privileges is the unit's concern, not the API's.
 func (u *UpgradeBackend) StartUpgrade() error {
 	if u.upgradeUnit == "" || u.systemd == nil {
@@ -151,30 +180,89 @@ func (u *UpgradeBackend) StartUpgrade() error {
 		logger.Warn("[upgrade] start requested but an upgrade is already running")
 		return ErrUpgradeInProgress
 	}
-	// Emit the start synchronously so it is tied to the accepted trigger,
-	// before the background wait begins.
-	logger.Info("[upgrade] starting upgrade unit %s, emitting running", u.upgradeUnit)
+	logger.Info("[upgrade] triggering upgrade unit %s, emitting running", u.upgradeUnit)
+	if err := u.systemd.TriggerUserUnit(u.ctx, u.upgradeUnit); err != nil {
+		u.running.Store(false)
+		logger.Warn("[upgrade] failed to trigger upgrade unit: %v", err)
+		return err
+	}
+	u.runState.Store(&RunState{State: "running"})
 	u.notify(events.Event{Type: events.TypeUpgradeInfo, Data: Progress{State: "running"}})
-	u.wg.Add(1)
-	go u.runUpgrade()
 	return nil
 }
 
-// runUpgrade waits for the upgrade oneshot to complete and emits the verdict.
-// A ctx cancellation (shutdown) exits quietly without a verdict.
-func (u *UpgradeBackend) runUpgrade() {
-	defer u.wg.Done()
-	defer u.running.Store(false)
-
-	result, err := u.systemd.StartUserServiceWait(u.ctx, u.upgradeUnit)
-	if errors.Is(err, context.Canceled) {
-		logger.Info("[upgrade] upgrade wait cancelled (shutdown)")
+// subscribeEvents subscribes to the bus for the run unit's service.updated
+// events, then resumes tracking if an upgrade was already running before a
+// restart. No-op when there is no unit or no bus (e.g. tests).
+func (u *UpgradeBackend) subscribeEvents() {
+	if u.upgradeUnit == "" || u.stream == nil {
 		return
 	}
-	if err != nil {
-		logger.Warn("[upgrade] upgrade run failed to start: %v", err)
+	u.sub = u.stream.SubscribeFunc(func(e events.Event) bool {
+		return e.Type == events.TypeServiceUpdated
+	})
+	u.wg.Add(1)
+	go u.consumeEvents()
+	u.resumeIfRunning()
+}
+
+// consumeEvents drains the subscription until shutdown. wg-tracked so Close waits
+// for it before closing the event channel.
+func (u *UpgradeBackend) consumeEvents() {
+	defer u.wg.Done()
+	for {
+		select {
+		case <-u.ctx.Done():
+			return
+		case e, ok := <-u.sub:
+			if !ok {
+				return
+			}
+			u.onServiceEvent(e)
+		}
 	}
-	success := err == nil && result == "done"
-	logger.Info("[upgrade] upgrade finished (result=%q success=%v), emitting finished", result, success)
+}
+
+// onServiceEvent emits the run verdict when the upgrade unit reaches a terminal
+// state. The running guard limits this to a tracked run and fires finished
+// exactly once (CAS true→false).
+func (u *UpgradeBackend) onServiceEvent(e events.Event) {
+	svc, ok := e.Data.(systemd.Service)
+	if !ok || svc.Name != u.upgradeUnit || svc.Scope != systemd.ScopeUser {
+		return
+	}
+	switch svc.ActiveState {
+	case "active", "inactive", "failed": // terminal for a oneshot
+	default:
+		return // still activating
+	}
+	u.runState.Store(nil) // run no longer in flight; status endpoint reverts to detection
+	if !u.running.CompareAndSwap(true, false) {
+		return
+	}
+	success := svc.ActiveState != "failed"
+	logger.Info("[upgrade] %s reached %s, emitting finished (success=%v)", u.upgradeUnit, svc.ActiveState, success)
 	u.notify(events.Event{Type: events.TypeUpgradeInfo, Data: Progress{State: "finished", Success: &success}})
+}
+
+// resumeIfRunning re-attaches to an upgrade triggered before an odio-api restart:
+// if the unit is still activating, re-announce running so reconnecting clients
+// see it; completion then arrives through the bus like any live run. The startup
+// snapshot is a single read, not a poll.
+func (u *UpgradeBackend) resumeIfRunning() {
+	if u.systemd == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(u.ctx, 5*time.Second)
+	svc, err := u.systemd.RefreshService(ctx, u.upgradeUnit, systemd.ScopeUser)
+	cancel()
+	if err != nil {
+		logger.Warn("[upgrade] cannot read %s state on startup: %v", u.upgradeUnit, err)
+		return
+	}
+	if svc.ActiveState == "activating" && u.running.CompareAndSwap(false, true) {
+		logger.Info("[upgrade] %s still running on startup, resuming", u.upgradeUnit)
+		u.runState.Store(&RunState{State: "running"})
+		u.notify(events.Event{Type: events.TypeUpgradeInfo, Data: Progress{State: "running"}})
+	}
 }
