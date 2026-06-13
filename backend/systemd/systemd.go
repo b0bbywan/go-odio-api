@@ -315,6 +315,25 @@ func (s *SystemdBackend) StartService(name string, scope UnitScope) error {
 	return s.Execute(s.ctx, name, scope, startUnit)
 }
 
+// StartUserServiceWait starts a user unit and blocks until its start job
+// finishes — for a oneshot, when ExecStart completes — returning the job result
+// ("done", "failed", ...). Honors ctx cancellation. User scope only.
+func (s *SystemdBackend) StartUserServiceWait(ctx context.Context, name string) (string, error) {
+	if err := s.canExecute(name, ScopeUser); err != nil {
+		return "", err
+	}
+	ch := make(chan string, 1)
+	if _, err := s.userConn.StartUnitContext(ctx, name, "replace", ch); err != nil {
+		return "", err
+	}
+	select {
+	case res := <-ch:
+		return res, nil
+	case <-ctx.Done():
+		return "", ctx.Err()
+	}
+}
+
 func (s *SystemdBackend) StopService(name string, scope UnitScope) error {
 	logger.Debug("[systemd] stopping service %s/%s", scope, name)
 	return s.Execute(s.ctx, name, scope, stopUnit)
