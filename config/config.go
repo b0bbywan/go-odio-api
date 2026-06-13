@@ -31,6 +31,7 @@ type Config struct {
 	MPRIS      *MPRISConfig
 	Pulseaudio *PulseAudioConfig
 	Systemd    *SystemdConfig
+	Upgrade    *UpgradeConfig
 	Zeroconf   *ZeroConfig
 	LogLevel   logger.Level
 }
@@ -90,6 +91,15 @@ type SystemdConfig struct {
 	SupportsUTMP   bool
 	XDGRuntimeDir  string
 	Timeout        time.Duration
+}
+
+// UpgradeConfig drives the agnostic upgrade backend: it reads a result file
+// written by an external detector and triggers external systemd user units.
+type UpgradeConfig struct {
+	Enabled     bool
+	ResultFile  string // upgrades.json to read and watch
+	CheckUnit   string // user unit to (re)run detection; empty disables /upgrade/check
+	UpgradeUnit string // user unit to run the upgrade; empty disables /upgrade/start
 }
 
 type BluetoothConfig struct {
@@ -329,6 +339,13 @@ func New(cfgFile *string) (*Config, error) {
 		Timeout:        getDuration("systemd.timeout", 90*time.Second),
 	}
 
+	upgradecfg := UpgradeConfig{
+		Enabled:     viper.GetBool("upgrade.enabled"),
+		ResultFile:  viper.GetString("upgrade.resultFile"),
+		CheckUnit:   viper.GetString("upgrade.checkUnit"),
+		UpgradeUnit: viper.GetString("upgrade.upgradeUnit"),
+	}
+
 	interfaces := getZeroconfInterfaces(binds)
 	zerocfg := ZeroConfig{
 		Enabled:      viper.GetBool("zeroconf.enabled"),
@@ -347,6 +364,7 @@ func New(cfgFile *string) (*Config, error) {
 		MPRIS:      &mpriscfg,
 		Pulseaudio: &pulsecfg,
 		Systemd:    &syscfg,
+		Upgrade:    &upgradecfg,
 		Zeroconf:   &zerocfg,
 		LogLevel:   parseLogLevel(viper.GetString("LogLevel")),
 	}
