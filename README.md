@@ -260,6 +260,12 @@ polkit.addRule(function(action, subject) {
 
 Replace `<user>` with the username running odio-api.
 
+### Software Upgrades
+
+Agnostic upgrade frontend — Odio implements neither detection nor upgrade logic. It reads a result file written by an external detector (current/latest version, availability) and triggers two systemd **user** units: one to re-check, one to run the upgrade. Both are registered as internal — triggerable, but hidden from `/services`. Disabled by default.
+
+Run progress streams over a Unix socket, not a file or the journal: progress is ephemeral, and on SD-card systems a socket avoids write wear (per-user journals are also unavailable on Raspberry Pi). The upgrade script connects to the socket and writes one JSON line per milestone, relayed verbatim as `upgrade.info` SSE events. The run verdict comes from the systemd job result (authoritative), independent of the script's self-report.
+
 ### Real-time Event Stream (SSE)
 
 `GET /events` streams live state changes to any HTTP client — no polling needed.
@@ -277,6 +283,7 @@ Events emitted:
 | `service.updated` | `systemd` | systemd unit state change |
 | `bluetooth.updated` | `bluetooth` | Bluetooth adapter or device state change (power, pairing, connection) |
 | `power.action` | `power` | Reboot or poweroff triggered via the API |
+| `upgrade.info` | `upgrade` | Detector status change, or run lifecycle/progress during an upgrade (see [Software Upgrades](#software-upgrades-1)) |
 
 Subscribe to a subset of events using query parameters:
 
@@ -562,6 +569,20 @@ zeroconf:
 
 Odio advertises itself via mDNS. Look for `_http._tcp.local.` → instance `odio-api`. Disabled on `lo` binding.
 
+#### Upgrade (opt-in)
+
+```yaml
+upgrade:
+  enabled: true
+  resultFile: /var/cache/odio/upgrades.json   # JSON written by the detector, read and watched
+  checkUnit: odio-check-upgrade.service        # user unit re-run by POST /upgrade/check
+  upgradeUnit: odio-upgrade.service            # user unit run by POST /upgrade/start
+  # progressSocket: ""                         # socket the upgrade script streams progress to
+                                               # default: $XDG_RUNTIME_DIR/odio-api/upgrade.sock (tmpfs, no SD writes)
+```
+
+`checkUnit` and `upgradeUnit` are registered as internal systemd user units — triggerable via the API but hidden from `/services`. Leave a unit empty to disable its endpoint. The result file is the source of truth for availability; the upgrade script reports live progress by connecting to `progressSocket` and writing newline-delimited JSON (`begin`/`progress`/`end`).
+
 ### Security defaults
 
 - **Localhost binding by default** — prevents accidental network exposure
@@ -653,6 +674,32 @@ POST   /power/power_off                   # Poweroff (403 if not declared in cap
 POST   /power/reboot                      # Reboot (403 if not declared in capabilities)
 ```
 
+### Software Upgrades
+
+Opt-in, disabled by default — see [Software Upgrades](#software-upgrades) for the model.
+
+```
+GET    /upgrade                           # Last detector status, or null if none yet
+POST   /upgrade/check                     # Re-run detection (triggers the check unit); 202 Accepted
+POST   /upgrade/start                     # Run the upgrade (triggers the upgrade unit); 202 Accepted, 409 if already running
+```
+
+Status and progress both stream as `upgrade.info` SSE events. Three payload shapes, distinguished by key:
+
+```jsonc
+// Detector status — also the GET /upgrade body
+{"current": "2026.5.0b3", "latest": "2026.6.0b1", "upgrade_available": true}
+
+// Run lifecycle — emitted by Odio around the trigger; success is the systemd job result (authoritative)
+{"state": "running"}
+{"state": "finished", "success": true}
+
+// Run progress — emitted by the upgrade script over the socket; roles/changed are optional
+{"event": "begin",    "total": 7, "roles": ["setup", "...", "finalize"]}
+{"event": "progress", "percent": 42, "current": 3, "step": "mpd"}
+{"event": "end",      "success": true, "changed": 3}
+```
+
 ### SSE Event Stream
 
 ```
@@ -661,6 +708,7 @@ GET    /events?backend=mpris                          # Only MPRIS player events
 GET    /events?backend=mpris,audio                    # Player + audio events
 GET    /events?backend=bluetooth                      # Only Bluetooth state changes
 GET    /events?backend=power                          # Only power actions (reboot/poweroff)
+GET    /events?backend=upgrade                        # Only upgrade status/progress events
 GET    /events?types=player.updated                   # Specific event types
 GET    /events?exclude=player.position                # All events except position ticks
 GET    /events?keepalive=60                           # Custom keepalive interval (seconds)
