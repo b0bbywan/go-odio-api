@@ -49,6 +49,18 @@ func New(ctx context.Context, config *config.SystemdConfig) (*SystemdBackend, er
 	}, nil
 }
 
+// AddInternalUserUnits registers extra user units as internal: triggerable and
+// state-tracked, but hidden from /services and service.updated events. Must be
+// called before Start, since the listener snapshots the unit list then.
+func (s *SystemdBackend) AddInternalUserUnits(names ...string) {
+	for _, name := range names {
+		if name == "" {
+			continue
+		}
+		s.config.UserServices = append(s.config.UserServices, config.SystemdService{Name: name, Internal: true})
+	}
+}
+
 // Start loads the initial cache and starts the listener
 func (s *SystemdBackend) Start() error {
 	logger.Debug("[systemd] starting backend (utmp=%v)", s.config.SupportsUTMP)
@@ -91,6 +103,14 @@ func (s *SystemdBackend) notify(e events.Event) {
 	default:
 		logger.Warn("[systemd] event channel full, dropping %s event", e.Type)
 	}
+}
+
+// notifyService emits a service.updated event, unless the unit is internal.
+func (s *SystemdBackend) notifyService(svc Service) {
+	if svc.Internal {
+		return
+	}
+	s.notify(events.Event{Type: events.TypeServiceUpdated, Data: svc})
 }
 
 // Events returns the read-only event channel for this backend.
@@ -164,6 +184,22 @@ func (s *SystemdBackend) ListServices() ([]Service, error) {
 	return out, nil
 }
 
+// PublicServices returns the configured services minus internal ones, for the
+// public /services listing.
+func (s *SystemdBackend) PublicServices() ([]Service, error) {
+	all, err := s.ListServices()
+	if err != nil {
+		return nil, err
+	}
+	public := make([]Service, 0, len(all))
+	for _, svc := range all {
+		if !svc.Internal {
+			public = append(public, svc)
+		}
+	}
+	return public, nil
+}
+
 // GetService retrieves a specific service from the cache
 func (s *SystemdBackend) GetService(name string, scope UnitScope) (*Service, bool) {
 	services, ok := s.cache.Get(cacheKey)
@@ -217,9 +253,10 @@ func (s *SystemdBackend) RefreshService(ctx context.Context, name string, scope 
 	}
 
 	svc := serviceFromProps(name, scope, props)
-	// URL is config-derived, not D-Bus-derived, so serviceFromProps can't know
-	// about it. Without this lookup, every refresh wipes the URL from cache.
+	// URL and Internal are config-derived, not D-Bus-derived, so serviceFromProps
+	// can't know about them. Without this lookup, every refresh wipes them.
 	svc.URL = s.configuredURL(name, scope)
+	svc.Internal = s.configuredInternal(name, scope)
 
 	if err := s.UpdateService(svc); err != nil {
 		logger.Debug("[systemd] failed to update %s: %v", name, err)
@@ -247,6 +284,23 @@ func (s *SystemdBackend) configuredURL(name string, scope UnitScope) string {
 	return ""
 }
 
+// configuredInternal reports whether the named unit was registered as internal.
+func (s *SystemdBackend) configuredInternal(name string, scope UnitScope) bool {
+	var configured []config.SystemdService
+	switch scope {
+	case ScopeSystem:
+		configured = s.config.SystemServices
+	case ScopeUser:
+		configured = s.config.UserServices
+	}
+	for _, svc := range configured {
+		if svc.Name == name {
+			return svc.Internal
+		}
+	}
+	return false
+}
+
 func (s *SystemdBackend) listServices(
 	ctx context.Context,
 	conn *dbus.Conn,
@@ -258,10 +312,14 @@ func (s *SystemdBackend) listServices(
 	}
 	names := make([]string, len(configured))
 	urls := make(map[string]string, len(configured))
+	internal := make(map[string]bool, len(configured))
 	for i, svc := range configured {
 		names[i] = svc.Name
 		if svc.URL != "" {
 			urls[svc.Name] = svc.URL
+		}
+		if svc.Internal {
+			internal[svc.Name] = true
 		}
 	}
 	services := make([]Service, 0, len(names))
@@ -279,6 +337,7 @@ func (s *SystemdBackend) listServices(
 				Running:     unit.SubState == "running",
 				Exists:      loaded,
 				URL:         urls[unit.Name],
+				Internal:    internal[unit.Name],
 			}
 			enabled, err := conn.GetUnitPropertyContext(ctx, unit.Name, "UnitFileState")
 			if err != nil {
