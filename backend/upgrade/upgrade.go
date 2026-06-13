@@ -37,20 +37,23 @@ func New(ctx context.Context, cfg *config.UpgradeConfig, sysd *systemd.SystemdBa
 	}
 
 	return &UpgradeBackend{
-		ctx:         ctx,
-		resultFile:  cfg.ResultFile,
-		checkUnit:   cfg.CheckUnit,
-		upgradeUnit: cfg.UpgradeUnit,
-		systemd:     sysd,
-		cache:       cache.New[*Status](0), // TTL=0 = no expiration
-		events:      make(chan events.Event, 16),
+		ctx:            ctx,
+		resultFile:     cfg.ResultFile,
+		checkUnit:      cfg.CheckUnit,
+		upgradeUnit:    cfg.UpgradeUnit,
+		progressSocket: cfg.ProgressSocket,
+		systemd:        sysd,
+		cache:          cache.New[*Status](0), // TTL=0 = no expiration
+		events:         make(chan events.Event, 16),
 	}, nil
 }
 
-// Start reads the current result file and starts watching it for changes.
+// Start reads the current result file, watches it for changes, and listens for
+// run progress streamed by the upgrade script.
 func (u *UpgradeBackend) Start() error {
 	u.readResult() // best-effort; a missing file is not an error
 	u.startWatcher()
+	u.startListener()
 	logger.Info("[upgrade] backend started successfully")
 	return nil
 }
@@ -63,9 +66,17 @@ func (u *UpgradeBackend) Close() {
 			logger.Warn("[upgrade] closing watcher: %v", err)
 		}
 	}
+	// Closing the listener unblocks Accept; an active connection unblocks via the
+	// already-cancelled ctx (see readProgress).
+	if u.listener != nil {
+		if err := u.listener.Close(); err != nil {
+			logger.Warn("[upgrade] closing progress listener: %v", err)
+		}
+	}
 	u.wg.Wait()
 	close(u.events)
 	u.watcher = nil
+	u.listener = nil
 }
 
 // Events returns the read-only event channel for this backend.

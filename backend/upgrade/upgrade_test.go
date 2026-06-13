@@ -2,6 +2,8 @@ package upgrade
 
 import (
 	"context"
+	"encoding/json"
+	"net"
 	"os"
 	"path/filepath"
 	"testing"
@@ -149,6 +151,63 @@ func TestInvalidResultKeepsLastValid(t *testing.T) {
 	}
 	if got := u.GetStatus(); got == nil || got.Latest != "2026.6.0b1" {
 		t.Fatalf("GetStatus = %+v, want last valid latest=2026.6.0b1", got)
+	}
+}
+
+func TestProgressSocketRelaysLines(t *testing.T) {
+	dir := t.TempDir()
+	// A subdir that does not exist yet: startListener must create it (like the
+	// default $XDG_RUNTIME_DIR/odio-api).
+	sock := filepath.Join(dir, "odio-api", "upgrade.sock")
+
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+
+	u, err := New(ctx, &config.UpgradeConfig{
+		Enabled:        true,
+		ResultFile:     filepath.Join(dir, "upgrades.json"),
+		ProgressSocket: sock,
+	}, nil)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	t.Cleanup(u.Close)
+	if err := u.Start(); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+
+	conn, err := net.Dial("unix", sock)
+	if err != nil {
+		t.Fatalf("dial progress socket: %v", err)
+	}
+	defer func() {
+		if err := conn.Close(); err != nil {
+			t.Logf("closing conn: %v", err)
+		}
+	}()
+
+	// Missing the required current/step → must be rejected, no event.
+	if _, err := conn.Write([]byte(`{"event":"progress","percent":10}` + "\n")); err != nil {
+		t.Fatalf("write malformed: %v", err)
+	}
+	if _, ok := recv(t, u.Events(), 300*time.Millisecond); ok {
+		t.Fatal("malformed progress line should not emit an event")
+	}
+
+	// Valid event with an extra ansible-flavoured field, which must pass through.
+	progress := `{"event":"progress","percent":42,"current":1,"step":"mpd","changed":3}`
+	if _, err := conn.Write([]byte(progress + "\n")); err != nil {
+		t.Fatalf("write progress: %v", err)
+	}
+	e, ok := recv(t, u.Events(), 2*time.Second)
+	if !ok {
+		t.Fatal("expected an upgrade.info event from the socket, got none")
+	}
+	if e.Type != events.TypeUpgradeInfo {
+		t.Fatalf("event type = %q, want %q", e.Type, events.TypeUpgradeInfo)
+	}
+	if got := string(e.Data.(json.RawMessage)); got != progress {
+		t.Fatalf("event data = %q, want verbatim %q", got, progress)
 	}
 }
 

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"sync"
 	"sync/atomic"
 
@@ -78,16 +79,18 @@ func (s *Status) UnmarshalJSON(b []byte) error {
 // units through the systemd backend. It does not know how detection or upgrade
 // are implemented.
 type UpgradeBackend struct {
-	ctx         context.Context
-	resultFile  string
-	checkUnit   string
-	upgradeUnit string
+	ctx            context.Context
+	resultFile     string
+	checkUnit      string
+	upgradeUnit    string
+	progressSocket string
 
-	systemd *systemd.SystemdBackend // triggers units (user scope); may be nil
-	cache   *cache.Cache[*Status]
-	lastRaw []byte // last accepted result file bytes, for change dedup
-	watcher *fsnotify.Watcher
-	running atomic.Bool // guards against concurrent upgrades
-	wg      sync.WaitGroup
-	events  chan events.Event
+	systemd  *systemd.SystemdBackend // triggers units (user scope); may be nil
+	cache    *cache.Cache[*Status]
+	lastRaw  []byte // last accepted result file bytes, for change dedup
+	watcher  *fsnotify.Watcher
+	listener net.Listener // unix socket the upgrade script streams progress to
+	running  atomic.Bool  // guards against concurrent upgrades
+	wg       sync.WaitGroup
+	events   chan events.Event
 }
