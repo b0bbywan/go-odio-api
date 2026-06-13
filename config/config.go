@@ -82,6 +82,10 @@ type PulseAudioConfig struct {
 type SystemdService struct {
 	Name string
 	URL  string
+	// Internal units are triggerable but hidden from the /services listing and
+	// service.updated events. Set programmatically (e.g. by the upgrade
+	// backend), never from user config.
+	Internal bool
 }
 
 type SystemdConfig struct {
