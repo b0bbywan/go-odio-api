@@ -9,9 +9,17 @@ import (
 	"testing"
 	"time"
 
+	"github.com/b0bbywan/go-odio-api/backend/systemd"
 	"github.com/b0bbywan/go-odio-api/config"
 	"github.com/b0bbywan/go-odio-api/events"
 )
+
+// fakeStream is a minimal events.Stream: the test pushes events onto ch, which
+// the backend reads through its subscription.
+type fakeStream struct{ ch chan events.Event }
+
+func (f *fakeStream) SubscribeFunc(func(events.Event) bool) chan events.Event { return f.ch }
+func (f *fakeStream) Unsubscribe(ch chan events.Event)                        { close(ch) }
 
 const validResult = `{"current":"dev","latest":"2026.6.0b1","upgrade_available":true}`
 
@@ -154,6 +162,55 @@ func TestInvalidResultKeepsLastValid(t *testing.T) {
 	}
 }
 
+// TestStatusResponseShape asserts the GET /upgrade payload: contract fields
+// flat at the top, free fields under "extra", and "run" added only while an
+// upgrade is in flight.
+func TestStatusResponseShape(t *testing.T) {
+	const result = `{"current":"dev","latest":"2026.7.0","upgrade_available":true,` +
+		`"checked_at":"2026-06-15T20:46:34Z","roles":["common"]}`
+	u, _ := newStarted(t, result)
+
+	marshal := func() map[string]json.RawMessage {
+		t.Helper()
+		b, err := json.Marshal(u.StatusResponse())
+		if err != nil {
+			t.Fatalf("marshal StatusResponse: %v", err)
+		}
+		var m map[string]json.RawMessage
+		if err := json.Unmarshal(b, &m); err != nil {
+			t.Fatalf("response not an object: %v\n%s", err, b)
+		}
+		return m
+	}
+
+	// Idle: contract fields flat, roles under "extra", no "run".
+	m := marshal()
+	if string(m["latest"]) != `"2026.7.0"` {
+		t.Errorf("latest = %s, want flat top-level", m["latest"])
+	}
+	if _, ok := m["run"]; ok {
+		t.Errorf("idle response should have no run, got %s", m["run"])
+	}
+	var extra map[string]json.RawMessage
+	if err := json.Unmarshal(m["extra"], &extra); err != nil {
+		t.Fatalf("extra not an object: %v", err)
+	}
+	if string(extra["roles"]) != `["common"]` {
+		t.Errorf("extra.roles = %s, want verbatim", extra["roles"])
+	}
+
+	// In flight: "run" appears alongside the flat fields.
+	pct := 50
+	u.runState.Store(&RunState{State: "running", Percent: &pct})
+	var run RunState
+	if err := json.Unmarshal(marshal()["run"], &run); err != nil {
+		t.Fatalf("run missing/undecodable: %v", err)
+	}
+	if run.State != "running" || run.Percent == nil || *run.Percent != 50 {
+		t.Errorf("run = %+v, want running 50%%", run)
+	}
+}
+
 func TestProgressSocketRelaysLines(t *testing.T) {
 	dir := t.TempDir()
 	// A subdir that does not exist yet: startListener must create it (like the
@@ -201,13 +258,57 @@ func TestProgressSocketRelaysLines(t *testing.T) {
 	}
 	e, ok := recv(t, u.Events(), 2*time.Second)
 	if !ok {
-		t.Fatal("expected an upgrade.info event from the socket, got none")
+		t.Fatal("expected an upgrade.progress event from the socket, got none")
 	}
-	if e.Type != events.TypeUpgradeInfo {
-		t.Fatalf("event type = %q, want %q", e.Type, events.TypeUpgradeInfo)
+	if e.Type != events.TypeUpgradeProgress {
+		t.Fatalf("event type = %q, want %q", e.Type, events.TypeUpgradeProgress)
 	}
 	if got := string(e.Data.(json.RawMessage)); got != progress {
 		t.Fatalf("event data = %q, want verbatim %q", got, progress)
+	}
+}
+
+func TestBusTerminalStateEmitsFinished(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "upgrades.json")
+	writeFile(t, path, validResult)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+
+	u, err := New(ctx, &config.UpgradeConfig{
+		Enabled:     true,
+		ResultFile:  path,
+		UpgradeUnit: "odio-upgrade.service",
+	}, nil)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	stream := &fakeStream{ch: make(chan events.Event, 8)}
+	u.UseEventStream(stream)
+	t.Cleanup(u.Close)
+	if err := u.Start(); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	recv(t, u.Events(), time.Second) // drain the initial result-read event
+
+	// Simulate an in-progress run, then its unit reaching a terminal success state.
+	u.running.Store(true)
+	stream.ch <- events.Event{
+		Type: events.TypeServiceUpdated,
+		Data: systemd.Service{Name: "odio-upgrade.service", Scope: systemd.ScopeUser, ActiveState: "inactive"},
+	}
+
+	e, ok := recv(t, u.Events(), 2*time.Second)
+	if !ok {
+		t.Fatal("expected an upgrade.info finished event, got none")
+	}
+	prog, ok := e.Data.(Progress)
+	if !ok {
+		t.Fatalf("event data = %T, want Progress", e.Data)
+	}
+	if prog.State != "finished" || prog.Success == nil || !*prog.Success {
+		t.Fatalf("got %+v, want state=finished success=true", prog)
 	}
 }
 
