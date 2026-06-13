@@ -105,11 +105,11 @@ func (s *SystemdBackend) notify(e events.Event) {
 	}
 }
 
-// notifyService emits a service.updated event, unless the unit is internal.
+// notifyService emits a service.updated event for every refreshed unit, internal
+// or not, so other backends can react to its state over the event bus (e.g. the
+// upgrade backend tracking its run unit). Internal units are kept out of the
+// /services *listing* by PublicServices, not from the event stream.
 func (s *SystemdBackend) notifyService(svc Service) {
-	if svc.Internal {
-		return
-	}
 	s.notify(events.Event{Type: events.TypeServiceUpdated, Data: svc})
 }
 
@@ -374,23 +374,16 @@ func (s *SystemdBackend) StartService(name string, scope UnitScope) error {
 	return s.Execute(s.ctx, name, scope, startUnit)
 }
 
-// StartUserServiceWait starts a user unit and blocks until its start job
-// finishes — for a oneshot, when ExecStart completes — returning the job result
-// ("done", "failed", ...). Honors ctx cancellation. User scope only.
-func (s *SystemdBackend) StartUserServiceWait(ctx context.Context, name string) (string, error) {
+// TriggerUserUnit starts a user unit without waiting for completion; callers
+// observe the run through service.updated events instead (see the upgrade
+// backend). User scope only.
+func (s *SystemdBackend) TriggerUserUnit(ctx context.Context, name string) error {
 	if err := s.canExecute(name, ScopeUser); err != nil {
-		return "", err
+		return err
 	}
-	ch := make(chan string, 1)
-	if _, err := s.userConn.StartUnitContext(ctx, name, "replace", ch); err != nil {
-		return "", err
-	}
-	select {
-	case res := <-ch:
-		return res, nil
-	case <-ctx.Done():
-		return "", ctx.Err()
-	}
+	// nil channel: enqueue the start job and return without awaiting the result.
+	_, err := s.userConn.StartUnitContext(ctx, name, "replace", nil)
+	return err
 }
 
 func (s *SystemdBackend) StopService(name string, scope UnitScope) error {
