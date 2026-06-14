@@ -97,6 +97,9 @@ func newBroadcasterFromBackend(ctx context.Context, b *Backend) *Broadcaster {
 	if b.Systemd != nil {
 		srcs = append(srcs, b.Systemd.Events())
 	}
+	if b.Upgrade != nil {
+		srcs = append(srcs, b.Upgrade.Events())
+	}
 	return NewBroadcaster(ctx, fanIn(ctx, srcs...))
 }
 

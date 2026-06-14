@@ -58,6 +58,7 @@ type Service struct {
 	Exists      bool      `json:"exists"`
 	Description string    `json:"description,omitempty"`
 	URL         string    `json:"url,omitempty"`
+	Internal    bool      `json:"-"` // triggerable but hidden from listings/events
 }
 
 type unitActionFunc func(ctx context.Context, conn *dbus.Conn, name string) error

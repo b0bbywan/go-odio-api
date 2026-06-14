@@ -103,191 +103,42 @@ Odio becomes the hub that makes all your HA integrations point to the correct ma
 
 ## Features
 
+Each backend has a full reference on **[docs.odio.love](https://docs.odio.love/api/)** — summaries below.
+
 ### Media Player Control (MPRIS)
 
-Auto-discovers all MPRIS-compatible players in real time — Spotify, VLC, Firefox, MPD, Kodi, etc. Add a new player and it appears immediately, zero config.
-
-- Full playback control: play, pause, stop, next, previous
-- Volume, seek, and position control
-- Shuffle and loop mode management
-- Real-time state updates via D-Bus signals
-- Smart caching with automatic cache invalidation
-- Position heartbeat for accurate playback tracking
+Auto-discovers all MPRIS players in real time — Spotify, VLC, Firefox, MPD, Kodi, etc. Add a player and it appears immediately, zero config. Full playback control (play/pause/stop/next/previous, seek, position, volume, shuffle, loop), real-time state via D-Bus signals, smart caching, position heartbeat. → [reference](https://docs.odio.love/api/mpris/)
 
 ### Audio Management (PulseAudio/PipeWire)
 
-- Server info and default output
-- Global and per-client volume/mute control
-- Real-time audio events via native PulseAudio monitoring
-- Limited PipeWire support via `pipewire-pulse`
+Server info and default output, global and per-client volume/mute, real-time audio events via native PulseAudio monitoring (pure Go, no libpulse). Limited PipeWire support via `pipewire-pulse`. → [reference](https://docs.odio.love/api/pulseaudio/)
 
 ### Service Management (systemd)
 
-Explicit whitelist required — nothing managed unless listed in `config.yaml`.
-
-- List and monitor whitelisted systemd services (system + user)
-- Start, stop, restart, enable, disable user services
-- Real-time service state updates via D-Bus signals
-- Disabled by default
+Explicit whitelist required — nothing managed unless listed in `config.yaml`. List/monitor whitelisted system + user services, start/stop/restart/enable/disable user services, real-time state via D-Bus signals. Disabled by default. → [reference](https://docs.odio.love/api/systemd/)
 
 ⚠️ **Security model:** Odio enforces user-session mutations only at the application layer, regardless of D-Bus or polkit configuration. System units are strictly read-only. See [Security](#security) for full details.
 
 
 ### Bluetooth Sink (A2DP)
 
-Odio can act as a Bluetooth audio receiver (A2DP sink) using D-Bus, allowing phones, computers, and other Bluetooth devices to stream audio to it.
+Acts as a Bluetooth audio receiver (A2DP sink) so phones and computers can stream to it — and the reverse, connecting *to* nearby speakers/headphones as an output (scan/connect/disconnect; devices stream live via `bluetooth.discovered`/`bluetooth.updated` SSE events). Disabled by default.
 
-[Live example](UI.md#bluetooth-on-pi-b)
-
-[Inspired from my own Bluetooth setup since 2020](https://mathieu-requillart.medium.com/my-ultimate-guide-to-the-raspberry-pi-audio-server-i-wanted-bluetooth-64c347ee0d22)
-
-#### Configuration
-A few system configuration steps are required to make this work. Since Odio doesn't run as root, it can't do it by itself.
-
-First make sure the user running Odio belongs to `bluetooth` group
-
-```bash
-
-$ groups
-pi adm dialout cdrom sudo audio video plugdev games users input render netdev bluetooth gpio i2c spi
-
-# if 'bluetooth' doesn't show in the line above:
-
-$ sudo usermod -a -G bluetooth <username>
-```
-
-Some packages are needed to automatically plug PulseAudio or PipeWire to Bluetooth.
-Odio doesn't directly support `ALSA` and never will.
-
-```bash
-
-# PulseAudio
-$ sudo apt install pulseaudio-module-bluetooth
-
-# PipeWire
-$ sudo apt install libspa-0.2-bluetooth
-```
-
-To ensure the device is correctly identified by phones and computers, you must edit `/etc/bluetooth/main.conf`:
-
-```ini
-[General]
-Name=Odio       # Bluetooth name shown during device discovery
-Class=0x240428
-```
-
-Class of Device (CoD) breakdown:
-- `0x24` → Major Device Class: **Audio/Video**
-- `0x0428` → Minor + services :
-  - **Audio Sink**
-  - Loudspeaker
-  - Rendering device
-
-This configuration makes Odio appear as a standard Bluetooth speaker or audio receiver.
-
-After modifying the configuration file, restart the Bluetooth service:
-```bash
-
-$ sudo systemctl restart bluetooth
-
-# A new user service should now be running
-# It creates an mpris player for each connected device
-$ systemctl --user status mpris-proxy.service
-● mpris-proxy.service - Bluetooth mpris proxy
-     Loaded: loaded (/usr/lib/systemd/user/mpris-proxy.service; enabled; preset: enabled)
-     Active: active (running) since Fri 2026-02-27 13:17:33 CET; 1h 15min ago
- Invocation: 4480169b9adb4c239ad81d7345dc1f92
-       Docs: man:mpris-proxy(1)
-   Main PID: 674 (mpris-proxy)
-      Tasks: 1 (limit: 379)
-        CPU: 791ms
-     CGroup: /user.slice/user-1000.slice/user@1000.service/app.slice/mpris-proxy.service
-             └─674 /usr/bin/mpris-proxy
-
-févr. 27 13:17:33 rasponkyold systemd[559]: Started mpris-proxy.service - Bluetooth mpris proxy.
-```
-
-#### Usage
-
-Bluetooth is intentionally not left in an automatic or always-on state by default.
-
-- **Power up**:
-  Bluetooth is enabled, but the device is not discoverable. You can connect to it if your phone is already paired.
-  Set `bluetooth.powerOnStart: true` to power the adapter up automatically when the service starts.
-- **Power Down** Default 30min of inactivity (= no connected clients)
-- **Pairing mode**:
-  The device becomes visible to nearby Bluetooth devices and accepts new pairings.
-  After a successful pairing (or when the timeout expires), Bluetooth automatically returns to its normal state:
-    - Not discoverable
-    - Not pairable
-- Audio profile: **A2DP** (high-quality audio streaming).
-
-This behavior matches how most Bluetooth speakers and audio receivers work.
-
-Odio automatically unblocks soft-blocked Bluetooth rfkill devices on power-up, so a `rfkill block bluetooth` followed by a power-up via the API will work without manual intervention.
-
-Bonus: You get to control it through `/pulseaudio/clients` or `/players/` and in the UI !
-
-#### Bluetooth output (speakers & headphones)
-
-Odio can also work the other way around: connect *to* nearby Bluetooth speakers or headphones and use them as an audio output.
-
-- **Scan**: `POST /bluetooth/scan` starts active discovery (powering the adapter up if needed) and filters for classic audio devices. Found devices stream live through `bluetooth.discovered` SSE events, are merged into the `known_devices` list as they appear (also pushed via `bluetooth.updated`), and reconciled with BlueZ when the scan stops. Stop with `POST /bluetooth/scan/stop`, or let it auto-stop after `scanTimeout` (default 60s, `0` to disable).
-- **Connect**: `POST /bluetooth/connect` with `{"address": "AA:BB:CC:DD:EE:FF"}`. The address is validated first (malformed → `400`), then the call blocks until BlueZ answers (it can take a few seconds and may trigger pairing) and returns the real success/failure. The device is trusted on success and any active scan is stopped to free the adapter. The `connected` state also propagates through `bluetooth.updated` SSE events.
-- **Disconnect**: `POST /bluetooth/disconnect` with the same `{"address": ...}` body.
-
-Devices are exposed as a single list — `GET /bluetooth/devices` (and the `known_devices` field of `GET /bluetooth`) returns every device BlueZ knows about with `paired`, `bonded`, `trusted` and `connected` flags, so a paired speaker and a freshly scanned one share the same shape. Connected output devices then route through PulseAudio/PipeWire as a regular output sink.
+Setup needs a few system steps (Odio isn't root): add the user to the `bluetooth` group, install the PulseAudio/PipeWire Bluetooth module, and set `Name` + `Class=0x240428` in `/etc/bluetooth/main.conf` so it advertises as an audio sink. Full guide → [reference](https://docs.odio.love/api/bluetooth/) · [live example on a Pi B](UI.md#bluetooth-on-pi-b)
 
 ### Power Management
 
-Remote reboot and power-off via the REST API — no SSH needed for day-to-day operations. Disabled by default. Uses `org.freedesktop.login1` D-Bus interface.
+Remote reboot and power-off via the REST API — no SSH for day-to-day ops. Disabled by default, uses `org.freedesktop.login1`. On desktop, logind handles permissions automatically; on headless systems a polkit rule is required to allow the user to reboot/power-off (full rule → [reference](https://docs.odio.love/api/power/)).
 
-On desktop systems with a graphical session, logind handles permissions automatically — no extra configuration needed.
+### Software Upgrades
 
-On **headless systems**, you need a polkit rule to allow your user to reboot/power-off via D-Bus. Create `/etc/polkit-1/rules.d/10-allow-shutdown.rules`:
+Agnostic upgrade frontend — Odio implements neither detection nor upgrade logic. It reads a result file written by an external detector (current/latest version, availability) and triggers two systemd **user** units: one to re-check, one to run the upgrade. Both are registered as internal — triggerable, but hidden from `/services`. Disabled by default.
 
-```javascript
-polkit.addRule(function(action, subject) {
-    if ((action.id == "org.freedesktop.login1.power-off" ||
-         action.id == "org.freedesktop.login1.power-off-multiple-sessions" ||
-         action.id == "org.freedesktop.login1.reboot" ||
-         action.id == "org.freedesktop.login1.reboot-multiple-sessions") &&
-        subject.user == "<user>") {
-        return polkit.Result.YES;
-    }
-});
-```
-
-Replace `<user>` with the username running odio-api.
+Run progress streams over a Unix socket, not a file or the journal: progress is ephemeral, and on SD-card systems a socket avoids write wear (per-user journals are also unavailable on Raspberry Pi). The upgrade script connects to the socket and writes one JSON line per milestone, relayed verbatim as `upgrade.info` SSE events. The run verdict comes from the systemd job result (authoritative), independent of the script's self-report.
 
 ### Real-time Event Stream (SSE)
 
-`GET /events` streams live state changes to any HTTP client — no polling needed.
-
-Events emitted:
-
-| Event type | Backend | Triggered by |
-|---|---|---|
-| `player.updated` | `mpris` | Playback state change, volume, metadata |
-| `player.added` | `mpris` | New MPRIS player appeared |
-| `player.removed` | `mpris` | MPRIS player closed |
-| `player.position` | `mpris` | Position tick (periodic, lightweight) |
-| `audio.updated` | `audio` | PulseAudio sink-input added or changed (volume, mute, cork) |
-| `audio.removed` | `audio` | PulseAudio sink-input removed |
-| `service.updated` | `systemd` | systemd unit state change |
-| `bluetooth.updated` | `bluetooth` | Bluetooth adapter or device state change (power, pairing, connection) |
-| `power.action` | `power` | Reboot or poweroff triggered via the API |
-
-Subscribe to a subset of events using query parameters:
-
-| Parameter | Description | Example |
-|---|---|---|
-| `types` | Comma-separated event type names to include | `?types=player.updated,player.added` |
-| `backend` | Comma-separated backend names to include | `?backend=mpris,audio` |
-| `exclude` | Comma-separated event type names to exclude | `?exclude=player.position` |
-| `keepalive` | Keepalive interval in seconds (default `30`, min `10`, max `120`) | `?keepalive=60` |
-
-`types` and `backend` can be combined — the union of all matched types is used. Omitting both receives all events. `server.info` is always delivered and cannot be excluded.
+`GET /events` streams live state changes to any HTTP client — no polling. One event type per backend (`player.updated`, `audio.updated`, `service.updated`, `bluetooth.updated`, `power.action`, `upgrade.info`, …), filterable with `types`, `backend`, and `exclude` query params (`server.info` is always delivered). → [reference](https://docs.odio.love/api/events/)
 
 ### REST API
 
@@ -490,77 +341,50 @@ bind: lo                      # loopback only (default)
 
 #### systemd (opt-in, whitelist required)
 
+Each entry is a bare service name or an object `{name, url}` (mixable). When `url` is set the dashboard renders a clickable link; the shorthand `:8080` resolves to the current host client-side.
+
 ```yaml
 systemd:
   enabled: true
-  timeout: 90s                          # fsnotify stable state timeout (default: 90s)
+  timeout: 90s                 # fsnotify stable-state timeout
   system:
     - bluetooth.service
-    - upmpdcli.service
   user:
-    - pipewire-pulse.service
-    - pulseaudio.service
-    - mpd.service                       # see [1]
-    - shairport-sync.service            # see [2]
-    - name: "snapclient.service"        # incompatible with mpris
+    - mpd.service
+    - spotifyd.service
+    - name: snapclient.service
       url: "http://<snapserver>:1780"
-    - spotifyd.service                  # see [3]
-    - firefox-kiosk@netflix.com.service # default support for mpris
-    - firefox-kiosk@youtube.com.service # default support for mpris
-    - firefox-kiosk@my.home-assistant.io.service
-    - kodi.service                      # see [4]
-    - vlc.service                       # default support for mpris
-    - plex.service                      # see [5]
-    - name: mympd.service               # object form: optional URL exposed in the dashboard
+    - name: mympd.service
       url: ":8080"
 ```
-[1] Install `mpd-mpris` or `mpDris2` for MPRIS support
-[2] Check my [article on Medium: Shairport Sync/Airplay with PulseAudio and MPRIS support](https://medium.com/@mathieu-requillart/set-up-a-b83d9c980e75)
-[3] Default on desktop; on headless, your spotifyd version [must be built with MPRIS support](https://docs.spotifyd.rs/advanced/dbus.html)
-[4] Install [Kodi Add-on: MPRIS D-Bus interface](https://github.com/wastis/MediaPlayerRemoteInterface#)
-[5] Maybe supported, untested
 
-Each entry can be a bare service name (string) or an object `{name, url}`; the two forms can be mixed in the same list. When `url` is set, the dashboard renders the service description as a clickable link. The shorthand `:8080` resolves to `<protocol>//<current-host>:8080` client-side, so the link works from any host the dashboard is reached on. `/path` and full URLs are also accepted.
+Players that need extra setup for MPRIS (MPD, shairport-sync, spotifyd, Kodi…) are covered in the [systemd reference](https://docs.odio.love/api/systemd/).
 
-#### Bluetooth
+#### Other backends
 
 ```yaml
 bluetooth:
   enabled: true
-  powerOnStart: false # power on adapter at service startup
-  timeout: 5s
-  pairingTimeout: 60s
-  idleTimeout: 30m # 0 for no autopoweroff
-  scanTimeout: 60s # auto-stop a scan after this delay (0 to disable)
-```
-
-#### Power Management
-
-```yaml
+  powerOnStart: false          # power on adapter at startup
+  idleTimeout: 30m             # auto power-off after inactivity (0 = never)
+  scanTimeout: 60s             # auto-stop a scan (0 = never)
 power:
   enabled: true
-  capabilities:
-    poweroff: true
-    reboot: true
-```
-
-#### PulseAudio
-
-```yaml
+  capabilities: { poweroff: true, reboot: true }
 pulseaudio:
   enabled: true
-  serve_cookie: true  # exposes GET /audio/cookie for network audio clients
-```
-
-#### Zeroconf / mDNS
-
-```yaml
-bind: eno1
+  serve_cookie: true           # exposes GET /audio/cookie for network audio clients
 zeroconf:
+  enabled: true                # mDNS (_http._tcp.local. → odio-api); disabled on `lo`
+upgrade:                       # agnostic upgrade frontend (opt-in)
   enabled: true
+  resultFile: /var/cache/odio/upgrades.json
+  checkUnit: odio-check-upgrade.service     # internal user unit; POST /upgrade/check
+  upgradeUnit: odio-upgrade.service         # internal user unit; POST /upgrade/start
+  # progressSocket default: $XDG_RUNTIME_DIR/odio-api/upgrade.sock (tmpfs, no SD writes)
 ```
 
-Odio advertises itself via mDNS. Look for `_http._tcp.local.` → instance `odio-api`. Disabled on `lo` binding.
+For `upgrade`, the result file is the source of truth for availability; the script reports live progress over the socket (`begin`/`progress`/`end`). Full per-option detail on [docs.odio.love](https://docs.odio.love/api/).
 
 ### Security defaults
 
@@ -571,170 +395,60 @@ Odio advertises itself via mDNS. Look for `_http._tcp.local.` → instance `odio
 
 ## API Endpoints
 
-### Server Information
+Full per-route reference with request bodies and responses lives on **[docs.odio.love/api](https://docs.odio.love/api/)**. Overview:
+
+| Group | Routes | Reference |
+|---|---|---|
+| Server | `GET /server` | — |
+| MPRIS | `GET /players`, `/players/{player}/cover`, `POST /players/{player}/{play,pause,play_pause,stop,next,previous,seek,position,volume,loop,shuffle}` | [mpris](https://docs.odio.love/api/mpris/) |
+| PulseAudio | `GET /audio`, `/audio/{server,clients,outputs,cookie}`, `POST /audio/server/{mute,volume}`, `/audio/{clients,outputs}/{id}/{mute,volume}`, `/audio/outputs/{id}/default` | [pulseaudio](https://docs.odio.love/api/pulseaudio/) |
+| systemd | `GET /services`, `POST /services/{scope}/{unit}/{start,stop,restart,enable,disable}` | [systemd](https://docs.odio.love/api/systemd/) |
+| Bluetooth | `GET /bluetooth`, `/bluetooth/devices`, `POST /bluetooth/{power_up,power_down,pairing_mode,scan,scan/stop,connect,disconnect}` | [bluetooth](https://docs.odio.love/api/bluetooth/) |
+| Power | `GET /power/`, `POST /power/{power_off,reboot}` | [power](https://docs.odio.love/api/power/) |
+| Upgrade | `GET /upgrade`, `POST /upgrade/{check,start}` | [below](#software-upgrades-1) |
+| SSE | `GET /events` | [events](https://docs.odio.love/api/events/) |
+
+### Software Upgrades
+
+Opt-in, disabled by default — see [Software Upgrades](#software-upgrades) for the model.
 
 ```
-GET    /server                             # {"hostname":"","os_platform":"","os_version":"","api_sw":"","api_version":"","backends":{"mpris":true,"pulseaudio":true,"systemd":false,"zeroconf":false}}
+GET    /upgrade                           # Last detector status, or null if none yet
+POST   /upgrade/check                     # Re-run detection (triggers the check unit); 202 Accepted
+POST   /upgrade/start                     # Run the upgrade (triggers the upgrade unit); 202 Accepted, 409 if already running
 ```
 
-### MPRIS Media Players
+Status and progress both stream as `upgrade.info` SSE events. Three payload shapes, distinguished by key:
 
-```
-GET    /players                           # List all media players
-GET    /players/{player}/cover            # Cover art (serves file:// or redirects http(s)://)
-POST   /players/{player}/play             # Play
-POST   /players/{player}/pause            # Pause
-POST   /players/{player}/play_pause       # Toggle play/pause
-POST   /players/{player}/stop             # Stop
-POST   /players/{player}/next             # Next track
-POST   /players/{player}/previous         # Previous track
-POST   /players/{player}/seek             # Seek (body: {"offset": 1000000})
-POST   /players/{player}/position         # Set position (body: {"track_id": "...", "position": 0})
-POST   /players/{player}/volume           # Set volume (body: {"volume": 0.5})
-POST   /players/{player}/loop             # Set loop status (body: {"loop": "None|Track|Playlist"})
-POST   /players/{player}/shuffle          # Set shuffle (body: {"shuffle": true})
-```
+```jsonc
+// Detector status — also the GET /upgrade body
+{"current": "2026.5.0b3", "latest": "2026.6.0b1", "upgrade_available": true}
 
-### PulseAudio
+// Run lifecycle — emitted by Odio around the trigger; success is the systemd job result (authoritative)
+{"state": "running"}
+{"state": "finished", "success": true}
 
-```
-GET    /audio                             # Combined: server info, outputs, clients
-GET    /audio/server                      # Get server info
-POST   /audio/server/mute                 # Mute/unmute default output
-POST   /audio/server/volume               # Set default output volume (body: {"volume": 0.5})
-GET    /audio/clients                     # List audio clients (sink-inputs)
-POST   /audio/clients/{sink}/mute         # Mute/unmute client
-POST   /audio/clients/{sink}/volume       # Set client volume (body: {"volume": 0.5})
-GET    /audio/outputs                     # List all audio outputs (sinks)
-POST   /audio/outputs/{output}/default    # Set default output
-POST   /audio/outputs/{output}/mute       # Mute/unmute output
-POST   /audio/outputs/{output}/volume     # Set output volume (body: {"volume": 0.5})
-GET    /audio/cookie                      # Download PulseAudio cookie file (requires pulseaudio.serve_cookie: true)
-```
-
-### Systemd Services
-
-```
-GET    /services                          # List all monitored services
-POST   /services/{scope}/{unit}/start     # Start service (scope: system|user)
-POST   /services/{scope}/{unit}/stop      # Stop service (scope: system|user)
-POST   /services/{scope}/{unit}/restart   # Restart service
-POST   /services/{scope}/{unit}/enable    # Enable service (scope: system|user)
-POST   /services/{scope}/{unit}/disable   # Disable service
-```
-
-### Bluetooth
-
-Sink (receive audio from phones/computers):
-```
-GET    /bluetooth                         # Get Bluetooth status (powered, pairing/scan state, known_devices list)
-POST   /bluetooth/power_up                # Turns Bluetooth on and makes the device ready to connect to already paired devices.
-POST   /bluetooth/power_down              # Turns Bluetooth off and disconnects any active Bluetooth connections.
-POST   /bluetooth/pairing_mode            # Enables Bluetooth pairing mode for 60s (configurable).
-                                          # Returns to non-discoverable state after timeout or successful pairing.
-```
-
-Output (connect to Bluetooth speakers/headphones):
-```
-GET    /bluetooth/devices                 # List devices: [{"address","name","paired","bonded","trusted","connected"}, ...]
-POST   /bluetooth/scan                    # Start scanning for nearby devices (powers the adapter up if needed).
-                                          # Discovered devices stream through bluetooth.discovered SSE events.
-POST   /bluetooth/scan/stop               # Stop scanning (idempotent).
-POST   /bluetooth/connect                 # Connect to a device (body: {"address": "AA:BB:CC:DD:EE:FF"}).
-                                          # Blocks until BlueZ answers, then returns success/failure.
-POST   /bluetooth/disconnect              # Disconnect a device (body: {"address": "AA:BB:CC:DD:EE:FF"}).
-```
-
-### Power Management
-
-```
-GET    /power/                            # Power capabilities {"reboot": true, "power_off": false}
-POST   /power/power_off                   # Poweroff (403 if not declared in capabilities)
-POST   /power/reboot                      # Reboot (403 if not declared in capabilities)
+// Run progress — emitted by the upgrade script over the socket; roles/changed are optional
+{"event": "begin",    "total": 7, "roles": ["setup", "...", "finalize"]}
+{"event": "progress", "percent": 42, "current": 3, "step": "mpd"}
+{"event": "end",      "success": true, "changed": 3}
 ```
 
 ### SSE Event Stream
 
 ```
-GET    /events                                        # All events (text/event-stream)
-GET    /events?backend=mpris                          # Only MPRIS player events
-GET    /events?backend=mpris,audio                    # Player + audio events
-GET    /events?backend=bluetooth                      # Only Bluetooth state changes
-GET    /events?backend=power                          # Only power actions (reboot/poweroff)
-GET    /events?types=player.updated                   # Specific event types
-GET    /events?exclude=player.position                # All events except position ticks
-GET    /events?keepalive=60                           # Custom keepalive interval (seconds)
-
-GET    /events?types=player.updated,service.updated&backend=audio&exclude=player.position  # Mixed
+GET /events                        # all events (text/event-stream)
+GET /events?backend=mpris,audio    # filter by backend (mpris, audio, systemd, bluetooth, power, upgrade)
+GET /events?types=player.updated   # filter by event type
+GET /events?exclude=player.position
+GET /events?keepalive=60
 ```
-
-#### Testing with curl
 
 ```bash
-# All events
 curl -N http://localhost:8018/events
-
-# Only player events
-curl -N "http://localhost:8018/events?backend=mpris"
-
-# Only position ticks lightweight on purpose (e.g. to drive a seek bar)
-curl -N "http://localhost:8018/events?types=player.position"
 ```
 
-Expected output:
-
-```
-event: server.info
-data: "connected"
-
-event: player.updated
-data: {"bus_name":"org.mpris.MediaPlayer2.spotify","identity":"Spotify",...}
-
-event: audio.updated
-data: [{"id":42,"name":"Spotify","volume":0.75,"muted":false,...}]
-
-event: audio.removed
-data: [{"id":41,"name":"pactl","volume":1,...}]
-
-event: service.updated
-data: {"name":"mpd.service","scope":"user","active_state":"active","running":true,...}
-
-event: bluetooth.updated
-data: {"powered":true,"discoverable":false,"pairable":false,"pairing_active":false,"scanning":false,"known_devices":[{"address":"AA:BB:CC:DD:EE:FF","name":"My Phone","bonded":true,"trusted":true,"connected":true}]}
-
-event: power.action
-data: {"action":"reboot"}
-```
-
-#### Simple browser listener
-
-```html
-<!DOCTYPE html>
-<html>
-<head><title>Odio live events</title></head>
-<body>
-<pre id="log"></pre>
-<script>
-  const log = document.getElementById('log');
-
-  // Subscribe to all events — add ?backend=mpris or ?types=... to filter
-  const es  = new EventSource('http://localhost:8018/events');
-
-  ['player.updated', 'player.added', 'player.removed', 'player.position',
-   'audio.updated', 'audio.removed', 'service.updated', 'bluetooth.updated', 'power.action'].forEach(type => {
-    es.addEventListener(type, e => {
-      const entry = `[${type}] ${e.data}\n`;
-      log.textContent = entry + log.textContent;
-    });
-  });
-
-  es.onerror = () => log.textContent = '[error] connection lost\n' + log.textContent;
-</script>
-</body>
-</html>
-```
-
-Save as `events.html`, open in a browser — events appear live as they happen. No polling, no page refresh needed.
+Each line is `event: <type>` then `data: <json>`. Full event catalogue, payloads, and a browser `EventSource` example: [events reference](https://docs.odio.love/api/events/).
 
 ## Security
 
