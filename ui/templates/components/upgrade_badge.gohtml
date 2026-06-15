@@ -1,0 +1,49 @@
+{{/*
+	Upgrade status badge for the header. Data is *ui.UpgradeStatus (may be nil).
+	State is icon + colour, no text label. Click installs (POST /upgrade/start,
+	confirmed) when available, else re-runs detection (POST /upgrade/check).
+	While running, the ring is its own sse-swap target updated by upgrade-ring.
+*/}}
+{{ define "section-upgrade" }}
+{{- $checked := .CheckedAtLabel -}}
+{{- if .Running -}}
+	<span class="inline-flex items-center rounded-full bg-green-500/10 p-1.5 text-green-400 [&_svg]:h-4 [&_svg]:w-4"
+	      title="Upgrading…{{ with .Run.Step }} {{ . }}{{ end }}"
+	      sse-swap="upgrade-progress" hx-swap="innerHTML">
+		{{ template "upgrade-ring" .Run }}
+	</span>
+{{- else if .Known -}}
+	{{- if .UpgradeAvailable -}}
+	<button hx-post="/upgrade/start" hx-swap="none"
+	        hx-confirm="Upgrade to {{ .Latest }}?"
+	        class="inline-flex items-center rounded-full bg-green-500/10 p-1.5 text-green-400 transition hover:bg-green-500/20 [&_svg]:h-4 [&_svg]:w-4"
+	        title="Upgrade available: {{ .Latest }}{{ if $checked }} · checked {{ $checked }}{{ end }}">
+		{{ template "icon-arrow-up" }}
+	</button>
+	{{- else -}}
+	<button hx-post="/upgrade/check" hx-swap="none"
+	        class="inline-flex items-center rounded-full bg-zinc-700/50 p-1.5 text-zinc-400 transition hover:bg-zinc-700 [&_svg]:h-4 [&_svg]:w-4"
+	        title="Up to date{{ if $checked }} · checked {{ $checked }}{{ end }}">
+		{{ template "icon-check" }}
+	</button>
+	{{- end -}}
+{{- else -}}
+	<button hx-post="/upgrade/check" hx-swap="none"
+	        class="inline-flex items-center rounded-full bg-zinc-700/50 p-1.5 text-zinc-400 transition hover:bg-zinc-700 [&_svg]:h-4 [&_svg]:w-4"
+	        title="Check for upgrades">
+		{{ template "icon-rotate-cw" }}
+	</button>
+{{- end -}}
+{{ end }}
+
+{{/* Progress ring; data is *ui.UpgradeRun (may be nil). Spinner until a percent is streamed. */}}
+{{ define "upgrade-ring" }}
+{{- if .HasPercent -}}
+<svg class="upgrade-ring" viewBox="0 0 36 36">
+	<circle class="upgrade-ring-track" cx="18" cy="18" r="15.915"/>
+	<circle class="upgrade-ring-fill" cx="18" cy="18" r="15.915" stroke-dashoffset="{{ .RingOffset }}"/>
+</svg>
+{{- else -}}
+<span class="spinner"></span>
+{{- end -}}
+{{ end }}
