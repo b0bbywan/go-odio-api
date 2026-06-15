@@ -34,6 +34,7 @@ func TestLoadTemplates(t *testing.T) {
 		"section-pulseaudio",
 		"section-systemd",
 		"section-bluetooth",
+		"section-upgrade",
 		"mpris-player",
 		"pulseaudio-sink",
 		"systemd-unit",
@@ -109,6 +110,21 @@ func TestSectionTemplates(t *testing.T) {
 			template: "section-bluetooth",
 			data:     &BluetoothView{Powered: true, PairingActive: true, PairingUntilMs: 1_700_000_000_000},
 		},
+		{
+			name:     "Upgrade badge up to date",
+			template: "section-upgrade",
+			data:     &UpgradeStatus{Current: "1.0", Latest: "1.0", UpgradeAvailable: false},
+		},
+		{
+			name:     "Upgrade badge update available",
+			template: "section-upgrade",
+			data:     &UpgradeStatus{Current: "1.0", Latest: "1.1", UpgradeAvailable: true},
+		},
+		{
+			name:     "Upgrade badge unknown (no detection)",
+			template: "section-upgrade",
+			data:     (*UpgradeStatus)(nil),
+		},
 	}
 
 	for _, tt := range tests {
@@ -126,6 +142,60 @@ func TestSectionTemplates(t *testing.T) {
 			}
 			if buf.Len() == 0 {
 				t.Errorf("%s produced empty output", tt.template)
+			}
+		})
+	}
+}
+
+// TestUpgradeBadgeTemplate asserts the badge label per state and that the
+// last-check time is surfaced in the tooltip; every state is a re-check button.
+func TestUpgradeBadgeTemplate(t *testing.T) {
+	tmpl := LoadTemplates()
+	checked := time.Date(2026, 6, 15, 20, 46, 34, 0, time.UTC)
+
+	// Badge is icon-only; state is asserted via the tooltip and a distinguishing
+	// SVG path fragment of the expected icon.
+	tests := []struct {
+		name        string
+		status      *UpgradeStatus
+		wantInTitle string
+		wantIconSVG string // path fragment unique to the expected icon
+	}{
+		{
+			name:        "up to date surfaces checked-at in tooltip, check icon",
+			status:      &UpgradeStatus{Current: "1.0", Latest: "1.0", UpgradeAvailable: false, CheckedAt: checked},
+			wantInTitle: "Up to date · checked " + (&UpgradeStatus{CheckedAt: checked}).CheckedAtLabel(),
+			wantIconSVG: "M20 6 9 17l-5-5", // icon-check
+		},
+		{
+			name:        "update available surfaces latest version, arrow-up icon",
+			status:      &UpgradeStatus{Current: "1.0", Latest: "1.1", UpgradeAvailable: true, CheckedAt: checked},
+			wantInTitle: "Upgrade available: 1.1",
+			wantIconSVG: "M12 19V5", // icon-arrow-up
+		},
+		{
+			name:        "unknown shows check prompt, refresh icon",
+			status:      nil,
+			wantInTitle: "Check for upgrades",
+			wantIconSVG: "M21 3v5h-5", // icon-rotate-cw
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			if err := tmpl.ExecuteTemplate(&buf, "section-upgrade", tt.status); err != nil {
+				t.Fatalf("execute section-upgrade: %v", err)
+			}
+			out := buf.String()
+			if !strings.Contains(out, tt.wantInTitle) {
+				t.Errorf("expected tooltip %q in output, got: %s", tt.wantInTitle, out)
+			}
+			if !strings.Contains(out, tt.wantIconSVG) {
+				t.Errorf("expected icon path %q in output, got: %s", tt.wantIconSVG, out)
+			}
+			if !strings.Contains(out, `hx-post="/upgrade/check"`) {
+				t.Errorf("expected re-check button, got: %s", out)
 			}
 		})
 	}
