@@ -20,7 +20,7 @@
 
 </head>
 
-<body class="min-h-screen bg-zinc-900 text-zinc-100">
+<body class="min-h-screen bg-zinc-900 text-zinc-100" hx-ext="sse" sse-connect="/ui/events">
 	<!-- Responsive sticky header -->
 	<header class="sticky top-0 z-10 border-b border-zinc-800 bg-zinc-900/95 backdrop-blur">
 		<div class="mx-auto max-w-7xl px-4 py-3 sm:px-6 lg:px-8">
@@ -39,6 +39,11 @@
 						</p>
 						{{ end }}
 					</div>
+					{{ if and .ServerInfo .ServerInfo.Backends.Upgrade }}
+					<div sse-swap="section-upgrade" hx-swap="innerHTML">
+						{{ template "section-upgrade" .Upgrade }}
+					</div>
+					{{ end }}
 				</div>
 
 				<!-- Centre slot: PWA promo + transient toasts, naturally centred between title and right block -->

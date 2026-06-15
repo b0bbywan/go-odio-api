@@ -58,6 +58,24 @@ button.htmx-request {
 	vertical-align: middle;
 }
 
+/* Upgrade progress ring (circumference 100; fill via stroke-dashoffset) */
+.upgrade-ring {
+	transform: rotate(-90deg);
+}
+.upgrade-ring-track {
+	fill: none;
+	stroke: currentColor;
+	stroke-opacity: 0.2;
+	stroke-width: 4;
+}
+.upgrade-ring-fill {
+	fill: none;
+	stroke: currentColor;
+	stroke-width: 4;
+	stroke-dasharray: 100;
+	stroke-linecap: round;
+}
+
 /* Volume & seek sliders */
 .volume-slider,
 .seek-slider {
