@@ -34,6 +34,8 @@ func TestLoadTemplates(t *testing.T) {
 		"section-pulseaudio",
 		"section-systemd",
 		"section-bluetooth",
+		"section-upgrade",
+		"upgrade-ring",
 		"mpris-player",
 		"pulseaudio-sink",
 		"systemd-unit",
@@ -109,6 +111,21 @@ func TestSectionTemplates(t *testing.T) {
 			template: "section-bluetooth",
 			data:     &BluetoothView{Powered: true, PairingActive: true, PairingUntilMs: 1_700_000_000_000},
 		},
+		{
+			name:     "Upgrade badge up to date",
+			template: "section-upgrade",
+			data:     &UpgradeStatus{Current: "1.0", Latest: "1.0", UpgradeAvailable: false},
+		},
+		{
+			name:     "Upgrade badge update available",
+			template: "section-upgrade",
+			data:     &UpgradeStatus{Current: "1.0", Latest: "1.1", UpgradeAvailable: true},
+		},
+		{
+			name:     "Upgrade badge unknown (no detection)",
+			template: "section-upgrade",
+			data:     (*UpgradeStatus)(nil),
+		},
 	}
 
 	for _, tt := range tests {
@@ -128,6 +145,103 @@ func TestSectionTemplates(t *testing.T) {
 				t.Errorf("%s produced empty output", tt.template)
 			}
 		})
+	}
+}
+
+// TestUpgradeBadgeTemplate asserts the badge label per state and that the
+// last-check time is surfaced in the tooltip; every state is a re-check button.
+func TestUpgradeBadgeTemplate(t *testing.T) {
+	tmpl := LoadTemplates()
+	checked := time.Date(2026, 6, 15, 20, 46, 34, 0, time.UTC)
+
+	// Badge is icon-only; state is asserted via the tooltip and a distinguishing
+	// SVG path fragment of the expected icon.
+	tests := []struct {
+		name        string
+		status      *UpgradeStatus
+		wantInTitle string
+		wantIconSVG string // path fragment unique to the expected icon
+		wantPost    string // hx-post target for the click
+		wantConfirm bool   // destructive action must be confirmed
+	}{
+		{
+			name:        "up to date surfaces checked-at in tooltip, check icon, re-checks",
+			status:      &UpgradeStatus{Current: "1.0", Latest: "1.0", UpgradeAvailable: false, CheckedAt: checked},
+			wantInTitle: "Up to date · checked " + (&UpgradeStatus{CheckedAt: checked}).CheckedAtLabel(),
+			wantIconSVG: "M20 6 9 17l-5-5", // icon-check
+			wantPost:    "/upgrade/check",
+		},
+		{
+			name:        "update available surfaces latest version, arrow-up icon, installs with confirm",
+			status:      &UpgradeStatus{Current: "1.0", Latest: "1.1", UpgradeAvailable: true, CheckedAt: checked},
+			wantInTitle: "Upgrade available: 1.1",
+			wantIconSVG: "M12 19V5", // icon-arrow-up
+			wantPost:    "/upgrade/start",
+			wantConfirm: true,
+		},
+		{
+			name:        "unknown shows check prompt, refresh icon, re-checks",
+			status:      nil,
+			wantInTitle: "Check for upgrades",
+			wantIconSVG: "M21 3v5h-5", // icon-rotate-cw
+			wantPost:    "/upgrade/check",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			if err := tmpl.ExecuteTemplate(&buf, "section-upgrade", tt.status); err != nil {
+				t.Fatalf("execute section-upgrade: %v", err)
+			}
+			out := buf.String()
+			if !strings.Contains(out, tt.wantInTitle) {
+				t.Errorf("expected tooltip %q in output, got: %s", tt.wantInTitle, out)
+			}
+			if !strings.Contains(out, tt.wantIconSVG) {
+				t.Errorf("expected icon path %q in output, got: %s", tt.wantIconSVG, out)
+			}
+			if !strings.Contains(out, `hx-post="`+tt.wantPost+`"`) {
+				t.Errorf("expected hx-post %q in output, got: %s", tt.wantPost, out)
+			}
+			if gotConfirm := strings.Contains(out, "hx-confirm="); gotConfirm != tt.wantConfirm {
+				t.Errorf("hx-confirm present = %v, want %v; output: %s", gotConfirm, tt.wantConfirm, out)
+			}
+		})
+	}
+}
+
+func TestUpgradeBadgeRunning(t *testing.T) {
+	tmpl := LoadTemplates()
+	pct := 42
+
+	render := func(status *UpgradeStatus) string {
+		t.Helper()
+		var buf bytes.Buffer
+		if err := tmpl.ExecuteTemplate(&buf, "section-upgrade", status); err != nil {
+			t.Fatalf("execute section-upgrade: %v", err)
+		}
+		return buf.String()
+	}
+
+	// Running badge is the ring's sse-swap target, no click action.
+	out := render(&UpgradeStatus{Latest: "1.1", Run: &UpgradeRun{State: "running", Percent: &pct}})
+	if !strings.Contains(out, `sse-swap="upgrade-progress"`) {
+		t.Errorf("running badge should be the ring sse-swap target, got: %s", out)
+	}
+	if strings.Contains(out, "hx-post=") {
+		t.Errorf("running badge should not be clickable, got: %s", out)
+	}
+
+	// Ring fill: stroke-dashoffset = 100 - percent.
+	if !strings.Contains(out, `stroke-dashoffset="58"`) {
+		t.Errorf("ring should reflect 42%% (offset 58), got: %s", out)
+	}
+
+	// No percent yet → spinner, no ring.
+	noPct := render(&UpgradeStatus{Latest: "1.1", Run: &UpgradeRun{State: "running"}})
+	if !strings.Contains(noPct, "spinner") || strings.Contains(noPct, "upgrade-ring-fill") {
+		t.Errorf("running without percent should be a spinner, got: %s", noPct)
 	}
 }
 
