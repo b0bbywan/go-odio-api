@@ -30,7 +30,32 @@ type Backends struct {
 	Power      bool `json:"power"`
 	PulseAudio bool `json:"pulseaudio"`
 	Systemd    bool `json:"systemd"`
+	Upgrade    bool `json:"upgrade"`
 	Zeroconf   bool `json:"zeroconf"`
+}
+
+// UpgradeStatus is the detector status from GET /upgrade. Extra version fields
+// (roles, manifest) are passed through by the backend but unused here. Latest is
+// empty when no detection has run yet (no result file).
+type UpgradeStatus struct {
+	Current          string    `json:"current"`
+	Latest           string    `json:"latest"`
+	UpgradeAvailable bool      `json:"upgrade_available"`
+	CheckedAt        time.Time `json:"checked_at"`
+}
+
+// Known reports whether a detection result is available to display.
+func (u *UpgradeStatus) Known() bool {
+	return u != nil && u.Latest != ""
+}
+
+// CheckedAtLabel is the last-check time for the badge tooltip, in local time,
+// or empty when no detection has run.
+func (u *UpgradeStatus) CheckedAtLabel() string {
+	if u == nil || u.CheckedAt.IsZero() {
+		return ""
+	}
+	return u.CheckedAt.Local().Format("02 Jan 2006, 15:04")
 }
 
 // PlayerCapabilities represents what transport actions a player supports
@@ -144,6 +169,7 @@ type DashboardView struct {
 	AudioData  *AudioData
 	Services   []ServiceView
 	Bluetooth  *BluetoothView
+	Upgrade    *UpgradeStatus
 }
 
 // PlayerView is a view-optimized version of Player for templates

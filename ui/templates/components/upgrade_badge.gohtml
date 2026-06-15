@@ -1,0 +1,29 @@
+{{/*
+	Upgrade status badge for the header. Data is *ui.UpgradeStatus (may be nil).
+	Clicking re-runs detection (POST /upgrade/check); the result lands later via
+	the section-upgrade SSE refresh. Last-check time is shown in the tooltip.
+*/}}
+{{ define "section-upgrade" }}
+{{- $checked := .CheckedAtLabel -}}
+{{- if .Known -}}
+	{{- if .UpgradeAvailable -}}
+	<button hx-post="/upgrade/check" hx-swap="none"
+	        class="inline-flex items-center gap-1 rounded-full bg-leaf/10 px-2 py-1 text-xs text-leaf transition hover:bg-leaf/20 [&_svg]:h-3.5 [&_svg]:w-3.5"
+	        title="Mise à jour disponible : {{ .Latest }}{{ if $checked }} · vérifié le {{ $checked }}{{ end }} · cliquer pour revérifier">
+		{{ template "icon-arrow-up" }}<span>maj dispo</span>
+	</button>
+	{{- else -}}
+	<button hx-post="/upgrade/check" hx-swap="none"
+	        class="inline-flex items-center gap-1 rounded-full bg-zinc-700/50 px-2 py-1 text-xs text-zinc-400 transition hover:bg-zinc-700 [&_svg]:h-3.5 [&_svg]:w-3.5"
+	        title="À jour{{ if $checked }} · vérifié le {{ $checked }}{{ end }} · cliquer pour revérifier">
+		{{ template "icon-check" }}<span>à jour</span>
+	</button>
+	{{- end -}}
+{{- else -}}
+	<button hx-post="/upgrade/check" hx-swap="none"
+	        class="inline-flex items-center gap-1 rounded-full bg-zinc-700/50 px-2 py-1 text-xs text-zinc-400 transition hover:bg-zinc-700 [&_svg]:h-3.5 [&_svg]:w-3.5"
+	        title="Vérifier les mises à jour">
+		{{ template "icon-rotate-cw" }}<span>vérifier</span>
+	</button>
+{{- end -}}
+{{ end }}
