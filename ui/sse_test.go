@@ -192,6 +192,13 @@ func TestSSEEvents_EventMapping(t *testing.T) {
 			apiResponse:  "[]",
 			wantSSEEvent: "event: section-mpris",
 		},
+		{
+			name:         "upgrade.info maps to section-upgrade",
+			eventType:    events.TypeUpgradeInfo,
+			apiEndpoint:  "/upgrade",
+			apiResponse:  `{"current":"1.0","latest":"1.1","upgrade_available":true,"checked_at":"2026-06-15T20:46:34Z"}`,
+			wantSSEEvent: "event: section-upgrade",
+		},
 	}
 
 	for _, tt := range tests {

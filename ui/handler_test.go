@@ -34,6 +34,7 @@ func TestLoadTemplates(t *testing.T) {
 		"section-pulseaudio",
 		"section-systemd",
 		"section-bluetooth",
+		"section-upgrade",
 		"mpris-player",
 		"pulseaudio-sink",
 		"systemd-unit",
@@ -109,6 +110,21 @@ func TestSectionTemplates(t *testing.T) {
 			template: "section-bluetooth",
 			data:     &BluetoothView{Powered: true, PairingActive: true, PairingUntilMs: 1_700_000_000_000},
 		},
+		{
+			name:     "Upgrade badge up to date",
+			template: "section-upgrade",
+			data:     &UpgradeStatus{Current: "1.0", Latest: "1.0", UpgradeAvailable: false},
+		},
+		{
+			name:     "Upgrade badge update available",
+			template: "section-upgrade",
+			data:     &UpgradeStatus{Current: "1.0", Latest: "1.1", UpgradeAvailable: true},
+		},
+		{
+			name:     "Upgrade badge unknown (no detection)",
+			template: "section-upgrade",
+			data:     (*UpgradeStatus)(nil),
+		},
 	}
 
 	for _, tt := range tests {
@@ -126,6 +142,61 @@ func TestSectionTemplates(t *testing.T) {
 			}
 			if buf.Len() == 0 {
 				t.Errorf("%s produced empty output", tt.template)
+			}
+		})
+	}
+}
+
+// TestUpgradeBadgeTemplate asserts the badge label per state and that the
+// last-check time is surfaced in the tooltip; every state is a re-check button.
+func TestUpgradeBadgeTemplate(t *testing.T) {
+	tmpl := LoadTemplates()
+	checked := time.Date(2026, 6, 15, 20, 46, 34, 0, time.UTC)
+
+	tests := []struct {
+		name        string
+		status      *UpgradeStatus
+		wantLabel   string
+		wantInTitle string
+	}{
+		{
+			name:        "up to date surfaces checked-at in tooltip",
+			status:      &UpgradeStatus{Current: "1.0", Latest: "1.0", UpgradeAvailable: false, CheckedAt: checked},
+			wantLabel:   "à jour",
+			wantInTitle: (&UpgradeStatus{CheckedAt: checked}).CheckedAtLabel(),
+		},
+		{
+			name:        "update available surfaces latest version",
+			status:      &UpgradeStatus{Current: "1.0", Latest: "1.1", UpgradeAvailable: true, CheckedAt: checked},
+			wantLabel:   "maj dispo",
+			wantInTitle: "1.1",
+		},
+		{
+			name:        "unknown shows verify prompt",
+			status:      nil,
+			wantLabel:   "vérifier",
+			wantInTitle: "Vérifier",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			if err := tmpl.ExecuteTemplate(&buf, "section-upgrade", tt.status); err != nil {
+				t.Fatalf("execute section-upgrade: %v", err)
+			}
+			out := buf.String()
+			if tt.wantInTitle == "" {
+				t.Fatal("test setup: wantInTitle is empty")
+			}
+			if !strings.Contains(out, tt.wantLabel) {
+				t.Errorf("expected label %q in output, got: %s", tt.wantLabel, out)
+			}
+			if !strings.Contains(out, tt.wantInTitle) {
+				t.Errorf("expected %q in output, got: %s", tt.wantInTitle, out)
+			}
+			if !strings.Contains(out, `hx-post="/upgrade/check"`) {
+				t.Errorf("expected re-check button, got: %s", out)
 			}
 		})
 	}
