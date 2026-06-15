@@ -134,6 +134,16 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if serverInfo.Backends.Upgrade {
+		logger.Debug("[ui] → API GET /upgrade")
+		if upgradeStatus, err := h.client.GetUpgrade(); err == nil {
+			data.Upgrade = upgradeStatus
+			logger.Debug("[ui] ← API /upgrade: available=%v", upgradeStatus.UpgradeAvailable)
+		} else {
+			logger.Warn("[ui] Failed to fetch upgrade status: %v", err)
+		}
+	}
+
 	// Render template
 	if err := h.tmpl.ExecuteTemplate(w, "dashboard", data); err != nil {
 		logger.Error("[ui] Template execution failed: %v", err)
@@ -217,6 +227,25 @@ func (h *Handler) BluetoothSection(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// UpgradeSection renders just the upgrade badge (for HTMX updates)
+func (h *Handler) UpgradeSection(w http.ResponseWriter, r *http.Request) {
+	logger.Debug("[ui] %s %s (HTMX section refresh)", r.Method, r.URL.Path)
+
+	logger.Debug("[ui] → API GET /upgrade")
+	status, err := h.client.GetUpgrade()
+	if err != nil {
+		logger.Error("[ui] Failed to fetch upgrade status: %v", err)
+		http.Error(w, "Failed to load upgrade status", http.StatusInternalServerError)
+		return
+	}
+	logger.Debug("[ui] ← API /upgrade: available=%v", status.UpgradeAvailable)
+
+	if err := h.tmpl.ExecuteTemplate(w, "section-upgrade", status); err != nil {
+		logger.Error("[ui] Template execution failed: %v", err)
+		http.Error(w, "Failed to render section", http.StatusInternalServerError)
+	}
+}
+
 // sseSection maps an event type to the SSE event name and the section data fetcher.
 type sseSection struct {
 	name    string
@@ -243,11 +272,27 @@ func fetchBluetooth(h *Handler) (string, any, error) {
 	return "section-bluetooth", status, err
 }
 
+func fetchUpgrade(h *Handler) (string, any, error) {
+	status, err := h.client.GetUpgrade()
+	return "section-upgrade", status, err
+}
+
+func fetchUpgradeRing(h *Handler) (string, any, error) {
+	status, err := h.client.GetUpgrade()
+	var run *UpgradeRun
+	if status != nil {
+		run = status.Run
+	}
+	return "upgrade-ring", run, err
+}
+
 var (
-	mprisSection     = &sseSection{name: "section-mpris", fetchFn: fetchMPRIS}
-	audioSection     = &sseSection{name: "section-audio", fetchFn: fetchAudio}
-	systemdSection   = &sseSection{name: "section-systemd", fetchFn: fetchSystemd}
-	bluetoothSection = &sseSection{name: "section-bluetooth", fetchFn: fetchBluetooth}
+	mprisSection       = &sseSection{name: "section-mpris", fetchFn: fetchMPRIS}
+	audioSection       = &sseSection{name: "section-audio", fetchFn: fetchAudio}
+	systemdSection     = &sseSection{name: "section-systemd", fetchFn: fetchSystemd}
+	bluetoothSection   = &sseSection{name: "section-bluetooth", fetchFn: fetchBluetooth}
+	upgradeSection     = &sseSection{name: "section-upgrade", fetchFn: fetchUpgrade}
+	upgradeRingSection = &sseSection{name: "upgrade-progress", fetchFn: fetchUpgradeRing}
 
 	eventToSection = map[string]*sseSection{
 		events.TypePlayerUpdated: mprisSection,
@@ -266,6 +311,8 @@ var (
 
 		events.TypeServiceUpdated:   systemdSection,
 		events.TypeBluetoothUpdated: bluetoothSection,
+		events.TypeUpgradeInfo:      upgradeSection,
+		events.TypeUpgradeProgress:  upgradeRingSection,
 	}
 )
 
