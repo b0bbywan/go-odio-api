@@ -33,6 +33,7 @@ type Backends struct {
 	Power      bool `json:"power"`
 	PulseAudio bool `json:"pulseaudio"`
 	Systemd    bool `json:"systemd"`
+	Upgrade    bool `json:"upgrade"`
 	Zeroconf   bool `json:"zeroconf"`
 }
 
@@ -103,6 +104,7 @@ func (b *Backend) GetServerDeviceInfo() (ServerDeviceInfo, error) {
 			Power:      b.Login1 != nil,
 			PulseAudio: b.Pulse != nil,
 			Systemd:    b.Systemd != nil,
+			Upgrade:    b.Upgrade != nil,
 			Zeroconf:   b.Zeroconf != nil,
 		},
 	}, nil
