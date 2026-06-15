@@ -226,6 +226,17 @@ func (c *APIClient) GetServices() ([]ServiceView, error) {
 	return convertServices(raw), nil
 }
 
+// GetUpgrade returns the detector status from /upgrade. The endpoint yields
+// JSON null when no detection has run; that decodes to a zero status (Known()
+// is then false), which the badge renders as a neutral "check" prompt.
+func (c *APIClient) GetUpgrade() (*UpgradeStatus, error) {
+	var v UpgradeStatus
+	if err := c.get("/upgrade", &v); err != nil {
+		return nil, err
+	}
+	return &v, nil
+}
+
 func convertServices(raw []Service) []ServiceView {
 	views := make([]ServiceView, 0, len(raw))
 	for _, s := range raw {

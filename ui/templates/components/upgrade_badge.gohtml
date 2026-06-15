@@ -1,0 +1,31 @@
+{{/*
+	Upgrade status badge for the header. Data is *ui.UpgradeStatus (may be nil).
+	Icon + colour carry the state (no text label, to stay language-agnostic like
+	the rest of the UI); the tooltip holds the detail. Clicking re-runs detection
+	(POST /upgrade/check); the result lands later via the section-upgrade SSE
+	refresh.
+*/}}
+{{ define "section-upgrade" }}
+{{- $checked := .CheckedAtLabel -}}
+{{- if .Known -}}
+	{{- if .UpgradeAvailable -}}
+	<button hx-post="/upgrade/check" hx-swap="none"
+	        class="inline-flex items-center rounded-full bg-leaf/10 p-1.5 text-leaf transition hover:bg-leaf/20 [&_svg]:h-4 [&_svg]:w-4"
+	        title="Upgrade available: {{ .Latest }}{{ if $checked }} · checked {{ $checked }}{{ end }}">
+		{{ template "icon-arrow-up" }}
+	</button>
+	{{- else -}}
+	<button hx-post="/upgrade/check" hx-swap="none"
+	        class="inline-flex items-center rounded-full bg-zinc-700/50 p-1.5 text-zinc-400 transition hover:bg-zinc-700 [&_svg]:h-4 [&_svg]:w-4"
+	        title="Up to date{{ if $checked }} · checked {{ $checked }}{{ end }}">
+		{{ template "icon-check" }}
+	</button>
+	{{- end -}}
+{{- else -}}
+	<button hx-post="/upgrade/check" hx-swap="none"
+	        class="inline-flex items-center rounded-full bg-zinc-700/50 p-1.5 text-zinc-400 transition hover:bg-zinc-700 [&_svg]:h-4 [&_svg]:w-4"
+	        title="Check for upgrades">
+		{{ template "icon-rotate-cw" }}
+	</button>
+{{- end -}}
+{{ end }}
