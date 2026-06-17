@@ -41,6 +41,15 @@ power:
     poweroff: false
     reboot: false
 
+# Agnostic upgrade backend: reads a result file written by an external detector
+# and triggers external systemd user units. Disabled by default.
+upgrade:
+  enabled: false
+  # resultFile: /var/cache/odio/upgrades.json  # required; alone it enables read-only GET /upgrade
+  # checkUnit: odio-check-upgrade.service       # optional user unit → enables POST /upgrade/check
+  # upgradeUnit: odio-upgrade.service           # optional user unit → enables POST /upgrade/start
+  # progressSocket: ""                          # unix socket the upgrade script streams JSON progress to; default $XDG_RUNTIME_DIR/odio-api/upgrade.sock
+
 pulseaudio:
   enabled: true
 
