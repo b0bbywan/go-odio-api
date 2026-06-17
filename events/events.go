@@ -14,11 +14,24 @@ const (
 	TypeBluetoothUpdated    = "bluetooth.updated"
 	TypeBluetoothDiscovered = "bluetooth.discovered"
 	TypePowerAction         = "power.action"
+	TypeUpgradeInfo         = "upgrade.info"
+	TypeUpgradeProgress     = "upgrade.progress"
 )
 
 type Event struct {
 	Type string
 	Data any
+	// Internal events ride the bus for inter-backend reactions but are not
+	// forwarded to external clients; the SSE stream drops them.
+	Internal bool
+}
+
+// Stream is the read side of the event bus, satisfied by backend.Broadcaster.
+// Declaring it here lets sub-backends consume the bus without importing their
+// parent package.
+type Stream interface {
+	SubscribeFunc(filter func(Event) bool) chan Event
+	Unsubscribe(ch chan Event)
 }
 
 // BackendTypes maps backend names to their event type constants.
@@ -28,6 +41,7 @@ var BackendTypes = map[string][]string{
 	"systemd":   {TypeServiceUpdated},
 	"bluetooth": {TypeBluetoothUpdated, TypeBluetoothDiscovered},
 	"power":     {TypePowerAction},
+	"upgrade":   {TypeUpgradeInfo, TypeUpgradeProgress},
 }
 
 // NewFilter combines include and exclude type lists into a single filter func.
