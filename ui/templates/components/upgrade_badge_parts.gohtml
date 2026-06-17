@@ -1,0 +1,48 @@
+{{/* Controls for section-upgrade. Each takes (dict "Status" *ui.UpgradeStatus
+     "Base" pill-classes): a button when its trigger is available, otherwise a
+     static indicator with the same look. */}}
+
+{{ define "upgrade-start" }}
+{{- $s := .Status -}}
+{{- $checked := $s.CheckedAtLabel -}}
+{{- $title := printf "Upgrade available: %s" $s.Latest -}}
+{{- if $checked }}{{ $title = printf "%s · checked %s" $title $checked }}{{ end -}}
+{{- if $s.Upgradeable -}}
+<button hx-post="/upgrade/start" hx-swap="none" hx-confirm="Upgrade to {{ $s.Latest }}?"
+        class="{{ .Base }} bg-green-500/10 text-green-400 transition hover:bg-green-500/20"
+        title="{{ $title }}">{{ template "icon-arrow-up" }}</button>
+{{- else -}}
+<span class="{{ .Base }} bg-green-500/10 text-green-400" title="{{ $title }}">{{ template "icon-arrow-up" }}</span>
+{{- end -}}
+{{ end }}
+
+{{/* Up to date or unknown: both re-check, the icon differs. */}}
+{{ define "upgrade-check" }}
+{{- $s := .Status -}}
+{{- $title := "Check for upgrades" -}}
+{{- if $s.Known -}}
+	{{- $title = "Up to date" -}}
+	{{- if $s.CheckedAtLabel }}{{ $title = printf "Up to date · checked %s" $s.CheckedAtLabel }}{{ end -}}
+{{- end -}}
+{{- if $s.Checkable -}}
+<button hx-post="/upgrade/check" hx-swap="none"
+        class="{{ .Base }} bg-zinc-700/50 text-zinc-400 transition hover:bg-zinc-700"
+        title="{{ $title }}">{{ template "upgrade-check-icon" $s }}</button>
+{{- else -}}
+<span class="{{ .Base }} bg-zinc-700/50 text-zinc-400" title="{{ $title }}">{{ template "upgrade-check-icon" $s }}</span>
+{{- end -}}
+{{ end }}
+
+{{ define "upgrade-check-icon" }}{{ if .Known }}{{ template "icon-check" }}{{ else }}{{ template "icon-rotate-cw" }}{{ end }}{{ end }}
+
+{{/* Progress ring; data is *ui.UpgradeRun (may be nil). Spinner until a percent is streamed. */}}
+{{ define "upgrade-ring" }}
+{{- if .HasPercent -}}
+<svg class="upgrade-ring" viewBox="0 0 36 36">
+	<circle class="upgrade-ring-track" cx="18" cy="18" r="15.915"/>
+	<circle class="upgrade-ring-fill" cx="18" cy="18" r="15.915" stroke-dashoffset="{{ .RingOffset }}"/>
+</svg>
+{{- else -}}
+<span class="spinner"></span>
+{{- end -}}
+{{ end }}

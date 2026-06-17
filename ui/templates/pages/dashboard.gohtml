@@ -2,7 +2,7 @@
 {{- $g1 := or .ServerInfo.Backends.Bluetooth .ServerInfo.Backends.PulseAudio -}}
 {{- $g2 := .ServerInfo.Backends.MPRIS -}}
 {{- $g3 := .ServerInfo.Backends.Systemd -}}
-<div hx-ext="sse" sse-connect="/ui/events" class="grid gap-4{{ if or (and $g1 $g2) (and $g1 $g3) (and $g2 $g3) }} sm:grid-cols-2{{ end }}{{ if and $g1 $g2 $g3 }} lg:grid-cols-3{{ end }}">
+<div class="grid gap-4{{ if or (and $g1 $g2) (and $g1 $g3) (and $g2 $g3) }} sm:grid-cols-2{{ end }}{{ if and $g1 $g2 $g3 }} lg:grid-cols-3{{ end }}">
 	{{ if or .ServerInfo.Backends.Bluetooth .ServerInfo.Backends.PulseAudio }}
 	<div class="min-w-0 flex flex-col gap-4">
 		{{ if .ServerInfo.Backends.Bluetooth }}

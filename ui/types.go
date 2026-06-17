@@ -30,7 +30,66 @@ type Backends struct {
 	Power      bool `json:"power"`
 	PulseAudio bool `json:"pulseaudio"`
 	Systemd    bool `json:"systemd"`
+	Upgrade    bool `json:"upgrade"`
 	Zeroconf   bool `json:"zeroconf"`
+}
+
+// UpgradeStatus is the GET /upgrade payload: the detector's contract fields plus
+// the live run state. Free detector fields ride under "extra" server-side and
+// are unused here. Latest is empty when no detection has run yet.
+type UpgradeStatus struct {
+	Current          string      `json:"current"`
+	Latest           string      `json:"latest"`
+	UpgradeAvailable bool        `json:"upgrade_available"`
+	CheckedAt        time.Time   `json:"checked_at"`
+	Run              *UpgradeRun `json:"run"`
+	CanCheck         bool        `json:"can_check"`
+	CanUpgrade       bool        `json:"can_upgrade"`
+}
+
+// UpgradeRun is the live progress of an in-flight upgrade; nil unless one runs.
+// Percent is nil until the script streams it (e.g. after an odio-api restart
+// mid-run), which the badge shows as an indeterminate ring.
+type UpgradeRun struct {
+	State   string `json:"state"`
+	Percent *int   `json:"percent"`
+	Step    string `json:"step"`
+}
+
+func (r *UpgradeRun) HasPercent() bool { return r != nil && r.Percent != nil }
+
+func (r *UpgradeRun) PercentValue() int {
+	if !r.HasPercent() {
+		return 0
+	}
+	return *r.Percent
+}
+
+// RingOffset is the stroke-dashoffset for a circumference-100 ring.
+func (r *UpgradeRun) RingOffset() int { return 100 - r.PercentValue() }
+
+// Known reports whether a detection result is available to display.
+func (u *UpgradeStatus) Known() bool {
+	return u != nil && u.Latest != ""
+}
+
+// Running reports whether an upgrade is in flight.
+func (u *UpgradeStatus) Running() bool {
+	return u != nil && u.Run != nil && u.Run.State == "running"
+}
+
+// Checkable / Upgradeable report whether the matching trigger is available, so
+// the badge offers an action only when the backend can honour it.
+func (u *UpgradeStatus) Checkable() bool   { return u != nil && u.CanCheck }
+func (u *UpgradeStatus) Upgradeable() bool { return u != nil && u.CanUpgrade }
+
+// CheckedAtLabel is the last-check time for the badge tooltip, in local time,
+// or empty when no detection has run.
+func (u *UpgradeStatus) CheckedAtLabel() string {
+	if u == nil || u.CheckedAt.IsZero() {
+		return ""
+	}
+	return u.CheckedAt.Local().Format("02 Jan 2006, 15:04")
 }
 
 // PlayerCapabilities represents what transport actions a player supports
@@ -144,6 +203,7 @@ type DashboardView struct {
 	AudioData  *AudioData
 	Services   []ServiceView
 	Bluetooth  *BluetoothView
+	Upgrade    *UpgradeStatus
 }
 
 // PlayerView is a view-optimized version of Player for templates
