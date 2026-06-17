@@ -1,0 +1,20 @@
+{{/*
+	Upgrade status badge for the header. Data is *ui.UpgradeStatus (may be nil).
+	State is icon + colour, no text label. Dispatches to a per-state control; the
+	shared pill classes ride along as "Base". While running, the ring is its own
+	sse-swap target.
+*/}}
+{{ define "section-upgrade" }}
+{{- $base := "inline-flex items-center rounded-full p-1.5 [&_svg]:h-4 [&_svg]:w-4" -}}
+{{- if .Running -}}
+	<span class="{{ $base }} bg-green-500/10 text-green-400"
+	      title="Upgrading…{{ with .Run.Step }} {{ . }}{{ end }}"
+	      sse-swap="upgrade-progress" hx-swap="innerHTML">
+		{{ template "upgrade-ring" .Run }}
+	</span>
+{{- else if and .Known .UpgradeAvailable -}}
+	{{ template "upgrade-start" (dict "Status" . "Base" $base) }}
+{{- else -}}
+	{{ template "upgrade-check" (dict "Status" . "Base" $base) }}
+{{- end -}}
+{{ end }}
