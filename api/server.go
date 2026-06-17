@@ -133,6 +133,11 @@ func (s *Server) register(b *backend.Backend) {
 		s.registerSystemdRoutes(b.Systemd)
 	}
 
+	// upgrade routes
+	if b.Upgrade != nil {
+		s.registerUpgradeRoutes(b.Upgrade)
+	}
+
 	// mpris routes
 	if b.MPRIS != nil {
 		s.registerMPRISRoutes(b.MPRIS)
