@@ -99,6 +99,13 @@ func startUnit(ctx context.Context, conn *sysdbus.Conn, name string) error {
 	})
 }
 
+// triggerUnit enqueues a start job without awaiting it (nil channel); callers
+// observe completion through service.updated events.
+func triggerUnit(ctx context.Context, conn *sysdbus.Conn, name string) error {
+	_, err := conn.StartUnitContext(ctx, name, "replace", nil)
+	return err
+}
+
 func stopUnit(ctx context.Context, conn *sysdbus.Conn, name string) error {
 	return doUnitJob(ctx, func(ch chan<- string) (int, error) {
 		return conn.StopUnitContext(ctx, name, "replace", ch)
