@@ -31,6 +31,7 @@ type Config struct {
 	MPRIS      *MPRISConfig
 	Pulseaudio *PulseAudioConfig
 	Systemd    *SystemdConfig
+	Upgrade    *UpgradeConfig
 	Zeroconf   *ZeroConfig
 	LogLevel   logger.Level
 }
@@ -81,6 +82,10 @@ type PulseAudioConfig struct {
 type SystemdService struct {
 	Name string
 	URL  string
+	// Internal units are triggerable but hidden from the /services listing and
+	// service.updated events. Set programmatically (e.g. by the upgrade
+	// backend), never from user config.
+	Internal bool
 }
 
 type SystemdConfig struct {
@@ -90,6 +95,16 @@ type SystemdConfig struct {
 	SupportsUTMP   bool
 	XDGRuntimeDir  string
 	Timeout        time.Duration
+}
+
+// UpgradeConfig drives the agnostic upgrade backend: it reads a result file
+// written by an external detector and triggers external systemd user units.
+type UpgradeConfig struct {
+	Enabled        bool
+	ResultFile     string // upgrades.json to read and watch
+	CheckUnit      string // user unit to (re)run detection; empty disables /upgrade/check
+	UpgradeUnit    string // user unit to run the upgrade; empty disables /upgrade/start
+	ProgressSocket string // unix socket the upgrade script streams run progress to
 }
 
 type BluetoothConfig struct {
@@ -329,6 +344,20 @@ func New(cfgFile *string) (*Config, error) {
 		Timeout:        getDuration("systemd.timeout", 90*time.Second),
 	}
 
+	// Progress streams over a socket, not a file, to avoid SD-card writes; default
+	// it into the tmpfs runtime dir.
+	progressSocket := viper.GetString("upgrade.progressSocket")
+	if progressSocket == "" {
+		progressSocket = filepath.Join(xdgRuntimeDir, "odio-api", "upgrade.sock")
+	}
+	upgradecfg := UpgradeConfig{
+		Enabled:        viper.GetBool("upgrade.enabled"),
+		ResultFile:     viper.GetString("upgrade.resultFile"),
+		CheckUnit:      viper.GetString("upgrade.checkUnit"),
+		UpgradeUnit:    viper.GetString("upgrade.upgradeUnit"),
+		ProgressSocket: progressSocket,
+	}
+
 	interfaces := getZeroconfInterfaces(binds)
 	zerocfg := ZeroConfig{
 		Enabled:      viper.GetBool("zeroconf.enabled"),
@@ -347,6 +376,7 @@ func New(cfgFile *string) (*Config, error) {
 		MPRIS:      &mpriscfg,
 		Pulseaudio: &pulsecfg,
 		Systemd:    &syscfg,
+		Upgrade:    &upgradecfg,
 		Zeroconf:   &zerocfg,
 		LogLevel:   parseLogLevel(viper.GetString("LogLevel")),
 	}
