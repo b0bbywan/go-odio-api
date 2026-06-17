@@ -77,6 +77,38 @@ func TestSSEHandler_ConnectedEvent(t *testing.T) {
 	}
 }
 
+// TestSSEHandler_DropsInternalEvents verifies Internal events are not forwarded to clients.
+func TestSSEHandler_DropsInternalEvents(t *testing.T) {
+	upstream := make(chan events.Event)
+	b := backend.NewBroadcaster(context.Background(), upstream)
+
+	req := httptest.NewRequest(http.MethodGet, "/events", nil)
+	ctx, cancel := context.WithCancel(context.Background())
+	req = req.WithContext(ctx)
+
+	w := httptest.NewRecorder()
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		sseHandler(b)(w, req)
+	}()
+
+	time.Sleep(20 * time.Millisecond) // let the handler subscribe
+	upstream <- events.Event{Type: events.TypeServiceUpdated, Data: "public-svc"}
+	upstream <- events.Event{Type: events.TypeServiceUpdated, Data: "internal-svc", Internal: true}
+	time.Sleep(20 * time.Millisecond)
+	cancel()
+	<-done
+
+	body := w.Body.String()
+	if !strings.Contains(body, `"public-svc"`) {
+		t.Errorf("expected non-internal event in body, got: %q", body)
+	}
+	if strings.Contains(body, `"internal-svc"`) {
+		t.Errorf("internal event should not be forwarded to clients, got: %q", body)
+	}
+}
+
 // TestParseFilter_NoParams returns nil (pass-all) when no query params are given.
 func TestParseFilter_NoParams(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/events", nil)
