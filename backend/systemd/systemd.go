@@ -387,6 +387,13 @@ func (s *SystemdBackend) StartService(name string, scope UnitScope) error {
 	return s.Execute(s.ctx, name, scope, startUnit)
 }
 
+// TriggerUserUnit starts a user unit without waiting for completion; callers
+// observe the run through service.updated events instead (see the upgrade
+// backend). User scope only.
+func (s *SystemdBackend) TriggerUserUnit(ctx context.Context, name string) error {
+	return s.Execute(ctx, name, ScopeUser, triggerUnit)
+}
+
 func (s *SystemdBackend) StopService(name string, scope UnitScope) error {
 	logger.Debug("[systemd] stopping service %s/%s", scope, name)
 	return s.Execute(s.ctx, name, scope, stopUnit)
