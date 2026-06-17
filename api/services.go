@@ -50,6 +50,11 @@ func withService(
 			return
 		}
 
+		if sd.IsInternal(unit, scope) {
+			http.Error(w, "unknown unit", http.StatusNotFound)
+			return
+		}
+
 		handleSystemdError(w, fn(unit, scope))
 	}
 }

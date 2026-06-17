@@ -67,6 +67,9 @@ func sseHandler(b *backend.Broadcaster) http.HandlerFunc {
 				if !ok {
 					return
 				}
+				if e.Internal {
+					continue // bus-only event, not for external clients
+				}
 				if err := sendToFlusher(flusher, w, e); err != nil {
 					return
 				}
