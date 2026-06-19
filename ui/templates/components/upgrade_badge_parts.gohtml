@@ -16,6 +16,18 @@
 {{- end -}}
 {{ end }}
 
+{{/* Last run failed: red alert, a retry button when upgradeable, else a static indicator. */}}
+{{ define "upgrade-failed" }}
+{{- $s := .Status -}}
+{{- if $s.Upgradeable -}}
+<button hx-post="/upgrade/start" hx-swap="none" hx-confirm="Retry upgrade to {{ $s.Latest }}?"
+        class="{{ .Base }} bg-red-500/10 text-red-400 transition hover:bg-red-500/20"
+        title="{{ $s.FailureLabel }}">{{ template "icon-alert-triangle" }}</button>
+{{- else -}}
+<span class="{{ .Base }} bg-red-500/10 text-red-400" title="{{ $s.FailureLabel }}">{{ template "icon-alert-triangle" }}</span>
+{{- end -}}
+{{ end }}
+
 {{/* Up to date or unknown: both re-check, the icon differs. */}}
 {{ define "upgrade-check" }}
 {{- $s := .Status -}}
