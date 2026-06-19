@@ -28,18 +28,25 @@ func TestRunTrackerProgressClaimsOnIdleEdge(t *testing.T) {
 }
 
 // A non-owning source refreshes the live state but never re-claims, and cannot finish.
+// The error it reported via noteEnd still folds into the owner's verdict, with the last step.
 func TestRunTrackerOwnershipIsExclusive(t *testing.T) {
 	var r runTracker
 	r.start(sourceUnit) // unit owns the run
+	step := "mpd"
 	pct := 42
-	if r.progress(sourceStream, &pct, nil) {
+	if r.progress(sourceStream, &pct, &step) {
 		t.Fatal("stream progress on a unit run started = true, want false (no re-claim)")
 	}
-	if r.finish(sourceStream) {
-		t.Fatal("stream finish on a unit run = true, want false (not the owner)")
+	r.noteEnd(ptr("disk full"))
+	if r.finish(sourceStream, true) != nil {
+		t.Fatal("stream finish on a unit run != nil, want nil (not the owner)")
 	}
-	if !r.finish(sourceUnit) {
-		t.Fatal("unit finish on a unit run = false, want true (owner)")
+	lr := r.finish(sourceUnit, false)
+	if lr == nil {
+		t.Fatal("unit finish on a unit run = nil, want a verdict (owner)")
+	}
+	if lr.Success || lr.Step != "mpd" || lr.Error != "disk full" || lr.FinishedAt == "" {
+		t.Fatalf("verdict = %+v, want success=false step=mpd error='disk full' finished_at set", lr)
 	}
 	if r.snapshot() != nil {
 		t.Fatal("snapshot after finish, want nil (idle)")

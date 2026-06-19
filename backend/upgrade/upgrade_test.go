@@ -448,6 +448,29 @@ func TestStreamDrivesCLIRunWithSystemdPresent(t *testing.T) {
 	}
 }
 
+// A finished run's verdict is exposed under last_run, persisted to the state file, and
+// reloaded by a fresh backend on Start — so it survives a restart and a late page load.
+func TestLastRunPersistsAndReloads(t *testing.T) {
+	statePath := filepath.Join(t.TempDir(), "state", "upgrade-run.json")
+
+	u1 := &UpgradeBackend{events: make(chan events.Event, 8), stateFile: statePath}
+	u1.applyRunProgress(progressLine{Event: ptr("begin"), Total: ptr(2)})
+	u1.applyRunProgress(progressLine{Event: ptr("progress"), Percent: ptr(50), Current: ptr(1), Step: ptr("mpd")})
+	u1.applyRunProgress(progressLine{Event: ptr("end"), Success: ptr(false), Error: ptr("disk full")})
+
+	lr := u1.StatusResponse().LastRun
+	if lr == nil || lr.Success || lr.Step != "mpd" || lr.Error != "disk full" {
+		t.Fatalf("last_run after failed run = %+v, want failure at mpd: disk full", lr)
+	}
+
+	u2 := &UpgradeBackend{events: make(chan events.Event, 8), stateFile: statePath}
+	u2.readState()
+	got := u2.StatusResponse().LastRun
+	if got == nil || got.Success || got.Step != "mpd" || got.Error != "disk full" {
+		t.Fatalf("reloaded last_run = %+v, want the persisted failure", got)
+	}
+}
+
 func TestUnconfiguredTriggersReturnError(t *testing.T) {
 	u, _ := newStarted(t, validResult)
 	if err := u.CheckNow(); err != ErrUnitNotConfigured {

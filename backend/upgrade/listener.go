@@ -87,6 +87,22 @@ func (u *UpgradeBackend) readProgress(conn net.Conn) {
 	}
 }
 
+// writeJSONAtomic marshals v through a temp file + rename, so a reader never sees a partial write.
+func writeJSONAtomic(path string, v any) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return err
+	}
+	data, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, data, 0o600); err != nil {
+		return err
+	}
+	return os.Rename(tmp, path)
+}
+
 // progressLine is the begin/progress/end contract; typed pointers reject absence and wrong type.
 type progressLine struct {
 	Event   *string `json:"event"`
@@ -95,6 +111,7 @@ type progressLine struct {
 	Current *int    `json:"current"`
 	Step    *string `json:"step"`
 	Success *bool   `json:"success"`
+	Error   *string `json:"error"` // optional, on end
 }
 
 func parseProgress(line []byte) (progressLine, bool) {
@@ -127,8 +144,9 @@ func (u *UpgradeBackend) applyRunProgress(p progressLine) {
 			u.notify(events.Event{Type: events.TypeUpgradeInfo, Data: RunState{State: "running"}})
 		}
 	case "end":
-		if u.run.finish(sourceStream) {
-			u.notify(events.Event{Type: events.TypeUpgradeInfo, Data: RunState{State: "finished", Success: p.Success}})
+		u.run.noteEnd(p.Error)
+		if lr := u.run.finish(sourceStream, *p.Success); lr != nil {
+			u.recordRun(lr)
 		}
 	}
 }

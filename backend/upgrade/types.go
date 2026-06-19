@@ -26,6 +26,16 @@ type RunState struct {
 	Percent *int    `json:"percent,omitempty"` // live, while running
 	Step    *string `json:"step,omitempty"`    // live, while running
 	Success *bool   `json:"success,omitempty"` // set once finished
+	Error   *string `json:"error,omitempty"`   // set once finished, when reported
+}
+
+// LastRun is the persisted verdict of the most recent finished run, surfaced under
+// "last_run" so a client connecting after the fact (or after a restart) still sees it.
+type LastRun struct {
+	Success    bool   `json:"success"`
+	FinishedAt string `json:"finished_at"`     // RFC3339
+	Step       string `json:"step,omitempty"`  // last step seen, best-effort
+	Error      string `json:"error,omitempty"` // script-reported, best-effort
 }
 
 // Status is the detector result; UnmarshalJSON routes unknown fields verbatim into Extra.
@@ -77,6 +87,7 @@ func (s *Status) UnmarshalJSON(b []byte) error {
 type StatusResponse struct {
 	Status
 	Run        *RunState `json:"run,omitempty"`
+	LastRun    *LastRun  `json:"last_run,omitempty"`
 	CanCheck   bool      `json:"can_check"`
 	CanUpgrade bool      `json:"can_upgrade"`
 }
@@ -88,9 +99,11 @@ type UpgradeBackend struct {
 	checkUnit      string
 	upgradeUnit    string
 	progressSocket string
+	stateFile      string
 
 	systemd  *systemd.SystemdBackend // triggers units (user scope); may be nil
 	status   cache.Value[*Status]    // last valid detector result; nil until first read
+	lastRun  cache.Value[*LastRun]   // verdict of the most recent finished run; persisted
 	lastRaw  []byte                  // last accepted result file bytes, for change dedup
 	watcher  *fsnotify.Watcher
 	listener net.Listener // unix socket the upgrade script streams progress to

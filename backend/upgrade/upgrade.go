@@ -36,6 +36,7 @@ func New(ctx context.Context, cfg *config.UpgradeConfig, sysd *systemd.SystemdBa
 		checkUnit:      cfg.CheckUnit,
 		upgradeUnit:    cfg.UpgradeUnit,
 		progressSocket: cfg.ProgressSocket,
+		stateFile:      cfg.StateFile,
 		systemd:        sysd,
 		events:         make(chan events.Event, 16),
 	}, nil
@@ -48,6 +49,7 @@ func (u *UpgradeBackend) UseEventStream(s events.Stream) { u.stream = s }
 // progress, and tracks the run unit over the bus.
 func (u *UpgradeBackend) Start() error {
 	u.readResult() // best-effort; a missing file is not an error
+	u.readState()  // restore the last run verdict across restarts
 	u.startWatcher()
 	u.startListener()
 	u.subscribeEvents()
@@ -88,6 +90,7 @@ func (u *UpgradeBackend) GetStatus() *Status {
 func (u *UpgradeBackend) StatusResponse() StatusResponse {
 	resp := StatusResponse{
 		Run:        u.run.snapshot(),
+		LastRun:    u.lastRun.Load(),
 		CanCheck:   u.CanCheck(),
 		CanUpgrade: u.CanUpgrade(),
 	}
@@ -136,6 +139,43 @@ func (u *UpgradeBackend) readResult() {
 	u.notify(events.Event{Type: events.TypeUpgradeInfo, Data: &status})
 }
 
+// readState restores the persisted last-run verdict; a missing or invalid file is not an error.
+func (u *UpgradeBackend) readState() {
+	if u.stateFile == "" {
+		return
+	}
+	data, err := os.ReadFile(u.stateFile)
+	if err != nil {
+		logger.Debug("[upgrade] run state file unavailable: %v", err)
+		return
+	}
+	var lr LastRun
+	if err := json.Unmarshal(data, &lr); err != nil {
+		logger.Warn("[upgrade] run state file invalid, ignoring: %v", err)
+		return
+	}
+	u.lastRun.Store(&lr)
+}
+
+// recordRun caches the run verdict, persists it best-effort, and emits the finished event.
+func (u *UpgradeBackend) recordRun(lr *LastRun) {
+	u.lastRun.Store(lr)
+	if u.stateFile != "" {
+		if err := writeJSONAtomic(u.stateFile, lr); err != nil {
+			logger.Warn("[upgrade] cannot persist run state to %s: %v", u.stateFile, err)
+		}
+	}
+	success := lr.Success
+	fin := RunState{State: "finished", Success: &success}
+	if lr.Step != "" {
+		fin.Step = &lr.Step
+	}
+	if lr.Error != "" {
+		fin.Error = &lr.Error
+	}
+	u.notify(events.Event{Type: events.TypeUpgradeInfo, Data: fin})
+}
+
 // CanCheck reports whether the check trigger is available: its unit is
 // configured and a systemd backend is present to run it.
 func (u *UpgradeBackend) CanCheck() bool { return u.checkUnit != "" && u.systemd != nil }
@@ -167,7 +207,7 @@ func (u *UpgradeBackend) StartUpgrade() error {
 	}
 	logger.Info("[upgrade] triggering upgrade unit %s, emitting running", u.upgradeUnit)
 	if err := u.systemd.TriggerUserUnit(u.ctx, u.upgradeUnit); err != nil {
-		u.run.finish(sourceUnit)
+		u.run.finish(sourceUnit, false) // never started; just clear the run
 		logger.Warn("[upgrade] failed to trigger upgrade unit: %v", err)
 		return err
 	}
@@ -217,12 +257,13 @@ func (u *UpgradeBackend) onServiceEvent(e events.Event) {
 	default:
 		return // still activating
 	}
-	if !u.run.finish(sourceUnit) {
+	success := svc.ActiveState != "failed"
+	lr := u.run.finish(sourceUnit, success)
+	if lr == nil {
 		return
 	}
-	success := svc.ActiveState != "failed"
 	logger.Info("[upgrade] %s reached %s, emitting finished (success=%v)", u.upgradeUnit, svc.ActiveState, success)
-	u.notify(events.Event{Type: events.TypeUpgradeInfo, Data: RunState{State: "finished", Success: &success}})
+	u.recordRun(lr)
 }
 
 // resumeIfRunning re-attaches to an upgrade triggered before a restart: if the
