@@ -114,13 +114,21 @@ func parseProgress(line []byte) (progressLine, bool) {
 	}
 }
 
-// applyRunProgress advances the live run state; "end" is left for the terminal unit state to clear.
+// applyRunProgress advances the live run; a CLI run (claimed here as sourceStream) is also driven to running/finished, a unit run only has its live state refreshed.
 func (u *UpgradeBackend) applyRunProgress(p progressLine) {
 	switch *p.Event {
 	case "begin":
 		zero := 0
-		u.runState.Store(&RunState{State: "running", Percent: &zero})
+		if u.run.progress(sourceStream, &zero, nil) {
+			u.notify(events.Event{Type: events.TypeUpgradeInfo, Data: RunState{State: "running"}})
+		}
 	case "progress":
-		u.runState.Store(&RunState{State: "running", Percent: p.Percent, Step: p.Step})
+		if u.run.progress(sourceStream, p.Percent, p.Step) {
+			u.notify(events.Event{Type: events.TypeUpgradeInfo, Data: RunState{State: "running"}})
+		}
+	case "end":
+		if u.run.finish(sourceStream) {
+			u.notify(events.Event{Type: events.TypeUpgradeInfo, Data: RunState{State: "finished", Success: p.Success}})
+		}
 	}
 }

@@ -42,6 +42,8 @@ func atomicWrite(t *testing.T, path, data string) {
 	}
 }
 
+func ptr[T any](v T) *T { return &v }
+
 func recv(t *testing.T, ch <-chan events.Event, d time.Duration) (events.Event, bool) {
 	t.Helper()
 	select {
@@ -201,7 +203,7 @@ func TestStatusResponseShape(t *testing.T) {
 
 	// In flight: "run" appears alongside the flat fields.
 	pct := 50
-	u.runState.Store(&RunState{State: "running", Percent: &pct})
+	u.run.progress(sourceStream, &pct, nil)
 	var run RunState
 	if err := json.Unmarshal(marshal()["run"], &run); err != nil {
 		t.Fatalf("run missing/undecodable: %v", err)
@@ -256,6 +258,10 @@ func TestProgressSocketRelaysLines(t *testing.T) {
 	if _, err := conn.Write([]byte(progress + "\n")); err != nil {
 		t.Fatalf("write progress: %v", err)
 	}
+	// First running line on an idle backend (no systemd) re-announces running.
+	if e, ok := recv(t, u.Events(), 2*time.Second); !ok || e.Type != events.TypeUpgradeInfo {
+		t.Fatalf("got (%q, %v), want a leading %s event", e.Type, ok, events.TypeUpgradeInfo)
+	}
 	e, ok := recv(t, u.Events(), 2*time.Second)
 	if !ok {
 		t.Fatal("expected an upgrade.progress event from the socket, got none")
@@ -265,6 +271,93 @@ func TestProgressSocketRelaysLines(t *testing.T) {
 	}
 	if got := string(e.Data.(json.RawMessage)); got != progress {
 		t.Fatalf("event data = %q, want verbatim %q", got, progress)
+	}
+}
+
+// Without systemd, begin/end each emit an upgrade.info lifecycle event on top of the raw progress relay.
+func TestProgressStreamDrivesLifecycleWithoutSystemd(t *testing.T) {
+	dir := t.TempDir()
+	sock := filepath.Join(dir, "upgrade.sock")
+
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+
+	u, err := New(ctx, &config.UpgradeConfig{
+		Enabled:        true,
+		ResultFile:     filepath.Join(dir, "upgrades.json"),
+		ProgressSocket: sock,
+	}, nil)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	t.Cleanup(u.Close)
+	if err := u.Start(); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+
+	conn, err := net.Dial("unix", sock)
+	if err != nil {
+		t.Fatalf("dial progress socket: %v", err)
+	}
+	defer func() {
+		if err := conn.Close(); err != nil {
+			t.Logf("closing conn: %v", err)
+		}
+	}()
+
+	// begin → upgrade.info{running} then the raw upgrade.progress relay.
+	if _, err := conn.Write([]byte(`{"event":"begin","total":3}` + "\n")); err != nil {
+		t.Fatalf("write begin: %v", err)
+	}
+	e, ok := recv(t, u.Events(), 2*time.Second)
+	if !ok || e.Type != events.TypeUpgradeInfo {
+		t.Fatalf("begin: got (%q, %v), want an %s event", e.Type, ok, events.TypeUpgradeInfo)
+	}
+	if run, _ := e.Data.(RunState); run.State != "running" {
+		t.Fatalf("begin info state = %q, want running", run.State)
+	}
+	if e, ok := recv(t, u.Events(), 2*time.Second); !ok || e.Type != events.TypeUpgradeProgress {
+		t.Fatalf("begin: got (%q, %v), want an %s relay", e.Type, ok, events.TypeUpgradeProgress)
+	}
+
+	// end → upgrade.info{finished} carrying success, then the raw relay.
+	if _, err := conn.Write([]byte(`{"event":"end","success":true}` + "\n")); err != nil {
+		t.Fatalf("write end: %v", err)
+	}
+	e, ok = recv(t, u.Events(), 2*time.Second)
+	if !ok || e.Type != events.TypeUpgradeInfo {
+		t.Fatalf("end: got (%q, %v), want an %s event", e.Type, ok, events.TypeUpgradeInfo)
+	}
+	run, _ := e.Data.(RunState)
+	if run.State != "finished" || run.Success == nil || !*run.Success {
+		t.Fatalf("end info = %+v, want finished success=true", run)
+	}
+	if u.run.snapshot() != nil {
+		t.Fatalf("run after end = %+v, want nil (cleared)", u.run.snapshot())
+	}
+}
+
+// A CLI reconnecting after an odio-api restart resumes mid-stream with a progress
+// line (no begin); the idle→running edge must still re-announce running.
+func TestProgressResumesRunningOnReconnect(t *testing.T) {
+	u := &UpgradeBackend{events: make(chan events.Event, 4)}
+
+	step := "mpd"
+	pct, cur := 42, 1
+	u.applyRunProgress(progressLine{Event: ptr("progress"), Percent: &pct, Current: &cur, Step: &step})
+
+	e, ok := recv(t, u.Events(), time.Second)
+	if !ok || e.Type != events.TypeUpgradeInfo {
+		t.Fatalf("resume: got (%q, %v), want an %s event", e.Type, ok, events.TypeUpgradeInfo)
+	}
+	if run, _ := e.Data.(RunState); run.State != "running" {
+		t.Fatalf("resume info state = %q, want running", run.State)
+	}
+
+	// A second progress line stays on the running edge: no further info event.
+	u.applyRunProgress(progressLine{Event: ptr("progress"), Percent: &pct, Current: &cur, Step: &step})
+	if e, ok := recv(t, u.Events(), 300*time.Millisecond); ok {
+		t.Fatalf("second progress line emitted %q, want no info event", e.Type)
 	}
 }
 
@@ -293,7 +386,7 @@ func TestBusTerminalStateEmitsFinished(t *testing.T) {
 	recv(t, u.Events(), time.Second) // drain the initial result-read event
 
 	// Simulate an in-progress run, then its unit reaching a terminal success state.
-	u.running.Store(true)
+	u.run.start(sourceUnit)
 	stream.ch <- events.Event{
 		Type: events.TypeServiceUpdated,
 		Data: systemd.Service{Name: "odio-upgrade.service", Scope: systemd.ScopeUser, ActiveState: "inactive"},
@@ -309,6 +402,49 @@ func TestBusTerminalStateEmitsFinished(t *testing.T) {
 	}
 	if prog.State != "finished" || prog.Success == nil || !*prog.Success {
 		t.Fatalf("got %+v, want state=finished success=true", prog)
+	}
+}
+
+// With systemd present, an upgrade launched out of band (CLI, no StartUpgrade) is still
+// driven by the progress stream, and a bus terminal event for the unit must not finish it.
+func TestStreamDrivesCLIRunWithSystemdPresent(t *testing.T) {
+	u := &UpgradeBackend{
+		events:      make(chan events.Event, 8),
+		upgradeUnit: "odio-upgrade.service",
+		systemd:     &systemd.SystemdBackend{}, // present, but this run never went through it
+	}
+
+	// begin from the CLI socket → running, even though systemd is present.
+	u.applyRunProgress(progressLine{Event: ptr("begin"), Total: ptr(3)})
+	e, ok := recv(t, u.Events(), time.Second)
+	if !ok || e.Type != events.TypeUpgradeInfo {
+		t.Fatalf("begin: got (%q, %v), want %s", e.Type, ok, events.TypeUpgradeInfo)
+	}
+	if run, _ := e.Data.(RunState); run.State != "running" {
+		t.Fatalf("begin state = %q, want running", run.State)
+	}
+
+	// A bus terminal event for the unit must not finish a stream-owned run.
+	u.onServiceEvent(events.Event{
+		Type: events.TypeServiceUpdated,
+		Data: systemd.Service{Name: "odio-upgrade.service", Scope: systemd.ScopeUser, ActiveState: "inactive"},
+	})
+	if e, ok := recv(t, u.Events(), 300*time.Millisecond); ok {
+		t.Fatalf("bus event finished a CLI run: emitted %q", e.Type)
+	}
+
+	// end from the CLI → finished carrying the script verdict.
+	u.applyRunProgress(progressLine{Event: ptr("end"), Success: ptr(true)})
+	e, ok = recv(t, u.Events(), time.Second)
+	if !ok || e.Type != events.TypeUpgradeInfo {
+		t.Fatalf("end: got (%q, %v), want %s", e.Type, ok, events.TypeUpgradeInfo)
+	}
+	run, _ := e.Data.(RunState)
+	if run.State != "finished" || run.Success == nil || !*run.Success {
+		t.Fatalf("end = %+v, want finished success=true", run)
+	}
+	if u.run.snapshot() != nil {
+		t.Fatalf("run after end = %+v, want idle", u.run.snapshot())
 	}
 }
 

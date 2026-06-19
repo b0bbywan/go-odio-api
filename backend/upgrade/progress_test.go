@@ -35,7 +35,7 @@ func TestParseProgressContract(t *testing.T) {
 
 func TestStartUpgradeRejectsConcurrentRun(t *testing.T) {
 	u := &UpgradeBackend{upgradeUnit: "upgrade.service", systemd: &systemd.SystemdBackend{}}
-	u.running.Store(true) // a run is already in flight
+	u.run.start(sourceUnit) // a run is already in flight
 
 	if err := u.StartUpgrade(); !errors.Is(err, ErrUpgradeInProgress) {
 		t.Fatalf("StartUpgrade while running = %v, want ErrUpgradeInProgress", err)

@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
@@ -94,9 +93,8 @@ type UpgradeBackend struct {
 	status   cache.Value[*Status]    // last valid detector result; nil until first read
 	lastRaw  []byte                  // last accepted result file bytes, for change dedup
 	watcher  *fsnotify.Watcher
-	listener net.Listener           // unix socket the upgrade script streams progress to
-	running  atomic.Bool            // guards against concurrent upgrades
-	runState cache.Value[*RunState] // live run progress for the status endpoint; nil when idle
+	listener net.Listener // unix socket the upgrade script streams progress to
+	run      runTracker   // owns the run lifecycle; source decides who finishes it
 	wg       sync.WaitGroup
 	events   chan events.Event
 

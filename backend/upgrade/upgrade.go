@@ -87,7 +87,7 @@ func (u *UpgradeBackend) GetStatus() *Status {
 // StatusResponse builds the GET /upgrade payload (always non-nil).
 func (u *UpgradeBackend) StatusResponse() StatusResponse {
 	resp := StatusResponse{
-		Run:        u.runState.Load(),
+		Run:        u.run.snapshot(),
 		CanCheck:   u.CanCheck(),
 		CanUpgrade: u.CanUpgrade(),
 	}
@@ -161,17 +161,16 @@ func (u *UpgradeBackend) StartUpgrade() error {
 		logger.Warn("[upgrade] start requested but no upgrade unit available")
 		return ErrUnitNotConfigured
 	}
-	if !u.running.CompareAndSwap(false, true) {
+	if !u.run.start(sourceUnit) {
 		logger.Warn("[upgrade] start requested but an upgrade is already running")
 		return ErrUpgradeInProgress
 	}
 	logger.Info("[upgrade] triggering upgrade unit %s, emitting running", u.upgradeUnit)
 	if err := u.systemd.TriggerUserUnit(u.ctx, u.upgradeUnit); err != nil {
-		u.running.Store(false)
+		u.run.finish(sourceUnit)
 		logger.Warn("[upgrade] failed to trigger upgrade unit: %v", err)
 		return err
 	}
-	u.runState.Store(&RunState{State: "running"})
 	u.notify(events.Event{Type: events.TypeUpgradeInfo, Data: RunState{State: "running"}})
 	return nil
 }
@@ -207,7 +206,7 @@ func (u *UpgradeBackend) consumeEvents() {
 }
 
 // onServiceEvent emits the run verdict once the upgrade unit reaches a terminal
-// state. The CAS guard fires finished exactly once per tracked run.
+// state, but only for a unit-owned run (finish rejects a stream-owned one).
 func (u *UpgradeBackend) onServiceEvent(e events.Event) {
 	svc, ok := e.Data.(systemd.Service)
 	if !ok || svc.Name != u.upgradeUnit || svc.Scope != systemd.ScopeUser {
@@ -218,8 +217,7 @@ func (u *UpgradeBackend) onServiceEvent(e events.Event) {
 	default:
 		return // still activating
 	}
-	u.runState.Reset()
-	if !u.running.CompareAndSwap(true, false) {
+	if !u.run.finish(sourceUnit) {
 		return
 	}
 	success := svc.ActiveState != "failed"
@@ -241,9 +239,8 @@ func (u *UpgradeBackend) resumeIfRunning() {
 		logger.Warn("[upgrade] cannot read %s state on startup: %v", u.upgradeUnit, err)
 		return
 	}
-	if svc.ActiveState == "activating" && u.running.CompareAndSwap(false, true) {
+	if svc.ActiveState == "activating" && u.run.start(sourceUnit) {
 		logger.Info("[upgrade] %s still running on startup, resuming", u.upgradeUnit)
-		u.runState.Store(&RunState{State: "running"})
 		u.notify(events.Event{Type: events.TypeUpgradeInfo, Data: RunState{State: "running"}})
 	}
 }
