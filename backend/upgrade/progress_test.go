@@ -19,6 +19,7 @@ func TestParseProgressContract(t *testing.T) {
 		{"progress missing step", `{"event":"progress","percent":42,"current":1}`, false},
 		{"progress missing current", `{"event":"progress","percent":42,"step":"mpd"}`, false},
 		{"end with success", `{"event":"end","success":true}`, true},
+		{"end with success and error", `{"event":"end","success":false,"error":"disk full"}`, true},
 		{"end without success", `{"event":"end"}`, false},
 		{"unknown event", `{"event":"halfway"}`, false},
 		{"missing event field", `{"percent":10}`, false},
@@ -35,7 +36,7 @@ func TestParseProgressContract(t *testing.T) {
 
 func TestStartUpgradeRejectsConcurrentRun(t *testing.T) {
 	u := &UpgradeBackend{upgradeUnit: "upgrade.service", systemd: &systemd.SystemdBackend{}}
-	u.running.Store(true) // a run is already in flight
+	u.run.start(sourceUnit) // a run is already in flight
 
 	if err := u.StartUpgrade(); !errors.Is(err, ErrUpgradeInProgress) {
 		t.Fatalf("StartUpgrade while running = %v, want ErrUpgradeInProgress", err)
