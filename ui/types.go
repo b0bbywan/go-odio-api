@@ -38,13 +38,23 @@ type Backends struct {
 // the live run state. Free detector fields ride under "extra" server-side and
 // are unused here. Latest is empty when no detection has run yet.
 type UpgradeStatus struct {
-	Current          string      `json:"current"`
-	Latest           string      `json:"latest"`
-	UpgradeAvailable bool        `json:"upgrade_available"`
-	CheckedAt        time.Time   `json:"checked_at"`
-	Run              *UpgradeRun `json:"run"`
-	CanCheck         bool        `json:"can_check"`
-	CanUpgrade       bool        `json:"can_upgrade"`
+	Current          string          `json:"current"`
+	Latest           string          `json:"latest"`
+	UpgradeAvailable bool            `json:"upgrade_available"`
+	CheckedAt        time.Time       `json:"checked_at"`
+	Run              *UpgradeRun     `json:"run"`
+	LastRun          *UpgradeLastRun `json:"last_run"`
+	CanCheck         bool            `json:"can_check"`
+	CanUpgrade       bool            `json:"can_upgrade"`
+}
+
+// UpgradeLastRun is the verdict of the most recent finished run, kept so a failure
+// stays visible after its one-shot SSE event. Step/Error are best-effort.
+type UpgradeLastRun struct {
+	Success    bool      `json:"success"`
+	FinishedAt time.Time `json:"finished_at"`
+	Step       string    `json:"step"`
+	Error      string    `json:"error"`
 }
 
 // UpgradeRun is the live progress of an in-flight upgrade; nil unless one runs.
@@ -82,6 +92,32 @@ func (u *UpgradeStatus) Running() bool {
 // the badge offers an action only when the backend can honour it.
 func (u *UpgradeStatus) Checkable() bool   { return u != nil && u.CanCheck }
 func (u *UpgradeStatus) Upgradeable() bool { return u != nil && u.CanUpgrade }
+
+// Failed reports whether the most recent run failed and is still relevant: no run is in flight
+// and an upgrade is still pending. Once the system is up to date (or no detection has run yet) a
+// past failure is moot — surfacing it would leave a permanent red badge with no way to dismiss it,
+// and since UpgradeAvailable implies a known Latest, the retry action always has a version to show.
+func (u *UpgradeStatus) Failed() bool {
+	return u != nil && u.LastRun != nil && !u.LastRun.Success && !u.Running() && u.UpgradeAvailable
+}
+
+// FailureLabel is the badge tooltip for a failed run: step and error when reported.
+func (u *UpgradeStatus) FailureLabel() string {
+	if u == nil || u.LastRun == nil {
+		return ""
+	}
+	label := "Last upgrade failed"
+	if u.LastRun.Step != "" {
+		label += " at " + u.LastRun.Step
+	}
+	if u.LastRun.Error != "" {
+		label += ": " + u.LastRun.Error
+	}
+	if !u.LastRun.FinishedAt.IsZero() {
+		label += " · " + u.LastRun.FinishedAt.Local().Format("02 Jan 2006, 15:04")
+	}
+	return label
+}
 
 // CheckedAtLabel is the last-check time for the badge tooltip, in local time,
 // or empty when no detection has run.
