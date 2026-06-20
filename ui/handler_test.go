@@ -245,6 +245,56 @@ func TestUpgradeBadgeRunning(t *testing.T) {
 	}
 }
 
+// TestUpgradeBadgeFailed verifies a failed last run surfaces as a red alert that takes
+// priority over an available upgrade, offers a retry only when upgradeable, and is hidden
+// once a run is live or the last run succeeded.
+func TestUpgradeBadgeFailed(t *testing.T) {
+	tmpl := LoadTemplates()
+	render := func(status *UpgradeStatus) string {
+		t.Helper()
+		var buf bytes.Buffer
+		if err := tmpl.ExecuteTemplate(&buf, "section-upgrade", status); err != nil {
+			t.Fatalf("execute section-upgrade: %v", err)
+		}
+		return buf.String()
+	}
+	const alertPath = "m21.73 18" // icon-alert-triangle
+	failed := &UpgradeLastRun{Success: false, Step: "mpd", Error: "disk full"}
+
+	// Failure beats an available upgrade, and offers a retry when upgradeable.
+	out := render(&UpgradeStatus{Latest: "1.1", UpgradeAvailable: true, CanUpgrade: true, LastRun: failed})
+	if !strings.Contains(out, alertPath) {
+		t.Errorf("failed badge should show the alert icon, got: %s", out)
+	}
+	if !strings.Contains(out, `hx-post="/upgrade/start"`) || !strings.Contains(out, "disk full") {
+		t.Errorf("failed+upgradeable badge should retry and carry the error, got: %s", out)
+	}
+
+	// No upgrade trigger → static alert, not clickable.
+	static := render(&UpgradeStatus{Latest: "1.1", UpgradeAvailable: true, LastRun: failed})
+	if strings.Contains(static, "hx-post=") || !strings.Contains(static, alertPath) {
+		t.Errorf("failed badge without trigger should be a static alert, got: %s", static)
+	}
+
+	// A live run hides the last failure; a successful last run shows no alert.
+	pct := 10
+	if r := render(&UpgradeStatus{Latest: "1.1", Run: &UpgradeRun{State: "running", Percent: &pct}, LastRun: failed}); strings.Contains(r, alertPath) {
+		t.Errorf("a running run should hide the last failure, got: %s", r)
+	}
+	if ok := render(&UpgradeStatus{Latest: "1.0", LastRun: &UpgradeLastRun{Success: true}}); strings.Contains(ok, alertPath) {
+		t.Errorf("a successful last run should not show the alert, got: %s", ok)
+	}
+
+	// A failure stays visible and retryable even when the system reads as up to date.
+	if up := render(&UpgradeStatus{Current: "1.0", Latest: "1.0", UpgradeAvailable: false, CanUpgrade: true, LastRun: failed}); !strings.Contains(up, alertPath) || !strings.Contains(up, `hx-post="/upgrade/start"`) {
+		t.Errorf("an up-to-date system with a failed last run should show a retryable alert, got: %s", up)
+	}
+	// A failure with no detection result still surfaces; the retry just omits the empty version.
+	if nr := render(&UpgradeStatus{CanUpgrade: true, LastRun: failed}); !strings.Contains(nr, alertPath) || strings.Contains(nr, "Retry upgrade to ?") {
+		t.Errorf("a failure without a detection result should show the alert and a version-less retry, got: %s", nr)
+	}
+}
+
 // TestUpgradeBadgeGatedActions verifies the badge renders a static icon (no
 // hx-post) when the matching trigger is unavailable, e.g. result-file-only mode.
 func TestUpgradeBadgeGatedActions(t *testing.T) {
