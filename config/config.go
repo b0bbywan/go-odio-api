@@ -105,6 +105,7 @@ type UpgradeConfig struct {
 	CheckUnit      string // user unit to (re)run detection; empty disables /upgrade/check
 	UpgradeUnit    string // user unit to run the upgrade; empty disables /upgrade/start
 	ProgressSocket string // unix socket the upgrade script streams run progress to
+	StateFile      string // persisted last-run verdict, in a persistent dir (survives reboot)
 }
 
 type BluetoothConfig struct {
@@ -259,6 +260,15 @@ func New(cfgFile *string) (*Config, error) {
 		xdgRuntimeDir = fmt.Sprintf("/run/user/%d", os.Getuid())
 	}
 
+	// No system-wide fallback for the state dir (unlike runtime's /run/user/{uid}); leave it
+	// empty when neither XDG_STATE_HOME nor HOME is set, so we never build a relative path.
+	stateHome := os.Getenv("XDG_STATE_HOME")
+	if stateHome == "" {
+		if home := os.Getenv("HOME"); home != "" {
+			stateHome = filepath.Join(home, ".local", "state")
+		}
+	}
+
 	port := viper.GetInt("api.port")
 	if port <= 0 || port > 65535 {
 		return nil, fmt.Errorf("invalid port: %d", port)
@@ -350,12 +360,22 @@ func New(cfgFile *string) (*Config, error) {
 	if progressSocket == "" {
 		progressSocket = filepath.Join(xdgRuntimeDir, "odio-api", "upgrade.sock")
 	}
+	// The last-run verdict must survive reboot, so it lives in the persistent state
+	// dir rather than the tmpfs runtime dir; one write per run, so SD wear is moot.
+	stateFile := viper.GetString("upgrade.stateFile")
+	if stateFile == "" && stateHome != "" {
+		stateFile = filepath.Join(stateHome, "odio-api", "upgrade-run.json")
+	}
 	upgradecfg := UpgradeConfig{
 		Enabled:        viper.GetBool("upgrade.enabled"),
 		ResultFile:     viper.GetString("upgrade.resultFile"),
 		CheckUnit:      viper.GetString("upgrade.checkUnit"),
 		UpgradeUnit:    viper.GetString("upgrade.upgradeUnit"),
 		ProgressSocket: progressSocket,
+		StateFile:      stateFile,
+	}
+	if upgradecfg.Enabled && upgradecfg.StateFile == "" {
+		logger.Warn("[config] upgrade.stateFile unset and no state dir (XDG_STATE_HOME/HOME); last-run verdict will not persist")
 	}
 
 	interfaces := getZeroconfInterfaces(binds)

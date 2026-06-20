@@ -3,6 +3,7 @@ package config
 import (
 	"net"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -170,6 +171,48 @@ func TestNew_Defaults(t *testing.T) {
 	// Test default log level
 	if cfg.LogLevel != logger.INFO {
 		t.Errorf("LogLevel = %d, want %d (INFO)", cfg.LogLevel, logger.INFO)
+	}
+}
+
+// The upgrade run-state file defaults to the persistent state dir: $XDG_STATE_HOME when
+// set, else $HOME/.local/state — never the tmpfs runtime dir used for the progress socket.
+func TestNew_UpgradeStateFileDefault(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
+
+	t.Setenv("XDG_STATE_HOME", "") // fallback path
+	viper.Reset()
+	cfg, err := New(nil)
+	if err != nil {
+		t.Fatalf("New(nil): %v", err)
+	}
+	if got, want := cfg.Upgrade.StateFile, filepath.Join(home, ".local", "state", "odio-api", "upgrade-run.json"); got != want {
+		t.Errorf("Upgrade.StateFile = %q, want %q", got, want)
+	}
+
+	stateHome := t.TempDir()
+	t.Setenv("XDG_STATE_HOME", stateHome)
+	viper.Reset()
+	cfg, err = New(nil)
+	if err != nil {
+		t.Fatalf("New(nil): %v", err)
+	}
+	if got, want := cfg.Upgrade.StateFile, filepath.Join(stateHome, "odio-api", "upgrade-run.json"); got != want {
+		t.Errorf("Upgrade.StateFile = %q, want %q", got, want)
+	}
+
+	// With neither var set, there is no state dir: StateFile stays empty (persistence disabled)
+	// rather than resolving to a relative path under the working directory.
+	t.Setenv("XDG_STATE_HOME", "")
+	t.Setenv("HOME", "")
+	viper.Reset()
+	cfg, err = New(nil)
+	if err != nil {
+		t.Fatalf("New(nil): %v", err)
+	}
+	if cfg.Upgrade.StateFile != "" {
+		t.Errorf("Upgrade.StateFile = %q, want empty when no state dir is resolvable", cfg.Upgrade.StateFile)
 	}
 }
 
