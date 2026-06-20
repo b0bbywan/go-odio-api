@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
@@ -27,6 +26,25 @@ type RunState struct {
 	Percent *int    `json:"percent,omitempty"` // live, while running
 	Step    *string `json:"step,omitempty"`    // live, while running
 	Success *bool   `json:"success,omitempty"` // set once finished
+	Error   *string `json:"error,omitempty"`   // set once finished, when reported
+}
+
+// LastRun is the persisted verdict of the most recent finished run, surfaced under
+// "last_run" so a client connecting after the fact (or after a restart) still sees it.
+type LastRun struct {
+	Success    bool   `json:"success"`
+	FinishedAt string `json:"finished_at"`     // RFC3339
+	Step       string `json:"step,omitempty"`  // last step seen, best-effort
+	Error      string `json:"error,omitempty"` // script-reported, best-effort
+}
+
+// persistedState is the on-disk shape: the last verdict, plus an in-flight snapshot
+// written only on graceful shutdown so the badge ring resumes at the right percent.
+type persistedState struct {
+	LastRun       *LastRun  `json:"last_run,omitempty"`
+	InFlight      *RunState `json:"in_flight,omitempty"`
+	InFlightPhase string    `json:"in_flight_phase,omitempty"` // "triggered" | "running" | "settling"
+	InFlightUnit  bool      `json:"in_flight_unit,omitempty"`  // true when we triggered it via the unit
 }
 
 // Status is the detector result; UnmarshalJSON routes unknown fields verbatim into Extra.
@@ -78,8 +96,18 @@ func (s *Status) UnmarshalJSON(b []byte) error {
 type StatusResponse struct {
 	Status
 	Run        *RunState `json:"run,omitempty"`
+	LastRun    *LastRun  `json:"last_run,omitempty"`
 	CanCheck   bool      `json:"can_check"`
 	CanUpgrade bool      `json:"can_upgrade"`
+}
+
+// systemdUnits is the slice of the systemd backend the upgrade backend drives, declared as an
+// interface so tests can stand in for the unit lifecycle without a real D-Bus connection.
+// *systemd.SystemdBackend satisfies it.
+type systemdUnits interface {
+	StartService(name string, scope systemd.UnitScope) error
+	TriggerUserUnit(ctx context.Context, name string) error
+	RefreshService(ctx context.Context, name string, scope systemd.UnitScope) (*systemd.Service, error)
 }
 
 // UpgradeBackend watches a detector result file and triggers systemd user units to upgrade.
@@ -89,17 +117,23 @@ type UpgradeBackend struct {
 	checkUnit      string
 	upgradeUnit    string
 	progressSocket string
+	stateFile      string
 
-	systemd  *systemd.SystemdBackend // triggers units (user scope); may be nil
-	status   cache.Value[*Status]    // last valid detector result; nil until first read
-	lastRaw  []byte                  // last accepted result file bytes, for change dedup
+	systemd  systemdUnits          // triggers units (user scope); nil when absent
+	status   cache.Value[*Status]  // last valid detector result; nil until first read
+	lastRun  cache.Value[*LastRun] // verdict of the most recent finished run; persisted
+	lastRaw  []byte                // last accepted result file bytes, for change dedup
 	watcher  *fsnotify.Watcher
-	listener net.Listener           // unix socket the upgrade script streams progress to
-	running  atomic.Bool            // guards against concurrent upgrades
-	runState cache.Value[*RunState] // live run progress for the status endpoint; nil when idle
+	listener net.Listener // unix socket the upgrade script streams progress to
+	run      runTracker   // owns the run lifecycle; source decides who finishes it
 	wg       sync.WaitGroup
 	events   chan events.Event
 
-	stream events.Stream     // shared event bus; tracks the run unit's lifecycle
-	sub    chan events.Event // our subscription to stream
+	resumeHint      *RunState // in-flight snapshot restored from disk, consumed by resumeIfRunning
+	resumeHintPhase runPhase  // phase of the snapshotted run
+	resumeHintUnit  bool      // whether the snapshotted run was unit-triggered
+
+	stream    events.Stream     // shared event bus; tracks the run unit's lifecycle
+	sub       chan events.Event // our subscription to stream
+	unitState string            // last-seen ActiveState of the upgrade unit (onServiceEvent only); dedups terminal events
 }
