@@ -101,11 +101,12 @@ type SystemdConfig struct {
 // written by an external detector and triggers external systemd user units.
 type UpgradeConfig struct {
 	Enabled        bool
-	ResultFile     string // upgrades.json to read and watch
-	CheckUnit      string // user unit to (re)run detection; empty disables /upgrade/check
-	UpgradeUnit    string // user unit to run the upgrade; empty disables /upgrade/start
-	ProgressSocket string // unix socket the upgrade script streams run progress to
-	StateFile      string // persisted last-run verdict, in a persistent dir (survives reboot)
+	ResultFile     string        // upgrades.json to read and watch
+	CheckUnit      string        // user unit to (re)run detection; empty disables /upgrade/check
+	UpgradeUnit    string        // user unit to run the upgrade; empty disables /upgrade/start
+	ProgressSocket string        // unix socket the upgrade script streams run progress to
+	StateFile      string        // persisted last-run verdict, in a persistent dir (survives reboot)
+	ReconnectGrace time.Duration // how long a disconnected CLI run waits for the script to reconnect before it is failed
 }
 
 type BluetoothConfig struct {
@@ -240,6 +241,8 @@ func New(cfgFile *string) (*Config, error) {
 
 	viper.SetDefault("zeroconf.enabled", true)
 
+	viper.SetDefault("upgrade.reconnectGrace", "2m")
+
 	// Load from configuration file, environment variables, and CLI flags
 	viper.SetConfigType("yaml") // config file format
 
@@ -373,6 +376,7 @@ func New(cfgFile *string) (*Config, error) {
 		UpgradeUnit:    viper.GetString("upgrade.upgradeUnit"),
 		ProgressSocket: progressSocket,
 		StateFile:      stateFile,
+		ReconnectGrace: viper.GetDuration("upgrade.reconnectGrace"),
 	}
 	if upgradecfg.Enabled && upgradecfg.StateFile == "" {
 		logger.Warn("[config] upgrade.stateFile unset and no state dir (XDG_STATE_HOME/HOME); last-run verdict will not persist")

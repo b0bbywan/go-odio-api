@@ -84,7 +84,30 @@ func (u *UpgradeBackend) readProgress(conn net.Conn) {
 		raw := make(json.RawMessage, len(line)) // scanner reuses its buffer; copy before async send
 		copy(raw, line)
 		u.notify(events.Event{Type: events.TypeUpgradeProgress, Data: raw})
+		if *p.Event == "end" {
+			return // a run ends once; trailing lines on this connection must not re-open it
+		}
 	}
+	// A dropped connection is not the run's end: the script reconnects and resends its tail (notably
+	// end), so leave the run tracked. Arm the grace so a CLI run whose script crashed and never
+	// reconnects is failed instead of stranded; a reconnecting progress line cancels it.
+	u.armGrace()
+}
+
+// writeJSONAtomic guards a concurrent reader from ever seeing a partial write.
+func writeJSONAtomic(path string, v any) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return err
+	}
+	data, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, data, 0o600); err != nil {
+		return err
+	}
+	return os.Rename(tmp, path)
 }
 
 // progressLine is the begin/progress/end contract; typed pointers reject absence and wrong type.
@@ -95,6 +118,7 @@ type progressLine struct {
 	Current *int    `json:"current"`
 	Step    *string `json:"step"`
 	Success *bool   `json:"success"`
+	Error   *string `json:"error"` // optional, on end
 }
 
 func parseProgress(line []byte) (progressLine, bool) {
@@ -114,13 +138,24 @@ func parseProgress(line []byte) (progressLine, bool) {
 	}
 }
 
-// applyRunProgress advances the live run state; "end" is left for the terminal unit state to clear.
+// applyRunProgress drives the run machine from a progress line. begin/progress claim or refresh the
+// run (announcing running on the idle→running edge); end finalizes a CLI run, or settles a unit run
+// to await its job result.
 func (u *UpgradeBackend) applyRunProgress(p progressLine) {
+	u.cancelGrace() // a progress line means the connection is alive: a reconnect cancels the grace
 	switch *p.Event {
 	case "begin":
 		zero := 0
-		u.runState.Store(&RunState{State: "running", Percent: &zero})
+		if u.run.observeProgress(&zero, nil) {
+			u.announceRunning()
+		}
 	case "progress":
-		u.runState.Store(&RunState{State: "running", Percent: p.Percent, Step: p.Step})
+		if u.run.observeProgress(p.Percent, p.Step) {
+			u.announceRunning()
+		}
+	case "end":
+		if lr := u.run.observeEnd(*p.Success, p.Error); lr != nil {
+			u.recordRun(lr)
+		}
 	}
 }

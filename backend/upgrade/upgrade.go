@@ -25,20 +25,24 @@ func New(ctx context.Context, cfg *config.UpgradeConfig, sysd *systemd.SystemdBa
 		return nil, nil
 	}
 
-	// Register as internal before Start, when the listener snapshots the units.
-	if sysd != nil {
-		sysd.AddInternalUserUnits(cfg.CheckUnit, cfg.UpgradeUnit)
-	}
-
-	return &UpgradeBackend{
+	b := &UpgradeBackend{
 		ctx:            ctx,
 		resultFile:     cfg.ResultFile,
 		checkUnit:      cfg.CheckUnit,
 		upgradeUnit:    cfg.UpgradeUnit,
 		progressSocket: cfg.ProgressSocket,
-		systemd:        sysd,
+		stateFile:      cfg.StateFile,
+		reconnectGrace: cfg.ReconnectGrace,
 		events:         make(chan events.Event, 16),
-	}, nil
+	}
+	// Assign only when present: a typed-nil *SystemdBackend stored in the interface field would
+	// read as non-nil and defeat every `u.systemd == nil` guard.
+	if sysd != nil {
+		// Register as internal before Start, when the listener snapshots the units.
+		sysd.AddInternalUserUnits(cfg.CheckUnit, cfg.UpgradeUnit)
+		b.systemd = sysd
+	}
+	return b, nil
 }
 
 // UseEventStream wires the shared bus; called by Backend.New once the broadcaster exists.
@@ -48,9 +52,12 @@ func (u *UpgradeBackend) UseEventStream(s events.Stream) { u.stream = s }
 // progress, and tracks the run unit over the bus.
 func (u *UpgradeBackend) Start() error {
 	u.readResult() // best-effort; a missing file is not an error
+	u.readState()  // restore the last run verdict across restarts
 	u.startWatcher()
 	u.startListener()
 	u.subscribeEvents()
+	u.resumeIfRunning()
+	u.startConsuming()
 	logger.Info("[upgrade] backend started successfully")
 	return nil
 }
@@ -72,6 +79,10 @@ func (u *UpgradeBackend) Close() {
 		u.stream.Unsubscribe(u.sub)
 	}
 	u.wg.Wait()
+	u.cancelGrace() // stop the disconnect timer before snapshotting, so it can't fire mid-persist
+	// Snapshot only after the goroutines stop: a run finishing concurrently would otherwise race
+	// recordRun's verdict write and could clobber it with a stale in-flight snapshot.
+	u.persistInFlight()
 	u.watcher = nil
 	u.listener = nil
 }
@@ -87,7 +98,8 @@ func (u *UpgradeBackend) GetStatus() *Status {
 // StatusResponse builds the GET /upgrade payload (always non-nil).
 func (u *UpgradeBackend) StatusResponse() StatusResponse {
 	resp := StatusResponse{
-		Run:        u.runState.Load(),
+		Run:        u.run.snapshot(),
+		LastRun:    u.lastRun.Load(),
 		CanCheck:   u.CanCheck(),
 		CanUpgrade: u.CanUpgrade(),
 	}
@@ -103,6 +115,12 @@ func (u *UpgradeBackend) notify(e events.Event) {
 	default:
 		logger.Warn("[upgrade] event channel full, dropping %s event", e.Type)
 	}
+}
+
+// announceRunning flips the badge to running. Every run-start path funnels through it so a fresh,
+// reconnecting, and resumed run all announce identically.
+func (u *UpgradeBackend) announceRunning() {
+	u.notify(events.Event{Type: events.TypeUpgradeInfo, Data: RunState{State: "running"}})
 }
 
 // readResult loads the result file into a Status and, when it changed, caches it
@@ -136,6 +154,121 @@ func (u *UpgradeBackend) readResult() {
 	u.notify(events.Event{Type: events.TypeUpgradeInfo, Data: &status})
 }
 
+// readState restores the persisted last-run verdict and any in-flight snapshot; a missing
+// or invalid file is not an error. The snapshot is held as a hint for resumeIfRunning.
+func (u *UpgradeBackend) readState() {
+	if u.stateFile == "" {
+		return
+	}
+	data, err := os.ReadFile(u.stateFile)
+	if err != nil {
+		logger.Debug("[upgrade] run state file unavailable: %v", err)
+		return
+	}
+	var ps persistedState
+	if err := json.Unmarshal(data, &ps); err != nil {
+		logger.Warn("[upgrade] run state file invalid, ignoring: %v", err)
+		return
+	}
+	if ps.LastRun != nil {
+		u.lastRun.Store(ps.LastRun)
+	}
+	u.resumeHint = ps.InFlight
+	u.resumeHintPhase = ps.InFlightPhase
+	u.resumeHintUnit = ps.InFlightUnit
+}
+
+// persist writes the state file best-effort; failures are logged, never fatal.
+func (u *UpgradeBackend) persist(ps persistedState) {
+	if u.stateFile == "" {
+		return
+	}
+	if err := writeJSONAtomic(u.stateFile, ps); err != nil {
+		logger.Warn("[upgrade] cannot persist run state to %s: %v", u.stateFile, err)
+	}
+}
+
+// persistInFlight snapshots a running upgrade on graceful shutdown so the next start resumes it at
+// the right percent. This covers the self-upgrade restart for both kinds: a unit run resumes against
+// its still-queryable unit, a CLI run resumes blind and waits for the script — which reconnects and
+// resends its tail (notably end) — to land on the live run.
+func (u *UpgradeBackend) persistInFlight() {
+	st, phase, unit := u.run.inflight()
+	if st == nil {
+		return
+	}
+	logger.Info("[upgrade] persisting in-flight run on shutdown")
+	u.persist(persistedState{LastRun: u.lastRun.Load(), InFlight: st, InFlightPhase: phase, InFlightUnit: unit})
+}
+
+// recordRun emits the finished event and keeps only a failure under last_run: a success clears any
+// prior failure (a successful retry must wipe the red badge), so the state file holds at most the
+// last unresolved failure.
+func (u *UpgradeBackend) recordRun(lr *LastRun) {
+	u.cancelGrace() // a finalize supersedes a pending disconnect grace
+	if lr.Success {
+		u.lastRun.Reset()
+		u.persist(persistedState{})
+	} else {
+		u.lastRun.Store(lr)
+		u.persist(persistedState{LastRun: lr})
+	}
+	success := lr.Success
+	fin := RunState{State: "finished", Success: &success}
+	if lr.Step != "" {
+		fin.Step = &lr.Step
+	}
+	if lr.Error != "" {
+		fin.Error = &lr.Error
+	}
+	u.notify(events.Event{Type: events.TypeUpgradeInfo, Data: fin})
+}
+
+// armGrace bounds a CLI run that lost its progress connection: if the script does not reconnect
+// within reconnectGrace, the run is failed rather than stranded on "running". Replaces any pending
+// timer; a no-op when no grace is configured.
+func (u *UpgradeBackend) armGrace() {
+	if u.reconnectGrace <= 0 {
+		return
+	}
+	u.graceMu.Lock()
+	defer u.graceMu.Unlock()
+	u.graceGen++
+	gen := u.graceGen
+	if u.graceTimer != nil {
+		u.graceTimer.Stop()
+	}
+	u.graceTimer = time.AfterFunc(u.reconnectGrace, func() { u.onGraceExpired(gen) })
+}
+
+// cancelGrace stops a pending grace timer: the script reconnected, the run finalized, or we shut down.
+func (u *UpgradeBackend) cancelGrace() {
+	u.graceMu.Lock()
+	defer u.graceMu.Unlock()
+	u.graceGen++
+	if u.graceTimer != nil {
+		u.graceTimer.Stop()
+		u.graceTimer = nil
+	}
+}
+
+// onGraceExpired fails a CLI run that never reconnected, unless a newer arm or cancel superseded this
+// timer (gen mismatch — the run reconnected or finished another way).
+func (u *UpgradeBackend) onGraceExpired(gen uint64) {
+	u.graceMu.Lock()
+	if gen != u.graceGen {
+		u.graceMu.Unlock()
+		return
+	}
+	u.graceTimer = nil
+	u.graceMu.Unlock()
+
+	if lr := u.run.failDisconnected(); lr != nil {
+		logger.Warn("[upgrade] CLI run did not reconnect within %s, marking failed", u.reconnectGrace)
+		u.recordRun(lr)
+	}
+}
+
 // CanCheck reports whether the check trigger is available: its unit is
 // configured and a systemd backend is present to run it.
 func (u *UpgradeBackend) CanCheck() bool { return u.checkUnit != "" && u.systemd != nil }
@@ -161,23 +294,23 @@ func (u *UpgradeBackend) StartUpgrade() error {
 		logger.Warn("[upgrade] start requested but no upgrade unit available")
 		return ErrUnitNotConfigured
 	}
-	if !u.running.CompareAndSwap(false, true) {
+	if !u.run.trigger() {
 		logger.Warn("[upgrade] start requested but an upgrade is already running")
 		return ErrUpgradeInProgress
 	}
 	logger.Info("[upgrade] triggering upgrade unit %s, emitting running", u.upgradeUnit)
 	if err := u.systemd.TriggerUserUnit(u.ctx, u.upgradeUnit); err != nil {
-		u.running.Store(false)
+		u.run.abort() // never started; clear the triggered run
 		logger.Warn("[upgrade] failed to trigger upgrade unit: %v", err)
 		return err
 	}
-	u.runState.Store(&RunState{State: "running"})
-	u.notify(events.Event{Type: events.TypeUpgradeInfo, Data: RunState{State: "running"}})
+	u.announceRunning()
 	return nil
 }
 
-// subscribeEvents tracks the run unit's service.updated events and resumes a run
-// already in flight. No-op without a unit or bus (e.g. tests).
+// subscribeEvents subscribes to the run unit's service.updated events but does not yet drain them:
+// resumeIfRunning re-attaches from a direct unit query first, and draining before it would race that
+// re-attach over u.run. The subscription buffers meanwhile. No-op without a unit or bus (e.g. tests).
 func (u *UpgradeBackend) subscribeEvents() {
 	if u.upgradeUnit == "" || u.stream == nil {
 		return
@@ -185,9 +318,15 @@ func (u *UpgradeBackend) subscribeEvents() {
 	u.sub = u.stream.SubscribeFunc(func(e events.Event) bool {
 		return e.Type == events.TypeServiceUpdated
 	})
+}
+
+// startConsuming drains the subscription until shutdown; a no-op when not subscribed.
+func (u *UpgradeBackend) startConsuming() {
+	if u.sub == nil {
+		return
+	}
 	u.wg.Add(1)
 	go u.consumeEvents()
-	u.resumeIfRunning()
 }
 
 // consumeEvents drains the subscription until shutdown.
@@ -206,44 +345,85 @@ func (u *UpgradeBackend) consumeEvents() {
 	}
 }
 
-// onServiceEvent emits the run verdict once the upgrade unit reaches a terminal
-// state. The CAS guard fires finished exactly once per tracked run.
+// onServiceEvent finalizes the run once the upgrade unit reaches a terminal state. A CLI run is
+// untouched: its lifecycle is the progress stream alone.
 func (u *UpgradeBackend) onServiceEvent(e events.Event) {
 	svc, ok := e.Data.(systemd.Service)
 	if !ok || svc.Name != u.upgradeUnit || svc.Scope != systemd.ScopeUser {
 		return
 	}
-	switch svc.ActiveState {
+	u.finalizeUnitRun(svc.ActiveState)
+}
+
+// finalizeUnitRun records the verdict for a live unit run whose unit reached a terminal systemd state;
+// the job result is authoritative, covering a script killed before its end line. Non-terminal states
+// and CLI or idle runs are ignored. Finalizing clears the run, so a repeated terminal event finds an
+// idle tracker and no-ops — the live run identity, not the ActiveState history, gates this.
+func (u *UpgradeBackend) finalizeUnitRun(activeState string) {
+	switch activeState {
 	case "active", "inactive", "failed": // terminal for a oneshot
 	default:
 		return // still activating
 	}
-	u.runState.Reset()
-	if !u.running.CompareAndSwap(true, false) {
-		return
+	if lr := u.run.observeUnitTerminal(activeState != "failed"); lr != nil {
+		logger.Info("[upgrade] %s reached %s, emitting finished (success=%v)", u.upgradeUnit, activeState, lr.Success)
+		u.recordRun(lr)
 	}
-	success := svc.ActiveState != "failed"
-	logger.Info("[upgrade] %s reached %s, emitting finished (success=%v)", u.upgradeUnit, svc.ActiveState, success)
-	u.notify(events.Event{Type: events.TypeUpgradeInfo, Data: RunState{State: "finished", Success: &success}})
 }
 
-// resumeIfRunning re-attaches to an upgrade triggered before a restart: if the
-// unit is still activating, re-announce running and let completion arrive over
-// the bus like any live run.
+// resumeIfRunning re-attaches to a unit upgrade that crossed our restart, using the systemd unit
+// as the source of truth — never a fabricated verdict from the absence of one:
+//   - still activating: a run is genuinely in progress (the self-upgrade restarted us mid-playbook,
+//     possibly killed without a snapshot), so resume running and let the bus finish it;
+//   - terminal AND we held a snapshot: it finished while we were down, emit that verdict;
+//   - unreadable (transient D-Bus error on startup): say nothing — "can't tell yet" is not "failed".
+//
+// The hint seeds the resumed percent but is not required to re-attach an activating unit, so a
+// non-graceful kill (no snapshot) is still recovered. A terminal unit without a hint is some prior,
+// already-recorded run — left alone.
 func (u *UpgradeBackend) resumeIfRunning() {
-	if u.systemd == nil {
+	hint := u.resumeHint
+	phase := u.resumeHintPhase
+	unit := u.resumeHintUnit
+	u.resumeHint = nil
+
+	// A CLI run has no unit to query: resume it blind from the snapshot and wait for the script to
+	// reconnect and resend its tail (progress, then end) onto the live run.
+	if hint != nil && !unit {
+		if u.run.resume(hint, phase, false) {
+			logger.Info("[upgrade] CLI run crossed restart, resuming and awaiting reconnect")
+			u.announceRunning()
+			u.armGrace() // resumed disconnected; fail it if the script never reconnects
+		}
 		return
 	}
+
+	if u.systemd == nil || u.upgradeUnit == "" {
+		return // no queryable unit; a CLI run resumes on its next progress line
+	}
+
 	ctx, cancel := context.WithTimeout(u.ctx, 5*time.Second)
 	svc, err := u.systemd.RefreshService(ctx, u.upgradeUnit, systemd.ScopeUser)
 	cancel()
 	if err != nil {
-		logger.Warn("[upgrade] cannot read %s state on startup: %v", u.upgradeUnit, err)
+		logger.Warn("[upgrade] cannot read %s state on startup, not resuming: %v", u.upgradeUnit, err)
 		return
 	}
-	if svc.ActiveState == "activating" && u.running.CompareAndSwap(false, true) {
-		logger.Info("[upgrade] %s still running on startup, resuming", u.upgradeUnit)
-		u.runState.Store(&RunState{State: "running"})
-		u.notify(events.Event{Type: events.TypeUpgradeInfo, Data: RunState{State: "running"}})
+
+	if svc.ActiveState == "activating" {
+		// Re-attach even without a snapshot (a non-graceful kill left none): default to running.
+		if hint == nil {
+			phase = phaseRunning
+		}
+		if u.run.resume(hint, phase, true) {
+			logger.Info("[upgrade] %s still running on startup, resuming", u.upgradeUnit)
+			u.announceRunning()
+		}
+		return
+	}
+
+	if hint != nil && u.run.resume(hint, phase, true) {
+		logger.Info("[upgrade] %s finished during downtime (%s)", u.upgradeUnit, svc.ActiveState)
+		u.finalizeUnitRun(svc.ActiveState)
 	}
 }
