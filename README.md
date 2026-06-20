@@ -134,7 +134,7 @@ Remote reboot and power-off via the REST API — no SSH for day-to-day ops. Disa
 
 Agnostic upgrade frontend — Odio implements neither detection nor upgrade logic. It reads a result file written by an external detector (current/latest version, availability) and can trigger two systemd **user** units: one to re-check, one to run the upgrade. Capabilities are additive: the result file alone enables status reads (`GET /upgrade`), and each configured unit enables its trigger (`POST /upgrade/check`, `POST /upgrade/start`). Configured units are registered as internal — triggerable, but hidden from `/services` and the event stream. Disabled by default.
 
-Run progress streams over a Unix socket, not a file or the journal: progress is ephemeral, and on SD-card systems a socket avoids write wear (per-user journals are also unavailable on Raspberry Pi). The upgrade script connects to the socket and writes one JSON line per milestone, relayed verbatim as `upgrade.progress` SSE events. The run verdict comes from the systemd job result (authoritative), independent of the script's self-report. The in-flight run state is also mirrored in `GET /upgrade` (under `run`), so a client connecting or reloading mid-upgrade still sees it.
+Run progress streams over a Unix socket, not a file or the journal: progress is ephemeral, and on SD-card systems a socket avoids write wear (per-user journals are also unavailable on Raspberry Pi). The upgrade script connects to the socket and writes one JSON line per milestone, relayed verbatim as `upgrade.progress` SSE events. Whichever source started the run owns its lifecycle: an upgrade triggered through the unit (`POST /upgrade/start`) takes its verdict from the systemd job result (authoritative), independent of the script's self-report; an upgrade launched out of band (e.g. the script run from the CLI, streaming to the socket without going through the unit) is driven entirely by the stream, taking its verdict from the script's `end` report. The in-flight run state is also mirrored in `GET /upgrade` (under `run`), so a client connecting or reloading mid-upgrade still sees it. A running unit upgrade is snapshotted to the state file on graceful shutdown, so a restart — e.g. odio-api upgrading itself — resumes the badge ring at its last percent, and emits the verdict if the unit finished while it was down. A CLI run instead resumes on the script's next progress line, and one that ends while the API is down is missed. Once a run finishes, its verdict is exposed under `last_run` (`{success, finished_at, step, error}`) and persisted to a small state file, so a client loading after the fact — notably after a failure — still learns the outcome; it survives restarts. `error` is best-effort (from the script's `end` report; absent when the systemd job fails without one).
 
 ### Real-time Event Stream (SSE)
 
@@ -382,6 +382,7 @@ upgrade:                       # agnostic upgrade frontend (opt-in)
   checkUnit: odio-check-upgrade.service     # optional internal user unit → enables POST /upgrade/check
   upgradeUnit: odio-upgrade.service         # optional internal user unit → enables POST /upgrade/start
   # progressSocket default: $XDG_RUNTIME_DIR/odio-api/upgrade.sock (tmpfs, no SD writes)
+  # stateFile default: $XDG_STATE_HOME/odio-api/upgrade-run.json (persistent; last-run verdict)
 ```
 
 For `upgrade`, the result file is the source of truth for availability; the script reports live progress over the socket (`begin`/`progress`/`end`). Units are optional — omit both for a read-only status badge, or add either to enable its POST. Full per-option detail on [docs.odio.love](https://docs.odio.love/api/).
@@ -440,14 +441,14 @@ Detector status and run lifecycle stream as `upgrade.info`; live run progress st
 // upgrade.info — detector status (on result-file change): the contract fields + "extra", no "run" or capability flags
 {"current": "2026.5.0b3", "latest": "2026.6.0b1", "upgrade_available": true, "checked_at": "...", "extra": { /* ... */ }}
 
-// upgrade.info — run lifecycle; success is the systemd job result (authoritative)
+// upgrade.info — run lifecycle; success is the run's verdict (systemd job for a unit run, the script's end for a CLI run)
 {"state": "running"}
-{"state": "finished", "success": true}
+{"state": "finished", "success": false, "step": "mpd", "error": "disk full"}
 
 // upgrade.progress — emitted by the upgrade script over the socket; minimum contract below, add any field you want
 {"event": "begin",    "total": 7}
 {"event": "progress", "percent": 42, "current": 3, "step": "mpd"}
-{"event": "end",      "success": true}
+{"event": "end",      "success": false, "error": "disk full"}
 ```
 
 ### SSE Event Stream
