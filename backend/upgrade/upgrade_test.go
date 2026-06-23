@@ -163,8 +163,8 @@ func TestInvalidResultKeepsLastValid(t *testing.T) {
 }
 
 // TestStatusResponseShape asserts the GET /upgrade payload: contract fields
-// flat at the top, free fields under "extra", and "run" always present (idle is
-// the last finished verdict, defaulting to success).
+// flat at the top, free fields under "extra", and "run" always present (idle
+// until a run happens).
 func TestStatusResponseShape(t *testing.T) {
 	const result = `{"current":"dev","latest":"2026.7.0","upgrade_available":true,` +
 		`"checked_at":"2026-06-15T20:46:34Z","roles":["common"]}`
@@ -183,7 +183,7 @@ func TestStatusResponseShape(t *testing.T) {
 		return m
 	}
 
-	// Idle: contract fields flat, roles under "extra", run is the finished default.
+	// Idle: contract fields flat, roles under "extra", run is the idle default.
 	m := marshal()
 	if string(m["latest"]) != `"2026.7.0"` {
 		t.Errorf("latest = %s, want flat top-level", m["latest"])
@@ -192,8 +192,8 @@ func TestStatusResponseShape(t *testing.T) {
 	if err := json.Unmarshal(m["run"], &idle); err != nil {
 		t.Fatalf("idle run missing/undecodable: %v", err)
 	}
-	if idle.State != "finished" || idle.Success == nil || !*idle.Success {
-		t.Errorf("idle run = %+v, want finished success=true", idle)
+	if idle.State != "idle" {
+		t.Errorf("idle run = %+v, want state idle", idle)
 	}
 	var extra map[string]json.RawMessage
 	if err := json.Unmarshal(m["extra"], &extra); err != nil {
@@ -311,8 +311,8 @@ func TestBusTerminalStateEmitsFinished(t *testing.T) {
 	if !ok {
 		t.Fatalf("event data = %T, want RunState", e.Data)
 	}
-	if prog.State != "finished" || prog.Success == nil || !*prog.Success {
-		t.Fatalf("got %+v, want state=finished success=true", prog)
+	if prog.State != "idle" {
+		t.Fatalf("got %+v, want state=idle (success)", prog)
 	}
 }
 
