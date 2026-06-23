@@ -25,21 +25,25 @@ func New(ctx context.Context, cfg *config.UpgradeConfig, sysd *systemd.SystemdBa
 		return nil, nil
 	}
 
-	// Register as internal before Start, when the listener snapshots the units.
-	if sysd != nil {
-		sysd.AddInternalUserUnits(cfg.CheckUnit, cfg.UpgradeUnit)
-	}
-
-	return &UpgradeBackend{
+	u := &UpgradeBackend{
 		ctx:            ctx,
 		resultFile:     cfg.ResultFile,
 		checkUnit:      cfg.CheckUnit,
 		upgradeUnit:    cfg.UpgradeUnit,
 		progressSocket: cfg.ProgressSocket,
-		systemd:        sysd,
 		run:            newRun(cfg.StateFile),
 		events:         make(chan events.Event, 16),
-	}, nil
+	}
+	// Assigning a nil *SystemdBackend through the interface would make u.systemd
+	// non-nil; only set it for a real backend so the nil checks stay honest.
+	if sysd != nil {
+		// Register as internal before Start, when the listener snapshots the units.
+		sysd.AddInternalUserUnits(cfg.CheckUnit, cfg.UpgradeUnit)
+		u.systemd = sysd
+	}
+	logger.Info("[upgrade] configured: result=%s state=%q socket=%q check=%q upgrade=%q systemd=%t",
+		cfg.ResultFile, cfg.StateFile, cfg.ProgressSocket, cfg.CheckUnit, cfg.UpgradeUnit, sysd != nil)
+	return u, nil
 }
 
 // UseEventStream wires the shared bus; called by Backend.New once the broadcaster exists.

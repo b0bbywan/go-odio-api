@@ -84,6 +84,15 @@ type StatusResponse struct {
 	CanUpgrade bool     `json:"can_upgrade"`
 }
 
+// systemdControl is the slice of systemd the upgrade backend depends on: enough
+// to trigger the check/upgrade units and read one unit's state on resume.
+// *systemd.SystemdBackend satisfies it; tests supply a fake.
+type systemdControl interface {
+	StartService(name string, scope systemd.UnitScope) error
+	TriggerUserUnit(ctx context.Context, name string) error
+	RefreshService(ctx context.Context, name string, scope systemd.UnitScope) (*systemd.Service, error)
+}
+
 // UpgradeBackend watches a detector result file and triggers systemd user units to upgrade.
 type UpgradeBackend struct {
 	ctx            context.Context
@@ -92,9 +101,9 @@ type UpgradeBackend struct {
 	upgradeUnit    string
 	progressSocket string
 
-	systemd  *systemd.SystemdBackend // triggers units (user scope); may be nil
-	status   cache.Value[*Status]    // last valid detector result; nil until first read
-	lastRaw  []byte                  // last accepted result file bytes, for change dedup
+	systemd  systemdControl       // triggers and reads units (user scope); nil interface when disabled
+	status   cache.Value[*Status] // last valid detector result; nil until first read
+	lastRaw  []byte               // last accepted result file bytes, for change dedup
 	watcher  *fsnotify.Watcher
 	listener net.Listener // unix socket the upgrade script streams progress to
 	run      *run         // run lifecycle and persisted snapshot
