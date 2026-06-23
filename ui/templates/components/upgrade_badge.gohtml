@@ -12,6 +12,8 @@
 	      sse-swap="upgrade-progress" hx-swap="innerHTML">
 		{{ template "upgrade-ring" .Run }}
 	</span>
+{{- else if .Failed -}}
+	{{ template "upgrade-fail" (dict "Status" . "Base" $base) }}
 {{- else if and .Known .UpgradeAvailable -}}
 	{{ template "upgrade-start" (dict "Status" . "Base" $base) }}
 {{- else -}}

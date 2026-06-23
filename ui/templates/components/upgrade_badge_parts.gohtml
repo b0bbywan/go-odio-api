@@ -35,6 +35,26 @@
 
 {{ define "upgrade-check-icon" }}{{ if .Known }}{{ template "icon-check" }}{{ else }}{{ template "icon-rotate-cw" }}{{ end }}{{ end }}
 
+{{/* Last run failed: red alert icon that swaps to the green upgrade arrow on
+     hover. A button retries the upgrade when the trigger is available, else a
+     static indicator with the same look. */}}
+{{ define "upgrade-fail" }}
+{{- $s := .Status -}}
+{{- if $s.Upgradeable -}}
+<button hx-post="/upgrade/start" hx-swap="none" hx-confirm="Retry upgrade to {{ $s.Latest }}?"
+        class="group {{ .Base }} bg-red-500/10 text-red-400 transition hover:bg-green-500/10 hover:text-green-400"
+        title="Upgrade failed — retry">{{ template "upgrade-fail-icons" }}</button>
+{{- else -}}
+<span class="group {{ .Base }} bg-red-500/10 text-red-400 transition hover:bg-green-500/10 hover:text-green-400"
+      title="Upgrade failed">{{ template "upgrade-fail-icons" }}</span>
+{{- end -}}
+{{ end }}
+
+{{ define "upgrade-fail-icons" -}}
+<span class="group-hover:hidden">{{ template "icon-triangle-alert" }}</span>
+<span class="hidden group-hover:inline-flex">{{ template "icon-arrow-up" }}</span>
+{{- end }}
+
 {{/* Progress ring; data is *ui.UpgradeRun (may be nil). Spinner until a percent is streamed. */}}
 {{ define "upgrade-ring" }}
 {{- if .HasPercent -}}

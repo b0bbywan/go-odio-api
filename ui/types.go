@@ -47,9 +47,10 @@ type UpgradeStatus struct {
 	CanUpgrade       bool        `json:"can_upgrade"`
 }
 
-// UpgradeRun is the live progress of an in-flight upgrade; nil unless one runs.
-// Percent is nil until the script streams it (e.g. after an odio-api restart
-// mid-run), which the badge shows as an indeterminate ring.
+// UpgradeRun is the run snapshot: the verdict is the state itself — "idle"
+// (none or last succeeded), "running", or "failed". Percent is nil until the
+// script streams it (e.g. after an odio-api restart mid-run), which the badge
+// shows as an indeterminate ring.
 type UpgradeRun struct {
 	State   string `json:"state"`
 	Percent *int   `json:"percent"`
@@ -76,6 +77,12 @@ func (u *UpgradeStatus) Known() bool {
 // Running reports whether an upgrade is in flight.
 func (u *UpgradeStatus) Running() bool {
 	return u != nil && u.Run != nil && u.Run.State == "running"
+}
+
+// Failed reports whether the last run ended unsuccessfully. The badge shows it
+// until the next run, which lets the user retry.
+func (u *UpgradeStatus) Failed() bool {
+	return u != nil && u.Run != nil && u.Run.State == "failed"
 }
 
 // Checkable / Upgradeable report whether the matching trigger is available, so
