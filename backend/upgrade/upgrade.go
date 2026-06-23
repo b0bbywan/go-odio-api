@@ -37,6 +37,7 @@ func New(ctx context.Context, cfg *config.UpgradeConfig, sysd *systemd.SystemdBa
 		upgradeUnit:    cfg.UpgradeUnit,
 		progressSocket: cfg.ProgressSocket,
 		systemd:        sysd,
+		run:            newRun(cfg.StateFile),
 		events:         make(chan events.Event, 16),
 	}, nil
 }
@@ -47,6 +48,7 @@ func (u *UpgradeBackend) UseEventStream(s events.Stream) { u.stream = s }
 // Start loads the current result, then watches the result file, listens for run
 // progress, and tracks the run unit over the bus.
 func (u *UpgradeBackend) Start() error {
+	u.run.load()   // restore a run persisted at the last shutdown before consumers read it
 	u.readResult() // best-effort; a missing file is not an error
 	u.startWatcher()
 	u.startListener()
@@ -72,6 +74,7 @@ func (u *UpgradeBackend) Close() {
 		u.stream.Unsubscribe(u.sub)
 	}
 	u.wg.Wait()
+	u.run.save() // flush the final run snapshot for the next boot
 	u.watcher = nil
 	u.listener = nil
 }
@@ -87,7 +90,7 @@ func (u *UpgradeBackend) GetStatus() *Status {
 // StatusResponse builds the GET /upgrade payload (always non-nil).
 func (u *UpgradeBackend) StatusResponse() StatusResponse {
 	resp := StatusResponse{
-		Run:        u.runState.Load(),
+		Run:        u.run.snapshot(),
 		CanCheck:   u.CanCheck(),
 		CanUpgrade: u.CanUpgrade(),
 	}
@@ -161,18 +164,20 @@ func (u *UpgradeBackend) StartUpgrade() error {
 		logger.Warn("[upgrade] start requested but no upgrade unit available")
 		return ErrUnitNotConfigured
 	}
-	if !u.running.CompareAndSwap(false, true) {
+	if !u.run.start(originSystemd) {
 		logger.Warn("[upgrade] start requested but an upgrade is already running")
 		return ErrUpgradeInProgress
 	}
 	logger.Info("[upgrade] triggering upgrade unit %s, emitting running", u.upgradeUnit)
 	if err := u.systemd.TriggerUserUnit(u.ctx, u.upgradeUnit); err != nil {
-		u.running.Store(false)
+		// The run started and failed to launch; record the verdict rather than
+		// rewinding to idle, so the UI shows the failure.
+		u.run.finish(false)
 		logger.Warn("[upgrade] failed to trigger upgrade unit: %v", err)
+		u.notify(events.Event{Type: events.TypeUpgradeInfo, Data: u.run.snapshot()})
 		return err
 	}
-	u.runState.Store(&RunState{State: "running"})
-	u.notify(events.Event{Type: events.TypeUpgradeInfo, Data: RunState{State: "running"}})
+	u.notify(events.Event{Type: events.TypeUpgradeInfo, Data: u.run.snapshot()})
 	return nil
 }
 
@@ -207,7 +212,9 @@ func (u *UpgradeBackend) consumeEvents() {
 }
 
 // onServiceEvent emits the run verdict once the upgrade unit reaches a terminal
-// state. The CAS guard fires finished exactly once per tracked run.
+// state. A socket-driven run owns its own lifecycle and is closed by its "end"
+// line, not by the unit. finish is idempotent, so a run that streams "end" and
+// also trips the unit's terminal state still emits finished exactly once.
 func (u *UpgradeBackend) onServiceEvent(e events.Event) {
 	svc, ok := e.Data.(systemd.Service)
 	if !ok || svc.Name != u.upgradeUnit || svc.Scope != systemd.ScopeUser {
@@ -218,20 +225,28 @@ func (u *UpgradeBackend) onServiceEvent(e events.Event) {
 	default:
 		return // still activating
 	}
-	u.runState.Reset()
-	if !u.running.CompareAndSwap(true, false) {
+	if u.run.origin() == originSocket {
 		return
 	}
 	success := svc.ActiveState != "failed"
+	if !u.run.finish(success) {
+		return
+	}
 	logger.Info("[upgrade] %s reached %s, emitting finished (success=%v)", u.upgradeUnit, svc.ActiveState, success)
-	u.notify(events.Event{Type: events.TypeUpgradeInfo, Data: RunState{State: "finished", Success: &success}})
+	u.notify(events.Event{Type: events.TypeUpgradeInfo, Data: u.run.snapshot()})
 }
 
-// resumeIfRunning re-attaches to an upgrade triggered before a restart: if the
-// unit is still activating, re-announce running and let completion arrive over
-// the bus like any live run.
+// resumeIfRunning reconciles a restored or out-of-band run at startup. A socket
+// run has no unit to consult and waits for its CLI client to reconnect. For a
+// systemd run it reads the unit: still activating means resume, already terminal
+// means the run finished while we were down, so record its verdict.
 func (u *UpgradeBackend) resumeIfRunning() {
 	if u.systemd == nil {
+		return
+	}
+	if u.run.isRunning() && u.run.origin() == originSocket {
+		logger.Info("[upgrade] resuming socket run, awaiting client reconnect")
+		u.notify(events.Event{Type: events.TypeUpgradeInfo, Data: u.run.snapshot()})
 		return
 	}
 	ctx, cancel := context.WithTimeout(u.ctx, 5*time.Second)
@@ -241,9 +256,18 @@ func (u *UpgradeBackend) resumeIfRunning() {
 		logger.Warn("[upgrade] cannot read %s state on startup: %v", u.upgradeUnit, err)
 		return
 	}
-	if svc.ActiveState == "activating" && u.running.CompareAndSwap(false, true) {
-		logger.Info("[upgrade] %s still running on startup, resuming", u.upgradeUnit)
-		u.runState.Store(&RunState{State: "running"})
-		u.notify(events.Event{Type: events.TypeUpgradeInfo, Data: RunState{State: "running"}})
+	switch {
+	case svc.ActiveState == "activating":
+		// claim it unless we already hold a restored run for this unit.
+		if u.run.isRunning() || u.run.start(originSystemd) {
+			logger.Info("[upgrade] %s still running on startup, resuming", u.upgradeUnit)
+			u.notify(events.Event{Type: events.TypeUpgradeInfo, Data: u.run.snapshot()})
+		}
+	case u.run.isRunning():
+		// restored running but the unit is terminal: it ended while we were down.
+		if u.run.finish(svc.ActiveState != "failed") {
+			logger.Info("[upgrade] %s ended while down (%s), recording verdict", u.upgradeUnit, svc.ActiveState)
+			u.notify(events.Event{Type: events.TypeUpgradeInfo, Data: u.run.snapshot()})
+		}
 	}
 }
