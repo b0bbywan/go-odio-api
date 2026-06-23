@@ -163,6 +163,55 @@ func TestSSEEvents_DebounceCoalesces(t *testing.T) {
 	}
 }
 
+// TestSSEEvents_UpgradeFailedRendersFailBadge locks the end-to-end failed path:
+// an upgrade.info event re-fetches GET /upgrade, and a run in the "failed" state
+// must render the alert-icon fail badge.
+func TestSSEEvents_UpgradeFailedRendersFailBadge(t *testing.T) {
+	upstream := make(chan events.Event, 4)
+	b := backend.NewBroadcaster(context.Background(), upstream)
+
+	apiMux := http.NewServeMux()
+	apiMux.HandleFunc("/upgrade", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if _, err := w.Write([]byte(`{"current":"1.0","latest":"1.1","upgrade_available":true,` +
+			`"can_upgrade":true,"run":{"state":"failed"}}`)); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	})
+	apiServer := httptest.NewServer(apiMux)
+	defer apiServer.Close()
+
+	h := &Handler{
+		tmpl:        LoadTemplates(),
+		client:      NewAPIClient(testAPIPort(t, apiServer)),
+		broadcaster: b,
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	req := httptest.NewRequest(http.MethodGet, "/ui/events", nil).WithContext(ctx)
+	w := httptest.NewRecorder()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		h.SSEEvents(w, req)
+	}()
+
+	time.Sleep(20 * time.Millisecond)
+	upstream <- events.Event{Type: events.TypeUpgradeInfo, Data: "test"}
+	time.Sleep(350 * time.Millisecond)
+	cancel()
+	<-done
+
+	body := w.Body.String()
+	if !strings.Contains(body, "event: section-upgrade") {
+		t.Fatalf("expected a section-upgrade SSE event, got: %s", body)
+	}
+	if !strings.Contains(body, "m21.73 18-8-14") {
+		t.Errorf("failed run should render the alert-icon fail badge, got: %s", body)
+	}
+}
+
 func TestSSEEvents_EventMapping(t *testing.T) {
 	tests := []struct {
 		name         string

@@ -245,6 +245,53 @@ func TestUpgradeBadgeRunning(t *testing.T) {
 	}
 }
 
+func TestUpgradeBadgeFailed(t *testing.T) {
+	tmpl := LoadTemplates()
+
+	render := func(status *UpgradeStatus) string {
+		t.Helper()
+		var buf bytes.Buffer
+		if err := tmpl.ExecuteTemplate(&buf, "section-upgrade", status); err != nil {
+			t.Fatalf("execute section-upgrade: %v", err)
+		}
+		return buf.String()
+	}
+
+	// A failed verdict wins over UpgradeAvailable: the alert icon shows by
+	// default and swaps to the green upgrade arrow on hover, with a retry button.
+	out := render(&UpgradeStatus{
+		Latest: "1.1", UpgradeAvailable: true, CanUpgrade: true,
+		Run: &UpgradeRun{State: "failed"},
+	})
+	if !strings.Contains(out, "m21.73 18-8-14") {
+		t.Errorf("failed badge should show the alert icon, got: %s", out)
+	}
+	if !strings.Contains(out, "group-hover:hidden") || !strings.Contains(out, "group-hover:inline-flex") {
+		t.Errorf("failed badge should swap icons on hover, got: %s", out)
+	}
+	if !strings.Contains(out, "M12 19V5") {
+		t.Errorf("failed badge should reveal the upgrade arrow on hover, got: %s", out)
+	}
+	if !strings.Contains(out, `hx-post="/upgrade/start"`) || !strings.Contains(out, "hx-confirm=") {
+		t.Errorf("failed badge with trigger should retry the upgrade, got: %s", out)
+	}
+
+	// Without the trigger it is a static indicator, no click action.
+	gated := render(&UpgradeStatus{Latest: "1.1", Run: &UpgradeRun{State: "failed"}})
+	if strings.Contains(gated, "hx-post=") {
+		t.Errorf("failed badge without trigger must not be clickable, got: %s", gated)
+	}
+	if !strings.Contains(gated, "m21.73 18-8-14") {
+		t.Errorf("failed badge without trigger should still show the alert icon, got: %s", gated)
+	}
+
+	// A succeeded run is idle, not a failure: no alert icon.
+	ok := render(&UpgradeStatus{Latest: "1.0", Run: &UpgradeRun{State: "idle"}})
+	if strings.Contains(ok, "m21.73 18-8-14") {
+		t.Errorf("succeeded (idle) run must not show the alert icon, got: %s", ok)
+	}
+}
+
 // TestUpgradeBadgeGatedActions verifies the badge renders a static icon (no
 // hx-post) when the matching trigger is unavailable, e.g. result-file-only mode.
 func TestUpgradeBadgeGatedActions(t *testing.T) {
