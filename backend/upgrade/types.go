@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
@@ -21,12 +20,15 @@ var ErrUnitNotConfigured = errors.New("upgrade: systemd unit not configured")
 
 var ErrUpgradeInProgress = errors.New("upgrade: already in progress")
 
-// RunState is the run lifecycle: the upgrade.info payload and the status "run" snapshot (nil when idle).
+// RunState is the run lifecycle: the upgrade.info payload and the status "run"
+// snapshot. The verdict is the state itself; idle is none or last succeeded.
 type RunState struct {
-	State   string  `json:"state"`             // "running" | "finished"
-	Percent *int    `json:"percent,omitempty"` // live, while running
-	Step    *string `json:"step,omitempty"`    // live, while running
-	Success *bool   `json:"success,omitempty"` // set once finished
+	State      string  `json:"state"`                 // "idle" | "running" | "failed"
+	Origin     string  `json:"origin,omitempty"`      // "systemd" | "socket"
+	Percent    *int    `json:"percent,omitempty"`     // live, while running
+	Step       *string `json:"step,omitempty"`        // live, while running
+	StartedAt  string  `json:"started_at,omitempty"`  // RFC3339
+	FinishedAt string  `json:"finished_at,omitempty"` // RFC3339
 }
 
 // Status is the detector result; UnmarshalJSON routes unknown fields verbatim into Extra.
@@ -74,12 +76,12 @@ func (s *Status) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-// StatusResponse is the GET /upgrade payload: Status, the live run, and available triggers.
+// StatusResponse is the GET /upgrade payload: Status, the run snapshot, and available triggers.
 type StatusResponse struct {
 	Status
-	Run        *RunState `json:"run,omitempty"`
-	CanCheck   bool      `json:"can_check"`
-	CanUpgrade bool      `json:"can_upgrade"`
+	Run        RunState `json:"run"`
+	CanCheck   bool     `json:"can_check"`
+	CanUpgrade bool     `json:"can_upgrade"`
 }
 
 // UpgradeBackend watches a detector result file and triggers systemd user units to upgrade.
@@ -94,9 +96,8 @@ type UpgradeBackend struct {
 	status   cache.Value[*Status]    // last valid detector result; nil until first read
 	lastRaw  []byte                  // last accepted result file bytes, for change dedup
 	watcher  *fsnotify.Watcher
-	listener net.Listener           // unix socket the upgrade script streams progress to
-	running  atomic.Bool            // guards against concurrent upgrades
-	runState cache.Value[*RunState] // live run progress for the status endpoint; nil when idle
+	listener net.Listener // unix socket the upgrade script streams progress to
+	run      *run         // run lifecycle and persisted snapshot
 	wg       sync.WaitGroup
 	events   chan events.Event
 

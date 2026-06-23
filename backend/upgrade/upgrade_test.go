@@ -163,8 +163,8 @@ func TestInvalidResultKeepsLastValid(t *testing.T) {
 }
 
 // TestStatusResponseShape asserts the GET /upgrade payload: contract fields
-// flat at the top, free fields under "extra", and "run" added only while an
-// upgrade is in flight.
+// flat at the top, free fields under "extra", and "run" always present (idle is
+// the last finished verdict, defaulting to success).
 func TestStatusResponseShape(t *testing.T) {
 	const result = `{"current":"dev","latest":"2026.7.0","upgrade_available":true,` +
 		`"checked_at":"2026-06-15T20:46:34Z","roles":["common"]}`
@@ -183,13 +183,17 @@ func TestStatusResponseShape(t *testing.T) {
 		return m
 	}
 
-	// Idle: contract fields flat, roles under "extra", no "run".
+	// Idle: contract fields flat, roles under "extra", run is the finished default.
 	m := marshal()
 	if string(m["latest"]) != `"2026.7.0"` {
 		t.Errorf("latest = %s, want flat top-level", m["latest"])
 	}
-	if _, ok := m["run"]; ok {
-		t.Errorf("idle response should have no run, got %s", m["run"])
+	var idle RunState
+	if err := json.Unmarshal(m["run"], &idle); err != nil {
+		t.Fatalf("idle run missing/undecodable: %v", err)
+	}
+	if idle.State != "finished" || idle.Success == nil || !*idle.Success {
+		t.Errorf("idle run = %+v, want finished success=true", idle)
 	}
 	var extra map[string]json.RawMessage
 	if err := json.Unmarshal(m["extra"], &extra); err != nil {
@@ -199,9 +203,9 @@ func TestStatusResponseShape(t *testing.T) {
 		t.Errorf("extra.roles = %s, want verbatim", extra["roles"])
 	}
 
-	// In flight: "run" appears alongside the flat fields.
-	pct := 50
-	u.runState.Store(&RunState{State: "running", Percent: &pct})
+	// In flight: run reflects the live percent.
+	u.run.start(originSystemd)
+	u.run.progress(50, "installing")
 	var run RunState
 	if err := json.Unmarshal(marshal()["run"], &run); err != nil {
 		t.Fatalf("run missing/undecodable: %v", err)
@@ -293,7 +297,7 @@ func TestBusTerminalStateEmitsFinished(t *testing.T) {
 	recv(t, u.Events(), time.Second) // drain the initial result-read event
 
 	// Simulate an in-progress run, then its unit reaching a terminal success state.
-	u.running.Store(true)
+	u.run.start(originSystemd)
 	stream.ch <- events.Event{
 		Type: events.TypeServiceUpdated,
 		Data: systemd.Service{Name: "odio-upgrade.service", Scope: systemd.ScopeUser, ActiveState: "inactive"},

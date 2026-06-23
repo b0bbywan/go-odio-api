@@ -102,6 +102,7 @@ type SystemdConfig struct {
 type UpgradeConfig struct {
 	Enabled        bool
 	ResultFile     string // upgrades.json to read and watch
+	StateFile      string // run-state snapshot, persisted across restarts
 	CheckUnit      string // user unit to (re)run detection; empty disables /upgrade/check
 	UpgradeUnit    string // user unit to run the upgrade; empty disables /upgrade/start
 	ProgressSocket string // unix socket the upgrade script streams run progress to
@@ -350,9 +351,19 @@ func New(cfgFile *string) (*Config, error) {
 	if progressSocket == "" {
 		progressSocket = filepath.Join(xdgRuntimeDir, "odio-api", "upgrade.sock")
 	}
+	// The run-state snapshot must survive a machine reboot, so it lives in the
+	// cache dir, not the tmpfs runtime dir.
+	stateFile := viper.GetString("upgrade.stateFile")
+	if stateFile == "" {
+		cacheDir, err := os.UserCacheDir()
+		if err == nil {
+			stateFile = filepath.Join(cacheDir, "odio-api", "upgrade-run.json")
+		}
+	}
 	upgradecfg := UpgradeConfig{
 		Enabled:        viper.GetBool("upgrade.enabled"),
 		ResultFile:     viper.GetString("upgrade.resultFile"),
+		StateFile:      stateFile,
 		CheckUnit:      viper.GetString("upgrade.checkUnit"),
 		UpgradeUnit:    viper.GetString("upgrade.upgradeUnit"),
 		ProgressSocket: progressSocket,
