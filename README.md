@@ -428,7 +428,7 @@ The detector's result file contract is `current`, `latest`, `upgrade_available` 
   "upgrade_available": true,
   "checked_at": "2026-06-15T20:46:34Z",
   "extra": { "roles": ["setup", "..."], "manifest": { "odios": "2026.6.0b1" } },
-  "run": { "state": "running", "percent": 42, "step": "mpd" },  // only during a run
+  "run": { "state": "running", "percent": 42, "step": "mpd" },  // "idle" until a run, "failed" if the last one failed
   "can_check": true,                                            // POST /upgrade/check available
   "can_upgrade": true                                           // POST /upgrade/start available
 }
@@ -440,9 +440,10 @@ Detector status and run lifecycle stream as `upgrade.info`; live run progress st
 // upgrade.info — detector status (on result-file change): the contract fields + "extra", no "run" or capability flags
 {"current": "2026.5.0b3", "latest": "2026.6.0b1", "upgrade_available": true, "checked_at": "...", "extra": { /* ... */ }}
 
-// upgrade.info — run lifecycle; success is the systemd job result (authoritative)
-{"state": "running"}
-{"state": "finished", "success": true}
+// upgrade.info — run lifecycle; the state is the verdict (systemd job result is authoritative):
+// "idle" (none or last succeeded), "running", "failed"
+{"state": "running", "percent": 42, "step": "mpd"}
+{"state": "failed"}
 
 // upgrade.progress — emitted by the upgrade script over the socket; minimum contract below, add any field you want
 {"event": "begin",    "total": 7}
