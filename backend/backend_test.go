@@ -70,7 +70,7 @@ func TestBackendDisabled(t *testing.T) {
 			zeroconfCfg := &config.ZeroConfig{Enabled: tt.zeroconfEnabled}
 			upgradeCfg := &config.UpgradeConfig{Enabled: tt.upgradeEnabled}
 
-			backend, err := New(ctx, bluetoothCfg, login1Cfg, mprisCfg, pulseCfg, systemdCfg, upgradeCfg, zeroconfCfg)
+			backend, err := New(ctx, bluetoothCfg, login1Cfg, mprisCfg, pulseCfg, &config.SendspinConfig{Enabled: false}, systemdCfg, upgradeCfg, zeroconfCfg)
 
 			// Bluetooth and other D-Bus backends may fail in test environment
 			// This is expected and we should skip the test
@@ -131,6 +131,7 @@ func TestSystemdWithEmptyConfig(t *testing.T) {
 		&config.Login1Config{Enabled: false},
 		&config.MPRISConfig{Enabled: false},
 		&config.PulseAudioConfig{Enabled: false},
+		&config.SendspinConfig{Enabled: false},
 		systemdCfg,
 		&config.UpgradeConfig{Enabled: false},
 		&config.ZeroConfig{Enabled: false},
@@ -160,6 +161,7 @@ func TestZeroconfWithLocalhostBind(t *testing.T) {
 		&config.Login1Config{Enabled: false},
 		&config.MPRISConfig{Enabled: false},
 		&config.PulseAudioConfig{Enabled: false},
+		&config.SendspinConfig{Enabled: false},
 		&config.SystemdConfig{Enabled: false},
 		&config.UpgradeConfig{Enabled: false},
 		zeroconfCfg,
@@ -217,6 +219,7 @@ func TestLogin1DisabledInBackend(t *testing.T) {
 		login1Cfg,
 		&config.MPRISConfig{Enabled: false},
 		&config.PulseAudioConfig{Enabled: false},
+		&config.SendspinConfig{Enabled: false},
 		&config.SystemdConfig{Enabled: false},
 		&config.UpgradeConfig{Enabled: false},
 		&config.ZeroConfig{Enabled: false},
@@ -249,6 +252,7 @@ func TestLogin1DisabledWithCapabilities(t *testing.T) {
 		login1Cfg,
 		&config.MPRISConfig{Enabled: false},
 		&config.PulseAudioConfig{Enabled: false},
+		&config.SendspinConfig{Enabled: false},
 		&config.SystemdConfig{Enabled: false},
 		&config.UpgradeConfig{Enabled: false},
 		&config.ZeroConfig{Enabled: false},
@@ -286,6 +290,7 @@ func TestBackendNew_Login1FieldInitialisedToNil(t *testing.T) {
 		&config.Login1Config{Enabled: false},
 		&config.MPRISConfig{Enabled: false},
 		&config.PulseAudioConfig{Enabled: false},
+		&config.SendspinConfig{Enabled: false},
 		&config.SystemdConfig{Enabled: false, SystemServices: []config.SystemdService{}, UserServices: []config.SystemdService{}},
 		&config.UpgradeConfig{Enabled: false},
 		&config.ZeroConfig{Enabled: false},

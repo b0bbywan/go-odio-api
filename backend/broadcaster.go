@@ -94,6 +94,9 @@ func newBroadcasterFromBackend(ctx context.Context, b *Backend) *Broadcaster {
 	if b.Pulse != nil {
 		srcs = append(srcs, b.Pulse.Events())
 	}
+	if b.Sendspin != nil {
+		srcs = append(srcs, b.Sendspin.Events())
+	}
 	if b.Systemd != nil {
 		srcs = append(srcs, b.Systemd.Events())
 	}

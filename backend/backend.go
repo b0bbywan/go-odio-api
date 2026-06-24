@@ -7,6 +7,7 @@ import (
 	"github.com/b0bbywan/go-odio-api/backend/login1"
 	"github.com/b0bbywan/go-odio-api/backend/mpris"
 	"github.com/b0bbywan/go-odio-api/backend/pulseaudio"
+	"github.com/b0bbywan/go-odio-api/backend/sendspin"
 	"github.com/b0bbywan/go-odio-api/backend/systemd"
 	"github.com/b0bbywan/go-odio-api/backend/upgrade"
 	"github.com/b0bbywan/go-odio-api/backend/zeroconf"
@@ -18,6 +19,7 @@ type Backend struct {
 	Login1    *login1.Login1Backend
 	MPRIS     *mpris.MPRISBackend
 	Pulse     *pulseaudio.PulseAudioBackend
+	Sendspin  *sendspin.SendspinBackend
 	Systemd   *systemd.SystemdBackend
 	Upgrade   *upgrade.UpgradeBackend
 	Zeroconf  *zeroconf.ZeroConfBackend
@@ -31,6 +33,7 @@ func New(
 	login1cfg *config.Login1Config,
 	mpriscfg *config.MPRISConfig,
 	pulscfg *config.PulseAudioConfig,
+	sendspincfg *config.SendspinConfig,
 	syscfg *config.SystemdConfig,
 	upgcfg *config.UpgradeConfig,
 	zerocfg *config.ZeroConfig,
@@ -51,6 +54,10 @@ func New(
 	}
 
 	if b.Pulse, err = pulseaudio.New(ctx, pulscfg); err != nil {
+		return nil, err
+	}
+
+	if b.Sendspin, err = sendspin.New(ctx, sendspincfg); err != nil {
 		return nil, err
 	}
 
@@ -104,6 +111,12 @@ func (b *Backend) Start() error {
 		}
 	}
 
+	if b.Sendspin != nil {
+		if err := b.Sendspin.Start(); err != nil {
+			return err
+		}
+	}
+
 	if b.Systemd != nil {
 		if err := b.Systemd.Start(); err != nil {
 			return err
@@ -137,6 +150,9 @@ func (b *Backend) Close() {
 	}
 	if b.Pulse != nil {
 		b.Pulse.Close()
+	}
+	if b.Sendspin != nil {
+		b.Sendspin.Close()
 	}
 	if b.Systemd != nil {
 		b.Systemd.Close()

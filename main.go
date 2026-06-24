@@ -50,6 +50,7 @@ func main() {
 		cfg.Login1,
 		cfg.MPRIS,
 		cfg.Pulseaudio,
+		cfg.Sendspin,
 		cfg.Systemd,
 		cfg.Upgrade,
 		cfg.Zeroconf,
