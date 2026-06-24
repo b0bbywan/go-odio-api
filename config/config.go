@@ -30,6 +30,7 @@ type Config struct {
 	Login1     *Login1Config
 	MPRIS      *MPRISConfig
 	Pulseaudio *PulseAudioConfig
+	Sendspin   *SendspinConfig
 	Systemd    *SystemdConfig
 	Upgrade    *UpgradeConfig
 	Zeroconf   *ZeroConfig
@@ -71,6 +72,17 @@ type Login1Config struct {
 type MPRISConfig struct {
 	Enabled bool
 	Timeout time.Duration
+}
+
+// SendspinConfig drives the experimental Sendspin player backend. ServerAddr is
+// optional: when empty the backend discovers a server over mDNS.
+type SendspinConfig struct {
+	Enabled    bool
+	ServerAddr string
+	PlayerName string
+	Volume     int
+	ClientID   string
+	Timeout    time.Duration // mDNS discovery timeout
 }
 
 type PulseAudioConfig struct {
@@ -233,6 +245,12 @@ func New(cfgFile *string) (*Config, error) {
 	viper.SetDefault("pulseaudio.enabled", true)
 	viper.SetDefault("pulseaudio.serve_cookie", false)
 
+	// Experimental, off by default: pulls in the patched (cgo-free) sendspin-go.
+	viper.SetDefault("sendspin.enabled", false)
+	viper.SetDefault("sendspin.playername", AppName)
+	viper.SetDefault("sendspin.volume", 80)
+	viper.SetDefault("sendspin.timeout", "10s")
+
 	viper.SetDefault("systemd.enabled", false)
 	viper.SetDefault("systemd.system", []string{})
 	viper.SetDefault("systemd.user", []string{})
@@ -328,6 +346,15 @@ func New(cfgFile *string) (*Config, error) {
 		ServeCookie:   viper.GetBool("pulseaudio.serve_cookie"),
 	}
 
+	sendspincfg := SendspinConfig{
+		Enabled:    viper.GetBool("sendspin.enabled"),
+		ServerAddr: viper.GetString("sendspin.serveraddr"),
+		PlayerName: viper.GetString("sendspin.playername"),
+		Volume:     viper.GetInt("sendspin.volume"),
+		ClientID:   viper.GetString("sendspin.clientid"),
+		Timeout:    getDuration("sendspin.timeout", 10*time.Second),
+	}
+
 	sysServices, err := parseSystemdServices(viper.Get("systemd.system"))
 	if err != nil {
 		return nil, fmt.Errorf("invalid systemd.system: %w", err)
@@ -386,6 +413,7 @@ func New(cfgFile *string) (*Config, error) {
 		Login1:     &logincfg,
 		MPRIS:      &mpriscfg,
 		Pulseaudio: &pulsecfg,
+		Sendspin:   &sendspincfg,
 		Systemd:    &syscfg,
 		Upgrade:    &upgradecfg,
 		Zeroconf:   &zerocfg,

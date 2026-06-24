@@ -16,6 +16,8 @@ const (
 	TypePowerAction         = "power.action"
 	TypeUpgradeInfo         = "upgrade.info"
 	TypeUpgradeProgress     = "upgrade.progress"
+	TypeSendspinUpdated     = "sendspin.updated"
+	TypeSendspinMetadata    = "sendspin.metadata"
 )
 
 type Event struct {
@@ -42,6 +44,7 @@ var BackendTypes = map[string][]string{
 	"bluetooth": {TypeBluetoothUpdated, TypeBluetoothDiscovered},
 	"power":     {TypePowerAction},
 	"upgrade":   {TypeUpgradeInfo, TypeUpgradeProgress},
+	"sendspin":  {TypeSendspinUpdated, TypeSendspinMetadata},
 }
 
 // NewFilter combines include and exclude type lists into a single filter func.
