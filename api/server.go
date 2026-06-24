@@ -128,6 +128,11 @@ func (s *Server) register(b *backend.Backend) {
 		s.registerPulseRoutes(b.Pulse)
 	}
 
+	// sendspin routes
+	if b.Sendspin != nil {
+		s.registerSendspinRoutes(b.Sendspin)
+	}
+
 	// systemd routes
 	if b.Systemd != nil {
 		s.registerSystemdRoutes(b.Systemd)
