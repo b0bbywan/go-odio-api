@@ -16,7 +16,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0  # required for git describe (VERSION computation)
 
@@ -26,7 +26,7 @@ jobs:
           go-version: '1.24'
 
       - name: Cache Go modules
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cache/go-build
@@ -36,7 +36,7 @@ jobs:
             ${{ runner.os }}-go-build-
 
       - name: Install Task
-        uses: arduino/setup-task@v2
+        uses: arduino/setup-task@v3
         with:
           version: 3.x
           repo-token: ${{ secrets.GITHUB_TOKEN }}
@@ -51,14 +51,14 @@ jobs:
         run: task package:all
 
       - name: Upload binaries
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: binaries-${{ github.sha }}
           path: dist/odio-api-linux-*
           retention-days: 7
 
       - name: Upload packages
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: packages-${{ github.sha }}
           path: |
@@ -75,7 +75,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
