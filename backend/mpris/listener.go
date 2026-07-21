@@ -2,6 +2,7 @@ package mpris
 
 import (
 	"context"
+	"slices"
 	"strings"
 
 	"github.com/godbus/dbus/v5"
@@ -62,6 +63,11 @@ func (l *Listener) handleSignal(sig *dbus.Signal) {
 		l.handlePropertiesChanged(sig)
 	case DBUS_NAME_OWNER_CHANGED:
 		l.handleNameOwnerChanged(sig)
+	case MPRIS_SIGNAL_TRACKLIST_REPLACED, MPRIS_SIGNAL_TRACK_ADDED,
+		MPRIS_SIGNAL_TRACK_REMOVED, MPRIS_SIGNAL_TRACK_METADATA_CHANGED:
+		if busName := l.resolveSender(sig); busName != "" {
+			l.handleTrackListSignal(busName, sig)
+		}
 	default:
 		logger.Debug("[mpris] unhandled signal: %s", sig.Name)
 	}
@@ -73,17 +79,12 @@ func (l *Listener) handlePropertiesChanged(sig *dbus.Signal) {
 	// Body[1] = changed properties (map[string]Variant)
 	// Body[2] = invalidated properties ([]string)
 
-	if len(sig.Body) < 2 {
+	iface, ok := arg[string](sig, 0)
+	if !ok {
 		return
 	}
 
-	iface, ok := sig.Body[0].(string)
-	if !ok || iface != MPRIS_PLAYER_IFACE {
-		// We only care about Player changes
-		return
-	}
-
-	changed, ok := sig.Body[1].(map[string]dbus.Variant)
+	changed, ok := arg[map[string]dbus.Variant](sig, 1)
 	if !ok {
 		return
 	}
@@ -93,6 +94,31 @@ func (l *Listener) handlePropertiesChanged(sig *dbus.Signal) {
 	busName := l.backend.findPlayerByUniqueName(sig.Sender)
 	if busName == "" {
 		// Signal from unknown player, ignore
+		return
+	}
+
+	if iface == MPRIS_TRACKLIST_IFACE {
+		if v, ok := changed["CanEditTracks"]; ok {
+			if err := l.backend.UpdateCanEditTracks(busName, v); err != nil {
+				logger.Error("[mpris] failed to update CanEditTracks for %s: %v", busName, err)
+			}
+		}
+		// Some players (VLC) never emit usable TrackList signals (VLC mangles
+		// their interface name) and only report queue changes here — as a
+		// changed value or a bare invalidation. Skipping when the IDs match
+		// the cache keeps players that emit both from doubling up.
+		if v, ok := changed["Tracks"]; ok {
+			if ids, ok := v.Value().([]dbus.ObjectPath); ok && !l.backend.tracklistMatches(busName, ids) {
+				l.refreshTracklist(busName, ids)
+			}
+			return
+		}
+		if invalidated, ok := arg[[]string](sig, 2); ok && slices.Contains(invalidated, "Tracks") {
+			l.refetchTracklist(busName)
+		}
+		return
+	}
+	if iface != MPRIS_PLAYER_IFACE {
 		return
 	}
 
@@ -175,6 +201,124 @@ func (l *Listener) handleNameOwnerChanged(sig *dbus.Signal) {
 		if err := l.backend.RemovePlayer(busName); err != nil {
 			logger.Error("[mpris] failed to remove player %s: %v", busName, err)
 		}
+	}
+}
+
+// resolveSender maps a signal's unique-name sender to a cached busName.
+// Dropping unknown senders is the safety net for the broad interface+path
+// match rule, which delivers TrackList signals from any sender.
+func (l *Listener) resolveSender(sig *dbus.Signal) string {
+	busName := l.backend.findPlayerByUniqueName(sig.Sender)
+	if busName == "" {
+		logger.Debug("[mpris] dropping %s from unknown sender %s", sig.Name, sig.Sender)
+	}
+	return busName
+}
+
+// refreshTracklist replaces a player's cached tracklist from a list of IDs,
+// fetching their metadata in one call (IDs only on failure).
+func (l *Listener) refreshTracklist(busName string, ids []dbus.ObjectPath) {
+	tracks := tracksFromIDs(ids)
+	if len(ids) > 0 {
+		if metas, err := newPlayer(l.backend, busName).getTracksMetadata(ids); err == nil {
+			tracks = tracksFromMetadata(ids, metas)
+		} else {
+			logger.Debug("[mpris] GetTracksMetadata failed for %s, keeping IDs only: %v", busName, err)
+		}
+	}
+
+	if err := l.backend.ReplaceTracklist(busName, tracks); err != nil {
+		logger.Error("[mpris] failed to replace tracklist for %s: %v", busName, err)
+	}
+}
+
+// refetchTracklist re-reads the Tracks property after an invalidation
+// (no value in the signal) and refreshes the cache if it changed.
+func (l *Listener) refetchTracklist(busName string) {
+	v, err := l.backend.getProperty(busName, MPRIS_TRACKLIST_IFACE, "Tracks")
+	if err != nil {
+		logger.Debug("[mpris] failed to fetch Tracks for %s: %v", busName, err)
+		return
+	}
+	ids, ok := v.Value().([]dbus.ObjectPath)
+	if !ok {
+		return
+	}
+	if !l.backend.tracklistMatches(busName, ids) {
+		l.refreshTracklist(busName, ids)
+	}
+}
+
+// handleTrackListSignal dispatches TrackList signals once the sender is
+// resolved to a cached player.
+func (l *Listener) handleTrackListSignal(busName string, sig *dbus.Signal) {
+	switch sig.Name {
+	case MPRIS_SIGNAL_TRACKLIST_REPLACED:
+		l.handleTrackListReplaced(busName, sig)
+	case MPRIS_SIGNAL_TRACK_ADDED:
+		l.handleTrackAdded(busName, sig)
+	case MPRIS_SIGNAL_TRACK_REMOVED:
+		l.handleTrackRemoved(busName, sig)
+	case MPRIS_SIGNAL_TRACK_METADATA_CHANGED:
+		l.handleTrackMetadataChanged(busName, sig)
+	}
+}
+
+// handleTrackListReplaced processes a wholesale tracklist replacement.
+// Body[0] = new track IDs; Body[1] = current track (unused)
+func (l *Listener) handleTrackListReplaced(busName string, sig *dbus.Signal) {
+	ids, ok := arg[[]dbus.ObjectPath](sig, 0)
+	if !ok {
+		return
+	}
+
+	l.refreshTracklist(busName, ids)
+}
+
+// handleTrackAdded processes a track insertion.
+// Body[0] = track metadata; Body[1] = the track it was inserted after
+func (l *Listener) handleTrackAdded(busName string, sig *dbus.Signal) {
+	meta, ok := arg[map[string]dbus.Variant](sig, 0)
+	if !ok {
+		return
+	}
+	afterTrack, ok := arg[dbus.ObjectPath](sig, 1)
+	if !ok {
+		return
+	}
+
+	if err := l.backend.AddTrackToCache(busName, trackFromSignalMetadata(meta), string(afterTrack)); err != nil {
+		logger.Error("[mpris] failed to add track for %s: %v", busName, err)
+	}
+}
+
+// handleTrackRemoved processes a track removal.
+// Body[0] = removed track ID
+func (l *Listener) handleTrackRemoved(busName string, sig *dbus.Signal) {
+	trackID, ok := arg[dbus.ObjectPath](sig, 0)
+	if !ok {
+		return
+	}
+
+	if err := l.backend.RemoveTrackFromCache(busName, string(trackID)); err != nil {
+		logger.Error("[mpris] failed to remove track for %s: %v", busName, err)
+	}
+}
+
+// handleTrackMetadataChanged processes per-track metadata updates.
+// Body[0] = track ID; Body[1] = new metadata
+func (l *Listener) handleTrackMetadataChanged(busName string, sig *dbus.Signal) {
+	trackID, ok := arg[dbus.ObjectPath](sig, 0)
+	if !ok {
+		return
+	}
+	meta, ok := arg[map[string]dbus.Variant](sig, 1)
+	if !ok {
+		return
+	}
+
+	if err := l.backend.UpdateTrackMetadataInCache(busName, string(trackID), trackFromSignalMetadata(meta)); err != nil {
+		logger.Error("[mpris] failed to update track metadata for %s: %v", busName, err)
 	}
 }
 

@@ -54,6 +54,21 @@ func tracklistEnvelope(p Player) map[string]any {
 	}
 }
 
+// tracklistMatches reports whether the player's cached tracklist has exactly
+// the given IDs in the same order.
+func (m *MPRISBackend) tracklistMatches(busName string, ids []dbus.ObjectPath) bool {
+	player, err := m.GetPlayerFromCache(busName)
+	if err != nil || len(player.Tracklist) != len(ids) {
+		return false
+	}
+	for i := range ids {
+		if player.Tracklist[i].TrackID != string(ids[i]) {
+			return false
+		}
+	}
+	return true
+}
+
 // ReplaceTracklist wholesale-replaces a player's tracklist (TrackListReplaced).
 func (m *MPRISBackend) ReplaceTracklist(busName string, tracks []Track) error {
 	return m.mutateTracklist(busName, func(p *Player) bool {

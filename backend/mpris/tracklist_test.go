@@ -444,6 +444,122 @@ func TestRemoveTrackValidation(t *testing.T) {
 	})
 }
 
+func TestListenerTracklistSignals(t *testing.T) {
+	const uniqueName = ":1.42"
+
+	newListener := func() (*Listener, *MPRISBackend) {
+		b := newTracklistBackend(Player{
+			BusName:            testBus,
+			uniqueName:         uniqueName,
+			TracklistSupported: true,
+			Tracklist:          []Track{{TrackID: "/track/1"}, {TrackID: "/track/2"}},
+		})
+		return &Listener{backend: b}, b
+	}
+
+	signal := func(name string, body ...interface{}) *dbus.Signal {
+		return &dbus.Signal{Sender: uniqueName, Path: MPRIS_PATH, Name: name, Body: body}
+	}
+
+	t.Run("TrackAdded prepends via NoTrack", func(t *testing.T) {
+		l, b := newListener()
+		meta := map[string]dbus.Variant{
+			"mpris:trackid": dbus.MakeVariant(dbus.ObjectPath("/track/new")),
+		}
+		l.handleSignal(signal(MPRIS_SIGNAL_TRACK_ADDED, meta, dbus.ObjectPath(MPRIS_NO_TRACK)))
+
+		p, _ := b.GetPlayerFromCache(testBus)
+		assertTrackIDs(t, p.Tracklist, []string{"/track/new", "/track/1", "/track/2"})
+	})
+
+	t.Run("TrackRemoved", func(t *testing.T) {
+		l, b := newListener()
+		l.handleSignal(signal(MPRIS_SIGNAL_TRACK_REMOVED, dbus.ObjectPath("/track/1")))
+
+		p, _ := b.GetPlayerFromCache(testBus)
+		assertTrackIDs(t, p.Tracklist, []string{"/track/2"})
+	})
+
+	t.Run("TrackMetadataChanged", func(t *testing.T) {
+		l, b := newListener()
+		meta := map[string]dbus.Variant{
+			"mpris:trackid": dbus.MakeVariant(dbus.ObjectPath("/track/1")),
+			"xesam:title":   dbus.MakeVariant("Fresh"),
+		}
+		l.handleSignal(signal(MPRIS_SIGNAL_TRACK_METADATA_CHANGED, dbus.ObjectPath("/track/1"), meta))
+
+		p, _ := b.GetPlayerFromCache(testBus)
+		if p.Tracklist[0].Metadata["xesam:title"] != "Fresh" {
+			t.Errorf("title = %q, want %q", p.Tracklist[0].Metadata["xesam:title"], "Fresh")
+		}
+	})
+
+	t.Run("TrackListReplaced with empty list clears", func(t *testing.T) {
+		l, b := newListener()
+		l.handleSignal(signal(MPRIS_SIGNAL_TRACKLIST_REPLACED, []dbus.ObjectPath{}, dbus.ObjectPath(MPRIS_NO_TRACK)))
+
+		p, _ := b.GetPlayerFromCache(testBus)
+		assertTrackIDs(t, p.Tracklist, []string{})
+	})
+
+	t.Run("unknown sender is dropped", func(t *testing.T) {
+		l, b := newListener()
+		sig := signal(MPRIS_SIGNAL_TRACK_REMOVED, dbus.ObjectPath("/track/1"))
+		sig.Sender = ":9.99"
+		l.handleSignal(sig)
+
+		p, _ := b.GetPlayerFromCache(testBus)
+		assertTrackIDs(t, p.Tracklist, []string{"/track/1", "/track/2"})
+	})
+
+	t.Run("malformed bodies are ignored", func(t *testing.T) {
+		l, b := newListener()
+		l.handleSignal(signal(MPRIS_SIGNAL_TRACK_ADDED, "not-a-map"))
+		l.handleSignal(signal(MPRIS_SIGNAL_TRACK_REMOVED))
+		l.handleSignal(signal(MPRIS_SIGNAL_TRACKLIST_REPLACED, "not-ids", dbus.ObjectPath("/x")))
+
+		p, _ := b.GetPlayerFromCache(testBus)
+		assertTrackIDs(t, p.Tracklist, []string{"/track/1", "/track/2"})
+	})
+
+	t.Run("PropertiesChanged on TrackList iface updates CanEditTracks", func(t *testing.T) {
+		l, b := newListener()
+		// Tracks matching the cache must be skipped (dedup for players that
+		// emit both TrackListReplaced and the property change): with a nil
+		// conn, going through the refresh would panic on the metadata fetch.
+		l.handleSignal(signal(DBUS_PROP_CHANGED_SIGNAL, MPRIS_TRACKLIST_IFACE, map[string]dbus.Variant{
+			"CanEditTracks": dbus.MakeVariant(true),
+			"Tracks":        dbus.MakeVariant([]dbus.ObjectPath{"/track/1", "/track/2"}),
+		}, []string{}))
+
+		p, _ := b.GetPlayerFromCache(testBus)
+		if !p.CanEditTracks {
+			t.Error("CanEditTracks should be true")
+		}
+		assertTrackIDs(t, p.Tracklist, []string{"/track/1", "/track/2"})
+	})
+
+	t.Run("PropertiesChanged with changed Tracks refreshes the list (VLC style)", func(t *testing.T) {
+		l, b := newListener()
+		l.handleSignal(signal(DBUS_PROP_CHANGED_SIGNAL, MPRIS_TRACKLIST_IFACE, map[string]dbus.Variant{
+			"Tracks": dbus.MakeVariant([]dbus.ObjectPath{}),
+		}, []string{}))
+
+		p, _ := b.GetPlayerFromCache(testBus)
+		assertTrackIDs(t, p.Tracklist, []string{})
+	})
+
+	t.Run("unrelated invalidated property does not refetch", func(t *testing.T) {
+		l, b := newListener()
+		// With a nil conn, a refetch would panic — not reaching D-Bus is the assertion.
+		l.handleSignal(signal(DBUS_PROP_CHANGED_SIGNAL, MPRIS_TRACKLIST_IFACE,
+			map[string]dbus.Variant{}, []string{"CanEditTracks"}))
+
+		p, _ := b.GetPlayerFromCache(testBus)
+		assertTrackIDs(t, p.Tracklist, []string{"/track/1", "/track/2"})
+	})
+}
+
 func TestTracklistUnsupportedError(t *testing.T) {
 	err := &TracklistUnsupportedError{BusName: "org.mpris.MediaPlayer2.spotify"}
 	expected := "tracklist not supported: org.mpris.MediaPlayer2.spotify"
