@@ -124,6 +124,16 @@ func (m *MPRISBackend) getNameOwner(busName string) (string, error) {
 	return owner, nil
 }
 
+// arg extracts sig.Body[i] as T, false if absent or mistyped.
+func arg[T any](sig *dbus.Signal, i int) (T, bool) {
+	if i >= len(sig.Body) {
+		var zero T
+		return zero, false
+	}
+	v, ok := sig.Body[i].(T)
+	return v, ok
+}
+
 // Value extraction helpers from dbus.Variant
 // These helpers are used to extract values from variants received
 // in D-Bus signals without making additional D-Bus calls.
