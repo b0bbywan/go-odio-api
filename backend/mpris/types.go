@@ -65,6 +65,18 @@ type Player struct {
 	Rate              float64           `json:"rate,omitempty" dbus:"Rate" iface:"org.mpris.MediaPlayer2.Player"`
 	Metadata          map[string]string `json:"metadata,omitempty" dbus:"Metadata" iface:"org.mpris.MediaPlayer2.Player"`
 	Capabilities      Capabilities      `json:"capabilities"`
+
+	// No dbus:/iface: tags: TrackList is optional, loaded by a separate
+	// non-fatal step outside the reflection loop whose GetAll failures are fatal.
+	TracklistSupported bool    `json:"tracklist_supported"`
+	CanEditTracks      bool    `json:"-"`
+	Tracklist          []Track `json:"-"` // served by the dedicated /tracklist endpoint
+}
+
+// Track represents an entry in a player's tracklist
+type Track struct {
+	TrackID  string            `json:"track_id"`
+	Metadata map[string]string `json:"metadata,omitempty"`
 }
 
 // Capabilities represents the actions supported by a player
@@ -104,4 +116,21 @@ type LoopRequest struct {
 
 type ShuffleRequest struct {
 	Shuffle bool `json:"shuffle"`
+}
+
+type TracklistResponse struct {
+	CanEditTracks bool    `json:"can_edit_tracks"`
+	Tracks        []Track `json:"tracks"`
+}
+
+// Shared by GoTo and RemoveTrack. Body instead of a path param:
+// track IDs are object paths containing "/"
+type TrackRequest struct {
+	TrackID string `json:"track_id"`
+}
+
+type AddTrackRequest struct {
+	Uri          string `json:"uri"`
+	AfterTrack   string `json:"after_track,omitempty"` // empty = append at end
+	SetAsCurrent bool   `json:"set_as_current,omitempty"`
 }

@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/godbus/dbus/v5"
+
+	"github.com/b0bbywan/go-odio-api/logger"
 )
 
 // newPlayer creates a new Player with backend connection
@@ -149,9 +151,79 @@ func (p *Player) loadFromDBus() error {
 	// Load capabilities from already retrieved properties
 	p.Capabilities = p.loadCapabilitiesFromProps(propsPlayer)
 
+	p.loadTracklist()
+
 	p.PositionUpdatedAt = time.Now()
 
 	return nil
+}
+
+// loadTracklist probes the optional TrackList interface. Never fails:
+// any error just leaves the player marked as not supporting tracklists.
+func (p *Player) loadTracklist() {
+	props, err := p.getAllProperties(MPRIS_TRACKLIST_IFACE)
+	if err != nil {
+		logger.Debug("[mpris] no tracklist for %s: %v", p.BusName, err)
+		return
+	}
+
+	tracksVariant, ok := props["Tracks"]
+	if !ok {
+		return
+	}
+	p.TracklistSupported = true
+
+	if v, ok := props["CanEditTracks"]; ok {
+		if canEdit, ok := extractBool(v); ok {
+			p.CanEditTracks = canEdit
+		}
+	}
+
+	ids, ok := tracksVariant.Value().([]dbus.ObjectPath)
+	if !ok || len(ids) == 0 {
+		return
+	}
+
+	metas, err := p.getTracksMetadata(ids)
+	if err != nil {
+		logger.Debug("[mpris] GetTracksMetadata failed for %s, falling back to IDs only: %v", p.BusName, err)
+		p.Tracklist = tracksFromIDs(ids)
+		return
+	}
+	p.Tracklist = tracksFromMetadata(ids, metas)
+}
+
+// tracksFromMetadata zips ordered track IDs with their metadata.
+// TrackID always comes from ids so players omitting mpris:trackid still work.
+func tracksFromMetadata(ids []dbus.ObjectPath, metas []map[string]dbus.Variant) []Track {
+	tracks := make([]Track, len(ids))
+	for i, id := range ids {
+		tracks[i] = Track{TrackID: string(id)}
+		if i < len(metas) {
+			tracks[i].Metadata = extractMetadata(metas[i])
+		}
+	}
+	return tracks
+}
+
+func tracksFromIDs(ids []dbus.ObjectPath) []Track {
+	tracks := make([]Track, len(ids))
+	for i, id := range ids {
+		tracks[i] = Track{TrackID: string(id)}
+	}
+	return tracks
+}
+
+// trackFromSignalMetadata builds a Track from signal-provided metadata,
+// where the ID can only come from mpris:trackid.
+func trackFromSignalMetadata(meta map[string]dbus.Variant) Track {
+	track := Track{Metadata: extractMetadata(meta)}
+	if v, ok := meta["mpris:trackid"]; ok {
+		if id, ok := v.Value().(dbus.ObjectPath); ok {
+			track.TrackID = string(id)
+		}
+	}
+	return track
 }
 
 // loadCapabilitiesFromProps loads capabilities from already retrieved properties.
