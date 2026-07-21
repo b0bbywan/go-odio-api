@@ -1,6 +1,7 @@
 package mpris
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/godbus/dbus/v5"
@@ -116,6 +117,331 @@ func TestTrackFromSignalMetadata(t *testing.T) {
 			}
 		})
 	}
+}
+
+const testBus = "org.mpris.MediaPlayer2.test"
+
+func newTracklistBackend(players ...Player) *MPRISBackend {
+	b := &MPRISBackend{}
+	b.players.Store(players)
+	return b
+}
+
+func trackIDs(tracks []Track) []string {
+	ids := make([]string, len(tracks))
+	for i, tr := range tracks {
+		ids[i] = tr.TrackID
+	}
+	return ids
+}
+
+func assertTrackIDs(t *testing.T, got []Track, want []string) {
+	t.Helper()
+	gotIDs := trackIDs(got)
+	if len(gotIDs) != len(want) {
+		t.Fatalf("track IDs = %v, want %v", gotIDs, want)
+	}
+	for i := range want {
+		if gotIDs[i] != want[i] {
+			t.Fatalf("track IDs = %v, want %v", gotIDs, want)
+		}
+	}
+}
+
+func TestReplaceTracklist(t *testing.T) {
+	b := newTracklistBackend(Player{BusName: testBus})
+
+	tracks := []Track{{TrackID: "/track/1"}, {TrackID: "/track/2"}}
+	if err := b.ReplaceTracklist(testBus, tracks); err != nil {
+		t.Fatalf("ReplaceTracklist failed: %v", err)
+	}
+
+	p, err := b.GetPlayerFromCache(testBus)
+	if err != nil {
+		t.Fatalf("GetPlayerFromCache: %v", err)
+	}
+	if !p.TracklistSupported {
+		t.Error("ReplaceTracklist should mark the player as tracklist-supported")
+	}
+	assertTrackIDs(t, p.Tracklist, []string{"/track/1", "/track/2"})
+
+	if err := b.ReplaceTracklist("org.mpris.MediaPlayer2.unknown", tracks); err == nil {
+		t.Error("ReplaceTracklist on unknown player should error")
+	}
+}
+
+func TestAddTrackToCache(t *testing.T) {
+	initial := []Track{{TrackID: "/track/1"}, {TrackID: "/track/2"}}
+	newTrack := Track{TrackID: "/track/new"}
+
+	tests := []struct {
+		name       string
+		busName    string
+		afterTrack string
+		wantIDs    []string
+		wantErr    bool
+	}{
+		{
+			name:       "prepend via NoTrack sentinel",
+			busName:    testBus,
+			afterTrack: MPRIS_NO_TRACK,
+			wantIDs:    []string{"/track/new", "/track/1", "/track/2"},
+		},
+		{
+			name:       "insert after existing track",
+			busName:    testBus,
+			afterTrack: "/track/1",
+			wantIDs:    []string{"/track/1", "/track/new", "/track/2"},
+		},
+		{
+			name:       "unknown afterTrack appends",
+			busName:    testBus,
+			afterTrack: "/track/ghost",
+			wantIDs:    []string{"/track/1", "/track/2", "/track/new"},
+		},
+		{
+			name:       "unknown player errors",
+			busName:    "org.mpris.MediaPlayer2.unknown",
+			afterTrack: MPRIS_NO_TRACK,
+			wantErr:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b := newTracklistBackend(Player{
+				BusName:   testBus,
+				Tracklist: append([]Track{}, initial...),
+			})
+
+			err := b.AddTrackToCache(tt.busName, newTrack, tt.afterTrack)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("AddTrackToCache error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if tt.wantErr {
+				return
+			}
+
+			p, _ := b.GetPlayerFromCache(testBus)
+			if !p.TracklistSupported {
+				t.Error("AddTrackToCache should mark the player as tracklist-supported")
+			}
+			assertTrackIDs(t, p.Tracklist, tt.wantIDs)
+		})
+	}
+}
+
+func TestRemoveTrackFromCache(t *testing.T) {
+	b := newTracklistBackend(Player{
+		BusName:   testBus,
+		Tracklist: []Track{{TrackID: "/track/1"}, {TrackID: "/track/2"}},
+	})
+
+	if err := b.RemoveTrackFromCache(testBus, "/track/1"); err != nil {
+		t.Fatalf("RemoveTrackFromCache failed: %v", err)
+	}
+	p, _ := b.GetPlayerFromCache(testBus)
+	assertTrackIDs(t, p.Tracklist, []string{"/track/2"})
+
+	// Unknown ID is a no-op
+	if err := b.RemoveTrackFromCache(testBus, "/track/ghost"); err != nil {
+		t.Fatalf("RemoveTrackFromCache with unknown ID failed: %v", err)
+	}
+	p, _ = b.GetPlayerFromCache(testBus)
+	assertTrackIDs(t, p.Tracklist, []string{"/track/2"})
+}
+
+func TestUpdateTrackMetadataInCache(t *testing.T) {
+	newBackend := func() *MPRISBackend {
+		return newTracklistBackend(Player{
+			BusName: testBus,
+			Tracklist: []Track{
+				{TrackID: "/track/1", Metadata: map[string]string{"xesam:title": "Old"}},
+				{TrackID: "/track/2"},
+			},
+		})
+	}
+
+	t.Run("metadata updated, ID kept when new one is empty", func(t *testing.T) {
+		b := newBackend()
+		err := b.UpdateTrackMetadataInCache(testBus, "/track/1", Track{
+			Metadata: map[string]string{"xesam:title": "New"},
+		})
+		if err != nil {
+			t.Fatalf("UpdateTrackMetadataInCache failed: %v", err)
+		}
+		p, _ := b.GetPlayerFromCache(testBus)
+		assertTrackIDs(t, p.Tracklist, []string{"/track/1", "/track/2"})
+		if p.Tracklist[0].Metadata["xesam:title"] != "New" {
+			t.Errorf("title = %q, want %q", p.Tracklist[0].Metadata["xesam:title"], "New")
+		}
+	})
+
+	t.Run("trackid rename", func(t *testing.T) {
+		b := newBackend()
+		err := b.UpdateTrackMetadataInCache(testBus, "/track/1", Track{
+			TrackID:  "/track/renamed",
+			Metadata: map[string]string{"xesam:title": "New"},
+		})
+		if err != nil {
+			t.Fatalf("UpdateTrackMetadataInCache failed: %v", err)
+		}
+		p, _ := b.GetPlayerFromCache(testBus)
+		assertTrackIDs(t, p.Tracklist, []string{"/track/renamed", "/track/2"})
+	})
+
+	t.Run("unknown old ID is a no-op", func(t *testing.T) {
+		b := newBackend()
+		if err := b.UpdateTrackMetadataInCache(testBus, "/track/ghost", Track{TrackID: "/x"}); err != nil {
+			t.Fatalf("UpdateTrackMetadataInCache failed: %v", err)
+		}
+		p, _ := b.GetPlayerFromCache(testBus)
+		assertTrackIDs(t, p.Tracklist, []string{"/track/1", "/track/2"})
+	})
+}
+
+func TestUpdateCanEditTracks(t *testing.T) {
+	b := newTracklistBackend(Player{BusName: testBus, TracklistSupported: true})
+
+	if err := b.UpdateCanEditTracks(testBus, dbus.MakeVariant(true)); err != nil {
+		t.Fatalf("UpdateCanEditTracks failed: %v", err)
+	}
+	p, _ := b.GetPlayerFromCache(testBus)
+	if !p.CanEditTracks {
+		t.Error("CanEditTracks should be true")
+	}
+
+	// Non-bool variant is ignored
+	if err := b.UpdateCanEditTracks(testBus, dbus.MakeVariant("nope")); err != nil {
+		t.Fatalf("UpdateCanEditTracks with non-bool failed: %v", err)
+	}
+	p, _ = b.GetPlayerFromCache(testBus)
+	if !p.CanEditTracks {
+		t.Error("non-bool variant should not change CanEditTracks")
+	}
+}
+
+func TestGetTracklist(t *testing.T) {
+	t.Run("unsupported player", func(t *testing.T) {
+		b := newTracklistBackend(Player{BusName: testBus})
+		_, err := b.GetTracklist(testBus)
+		var unsupported *TracklistUnsupportedError
+		if !errors.As(err, &unsupported) {
+			t.Fatalf("GetTracklist error = %v, want TracklistUnsupportedError", err)
+		}
+	})
+
+	t.Run("supported with nil slice returns empty non-nil tracks", func(t *testing.T) {
+		b := newTracklistBackend(Player{BusName: testBus, TracklistSupported: true})
+		resp, err := b.GetTracklist(testBus)
+		if err != nil {
+			t.Fatalf("GetTracklist failed: %v", err)
+		}
+		if resp.Tracks == nil {
+			t.Error("Tracks should be non-nil so JSON is [] instead of null")
+		}
+		if len(resp.Tracks) != 0 {
+			t.Errorf("len(Tracks) = %d, want 0", len(resp.Tracks))
+		}
+	})
+
+	t.Run("full response", func(t *testing.T) {
+		b := newTracklistBackend(Player{
+			BusName:            testBus,
+			TracklistSupported: true,
+			CanEditTracks:      true,
+			Tracklist:          []Track{{TrackID: "/track/1"}},
+		})
+		resp, err := b.GetTracklist(testBus)
+		if err != nil {
+			t.Fatalf("GetTracklist failed: %v", err)
+		}
+		if !resp.CanEditTracks {
+			t.Error("CanEditTracks should be true")
+		}
+		assertTrackIDs(t, resp.Tracks, []string{"/track/1"})
+	})
+}
+
+// Action guard tests run with a nil D-Bus conn: any guard passing through
+// to callMethod would panic.
+
+func TestGoToValidation(t *testing.T) {
+	t.Run("unsupported player", func(t *testing.T) {
+		b := newTracklistBackend(Player{BusName: testBus})
+		var unsupported *TracklistUnsupportedError
+		if err := b.GoTo(testBus, "/track/1"); !errors.As(err, &unsupported) {
+			t.Errorf("GoTo error = %v, want TracklistUnsupportedError", err)
+		}
+	})
+
+	t.Run("invalid object path", func(t *testing.T) {
+		b := newTracklistBackend(Player{BusName: testBus, TracklistSupported: true})
+		var validation *ValidationError
+		if err := b.GoTo(testBus, "not-a-path"); !errors.As(err, &validation) {
+			t.Errorf("GoTo error = %v, want ValidationError", err)
+		}
+	})
+}
+
+func TestAddTrackValidation(t *testing.T) {
+	t.Run("unsupported player", func(t *testing.T) {
+		b := newTracklistBackend(Player{BusName: testBus})
+		var unsupported *TracklistUnsupportedError
+		if err := b.AddTrack(testBus, "file:///a.mp3", "", false); !errors.As(err, &unsupported) {
+			t.Errorf("AddTrack error = %v, want TracklistUnsupportedError", err)
+		}
+	})
+
+	t.Run("cannot edit tracks", func(t *testing.T) {
+		b := newTracklistBackend(Player{BusName: testBus, TracklistSupported: true})
+		var capability *CapabilityError
+		if err := b.AddTrack(testBus, "file:///a.mp3", "", false); !errors.As(err, &capability) {
+			t.Errorf("AddTrack error = %v, want CapabilityError", err)
+		}
+	})
+
+	t.Run("empty uri", func(t *testing.T) {
+		b := newTracklistBackend(Player{BusName: testBus, TracklistSupported: true, CanEditTracks: true})
+		var validation *ValidationError
+		if err := b.AddTrack(testBus, "", "", false); !errors.As(err, &validation) {
+			t.Errorf("AddTrack error = %v, want ValidationError", err)
+		}
+	})
+
+	t.Run("invalid afterTrack", func(t *testing.T) {
+		b := newTracklistBackend(Player{BusName: testBus, TracklistSupported: true, CanEditTracks: true})
+		var validation *ValidationError
+		if err := b.AddTrack(testBus, "file:///a.mp3", "not-a-path", false); !errors.As(err, &validation) {
+			t.Errorf("AddTrack error = %v, want ValidationError", err)
+		}
+	})
+}
+
+func TestRemoveTrackValidation(t *testing.T) {
+	t.Run("unsupported player", func(t *testing.T) {
+		b := newTracklistBackend(Player{BusName: testBus})
+		var unsupported *TracklistUnsupportedError
+		if err := b.RemoveTrack(testBus, "/track/1"); !errors.As(err, &unsupported) {
+			t.Errorf("RemoveTrack error = %v, want TracklistUnsupportedError", err)
+		}
+	})
+
+	t.Run("cannot edit tracks", func(t *testing.T) {
+		b := newTracklistBackend(Player{BusName: testBus, TracklistSupported: true})
+		var capability *CapabilityError
+		if err := b.RemoveTrack(testBus, "/track/1"); !errors.As(err, &capability) {
+			t.Errorf("RemoveTrack error = %v, want CapabilityError", err)
+		}
+	})
+
+	t.Run("invalid object path", func(t *testing.T) {
+		b := newTracklistBackend(Player{BusName: testBus, TracklistSupported: true, CanEditTracks: true})
+		var validation *ValidationError
+		if err := b.RemoveTrack(testBus, "not-a-path"); !errors.As(err, &validation) {
+			t.Errorf("RemoveTrack error = %v, want ValidationError", err)
+		}
+	})
 }
 
 func TestTracklistUnsupportedError(t *testing.T) {
