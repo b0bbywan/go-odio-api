@@ -965,14 +965,15 @@ func TestPlayerStructTags(t *testing.T) {
 		dbusTag  string
 		ifaceTag string
 	}{
-		"Identity":       {dbusTag: "Identity", ifaceTag: "org.mpris.MediaPlayer2"},
-		"PlaybackStatus": {dbusTag: "PlaybackStatus", ifaceTag: "org.mpris.MediaPlayer2.Player"},
-		"LoopStatus":     {dbusTag: "LoopStatus", ifaceTag: "org.mpris.MediaPlayer2.Player"},
-		"Shuffle":        {dbusTag: "Shuffle", ifaceTag: "org.mpris.MediaPlayer2.Player"},
-		"Volume":         {dbusTag: "Volume", ifaceTag: "org.mpris.MediaPlayer2.Player"},
-		"Position":       {dbusTag: "Position", ifaceTag: "org.mpris.MediaPlayer2.Player"},
-		"Rate":           {dbusTag: "Rate", ifaceTag: "org.mpris.MediaPlayer2.Player"},
-		"Metadata":       {dbusTag: "Metadata", ifaceTag: "org.mpris.MediaPlayer2.Player"},
+		"Identity":            {dbusTag: "Identity", ifaceTag: "org.mpris.MediaPlayer2"},
+		"SupportedUriSchemes": {dbusTag: "SupportedUriSchemes", ifaceTag: "org.mpris.MediaPlayer2"},
+		"PlaybackStatus":      {dbusTag: "PlaybackStatus", ifaceTag: "org.mpris.MediaPlayer2.Player"},
+		"LoopStatus":          {dbusTag: "LoopStatus", ifaceTag: "org.mpris.MediaPlayer2.Player"},
+		"Shuffle":             {dbusTag: "Shuffle", ifaceTag: "org.mpris.MediaPlayer2.Player"},
+		"Volume":              {dbusTag: "Volume", ifaceTag: "org.mpris.MediaPlayer2.Player"},
+		"Position":            {dbusTag: "Position", ifaceTag: "org.mpris.MediaPlayer2.Player"},
+		"Rate":                {dbusTag: "Rate", ifaceTag: "org.mpris.MediaPlayer2.Player"},
+		"Metadata":            {dbusTag: "Metadata", ifaceTag: "org.mpris.MediaPlayer2.Player"},
 	}
 
 	for i := 0; i < playerType.NumField(); i++ {

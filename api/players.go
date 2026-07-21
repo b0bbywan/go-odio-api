@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/url"
@@ -43,6 +44,13 @@ func handleMPRISError(w http.ResponseWriter, err error) {
 	// Handle player not found errors
 	var notFoundErr *mpris.PlayerNotFoundError
 	if errors.As(err, &notFoundErr) {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	// Tracklist unsupported: the resource doesn't exist for this player
+	var unsupportedErr *mpris.TracklistUnsupportedError
+	if errors.As(err, &unsupportedErr) {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
@@ -131,6 +139,52 @@ func SetShuffleHandler(m *mpris.MPRISBackend) http.HandlerFunc {
 	return withPlayer(func(w http.ResponseWriter, r *http.Request, busName string) {
 		withBody(nil, func(w http.ResponseWriter, r *http.Request, req *mpris.ShuffleRequest) {
 			handleMPRISError(w, m.SetShuffle(busName, req.Shuffle))
+		})(w, r)
+	})
+}
+
+// withTrack extracts the {trackid} parameter: the last segment of a track's
+// object path (or the %2F-encoded full path), resolved against the cached
+// tracklist by the backend.
+func withTrack(
+	next func(w http.ResponseWriter, r *http.Request, busName, trackRef string),
+) http.HandlerFunc {
+	return withPlayer(func(w http.ResponseWriter, r *http.Request, busName string) {
+		next(w, r, busName, r.PathValue("trackid"))
+	})
+}
+
+func TracklistHandler(getTracklist func(string) (*mpris.TracklistResponse, error)) http.HandlerFunc {
+	return withPlayer(func(w http.ResponseWriter, r *http.Request, busName string) {
+		resp, err := getTracklist(busName)
+		if err != nil {
+			handleMPRISError(w, err)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(resp); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	})
+}
+
+func GoToHandler(m *mpris.MPRISBackend) http.HandlerFunc {
+	return withTrack(func(w http.ResponseWriter, r *http.Request, busName, trackID string) {
+		handleMPRISError(w, m.GoTo(busName, trackID))
+	})
+}
+
+func RemoveTrackHandler(m *mpris.MPRISBackend) http.HandlerFunc {
+	return withTrack(func(w http.ResponseWriter, r *http.Request, busName, trackID string) {
+		handleMPRISError(w, m.RemoveTrack(busName, trackID))
+	})
+}
+
+func AddTrackHandler(m *mpris.MPRISBackend) http.HandlerFunc {
+	return withPlayer(func(w http.ResponseWriter, r *http.Request, busName string) {
+		withBody(nil, func(w http.ResponseWriter, r *http.Request, req *mpris.AddTrackRequest) {
+			handleMPRISError(w, m.AddTrack(busName, req.Uri, req.AfterTrack, req.SetAsCurrent))
 		})(w, r)
 	})
 }

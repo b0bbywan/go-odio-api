@@ -162,6 +162,12 @@ func extractFloat64(v dbus.Variant) (float64, bool) {
 	return val, ok
 }
 
+// extractStringSlice extracts a []string from a dbus.Variant
+func extractStringSlice(v dbus.Variant) ([]string, bool) {
+	val, ok := v.Value().([]string)
+	return val, ok
+}
+
 // extractMetadataMap extracts a metadata map from a dbus.Variant
 func extractMetadataMap(v dbus.Variant) (map[string]dbus.Variant, bool) {
 	val, ok := v.Value().(map[string]dbus.Variant)

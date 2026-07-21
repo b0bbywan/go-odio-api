@@ -179,6 +179,14 @@ func TestHandleMPRISError(t *testing.T) {
 			wantBodyMatch:  "action not allowed",
 		},
 		{
+			name: "TracklistUnsupportedError returns 404 Not Found",
+			err: &mpris.TracklistUnsupportedError{
+				BusName: "org.mpris.MediaPlayer2.firefox",
+			},
+			wantStatusCode: http.StatusNotFound,
+			wantBodyMatch:  "tracklist not supported",
+		},
+		{
 			name:           "generic error returns 500 Internal Server Error",
 			err:            http.ErrServerClosed,
 			wantStatusCode: http.StatusInternalServerError,
@@ -203,6 +211,114 @@ func TestHandleMPRISError(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestTracklistHandler(t *testing.T) {
+	tests := []struct {
+		name           string
+		getTracklist   func(string) (*mpris.TracklistResponse, error)
+		wantStatusCode int
+		wantBodyMatch  string
+	}{
+		{
+			name: "success returns 200 with tracks",
+			getTracklist: func(string) (*mpris.TracklistResponse, error) {
+				return &mpris.TracklistResponse{
+					CanEditTracks: true,
+					Tracks:        []mpris.Track{{TrackID: "/org/mpris/MediaPlayer2/Track/1"}},
+				}, nil
+			},
+			wantStatusCode: http.StatusOK,
+			wantBodyMatch:  `"/org/mpris/MediaPlayer2/Track/1"`,
+		},
+		{
+			name: "empty tracklist returns 200 with empty array",
+			getTracklist: func(string) (*mpris.TracklistResponse, error) {
+				return &mpris.TracklistResponse{Tracks: []mpris.Track{}}, nil
+			},
+			wantStatusCode: http.StatusOK,
+			wantBodyMatch:  `"tracks":[]`,
+		},
+		{
+			name: "unsupported returns 404",
+			getTracklist: func(busName string) (*mpris.TracklistResponse, error) {
+				return nil, &mpris.TracklistUnsupportedError{BusName: busName}
+			},
+			wantStatusCode: http.StatusNotFound,
+			wantBodyMatch:  "tracklist not supported",
+		},
+		{
+			name: "player not found returns 404",
+			getTracklist: func(busName string) (*mpris.TracklistResponse, error) {
+				return nil, &mpris.PlayerNotFoundError{BusName: busName}
+			},
+			wantStatusCode: http.StatusNotFound,
+			wantBodyMatch:  "player not found",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			handler := TracklistHandler(tt.getTracklist)
+
+			req := httptest.NewRequest("GET", "/players/org.mpris.MediaPlayer2.mpd/tracklist", nil)
+			req.SetPathValue("player", "org.mpris.MediaPlayer2.mpd")
+			w := httptest.NewRecorder()
+
+			handler(w, req)
+
+			if w.Code != tt.wantStatusCode {
+				t.Errorf("status = %d, want %d", w.Code, tt.wantStatusCode)
+			}
+			if !strings.Contains(w.Body.String(), tt.wantBodyMatch) {
+				t.Errorf("body = %q, want to contain %q", w.Body.String(), tt.wantBodyMatch)
+			}
+		})
+	}
+}
+
+func TestWithTrackRoutePattern(t *testing.T) {
+	newMux := func(gotBus, gotTrack *string) *http.ServeMux {
+		mux := http.NewServeMux()
+		mux.HandleFunc("POST /players/{player}/tracklist/goto/{trackid}",
+			withTrack(func(w http.ResponseWriter, r *http.Request, busName, trackRef string) {
+				*gotBus, *gotTrack = busName, trackRef
+				w.WriteHeader(http.StatusAccepted)
+			}))
+		return mux
+	}
+
+	t.Run("last segment", func(t *testing.T) {
+		var gotBus, gotTrack string
+		req := httptest.NewRequest("POST", "/players/org.mpris.MediaPlayer2.mpd/tracklist/goto/7", nil)
+		w := httptest.NewRecorder()
+		newMux(&gotBus, &gotTrack).ServeHTTP(w, req)
+
+		if w.Code != http.StatusAccepted {
+			t.Fatalf("status = %d, want %d", w.Code, http.StatusAccepted)
+		}
+		if gotBus != "org.mpris.MediaPlayer2.mpd" {
+			t.Errorf("busName = %q, want %q", gotBus, "org.mpris.MediaPlayer2.mpd")
+		}
+		if gotTrack != "7" {
+			t.Errorf("trackRef = %q, want %q", gotTrack, "7")
+		}
+	})
+
+	t.Run("percent-encoded full object path", func(t *testing.T) {
+		var gotBus, gotTrack string
+		req := httptest.NewRequest("POST",
+			"/players/org.mpris.MediaPlayer2.mpd/tracklist/goto/%2Forg%2Fmpris%2FMediaPlayer2%2FTrack%2F7", nil)
+		w := httptest.NewRecorder()
+		newMux(&gotBus, &gotTrack).ServeHTTP(w, req)
+
+		if w.Code != http.StatusAccepted {
+			t.Fatalf("status = %d, want %d", w.Code, http.StatusAccepted)
+		}
+		if gotTrack != "/org/mpris/MediaPlayer2/Track/7" {
+			t.Errorf("trackRef = %q, want %q", gotTrack, "/org/mpris/MediaPlayer2/Track/7")
+		}
+	})
 }
 
 // TestWithPlayer tests the middleware for extracting busName

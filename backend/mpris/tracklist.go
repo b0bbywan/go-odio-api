@@ -1,6 +1,9 @@
 package mpris
 
 import (
+	"net/url"
+	"path"
+	"slices"
 	"time"
 
 	"github.com/godbus/dbus/v5"
@@ -8,6 +11,19 @@ import (
 	"github.com/b0bbywan/go-odio-api/events"
 	"github.com/b0bbywan/go-odio-api/logger"
 )
+
+// resolveTrackRef resolves an API-supplied track reference — a full object
+// path or just its last segment — against the cached tracklist. Track IDs are
+// player-chosen object paths with no common prefix, so the cache is the only
+// way to rebuild the full path from a bare ID.
+func resolveTrackRef(tracks []Track, ref string) (string, bool) {
+	for i := range tracks {
+		if tracks[i].TrackID == ref || path.Base(tracks[i].TrackID) == ref {
+			return tracks[i].TrackID, true
+		}
+	}
+	return "", false
+}
 
 // mutateTracklist applies fn to the cached player and broadcasts the resulting
 // tracklist snapshot. fn returns false for no-op mutations (nothing stored,
@@ -206,14 +222,16 @@ func (m *MPRISBackend) GetTracklist(busName string) (*TracklistResponse, error) 
 	return &TracklistResponse{CanEditTracks: player.CanEditTracks, Tracks: tracks}, nil
 }
 
-// GoTo skips to the given track. Not gated on CanEditTracks: the spec doesn't
-// class GoTo as an edit operation.
-func (m *MPRISBackend) GoTo(busName, trackID string) error {
-	if _, err := m.tracklistPlayer(busName); err != nil {
+// GoTo skips to the referenced track. Not gated on CanEditTracks: the spec
+// doesn't class GoTo as an edit operation.
+func (m *MPRISBackend) GoTo(busName, trackRef string) error {
+	player, err := m.tracklistPlayer(busName)
+	if err != nil {
 		return err
 	}
-	if !dbus.ObjectPath(trackID).IsValid() {
-		return &ValidationError{Field: "track_id", Message: "must be a valid D-Bus object path"}
+	trackID, ok := resolveTrackRef(player.Tracklist, trackRef)
+	if !ok {
+		return &ValidationError{Field: "track_id", Message: "unknown track: " + trackRef}
 	}
 
 	logger.Debug("[mpris] going to track %s for %s", trackID, busName)
@@ -227,32 +245,46 @@ func (m *MPRISBackend) AddTrack(busName, uri, afterTrack string, setAsCurrent bo
 	if err != nil {
 		return err
 	}
-	if uri == "" {
-		return &ValidationError{Field: "uri", Message: "must not be empty"}
+	// The spec requires an absolute URI whose scheme the player declared in
+	// SupportedUriSchemes; a bare path would be silently dropped player-side.
+	u, err := url.Parse(uri)
+	if err != nil || u.Scheme == "" {
+		return &ValidationError{Field: "uri", Message: "must be an absolute URI (e.g. file:///path or http://...)"}
+	}
+	if len(player.SupportedUriSchemes) > 0 && !slices.Contains(player.SupportedUriSchemes, u.Scheme) {
+		return &ValidationError{Field: "uri", Message: "scheme " + u.Scheme + " not supported by player"}
 	}
 
-	if afterTrack == "" {
+	switch afterTrack {
+	case "":
 		if n := len(player.Tracklist); n > 0 {
 			afterTrack = player.Tracklist[n-1].TrackID
 		} else {
 			afterTrack = MPRIS_NO_TRACK
 		}
-	}
-	if !dbus.ObjectPath(afterTrack).IsValid() {
-		return &ValidationError{Field: "after_track", Message: "must be a valid D-Bus object path"}
+	case MPRIS_NO_TRACK, "NoTrack": // explicit prepend
+		afterTrack = MPRIS_NO_TRACK
+	default:
+		resolved, ok := resolveTrackRef(player.Tracklist, afterTrack)
+		if !ok {
+			return &ValidationError{Field: "after_track", Message: "unknown track: " + afterTrack}
+		}
+		afterTrack = resolved
 	}
 
 	logger.Debug("[mpris] adding track %s after %s for %s", uri, afterTrack, busName)
 	return m.callMethod(busName, MPRIS_METHOD_ADD_TRACK, uri, dbus.ObjectPath(afterTrack), setAsCurrent)
 }
 
-// RemoveTrack asks the player to remove a track from its tracklist.
-func (m *MPRISBackend) RemoveTrack(busName, trackID string) error {
-	if _, err := m.editableTracklistPlayer(busName); err != nil {
+// RemoveTrack asks the player to remove the referenced track from its tracklist.
+func (m *MPRISBackend) RemoveTrack(busName, trackRef string) error {
+	player, err := m.editableTracklistPlayer(busName)
+	if err != nil {
 		return err
 	}
-	if !dbus.ObjectPath(trackID).IsValid() {
-		return &ValidationError{Field: "track_id", Message: "must be a valid D-Bus object path"}
+	trackID, ok := resolveTrackRef(player.Tracklist, trackRef)
+	if !ok {
+		return &ValidationError{Field: "track_id", Message: "unknown track: " + trackRef}
 	}
 
 	logger.Debug("[mpris] removing track %s for %s", trackID, busName)

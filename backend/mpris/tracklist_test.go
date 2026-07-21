@@ -300,6 +300,37 @@ func TestUpdateTrackMetadataInCache(t *testing.T) {
 	})
 }
 
+func TestResolveTrackRef(t *testing.T) {
+	tracks := []Track{
+		{TrackID: "/org/mpris/MediaPlayer2/Track/7"},
+		{TrackID: "/org/videolan/vlc/playlist/17"},
+	}
+
+	tests := []struct {
+		name   string
+		ref    string
+		want   string
+		wantOk bool
+	}{
+		{name: "full object path", ref: "/org/mpris/MediaPlayer2/Track/7", want: "/org/mpris/MediaPlayer2/Track/7", wantOk: true},
+		{name: "last segment", ref: "17", want: "/org/videolan/vlc/playlist/17", wantOk: true},
+		{name: "unknown ref", ref: "99", wantOk: false},
+		{name: "partial path does not match", ref: "playlist/17", wantOk: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := resolveTrackRef(tracks, tt.ref)
+			if ok != tt.wantOk {
+				t.Fatalf("resolveTrackRef(%q) ok = %v, want %v", tt.ref, ok, tt.wantOk)
+			}
+			if got != tt.want {
+				t.Errorf("resolveTrackRef(%q) = %q, want %q", tt.ref, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestUpdateCanEditTracks(t *testing.T) {
 	b := newTracklistBackend(Player{BusName: testBus, TracklistSupported: true})
 
@@ -375,10 +406,10 @@ func TestGoToValidation(t *testing.T) {
 		}
 	})
 
-	t.Run("invalid object path", func(t *testing.T) {
+	t.Run("unknown track ref", func(t *testing.T) {
 		b := newTracklistBackend(Player{BusName: testBus, TracklistSupported: true})
 		var validation *ValidationError
-		if err := b.GoTo(testBus, "not-a-path"); !errors.As(err, &validation) {
+		if err := b.GoTo(testBus, "99"); !errors.As(err, &validation) {
 			t.Errorf("GoTo error = %v, want ValidationError", err)
 		}
 	})
@@ -409,10 +440,31 @@ func TestAddTrackValidation(t *testing.T) {
 		}
 	})
 
-	t.Run("invalid afterTrack", func(t *testing.T) {
+	t.Run("bare path uri (no scheme)", func(t *testing.T) {
 		b := newTracklistBackend(Player{BusName: testBus, TracklistSupported: true, CanEditTracks: true})
 		var validation *ValidationError
-		if err := b.AddTrack(testBus, "file:///a.mp3", "not-a-path", false); !errors.As(err, &validation) {
+		if err := b.AddTrack(testBus, "B' Side/track.mp3", "", false); !errors.As(err, &validation) {
+			t.Errorf("AddTrack error = %v, want ValidationError", err)
+		}
+	})
+
+	t.Run("scheme not in SupportedUriSchemes", func(t *testing.T) {
+		b := newTracklistBackend(Player{
+			BusName:             testBus,
+			TracklistSupported:  true,
+			CanEditTracks:       true,
+			SupportedUriSchemes: []string{"file"},
+		})
+		var validation *ValidationError
+		if err := b.AddTrack(testBus, "http://example.com/a.mp3", "", false); !errors.As(err, &validation) {
+			t.Errorf("AddTrack error = %v, want ValidationError", err)
+		}
+	})
+
+	t.Run("unknown afterTrack", func(t *testing.T) {
+		b := newTracklistBackend(Player{BusName: testBus, TracklistSupported: true, CanEditTracks: true})
+		var validation *ValidationError
+		if err := b.AddTrack(testBus, "file:///a.mp3", "99", false); !errors.As(err, &validation) {
 			t.Errorf("AddTrack error = %v, want ValidationError", err)
 		}
 	})
@@ -435,10 +487,10 @@ func TestRemoveTrackValidation(t *testing.T) {
 		}
 	})
 
-	t.Run("invalid object path", func(t *testing.T) {
+	t.Run("unknown track ref", func(t *testing.T) {
 		b := newTracklistBackend(Player{BusName: testBus, TracklistSupported: true, CanEditTracks: true})
 		var validation *ValidationError
-		if err := b.RemoveTrack(testBus, "not-a-path"); !errors.As(err, &validation) {
+		if err := b.RemoveTrack(testBus, "99"); !errors.As(err, &validation) {
 			t.Errorf("RemoveTrack error = %v, want ValidationError", err)
 		}
 	})
