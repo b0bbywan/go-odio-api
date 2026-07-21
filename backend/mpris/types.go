@@ -23,8 +23,10 @@ type MPRISBackend struct {
 	ctx     context.Context
 	timeout time.Duration
 
-	// permanent cache (no expiration)
-	cache *cache.Cache[[]Player]
+	// Players cache: readers take lock-free immutable snapshots (nil = never
+	// loaded); writers copy-on-write, serialized through updatePlayers.
+	players   cache.Value[[]Player]
+	playersMu sync.Mutex
 
 	// listener for MPRIS changes
 	listener *Listener

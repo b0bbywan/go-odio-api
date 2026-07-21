@@ -87,8 +87,8 @@ func (h *Heartbeat) run() {
 // updatePlayingPositions updates the position of all playing players.
 // Returns true if at least one player is Playing.
 func (h *Heartbeat) updatePlayingPositions() bool {
-	players, ok := h.backend.cache.Get(CACHE_KEY)
-	if !ok {
+	players := h.backend.players.Load()
+	if players == nil {
 		return false
 	}
 

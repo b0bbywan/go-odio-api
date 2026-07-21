@@ -8,7 +8,6 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
-	"github.com/b0bbywan/go-odio-api/cache"
 	"github.com/b0bbywan/go-odio-api/config"
 	"github.com/b0bbywan/go-odio-api/events"
 	"github.com/b0bbywan/go-odio-api/logger"
@@ -29,9 +28,31 @@ func New(ctx context.Context, cfg *config.MPRISConfig) (*MPRISBackend, error) {
 		conn:    conn,
 		ctx:     ctx,
 		timeout: cfg.Timeout,
-		cache:   cache.New[[]Player](0), // TTL=0 = no expiration
 		events:  make(chan events.Event, 64),
 	}, nil
+}
+
+// updatePlayers hands fn a private copy of the cached players and stores fn's
+// result; fn may return nil to abort the write. playersMu serializes writers so
+// concurrent read-modify-writes can't drop each other; readers stay lock-free.
+// Returns false without calling fn when the cache was never loaded (nil) —
+// storing would wrongly mark the cache as valid.
+func (m *MPRISBackend) updatePlayers(fn func([]Player) []Player) bool {
+	m.playersMu.Lock()
+	defer m.playersMu.Unlock()
+
+	snapshot := m.players.Load()
+	if snapshot == nil {
+		return false
+	}
+
+	players := make([]Player, len(snapshot))
+	copy(players, snapshot)
+
+	if updated := fn(players); updated != nil {
+		m.players.Store(updated)
+	}
+	return true
 }
 
 // Start loads the initial cache and starts the listener
@@ -64,7 +85,7 @@ func (m *MPRISBackend) Start() error {
 // To force reload of a specific player, use ReloadPlayerFromDBus.
 func (m *MPRISBackend) ListPlayers() ([]Player, error) {
 	// Check cache first
-	if players, ok := m.cache.Get(CACHE_KEY); ok {
+	if players := m.players.Load(); players != nil {
 		logger.Debug("[mpris] returning %d players from cache", len(players))
 		return players, nil
 	}
@@ -96,7 +117,7 @@ func (m *MPRISBackend) ListPlayers() ([]Player, error) {
 	logger.Debug("[mpris] loaded %d players in %s", len(players), elapsed)
 
 	// Update cache
-	m.cache.Set(CACHE_KEY, players)
+	m.players.Store(players)
 
 	return players, nil
 }
@@ -109,8 +130,8 @@ func (m *MPRISBackend) GetPlayerFromCache(busName string) (*Player, error) {
 		return nil, err
 	}
 
-	players, ok := m.cache.Get(CACHE_KEY)
-	if !ok {
+	players := m.players.Load()
+	if players == nil {
 		return nil, &PlayerNotFoundError{BusName: busName}
 	}
 
@@ -126,30 +147,24 @@ func (m *MPRISBackend) GetPlayerFromCache(busName string) (*Player, error) {
 // If the player exists, it is replaced. Otherwise, it is added to the cache.
 // WARNING: If the cache is empty, this function reloads ALL players via ListPlayers.
 func (m *MPRISBackend) UpdatePlayer(updated Player) error {
-	players, ok := m.cache.Get(CACHE_KEY)
+	found := false
+	ok := m.updatePlayers(func(players []Player) []Player {
+		for i, player := range players {
+			if player.BusName == updated.BusName {
+				players[i] = updated
+				found = true
+				return players
+			}
+		}
+		// Player not in cache, add it
+		return append(players, updated)
+	})
 	if !ok {
 		// If no cache, reload everything
-		if _, err := m.ListPlayers(); err != nil {
-			return err
-		}
-		return nil
+		_, err := m.ListPlayers()
+		return err
 	}
 
-	found := false
-	for i, player := range players {
-		if player.BusName == updated.BusName {
-			players[i] = updated
-			found = true
-			break
-		}
-	}
-
-	if !found {
-		// Player not in cache, add it
-		players = append(players, updated)
-	}
-
-	m.cache.Set(CACHE_KEY, players)
 	eventType := events.TypePlayerUpdated
 	if !found {
 		eventType = events.TypePlayerAdded
@@ -187,15 +202,20 @@ func shouldAcceptPosition(p *Player, pos int64) bool {
 // Mainly used by the listener to update cache upon receiving
 // D-Bus PropertiesChanged signals. Does NOT make D-Bus calls.
 func (m *MPRISBackend) UpdatePlayerProperties(busName string, changed map[string]dbus.Variant) error {
-	players, ok := m.cache.Get(CACHE_KEY)
-	if !ok {
-		return &PlayerNotFoundError{BusName: busName}
-	}
-
-	for i, player := range players {
-		if player.BusName != busName {
-			continue
+	var updated Player
+	found := false
+	ok := m.updatePlayers(func(players []Player) []Player {
+		i := -1
+		for j := range players {
+			if players[j].BusName == busName {
+				i = j
+				break
+			}
 		}
+		if i < 0 {
+			return nil
+		}
+		found = true
 
 		// Update only properties that have changed
 		for key, variant := range changed {
@@ -267,13 +287,16 @@ func (m *MPRISBackend) UpdatePlayerProperties(busName string, changed map[string
 			}
 		}
 
-		m.cache.Set(CACHE_KEY, players)
-		m.notify(events.Event{Type: events.TypePlayerUpdated, Data: playerEnvelope(players[i])})
-		logger.Debug("[mpris] updated %d properties for player %s", len(changed), busName)
-		return nil
+		updated = players[i]
+		return players
+	})
+	if !ok || !found {
+		return &PlayerNotFoundError{BusName: busName}
 	}
 
-	return &PlayerNotFoundError{BusName: busName}
+	m.notify(events.Event{Type: events.TypePlayerUpdated, Data: playerEnvelope(updated)})
+	logger.Debug("[mpris] updated %d properties for player %s", len(changed), busName)
+	return nil
 }
 
 // UpdateProperty updates a single property of a player in the cache
@@ -286,26 +309,26 @@ func (m *MPRISBackend) UpdateProperty(busName, property string, value dbus.Varia
 // UpdatePositions updates positions for multiple players in a single cache pass
 // and emits a single player.position event with all updated positions.
 func (m *MPRISBackend) UpdatePositions(positions map[string]positionUpdate) {
-	players, ok := m.cache.Get(CACHE_KEY)
-	if !ok {
-		return
-	}
-
 	var updates []map[string]any
-	for i, player := range players {
-		if u, ok := positions[player.BusName]; ok {
-			players[i].Position = u.position
-			players[i].PositionUpdatedAt = time.UnixMilli(u.emittedAt)
-			updates = append(updates, map[string]any{
-				"bus_name":   player.BusName,
-				"track_id":   u.trackID,
-				"position":   u.position,
-				"emitted_at": u.emittedAt,
-			})
+	m.updatePlayers(func(players []Player) []Player {
+		for i, player := range players {
+			if u, ok := positions[player.BusName]; ok {
+				players[i].Position = u.position
+				players[i].PositionUpdatedAt = time.UnixMilli(u.emittedAt)
+				updates = append(updates, map[string]any{
+					"bus_name":   player.BusName,
+					"track_id":   u.trackID,
+					"position":   u.position,
+					"emitted_at": u.emittedAt,
+				})
+			}
 		}
-	}
+		if len(updates) == 0 {
+			return nil
+		}
+		return players
+	})
 
-	m.cache.Set(CACHE_KEY, players)
 	if len(updates) > 0 {
 		m.notify(events.Event{Type: events.TypePlayerPosition, Data: updates})
 	}
@@ -337,19 +360,19 @@ func (m *MPRISBackend) RemovePlayer(busName string) error {
 		return err
 	}
 
-	players, ok := m.cache.Get(CACHE_KEY)
+	ok := m.updatePlayers(func(players []Player) []Player {
+		filtered := make([]Player, 0, len(players))
+		for _, player := range players {
+			if player.BusName != busName {
+				filtered = append(filtered, player)
+			}
+		}
+		return filtered
+	})
 	if !ok {
 		return nil
 	}
 
-	filtered := make([]Player, 0, len(players))
-	for _, player := range players {
-		if player.BusName != busName {
-			filtered = append(filtered, player)
-		}
-	}
-
-	m.cache.Set(CACHE_KEY, filtered)
 	m.notify(events.Event{
 		Type: events.TypePlayerRemoved,
 		Data: map[string]string{"bus_name": busName},
@@ -363,10 +386,7 @@ func (m *MPRISBackend) RemovePlayer(busName string) error {
 // (e.g., "org.mpris.MediaPlayer2.spotify"). This function maps between the two
 // by searching in the cache. Returns "" if the player is not found.
 func (m *MPRISBackend) findPlayerByUniqueName(uniqueName string) string {
-	players, ok := m.cache.Get(CACHE_KEY)
-	if !ok {
-		return ""
-	}
+	players := m.players.Load()
 
 	for _, player := range players {
 		if player.uniqueName == uniqueName {
@@ -569,12 +589,12 @@ func (m *MPRISBackend) SetShuffle(busName string, shuffle bool) error {
 
 // CacheUpdatedAt returns the last time the player cache was written to.
 func (m *MPRISBackend) CacheUpdatedAt() time.Time {
-	return m.cache.UpdatedAt()
+	return m.players.UpdatedAt()
 }
 
 // InvalidateCache invalidates the entire cache
 func (m *MPRISBackend) InvalidateCache() {
-	m.cache.Delete(CACHE_KEY)
+	m.players.Reset()
 }
 
 // Close cleanly closes connections and stops the listener

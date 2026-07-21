@@ -1,8 +1,6 @@
 package mpris
 
 const (
-	CACHE_KEY = "players"
-
 	// MPRIS D-Bus constants
 	MPRIS_PREFIX    = "org.mpris.MediaPlayer2"
 	MPRIS_PATH      = "/org/mpris/MediaPlayer2"

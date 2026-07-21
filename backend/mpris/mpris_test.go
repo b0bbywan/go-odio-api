@@ -1,18 +1,79 @@
 package mpris
 
 import (
+	"fmt"
 	"reflect"
+	"sync"
 	"testing"
 	"time"
 
-	"github.com/b0bbywan/go-odio-api/cache"
 	"github.com/godbus/dbus/v5"
+
+	"github.com/b0bbywan/go-odio-api/events"
 )
 
-func TestGetPlayerFromCache(t *testing.T) {
-	backend := &MPRISBackend{
-		cache: cache.New[[]Player](0),
+// Readers must hold immutable snapshots: a writer updating the cache while a
+// reader walks a player's metadata must not race (-race enforces this).
+func TestConcurrentReadersWriters(t *testing.T) {
+	const busName = "org.mpris.MediaPlayer2.test"
+
+	b := &MPRISBackend{events: make(chan events.Event, 16)}
+	drained := make(chan struct{})
+	go func() {
+		defer close(drained)
+		for range b.events {
+		}
+	}()
+
+	b.players.Store([]Player{{
+		BusName:  busName,
+		Metadata: map[string]string{"mpris:trackid": "/track/0"},
+	}})
+
+	var wg sync.WaitGroup
+	for w := 0; w < 2; w++ {
+		wg.Add(1)
+		go func(seed int) {
+			defer wg.Done()
+			for i := 0; i < 300; i++ {
+				changed := map[string]dbus.Variant{
+					"Metadata": dbus.MakeVariant(map[string]dbus.Variant{
+						"mpris:trackid": dbus.MakeVariant(dbus.ObjectPath(fmt.Sprintf("/track/%d-%d", seed, i))),
+						"xesam:title":   dbus.MakeVariant("Song"),
+					}),
+				}
+				if err := b.UpdatePlayerProperties(busName, changed); err != nil {
+					t.Errorf("UpdatePlayerProperties: %v", err)
+					return
+				}
+			}
+		}(w)
 	}
+	for r := 0; r < 2; r++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for i := 0; i < 300; i++ {
+				players, err := b.ListPlayers()
+				if err != nil {
+					t.Errorf("ListPlayers: %v", err)
+					return
+				}
+				for _, p := range players {
+					for k, v := range p.Metadata {
+						_, _ = k, v
+					}
+				}
+			}
+		}()
+	}
+	wg.Wait()
+	close(b.events)
+	<-drained
+}
+
+func TestGetPlayerFromCache(t *testing.T) {
+	backend := &MPRISBackend{}
 
 	// Populate cache with test players
 	players := []Player{
@@ -39,7 +100,7 @@ func TestGetPlayerFromCache(t *testing.T) {
 			},
 		},
 	}
-	backend.cache.Set(CACHE_KEY, players)
+	backend.players.Store(players)
 
 	tests := []struct {
 		name       string
@@ -115,9 +176,7 @@ func TestGetPlayerFromCache(t *testing.T) {
 }
 
 func TestGetPlayerFromCacheEmptyCache(t *testing.T) {
-	backend := &MPRISBackend{
-		cache: cache.New[[]Player](0),
-	}
+	backend := &MPRISBackend{}
 
 	player, err := backend.GetPlayerFromCache("org.mpris.MediaPlayer2.test")
 	if err == nil {
@@ -129,9 +188,7 @@ func TestGetPlayerFromCacheEmptyCache(t *testing.T) {
 }
 
 func TestUpdatePlayer(t *testing.T) {
-	backend := &MPRISBackend{
-		cache: cache.New[[]Player](0),
-	}
+	backend := &MPRISBackend{}
 
 	// Initial cache state
 	half, full, eightyPct := 0.5, 1.0, 0.8
@@ -149,7 +206,7 @@ func TestUpdatePlayer(t *testing.T) {
 			Volume:         &full,
 		},
 	}
-	backend.cache.Set(CACHE_KEY, initialPlayers)
+	backend.players.Store(initialPlayers)
 
 	// Update an existing player
 	updatedPlayer := Player{
@@ -191,9 +248,7 @@ func TestUpdatePlayer(t *testing.T) {
 }
 
 func TestUpdatePlayerAddNew(t *testing.T) {
-	backend := &MPRISBackend{
-		cache: cache.New[[]Player](0),
-	}
+	backend := &MPRISBackend{}
 
 	// Initial cache with one player
 	initialPlayers := []Player{
@@ -202,7 +257,7 @@ func TestUpdatePlayerAddNew(t *testing.T) {
 			Identity: "Spotify",
 		},
 	}
-	backend.cache.Set(CACHE_KEY, initialPlayers)
+	backend.players.Store(initialPlayers)
 
 	// Add a new player
 	newPlayer := Player{
@@ -229,16 +284,14 @@ func TestUpdatePlayerAddNew(t *testing.T) {
 	}
 
 	// Verify we now have 2 players in cache
-	players, _ := backend.cache.Get(CACHE_KEY)
+	players := backend.players.Load()
 	if len(players) != 2 {
 		t.Errorf("Cache should contain 2 players, got %d", len(players))
 	}
 }
 
 func TestRemovePlayer(t *testing.T) {
-	backend := &MPRISBackend{
-		cache: cache.New[[]Player](0),
-	}
+	backend := &MPRISBackend{}
 
 	// Populate cache with two players
 	players := []Player{
@@ -251,7 +304,7 @@ func TestRemovePlayer(t *testing.T) {
 			Identity: "VLC",
 		},
 	}
-	backend.cache.Set(CACHE_KEY, players)
+	backend.players.Store(players)
 
 	// Remove one player
 	err := backend.RemovePlayer("org.mpris.MediaPlayer2.spotify")
@@ -275,22 +328,20 @@ func TestRemovePlayer(t *testing.T) {
 	}
 
 	// Verify cache size
-	cachedPlayers, _ := backend.cache.Get(CACHE_KEY)
+	cachedPlayers := backend.players.Load()
 	if len(cachedPlayers) != 1 {
 		t.Errorf("Cache should contain 1 player, got %d", len(cachedPlayers))
 	}
 }
 
 func TestInvalidateCache(t *testing.T) {
-	backend := &MPRISBackend{
-		cache: cache.New[[]Player](0),
-	}
+	backend := &MPRISBackend{}
 
 	// Populate cache
 	players := []Player{
 		{BusName: "org.mpris.MediaPlayer2.test", Identity: "Test"},
 	}
-	backend.cache.Set(CACHE_KEY, players)
+	backend.players.Store(players)
 
 	// Verify cache is populated
 	_, err := backend.GetPlayerFromCache("org.mpris.MediaPlayer2.test")
@@ -1241,8 +1292,8 @@ func TestUpdatePlayerPropertiesPosition(t *testing.T) {
 	const busName = "org.mpris.MediaPlayer2.test"
 
 	newBackend := func(initial Player) *MPRISBackend {
-		b := &MPRISBackend{cache: cache.New[[]Player](0)}
-		b.cache.Set(CACHE_KEY, []Player{initial})
+		b := &MPRISBackend{}
+		b.players.Store([]Player{initial})
 		return b
 	}
 
@@ -1350,8 +1401,8 @@ func TestUpdatePlayerPropertiesCapabilities(t *testing.T) {
 	const busName = "org.mpris.MediaPlayer2.test"
 
 	newBackend := func(initial Player) *MPRISBackend {
-		b := &MPRISBackend{cache: cache.New[[]Player](0)}
-		b.cache.Set(CACHE_KEY, []Player{initial})
+		b := &MPRISBackend{}
+		b.players.Store([]Player{initial})
 		return b
 	}
 
