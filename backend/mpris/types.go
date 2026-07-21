@@ -57,16 +57,17 @@ type Player struct {
 
 	BusName string `json:"bus_name"`
 
-	Identity          string            `json:"identity" dbus:"Identity" iface:"org.mpris.MediaPlayer2"`
-	PlaybackStatus    PlaybackStatus    `json:"playback_status" dbus:"PlaybackStatus" iface:"org.mpris.MediaPlayer2.Player"`
-	LoopStatus        LoopStatus        `json:"loop_status,omitempty" dbus:"LoopStatus" iface:"org.mpris.MediaPlayer2.Player"`
-	Shuffle           bool              `json:"shuffle,omitempty" dbus:"Shuffle" iface:"org.mpris.MediaPlayer2.Player"`
-	Volume            *float64          `json:"volume,omitempty" dbus:"Volume" iface:"org.mpris.MediaPlayer2.Player"`
-	Position          int64             `json:"position,omitempty" dbus:"Position" iface:"org.mpris.MediaPlayer2.Player"`
-	PositionUpdatedAt time.Time         `json:"position_updated_at"`
-	Rate              float64           `json:"rate,omitempty" dbus:"Rate" iface:"org.mpris.MediaPlayer2.Player"`
-	Metadata          map[string]string `json:"metadata,omitempty" dbus:"Metadata" iface:"org.mpris.MediaPlayer2.Player"`
-	Capabilities      Capabilities      `json:"capabilities"`
+	Identity            string            `json:"identity" dbus:"Identity" iface:"org.mpris.MediaPlayer2"`
+	SupportedUriSchemes []string          `json:"-" dbus:"SupportedUriSchemes" iface:"org.mpris.MediaPlayer2"`
+	PlaybackStatus      PlaybackStatus    `json:"playback_status" dbus:"PlaybackStatus" iface:"org.mpris.MediaPlayer2.Player"`
+	LoopStatus          LoopStatus        `json:"loop_status,omitempty" dbus:"LoopStatus" iface:"org.mpris.MediaPlayer2.Player"`
+	Shuffle             bool              `json:"shuffle,omitempty" dbus:"Shuffle" iface:"org.mpris.MediaPlayer2.Player"`
+	Volume              *float64          `json:"volume,omitempty" dbus:"Volume" iface:"org.mpris.MediaPlayer2.Player"`
+	Position            int64             `json:"position,omitempty" dbus:"Position" iface:"org.mpris.MediaPlayer2.Player"`
+	PositionUpdatedAt   time.Time         `json:"position_updated_at"`
+	Rate                float64           `json:"rate,omitempty" dbus:"Rate" iface:"org.mpris.MediaPlayer2.Player"`
+	Metadata            map[string]string `json:"metadata,omitempty" dbus:"Metadata" iface:"org.mpris.MediaPlayer2.Player"`
+	Capabilities        Capabilities      `json:"capabilities"`
 
 	// No dbus:/iface: tags: TrackList is optional, loaded by a separate
 	// non-fatal step outside the reflection loop whose GetAll failures are fatal.
@@ -123,12 +124,6 @@ type ShuffleRequest struct {
 type TracklistResponse struct {
 	CanEditTracks bool    `json:"can_edit_tracks"`
 	Tracks        []Track `json:"tracks"`
-}
-
-// Shared by GoTo and RemoveTrack. Body instead of a path param:
-// track IDs are object paths containing "/"
-type TrackRequest struct {
-	TrackID string `json:"track_id"`
 }
 
 type AddTrackRequest struct {

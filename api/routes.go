@@ -230,4 +230,20 @@ func (s *Server) registerMPRISRoutes(b *mpris.MPRISBackend) {
 		"POST /players/{player}/shuffle",
 		SetShuffleHandler(b),
 	)
+	s.mux.HandleFunc(
+		"GET /players/{player}/tracklist",
+		TracklistHandler(b.GetTracklist),
+	)
+	s.mux.HandleFunc(
+		"POST /players/{player}/tracklist/goto/{trackid}",
+		GoToHandler(b),
+	)
+	s.mux.HandleFunc(
+		"POST /players/{player}/tracklist/add",
+		AddTrackHandler(b),
+	)
+	s.mux.HandleFunc(
+		"POST /players/{player}/tracklist/remove/{trackid}",
+		RemoveTrackHandler(b),
+	)
 }

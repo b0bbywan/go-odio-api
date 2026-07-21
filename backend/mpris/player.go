@@ -140,6 +140,13 @@ func (p *Player) loadFromDBus() error {
 				field.SetInt(val)
 			}
 
+		case reflect.Slice:
+			if field.Type().Elem().Kind() == reflect.String {
+				if val, ok := extractStringSlice(variant); ok {
+					field.Set(reflect.ValueOf(val))
+				}
+			}
+
 		case reflect.Map:
 			// Special case for Metadata
 			if dbusTag == "Metadata" {
