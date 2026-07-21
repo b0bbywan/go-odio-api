@@ -41,6 +41,15 @@ func (e *ValidationError) Error() string {
 	return e.Message
 }
 
+// TracklistUnsupportedError indicates that a player doesn't implement the TrackList interface
+type TracklistUnsupportedError struct {
+	BusName string
+}
+
+func (e *TracklistUnsupportedError) Error() string {
+	return "tracklist not supported: " + e.BusName
+}
+
 type dbusTimeoutError struct{}
 
 func (e *dbusTimeoutError) Error() string {

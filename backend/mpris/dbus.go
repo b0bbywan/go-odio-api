@@ -89,8 +89,8 @@ func (m *MPRISBackend) addMatchRule(rule string) error {
 }
 
 // addListenMatchRules subscribes to the necessary D-Bus signals for the listener.
-// Subscribes to PropertiesChanged (player state changes) and
-// NameOwnerChanged (player appearance/disappearance).
+// Subscribes to PropertiesChanged (player state changes),
+// NameOwnerChanged (player appearance/disappearance) and TrackList signals.
 func (m *MPRISBackend) addListenMatchRules() error {
 	matchRule := "type='signal',interface='" + DBUS_PROP_IFACE + "',member='PropertiesChanged',arg0namespace='" + MPRIS_PREFIX + "'"
 	if err := m.addMatchRule(matchRule); err != nil {
@@ -99,6 +99,13 @@ func (m *MPRISBackend) addListenMatchRules() error {
 
 	ownerMatchRule := "type='signal',interface='" + DBUS_INTERFACE + "',member='NameOwnerChanged',arg0namespace='" + MPRIS_PREFIX + "'"
 	if err := m.addMatchRule(ownerMatchRule); err != nil {
+		return err
+	}
+
+	// No arg0namespace here: TrackListReplaced's arg0 is `ao`, not a string.
+	// Unknown senders at this path are dropped by findPlayerByUniqueName.
+	tracklistMatchRule := "type='signal',interface='" + MPRIS_TRACKLIST_IFACE + "',path='" + MPRIS_PATH + "'"
+	if err := m.addMatchRule(tracklistMatchRule); err != nil {
 		return err
 	}
 
@@ -168,4 +175,19 @@ func (p *Player) getAllProperties(iface string) (map[string]dbus.Variant, error)
 
 	err := call.Store(&props)
 	return props, err
+}
+
+// getTracksMetadata retrieves metadata for the given track IDs in a single call.
+// The spec guarantees results in the same order as the requested IDs.
+func (p *Player) getTracksMetadata(ids []dbus.ObjectPath) ([]map[string]dbus.Variant, error) {
+	obj := p.conn.Object(p.BusName, MPRIS_PATH)
+	var metas []map[string]dbus.Variant
+
+	call := obj.Call(MPRIS_METHOD_GET_TRACKS_METADATA, 0, ids)
+	if err := p.callWithTimeout(call); err != nil {
+		return nil, err
+	}
+
+	err := call.Store(&metas)
+	return metas, err
 }
