@@ -652,3 +652,54 @@ func TestRemoveMissingClients(t *testing.T) {
 		})
 	}
 }
+
+// TestClientName verifies the naming fallback chain for streams that register
+// empty names (issue #130: spotifyd).
+func TestClientName(t *testing.T) {
+	tests := []struct {
+		name  string
+		props map[string]string
+		want  string
+	}{
+		{
+			name: "media.name wins",
+			props: map[string]string{
+				"media.name":                 "Playback",
+				"application.name":           "Spotify",
+				"application.process.binary": "spotify",
+			},
+			want: "Playback",
+		},
+		{
+			name: "application.name when media.name empty",
+			props: map[string]string{
+				"media.name":                 "",
+				"application.name":           "Spotify",
+				"application.process.binary": "spotify",
+			},
+			want: "Spotify",
+		},
+		{
+			name: "binary when both names empty",
+			props: map[string]string{
+				"media.name":                 "",
+				"application.name":           "",
+				"application.process.binary": "spotifyd",
+			},
+			want: "spotifyd",
+		},
+		{
+			name:  "everything empty",
+			props: map[string]string{},
+			want:  "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := clientName(tt.props); got != tt.want {
+				t.Errorf("clientName() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
