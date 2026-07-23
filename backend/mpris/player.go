@@ -233,34 +233,30 @@ func trackFromSignalMetadata(meta map[string]dbus.Variant) Track {
 	return track
 }
 
-// loadCapabilitiesFromProps loads capabilities from already retrieved properties.
-// Used by loadFromDBus() to avoid additional D-Bus calls.
-// Maps D-Bus properties (CanPlay, CanPause, etc.) to the Capabilities struct
-// using reflection and `dbus` tags.
-func (p *Player) loadCapabilitiesFromProps(props map[string]dbus.Variant) Capabilities {
-	var caps Capabilities
-
-	val := reflect.ValueOf(&caps).Elem()
-	typ := val.Type()
-
-	for i := 0; i < val.NumField(); i++ {
-		field := val.Field(i)
-		fieldType := typ.Field(i)
-
-		// Retrieve dbus tag
-		dbusTag := fieldType.Tag.Get("dbus")
-		if dbusTag == "" {
-			continue
-		}
-
-		// Retrieve property from props
-		if variant, ok := props[dbusTag]; ok {
-			if boolVal, ok := extract[bool](variant); ok {
-				field.SetBool(boolVal)
-			}
+// setFromProp sets the Capabilities field whose `dbus` tag matches name;
+// no-op when no field matches or the variant does not hold a bool.
+func (c *Capabilities) setFromProp(name string, variant dbus.Variant) {
+	val, ok := extract[bool](variant)
+	if !ok {
+		return
+	}
+	v := reflect.ValueOf(c).Elem()
+	typ := v.Type()
+	for i := 0; i < v.NumField(); i++ {
+		if typ.Field(i).Tag.Get("dbus") == name {
+			v.Field(i).SetBool(val)
+			return
 		}
 	}
+}
 
+// loadCapabilitiesFromProps loads capabilities from already retrieved
+// properties, avoiding additional D-Bus calls.
+func (p *Player) loadCapabilitiesFromProps(props map[string]dbus.Variant) Capabilities {
+	var caps Capabilities
+	for name, variant := range props {
+		caps.setFromProp(name, variant)
+	}
 	return caps
 }
 
