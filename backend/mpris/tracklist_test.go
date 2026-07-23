@@ -177,15 +177,25 @@ func TestAddTrackToCache(t *testing.T) {
 	tests := []struct {
 		name       string
 		busName    string
+		trackID    string // defaults to /track/new
 		afterTrack string
 		wantIDs    []string
 		wantErr    bool
+		noop       bool // duplicate signal: nothing stored, supported flag untouched
 	}{
 		{
 			name:       "prepend via NoTrack sentinel",
 			busName:    testBus,
 			afterTrack: MPRIS_NO_TRACK,
 			wantIDs:    []string{"/track/new", "/track/1", "/track/2"},
+		},
+		{
+			name:       "duplicate TrackAdded for a cached ID is a no-op",
+			busName:    testBus,
+			trackID:    "/track/1",
+			afterTrack: "/track/2",
+			wantIDs:    []string{"/track/1", "/track/2"},
+			noop:       true,
 		},
 		{
 			name:       "insert after existing track",
@@ -214,7 +224,11 @@ func TestAddTrackToCache(t *testing.T) {
 				Tracklist: append([]Track{}, initial...),
 			})
 
-			err := b.AddTrackToCache(tt.busName, newTrack, tt.afterTrack)
+			track := newTrack
+			if tt.trackID != "" {
+				track.TrackID = tt.trackID
+			}
+			err := b.AddTrackToCache(tt.busName, track, tt.afterTrack)
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("AddTrackToCache error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -223,8 +237,8 @@ func TestAddTrackToCache(t *testing.T) {
 			}
 
 			p, _ := b.GetPlayerFromCache(testBus)
-			if !p.TracklistSupported {
-				t.Error("AddTrackToCache should mark the player as tracklist-supported")
+			if p.TracklistSupported == tt.noop {
+				t.Errorf("TracklistSupported = %v: an insert should set it, a no-op should store nothing", p.TracklistSupported)
 			}
 			assertTrackIDs(t, p.Tracklist, tt.wantIDs)
 		})
