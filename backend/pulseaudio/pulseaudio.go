@@ -360,9 +360,9 @@ func (pa *PulseAudioBackend) SetVolumeMaster(volume float32) error {
 
 func (pa *PulseAudioBackend) ToggleMute(name string) error {
 	logger.Debug("[pulseaudio] toggling mute for client %q", name)
-	sink, err := pa.client.GetSinkInputByName(name)
+	sink, err := pa.findSinkInput(name)
 	if err != nil {
-		return fmt.Errorf("failed to get sink input: %w", err)
+		return err
 	}
 
 	if err := sink.ToggleMute(); err != nil {
@@ -373,9 +373,9 @@ func (pa *PulseAudioBackend) ToggleMute(name string) error {
 
 func (pa *PulseAudioBackend) SetVolume(name string, vol float32) error {
 	logger.Debug("[pulseaudio] setting volume for client %q to %.2f", name, vol)
-	sink, err := pa.client.GetSinkInputByName(name)
+	sink, err := pa.findSinkInput(name)
 	if err != nil {
-		return fmt.Errorf("failed to get sink input: %w", err)
+		return err
 	}
 
 	if err := sink.SetVolume(vol); err != nil {
@@ -383,6 +383,21 @@ func (pa *PulseAudioBackend) SetVolume(name string, vol float32) error {
 	}
 
 	return nil
+}
+
+// findSinkInput matches a sink input by the same derived name the parsers
+// expose, so clients registering empty names stay addressable.
+func (pa *PulseAudioBackend) findSinkInput(name string) (pulseaudio.SinkInput, error) {
+	inputs, err := pa.client.SinkInputs()
+	if err != nil {
+		return pulseaudio.SinkInput{}, fmt.Errorf("failed to list sink inputs: %w", err)
+	}
+	for _, s := range inputs {
+		if strings.EqualFold(clientName(s.PropList), name) {
+			return s, nil
+		}
+	}
+	return pulseaudio.SinkInput{}, &NotFoundError{Resource: "client", Name: name}
 }
 
 func (pa *PulseAudioBackend) parseSinkInput(s pulseaudio.SinkInput) AudioClient {
@@ -406,7 +421,7 @@ func (pa *PulseAudioBackend) parsePulseSinkInput(s pulseaudio.SinkInput) AudioCl
 
 	return AudioClient{
 		ID:      s.Index,
-		Name:    props["media.name"],
+		Name:    clientName(props),
 		App:     props["application.name"],
 		Muted:   s.IsMute(),
 		Volume:  s.GetVolume(),
@@ -417,6 +432,18 @@ func (pa *PulseAudioBackend) parsePulseSinkInput(s pulseaudio.SinkInput) AudioCl
 		Host:    props["application.process.host"],
 		Props:   props,
 	}
+}
+
+// clientName is a client's routing and display name: media.name, falling back
+// to application.name then the process binary for streams that register empty
+// names (e.g. spotifyd).
+func clientName(props map[string]string) string {
+	for _, key := range []string{"media.name", "application.name", "application.process.binary"} {
+		if v := props[key]; v != "" {
+			return v
+		}
+	}
+	return ""
 }
 
 func detectServerKind(s *pulseaudio.Server) AudioServerKind {

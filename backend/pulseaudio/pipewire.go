@@ -27,7 +27,7 @@ func (pa *PulseAudioBackend) parsePipeWireSinkInput(s pulseaudio.SinkInput) Audi
 
 	return AudioClient{
 		ID:      s.Index,
-		Name:    props["media.name"],
+		Name:    clientName(props),
 		App:     props["application.name"],
 		Muted:   s.IsMute(),
 		Volume:  s.GetVolume(),
