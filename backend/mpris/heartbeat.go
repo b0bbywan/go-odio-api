@@ -108,7 +108,7 @@ func (h *Heartbeat) updatePlayingPositions() bool {
 			continue
 		}
 
-		pos, ok := extractInt64(variant)
+		pos, ok := extract[int64](variant)
 		if !ok || !shouldAcceptPosition(&player, pos) {
 			continue
 		}

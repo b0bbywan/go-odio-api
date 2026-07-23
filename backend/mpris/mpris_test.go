@@ -549,12 +549,12 @@ func TestExtractString(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			value, ok := extractString(tt.variant)
+			value, ok := extract[string](tt.variant)
 			if ok != tt.wantOk {
-				t.Errorf("extractString() ok = %v, want %v", ok, tt.wantOk)
+				t.Errorf("extract[string]() ok = %v, want %v", ok, tt.wantOk)
 			}
 			if value != tt.wantValue {
-				t.Errorf("extractString() value = %q, want %q", value, tt.wantValue)
+				t.Errorf("extract[string]() value = %q, want %q", value, tt.wantValue)
 			}
 		})
 	}
@@ -589,12 +589,12 @@ func TestExtractBool(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			value, ok := extractBool(tt.variant)
+			value, ok := extract[bool](tt.variant)
 			if ok != tt.wantOk {
-				t.Errorf("extractBool() ok = %v, want %v", ok, tt.wantOk)
+				t.Errorf("extract[bool]() ok = %v, want %v", ok, tt.wantOk)
 			}
 			if value != tt.wantValue {
-				t.Errorf("extractBool() value = %v, want %v", value, tt.wantValue)
+				t.Errorf("extract[bool]() value = %v, want %v", value, tt.wantValue)
 			}
 		})
 	}
@@ -635,12 +635,12 @@ func TestExtractInt64(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			value, ok := extractInt64(tt.variant)
+			value, ok := extract[int64](tt.variant)
 			if ok != tt.wantOk {
-				t.Errorf("extractInt64() ok = %v, want %v", ok, tt.wantOk)
+				t.Errorf("extract[int64]() ok = %v, want %v", ok, tt.wantOk)
 			}
 			if value != tt.wantValue {
-				t.Errorf("extractInt64() value = %v, want %v", value, tt.wantValue)
+				t.Errorf("extract[int64]() value = %v, want %v", value, tt.wantValue)
 			}
 		})
 	}
@@ -681,12 +681,12 @@ func TestExtractFloat64(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			value, ok := extractFloat64(tt.variant)
+			value, ok := extract[float64](tt.variant)
 			if ok != tt.wantOk {
-				t.Errorf("extractFloat64() ok = %v, want %v", ok, tt.wantOk)
+				t.Errorf("extract[float64]() ok = %v, want %v", ok, tt.wantOk)
 			}
 			if value != tt.wantValue {
-				t.Errorf("extractFloat64() value = %v, want %v", value, tt.wantValue)
+				t.Errorf("extract[float64]() value = %v, want %v", value, tt.wantValue)
 			}
 		})
 	}
@@ -719,9 +719,9 @@ func TestExtractMetadataMap(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, ok := extractMetadataMap(tt.variant)
+			_, ok := extract[map[string]dbus.Variant](tt.variant)
 			if ok != tt.wantOk {
-				t.Errorf("extractMetadataMap() ok = %v, want %v", ok, tt.wantOk)
+				t.Errorf("extract[map[string]dbus.Variant]() ok = %v, want %v", ok, tt.wantOk)
 			}
 		})
 	}

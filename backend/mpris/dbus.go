@@ -134,43 +134,10 @@ func arg[T any](sig *dbus.Signal, i int) (T, bool) {
 	return v, ok
 }
 
-// Value extraction helpers from dbus.Variant
-// These helpers are used to extract values from variants received
-// in D-Bus signals without making additional D-Bus calls.
-
-// extractString extracts a string from a dbus.Variant
-func extractString(v dbus.Variant) (string, bool) {
-	val, ok := v.Value().(string)
-	return val, ok
-}
-
-// extractBool extracts a bool from a dbus.Variant
-func extractBool(v dbus.Variant) (bool, bool) {
-	val, ok := v.Value().(bool)
-	return val, ok
-}
-
-// extractInt64 extracts an int64 from a dbus.Variant
-func extractInt64(v dbus.Variant) (int64, bool) {
-	val, ok := v.Value().(int64)
-	return val, ok
-}
-
-// extractFloat64 extracts a float64 from a dbus.Variant
-func extractFloat64(v dbus.Variant) (float64, bool) {
-	val, ok := v.Value().(float64)
-	return val, ok
-}
-
-// extractStringSlice extracts a []string from a dbus.Variant
-func extractStringSlice(v dbus.Variant) ([]string, bool) {
-	val, ok := v.Value().([]string)
-	return val, ok
-}
-
-// extractMetadataMap extracts a metadata map from a dbus.Variant
-func extractMetadataMap(v dbus.Variant) (map[string]dbus.Variant, bool) {
-	val, ok := v.Value().(map[string]dbus.Variant)
+// extract returns the variant's value as T, false if it holds another type.
+// Lets signal handlers read values without additional D-Bus calls.
+func extract[T any](v dbus.Variant) (T, bool) {
+	val, ok := v.Value().(T)
 	return val, ok
 }
 

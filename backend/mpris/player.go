@@ -112,17 +112,17 @@ func (p *Player) loadFromDBus() error {
 		// Handle according to field type
 		switch field.Kind() {
 		case reflect.String:
-			if val, ok := extractString(variant); ok {
+			if val, ok := extract[string](variant); ok {
 				field.SetString(val)
 			}
 
 		case reflect.Bool:
-			if val, ok := extractBool(variant); ok {
+			if val, ok := extract[bool](variant); ok {
 				field.SetBool(val)
 			}
 
 		case reflect.Float64:
-			if val, ok := extractFloat64(variant); ok {
+			if val, ok := extract[float64](variant); ok {
 				field.SetFloat(val)
 			}
 
@@ -130,19 +130,19 @@ func (p *Player) loadFromDBus() error {
 			// Volume is *float64 so we can distinguish "muted to 0" from
 			// "player does not expose the property" (nil → JSON-omitted).
 			if field.Type().Elem().Kind() == reflect.Float64 {
-				if val, ok := extractFloat64(variant); ok {
+				if val, ok := extract[float64](variant); ok {
 					field.Set(reflect.ValueOf(&val))
 				}
 			}
 
 		case reflect.Int64:
-			if val, ok := extractInt64(variant); ok {
+			if val, ok := extract[int64](variant); ok {
 				field.SetInt(val)
 			}
 
 		case reflect.Slice:
 			if field.Type().Elem().Kind() == reflect.String {
-				if val, ok := extractStringSlice(variant); ok {
+				if val, ok := extract[[]string](variant); ok {
 					field.Set(reflect.ValueOf(val))
 				}
 			}
@@ -181,7 +181,7 @@ func (p *Player) loadTracklist() {
 	p.TracklistSupported = true
 
 	if v, ok := props["CanEditTracks"]; ok {
-		if canEdit, ok := extractBool(v); ok {
+		if canEdit, ok := extract[bool](v); ok {
 			p.CanEditTracks = canEdit
 		}
 	}
@@ -255,7 +255,7 @@ func (p *Player) loadCapabilitiesFromProps(props map[string]dbus.Variant) Capabi
 
 		// Retrieve property from props
 		if variant, ok := props[dbusTag]; ok {
-			if boolVal, ok := extractBool(variant); ok {
+			if boolVal, ok := extract[bool](variant); ok {
 				field.SetBool(boolVal)
 			}
 		}

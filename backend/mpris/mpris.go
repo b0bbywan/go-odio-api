@@ -221,23 +221,23 @@ func (m *MPRISBackend) UpdatePlayerProperties(busName string, changed map[string
 		for key, variant := range changed {
 			switch key {
 			case "PlaybackStatus":
-				if val, ok := extractString(variant); ok {
+				if val, ok := extract[string](variant); ok {
 					players[i].PlaybackStatus = PlaybackStatus(val)
 				}
 			case "LoopStatus":
-				if val, ok := extractString(variant); ok {
+				if val, ok := extract[string](variant); ok {
 					players[i].LoopStatus = LoopStatus(val)
 				}
 			case "Shuffle":
-				if val, ok := extractBool(variant); ok {
+				if val, ok := extract[bool](variant); ok {
 					players[i].Shuffle = val
 				}
 			case "Volume":
-				if val, ok := extractFloat64(variant); ok {
+				if val, ok := extract[float64](variant); ok {
 					players[i].Volume = &val
 				}
 			case "Metadata":
-				if metaMap, ok := extractMetadataMap(variant); ok {
+				if metaMap, ok := extract[map[string]dbus.Variant](variant); ok {
 					oldTrackID := players[i].Metadata["mpris:trackid"]
 					players[i].Metadata = make(map[string]string)
 					for k, v := range metaMap {
@@ -252,36 +252,36 @@ func (m *MPRISBackend) UpdatePlayerProperties(busName string, changed map[string
 					}
 				}
 			case "Rate":
-				if val, ok := extractFloat64(variant); ok {
+				if val, ok := extract[float64](variant); ok {
 					players[i].Rate = val
 				}
 			case "Position":
-				if val, ok := extractInt64(variant); ok && shouldAcceptPosition(&players[i], val) {
+				if val, ok := extract[int64](variant); ok && shouldAcceptPosition(&players[i], val) {
 					players[i].Position = val
 					players[i].PositionUpdatedAt = time.Now()
 				}
 			case "CanPlay":
-				if val, ok := extractBool(variant); ok {
+				if val, ok := extract[bool](variant); ok {
 					players[i].Capabilities.CanPlay = val
 				}
 			case "CanPause":
-				if val, ok := extractBool(variant); ok {
+				if val, ok := extract[bool](variant); ok {
 					players[i].Capabilities.CanPause = val
 				}
 			case "CanGoNext":
-				if val, ok := extractBool(variant); ok {
+				if val, ok := extract[bool](variant); ok {
 					players[i].Capabilities.CanGoNext = val
 				}
 			case "CanGoPrevious":
-				if val, ok := extractBool(variant); ok {
+				if val, ok := extract[bool](variant); ok {
 					players[i].Capabilities.CanGoPrevious = val
 				}
 			case "CanSeek":
-				if val, ok := extractBool(variant); ok {
+				if val, ok := extract[bool](variant); ok {
 					players[i].Capabilities.CanSeek = val
 				}
 			case "CanControl":
-				if val, ok := extractBool(variant); ok {
+				if val, ok := extract[bool](variant); ok {
 					players[i].Capabilities.CanControl = val
 				}
 			}
