@@ -1,3 +1,121 @@
+odio-api (0.16.0) trixie; urgency=low
+
+  MPRIS Tracklist
+
+  * MPRIS TrackList interface support: tracklist loaded into the player
+    cache, kept live via D-Bus signals, with dedicated SSE events.
+  * New endpoints: get the tracklist, jump to a track, add and remove
+    tracks (capability-gated, tracks referenced by ID).
+  * UI: a toggle on the player card switches the cover to the tracklist
+    (current track highlighted, tap to jump, per-track remove), with
+    view and scroll position preserved across live refreshes.
+  * UI: tap the cover to zoom it fullscreen.
+
+ -- Mathieu Réquillart <mathieu.requillart@gmail.com>  Thu, 23 Jul 2026 00:00:00 +0000
+
+
+odio-api (0.15.1) trixie; urgency=low
+
+  Self-Upgrade Backend
+
+  * New upgrade backend: pluggable detector/executor scripts with a
+    persisted run lifecycle (idle/running/failed) surviving restarts.
+  * GET /upgrade status and POST trigger endpoints, with SSE progress
+    events; internal units hidden from the public services list.
+  * UI: upgrade badge in the header with progress ring and failure state.
+  * Systemd backend: internal user units and fire-and-forget triggers.
+
+ -- Mathieu Réquillart <mathieu.requillart@gmail.com>  Tue, 23 Jun 2026 00:00:00 +0000
+
+
+odio-api (0.14.0) trixie; urgency=low
+
+  Bluetooth Device Management
+
+  * Scan, connect and disconnect endpoints with a live device list
+    (known + freshly discovered devices merged during scans).
+  * UI: bluetooth device list with connect/disconnect, scan toggle,
+    connect spinner and client-side pairing countdown.
+  * Reworked signal handling into a single permanent D-Bus listener;
+    adapter opens pairable mode only when bonding a new device.
+
+ -- Mathieu Réquillart <mathieu.requillart@gmail.com>  Wed, 03 Jun 2026 00:00:00 +0000
+
+
+odio-api (0.13.2) trixie; urgency=low
+
+  Player UX Polish
+
+  * UI: collapsible player cards, lucide icons everywhere, transport
+    controls unified on HTMX with error toasts, dismissible PWA promo.
+  * MPRIS fixes: capability changes propagated live, percent-encoded
+    cover URIs, seeker stability against stale/bogus positions, player
+    names from MPRIS Identity.
+  * New bluetooth.powerOnStart option to power the adapter at startup.
+
+ -- Mathieu Réquillart <mathieu.requillart@gmail.com>  Tue, 19 May 2026 00:00:00 +0000
+
+
+odio-api (0.12.0) trixie; urgency=low
+
+  Config Drop-ins & Service Links
+
+  * conf.d drop-in snippets to override parts of the configuration.
+  * Optional URL attached to systemd services, rendered as a clickable
+    link in the dashboard.
+
+ -- Mathieu Réquillart <mathieu.requillart@gmail.com>  Fri, 01 May 2026 00:00:00 +0000
+
+
+odio-api (0.11.0) trixie; urgency=low
+
+  Cover Art & Native SSE UI
+
+  * New MPRIS cover endpoint serving player artwork to the UI.
+  * UI: switched to native HTMX SSE with server-rendered fragments
+    (HTMX 2.0.8), ETag caching for embedded static assets.
+  * UI hides inactive MPRIS players and corked audio clients.
+
+ -- Mathieu Réquillart <mathieu.requillart@gmail.com>  Tue, 07 Apr 2026 00:00:00 +0000
+
+
+odio-api (0.10.3) trixie; urgency=low
+
+  Dashboard Restyle
+
+  * UI restyled to match odio.love and the PWA.
+  * Configurable systemd fsnotify timeout (default 90s).
+  * Packaging: service unit ordered after default.target.
+
+ -- Mathieu Réquillart <mathieu.requillart@gmail.com>  Thu, 02 Apr 2026 00:00:00 +0000
+
+
+odio-api (0.9.2) trixie; urgency=low
+
+  Audio Outputs & Bluetooth Radio
+
+  * PulseAudio sinks exposed as outputs with default-sink management,
+    combined GET /audio endpoint and a sink selector in the UI.
+  * GET /audio/cookie serves the PulseAudio auth cookie.
+  * Soft-blocked bluetooth rfkill devices auto-unblock on power-up.
+  * Invalid config files now fail hard instead of silently using
+    defaults; packages published to the odio APT repository.
+
+ -- Mathieu Réquillart <mathieu.requillart@gmail.com>  Thu, 19 Mar 2026 00:00:00 +0000
+
+
+odio-api (0.8.1) trixie; urgency=low
+
+  Real-Time Events
+
+  * New GET /events SSE endpoint streaming state changes from all
+    backends (audio, bluetooth, power).
+  * Event type filtering and configurable keepalive interval.
+  * Audio changes stream as delta events instead of full lists.
+
+ -- Mathieu Réquillart <mathieu.requillart@gmail.com>  Wed, 04 Mar 2026 00:00:00 +0000
+
+
 odio-api (0.7.0) trixie; urgency=low
 
   Bluetooth Support
