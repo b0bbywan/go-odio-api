@@ -1,3 +1,16 @@
+odio-api (0.16.1) trixie; urgency=low
+
+  Tracklist & Client Naming Fixes
+
+  * MPRIS: duplicate TrackAdded signals no longer duplicate the cached
+    tracklist entry (track IDs are unique per spec).
+  * PulseAudio: clients registering empty names (e.g. spotifyd) get a
+    derived name — application.name, then the process binary — fixing
+    the empty label and broken mute/volume routes (#130).
+
+ -- Mathieu Réquillart <mathieu.requillart@gmail.com>  Thu, 23 Jul 2026 00:00:00 +0000
+
+
 odio-api (0.16.0) trixie; urgency=low
 
   MPRIS Tracklist
