@@ -213,8 +213,16 @@ button.htmx-request {
 	}
 
 	.player-art {
-		@apply mx-auto w-full max-w-[75%] rounded-md mb-2;
+		@apply mx-auto w-full max-w-[75%] rounded-md mb-2 cursor-zoom-in;
 		max-height: 75cqw;
+	}
+
+	.art-overlay {
+		@apply fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/80 p-4 backdrop-blur-sm cursor-zoom-out;
+	}
+
+	.art-overlay img {
+		@apply max-h-full max-w-full rounded-lg shadow-2xl;
 	}
 
 	.btn {
