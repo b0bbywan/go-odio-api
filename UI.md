@@ -40,8 +40,9 @@ Note: Necessary cors for the PWA are included by default but can be overridden.
 - **Dynamic & Adaptive Sections**
   - **Audio Server**: default sink selector (click to switch output), global volume, active clients with per-app volume control
   - **Media Players**: live list of MPRIS players (Spotify/go-librespot, MPD, Chrome, Kodi, Firefox instances…)
-    - Dynamic cover art
+    - Dynamic cover art, tap to zoom fullscreen
     - Full metadata (title, artist, album)
+    - Tracklist view on players that expose one: current track, tap to jump, remove tracks
     - Progress bar + seek support
     - Play/pause/stop/next/prev controls
   - **Services**: systemd user service status, stop/restart from the UI

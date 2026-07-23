@@ -107,7 +107,7 @@ Each backend has a full reference on **[docs.odio.love](https://docs.odio.love/a
 
 ### Media Player Control (MPRIS)
 
-Auto-discovers all MPRIS players in real time — Spotify, VLC, Firefox, MPD, Kodi, etc. Add a player and it appears immediately, zero config. Full playback control (play/pause/stop/next/previous, seek, position, volume, shuffle, loop), real-time state via D-Bus signals, smart caching, position heartbeat. → [reference](https://docs.odio.love/api/mpris/)
+Auto-discovers all MPRIS players in real time — Spotify, VLC, Firefox, MPD, Kodi, etc. Add a player and it appears immediately, zero config. Full playback control (play/pause/stop/next/previous, seek, position, volume, shuffle, loop), tracklist browsing and editing (jump/add/remove) on players that expose it, real-time state via D-Bus signals, smart caching, position heartbeat. → [reference](https://docs.odio.love/api/mpris/)
 
 ### Audio Management (PulseAudio/PipeWire)
 
@@ -400,7 +400,7 @@ Full per-route reference with request bodies and responses lives on **[docs.odio
 | Group | Routes | Reference |
 |---|---|---|
 | Server | `GET /server` | — |
-| MPRIS | `GET /players`, `/players/{player}/cover`, `POST /players/{player}/{play,pause,play_pause,stop,next,previous,seek,position,volume,loop,shuffle}` | [mpris](https://docs.odio.love/api/mpris/) |
+| MPRIS | `GET /players`, `/players/{player}/{cover,tracklist}`, `POST /players/{player}/{play,pause,play_pause,stop,next,previous,seek,position,volume,loop,shuffle}`, `POST /players/{player}/tracklist/{add,goto,remove}` | [mpris](https://docs.odio.love/api/mpris/) |
 | PulseAudio | `GET /audio`, `/audio/{server,clients,outputs,cookie}`, `POST /audio/server/{mute,volume}`, `/audio/{clients,outputs}/{id}/{mute,volume}`, `/audio/outputs/{id}/default` | [pulseaudio](https://docs.odio.love/api/pulseaudio/) |
 | systemd | `GET /services`, `POST /services/{scope}/{unit}/{start,stop,restart,enable,disable}` | [systemd](https://docs.odio.love/api/systemd/) |
 | Bluetooth | `GET /bluetooth`, `/bluetooth/devices`, `POST /bluetooth/{power_up,power_down,pairing_mode,scan,scan/stop,connect,disconnect}` | [bluetooth](https://docs.odio.love/api/bluetooth/) |
