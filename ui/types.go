@@ -111,17 +111,30 @@ type PlayerCapabilities struct {
 
 // Player represents an MPRIS player from /players
 type Player struct {
-	Name              string             `json:"bus_name"` // API returns "bus_name", not "name"
-	Identity          string             `json:"identity"` // human-readable name from MPRIS (e.g. "Chrome", "Spotify")
-	Metadata          map[string]string  `json:"metadata"`
-	Status            string             `json:"playback_status"` // API returns "playback_status", not "status"
-	Position          int64              `json:"position"`
-	PositionUpdatedAt time.Time          `json:"position_updated_at"`
-	Rate              float64            `json:"rate"`
-	Volume            *float64           `json:"volume"`
-	Shuffle           bool               `json:"shuffle"`     // omitted by backend when false (omitempty)
-	LoopStatus        *string            `json:"loop_status"` // pointer: nil ⇒ player doesn't expose LoopStatus
-	Capabilities      PlayerCapabilities `json:"capabilities"`
+	Name               string             `json:"bus_name"` // API returns "bus_name", not "name"
+	Identity           string             `json:"identity"` // human-readable name from MPRIS (e.g. "Chrome", "Spotify")
+	Metadata           map[string]string  `json:"metadata"`
+	Status             string             `json:"playback_status"` // API returns "playback_status", not "status"
+	Position           int64              `json:"position"`
+	PositionUpdatedAt  time.Time          `json:"position_updated_at"`
+	Rate               float64            `json:"rate"`
+	Volume             *float64           `json:"volume"`
+	Shuffle            bool               `json:"shuffle"`     // omitted by backend when false (omitempty)
+	LoopStatus         *string            `json:"loop_status"` // pointer: nil ⇒ player doesn't expose LoopStatus
+	Capabilities       PlayerCapabilities `json:"capabilities"`
+	TracklistSupported bool               `json:"tracklist_supported"`
+}
+
+// Track represents an entry from /players/{name}/tracklist
+type Track struct {
+	TrackID  string            `json:"track_id"`
+	Metadata map[string]string `json:"metadata"`
+}
+
+// TracklistResponse is the GET /players/{name}/tracklist payload
+type TracklistResponse struct {
+	CanEditTracks bool    `json:"can_edit_tracks"`
+	Tracks        []Track `json:"tracks"`
 }
 
 // AudioOutput represents a PulseAudio/PipeWire sink from /audio
@@ -241,6 +254,21 @@ type PlayerView struct {
 	Rate              float64 // Playback rate (1.0 = normal speed)
 	CanSeek           bool
 	PositionUpdatedAt string // RFC3339 timestamp of the last per-player position write
+	// Tracklist — empty when the player doesn't expose one
+	Tracks        []TrackView
+	CanEditTracks bool
+}
+
+// ShowTracklist reports whether the tracklist view is worth a toggle:
+// a list of 0 or 1 track offers nothing over the cover.
+func (v PlayerView) ShowTracklist() bool { return len(v.Tracks) >= 2 }
+
+// TrackView is a view-optimized tracklist entry for templates
+type TrackView struct {
+	Ref     string // %2F-encoded full track ID, used as the API path reference
+	Label   string // track title, falling back to the ID's last segment
+	Artist  string
+	Current bool // matches the player's mpris:trackid
 }
 
 // ServiceView is a view-optimized version of Service for templates

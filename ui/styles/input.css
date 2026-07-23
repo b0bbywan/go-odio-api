@@ -217,6 +217,35 @@ button.htmx-request {
 		max-height: 75cqw;
 	}
 
+	/* Tracklist view — capped to the cover's footprint, scrolls inside */
+	.tracklist {
+		@apply mb-3 overflow-y-auto rounded-md px-2;
+		max-height: 75cqw;
+	}
+
+	.tracklist-row {
+		@apply flex items-center gap-1;
+	}
+
+	.tracklist-goto {
+		@apply min-w-0 flex-1 truncate rounded px-2 py-1.5 text-left text-sm text-zinc-300 transition-colors hover:bg-zinc-700/50;
+	}
+
+	.tracklist-current .tracklist-goto {
+		@apply text-lime;
+	}
+
+	.tracklist-remove {
+		@apply shrink-0 rounded p-1 text-zinc-500 transition-colors hover:bg-zinc-700/50 hover:text-red-400;
+	}
+	.tracklist-remove svg {
+		@apply h-3.5 w-3.5;
+	}
+
+	.player-view-toggle {
+		@apply mr-2 rounded text-zinc-500 transition-colors hover:text-zinc-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-lime/50;
+	}
+
 	.art-overlay {
 		@apply fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/80 p-4 backdrop-blur-sm cursor-zoom-out;
 	}
