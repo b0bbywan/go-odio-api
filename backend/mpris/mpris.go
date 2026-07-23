@@ -408,14 +408,23 @@ func (m *MPRISBackend) getPlayerFromDBus(busName string) (Player, error) {
 	return *player, nil
 }
 
-// Play starts playback
-func (m *MPRISBackend) Play(busName string) error {
+// requireCapability gates an action on a cached player's capability,
+// mapping a missing player or capability to the matching error.
+func (m *MPRISBackend) requireCapability(busName, required string, can func(*Player) bool) error {
 	player, err := m.GetPlayerFromCache(busName)
 	if err != nil {
 		return err
 	}
-	if !player.CanPlay() {
-		return &CapabilityError{Required: "CanPlay"}
+	if !can(player) {
+		return &CapabilityError{Required: required}
+	}
+	return nil
+}
+
+// Play starts playback
+func (m *MPRISBackend) Play(busName string) error {
+	if err := m.requireCapability(busName, "CanPlay", (*Player).CanPlay); err != nil {
+		return err
 	}
 
 	logger.Debug("[mpris] playing %s", busName)
@@ -424,12 +433,8 @@ func (m *MPRISBackend) Play(busName string) error {
 
 // Pause pauses playback
 func (m *MPRISBackend) Pause(busName string) error {
-	player, err := m.GetPlayerFromCache(busName)
-	if err != nil {
+	if err := m.requireCapability(busName, "CanPause", (*Player).CanPause); err != nil {
 		return err
-	}
-	if !player.CanPause() {
-		return &CapabilityError{Required: "CanPause"}
 	}
 
 	logger.Debug("[mpris] pausing %s", busName)
@@ -438,12 +443,9 @@ func (m *MPRISBackend) Pause(busName string) error {
 
 // PlayPause toggles between play and pause
 func (m *MPRISBackend) PlayPause(busName string) error {
-	player, err := m.GetPlayerFromCache(busName)
-	if err != nil {
+	canEither := func(p *Player) bool { return p.CanPlay() || p.CanPause() }
+	if err := m.requireCapability(busName, "CanPlay or CanPause", canEither); err != nil {
 		return err
-	}
-	if !player.CanPlay() && !player.CanPause() {
-		return &CapabilityError{Required: "CanPlay or CanPause"}
 	}
 
 	logger.Debug("[mpris] toggling play/pause for %s", busName)
@@ -452,12 +454,8 @@ func (m *MPRISBackend) PlayPause(busName string) error {
 
 // Stop stops playback
 func (m *MPRISBackend) Stop(busName string) error {
-	player, err := m.GetPlayerFromCache(busName)
-	if err != nil {
+	if err := m.requireCapability(busName, "CanControl", (*Player).CanControl); err != nil {
 		return err
-	}
-	if !player.CanControl() {
-		return &CapabilityError{Required: "CanControl"}
 	}
 
 	logger.Debug("[mpris] stopping %s", busName)
@@ -466,12 +464,8 @@ func (m *MPRISBackend) Stop(busName string) error {
 
 // Next skips to the next track
 func (m *MPRISBackend) Next(busName string) error {
-	player, err := m.GetPlayerFromCache(busName)
-	if err != nil {
+	if err := m.requireCapability(busName, "CanGoNext", (*Player).CanGoNext); err != nil {
 		return err
-	}
-	if !player.CanGoNext() {
-		return &CapabilityError{Required: "CanGoNext"}
 	}
 
 	logger.Debug("[mpris] next track for %s", busName)
@@ -480,12 +474,8 @@ func (m *MPRISBackend) Next(busName string) error {
 
 // Previous goes back to the previous track
 func (m *MPRISBackend) Previous(busName string) error {
-	player, err := m.GetPlayerFromCache(busName)
-	if err != nil {
+	if err := m.requireCapability(busName, "CanGoPrevious", (*Player).CanGoPrevious); err != nil {
 		return err
-	}
-	if !player.CanGoPrevious() {
-		return &CapabilityError{Required: "CanGoPrevious"}
 	}
 
 	logger.Debug("[mpris] previous track for %s", busName)
@@ -494,12 +484,8 @@ func (m *MPRISBackend) Previous(busName string) error {
 
 // Seek moves the playback position
 func (m *MPRISBackend) Seek(busName string, offset int64) error {
-	player, err := m.GetPlayerFromCache(busName)
-	if err != nil {
+	if err := m.requireCapability(busName, "CanSeek", (*Player).CanSeek); err != nil {
 		return err
-	}
-	if !player.CanSeek() {
-		return &CapabilityError{Required: "CanSeek"}
 	}
 
 	logger.Debug("[mpris] seeking %d for %s", offset, busName)
@@ -540,12 +526,8 @@ func (m *MPRISBackend) SetVolume(busName string, volume float64) error {
 		return &ValidationError{Field: "volume", Message: "must be between 0 and 1"}
 	}
 
-	player, err := m.GetPlayerFromCache(busName)
-	if err != nil {
+	if err := m.requireCapability(busName, "CanControl", (*Player).CanControl); err != nil {
 		return err
-	}
-	if !player.CanControl() {
-		return &CapabilityError{Required: "CanControl"}
 	}
 
 	logger.Debug("[mpris] setting volume to %.2f for %s", volume, busName)
@@ -561,12 +543,8 @@ func (m *MPRISBackend) SetLoopStatus(busName string, status LoopStatus) error {
 		return &ValidationError{Field: "loop", Message: "must be None, Track, or Playlist"}
 	}
 
-	player, err := m.GetPlayerFromCache(busName)
-	if err != nil {
+	if err := m.requireCapability(busName, "CanControl", (*Player).CanControl); err != nil {
 		return err
-	}
-	if !player.CanControl() {
-		return &CapabilityError{Required: "CanControl"}
 	}
 
 	logger.Debug("[mpris] setting loop status to %s for %s", status, busName)
@@ -575,12 +553,8 @@ func (m *MPRISBackend) SetLoopStatus(busName string, status LoopStatus) error {
 
 // SetShuffle enables/disables shuffle mode
 func (m *MPRISBackend) SetShuffle(busName string, shuffle bool) error {
-	player, err := m.GetPlayerFromCache(busName)
-	if err != nil {
+	if err := m.requireCapability(busName, "CanControl", (*Player).CanControl); err != nil {
 		return err
-	}
-	if !player.CanControl() {
-		return &CapabilityError{Required: "CanControl"}
 	}
 
 	logger.Debug("[mpris] setting shuffle to %v for %s", shuffle, busName)
