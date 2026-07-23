@@ -1,11 +1,16 @@
 {{ define "mpris-player" }}
-<details id="player-{{ .Name }}" class="player-card" open>
+<details id="player-{{ .Name }}" class="player-card group" data-view="cover" open>
 	<summary class="player-summary">
 		<span class="player-name flex-1 text-center">{{ .DisplayName }}</span>
+		{{ if .ShowTracklist }}
+		<button class="player-view-toggle group-data-[view=tracklist]:text-lime" title="Tracklist"
+				onclick="event.preventDefault(); toggleTracklistView(this)">{{ template "icon-list-music" }}</button>
+		{{ end }}
 		<span class="player-toggle">▾</span>
 	</summary>
 
 	{{ template "mpris-track-info" . }}
+	{{ template "mpris-tracklist" . }}
 	{{ template "mpris-seeker" . }}
 
 	{{ if ne .Volume nil }}

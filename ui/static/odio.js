@@ -89,6 +89,34 @@ document.addEventListener('keydown', e => {
 	if (e.key === 'Escape') closeArtZoom();
 });
 
+// ── Tracklist view ──────────────────────────────────────────────────────────
+
+// data-view on the player card switches the media slot between cover and
+// tracklist (group-data-[view=tracklist]: variants drive visibility). Chosen
+// views are remembered by card id and reapplied after SSE swaps, like
+// detailsState; the entry is dropped when the tracklist no longer renders
+// (shrunk below 2 tracks) so the card can't restore into an empty slot.
+var tracklistViews = {};
+
+function toggleTracklistView(btn) {
+	const card = btn.closest('.player-card');
+	const next = card.dataset.view === 'tracklist' ? 'cover' : 'tracklist';
+	card.dataset.view = next;
+	tracklistViews[card.id] = next;
+}
+
+document.addEventListener('htmx:afterSwap', function() {
+	Object.keys(tracklistViews).forEach(function(id) {
+		const card = document.getElementById(id);
+		if (!card) return;
+		if (card.querySelector('.tracklist')) {
+			card.dataset.view = tracklistViews[id];
+		} else {
+			delete tracklistViews[id];
+		}
+	});
+});
+
 // ── Transport buttons ───────────────────────────────────────────────────────
 
 // Both icons live in the button as <span>; group-data-[playing=true]: variants

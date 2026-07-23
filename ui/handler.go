@@ -295,9 +295,10 @@ var (
 	upgradeRingSection = &sseSection{name: "upgrade-progress", fetchFn: fetchUpgradeRing}
 
 	eventToSection = map[string]*sseSection{
-		events.TypePlayerUpdated: mprisSection,
-		events.TypePlayerAdded:   mprisSection,
-		events.TypePlayerRemoved: mprisSection,
+		events.TypePlayerUpdated:   mprisSection,
+		events.TypePlayerAdded:     mprisSection,
+		events.TypePlayerRemoved:   mprisSection,
+		events.TypePlayerTracklist: mprisSection,
 		// player.position is intentionally NOT mapped here: re-rendering the
 		// whole section every heartbeat tick (5s) made the card flicker. The
 		// seeker is interpolated client-side from data-position +

@@ -1,6 +1,6 @@
 {{ define "mpris-track-info" }}
-<!-- Cover + track info (centered) -->
-<div class="text-center mb-3">
+<!-- Cover + track info (centered); hidden while the card shows the tracklist -->
+<div class="text-center mb-3 group-data-[view=tracklist]:hidden">
 	{{ if .ArtUrl }}
 	<img src="{{ .ArtUrl }}" alt="cover" class="player-art" onclick="openArtZoom(this)">
 	{{ end }}
@@ -17,6 +17,27 @@
 	<div class="player-meta-small" title="{{ .Album }}">{{ .Album }}</div>
 	{{ end }}
 </div>
+{{ end }}
+
+{{ define "mpris-tracklist" }}
+{{ if .ShowTracklist }}
+<!-- Takes the cover's slot when the card's data-view is "tracklist" -->
+<div class="tracklist hidden group-data-[view=tracklist]:block">
+	{{ range .Tracks }}
+	<div class="tracklist-row{{ if .Current }} tracklist-current{{ end }}">
+		<button class="tracklist-goto"
+				title="{{ if .Artist }}{{ .Artist }} – {{ end }}{{ .Label }}"
+				hx-post="/players/{{ $.Name }}/tracklist/goto/{{ .Ref }}"
+				hx-swap="none">{{ .Label }}</button>
+		{{ if $.CanEditTracks }}
+		<button class="tracklist-remove" title="Remove track"
+				hx-post="/players/{{ $.Name }}/tracklist/remove/{{ .Ref }}"
+				hx-swap="none">{{ template "icon-x" }}</button>
+		{{ end }}
+	</div>
+	{{ end }}
+</div>
+{{ end }}
 {{ end }}
 
 {{ define "mpris-seeker" }}

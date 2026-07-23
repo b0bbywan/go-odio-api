@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"path"
 	"sort"
 	"strconv"
 	"strings"
@@ -61,7 +62,58 @@ func (c *APIClient) GetPlayers() ([]PlayerView, error) {
 	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
 		return nil, fmt.Errorf("/players: decode failed: %w", err)
 	}
-	return convertPlayers(raw), nil
+	views := convertPlayers(raw)
+	c.attachTracklists(raw, views)
+	return views, nil
+}
+
+// attachTracklists fetches the tracklist of each supporting player and fills
+// the matching view. Failures only cost the tracklist, not the section.
+func (c *APIClient) attachTracklists(raw []Player, views []PlayerView) {
+	supported := make(map[string]*Player, len(raw))
+	for i := range raw {
+		if raw[i].TracklistSupported {
+			supported[raw[i].Name] = &raw[i]
+		}
+	}
+	for i := range views {
+		p, ok := supported[views[i].Name]
+		if !ok {
+			continue
+		}
+		tl, err := c.GetTracklist(p.Name)
+		if err != nil {
+			logger.Warn("[ui] failed to fetch tracklist for %s: %v", p.Name, err)
+			continue
+		}
+		views[i].CanEditTracks = tl.CanEditTracks
+		views[i].Tracks = convertTracks(tl.Tracks, p.Metadata["mpris:trackid"])
+	}
+}
+
+func (c *APIClient) GetTracklist(name string) (*TracklistResponse, error) {
+	var v TracklistResponse
+	if err := c.get("/players/"+name+"/tracklist", &v); err != nil {
+		return nil, err
+	}
+	return &v, nil
+}
+
+func convertTracks(tracks []Track, currentID string) []TrackView {
+	views := make([]TrackView, 0, len(tracks))
+	for _, t := range tracks {
+		label := t.Metadata["xesam:title"]
+		if label == "" {
+			label = path.Base(t.TrackID)
+		}
+		views = append(views, TrackView{
+			Ref:     url.PathEscape(t.TrackID),
+			Label:   label,
+			Artist:  t.Metadata["xesam:artist"],
+			Current: t.TrackID == currentID,
+		})
+	}
+	return views
 }
 
 func convertPlayers(raw []Player) []PlayerView {
