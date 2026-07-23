@@ -2,7 +2,7 @@
 <!-- Cover + track info (centered) -->
 <div class="text-center mb-3">
 	{{ if .ArtUrl }}
-	<img src="{{ .ArtUrl }}" alt="cover" class="player-art">
+	<img src="{{ .ArtUrl }}" alt="cover" class="player-art" onclick="openArtZoom(this)">
 	{{ end }}
 	{{ if or .Artist .Title }}
 	<div class="player-meta" title="{{ if .Artist }}{{ .Artist }}{{ end }}{{ if and .Artist .Title }} – {{ end }}{{ if .Title }}{{ .Title }}{{ end }}">

@@ -67,6 +67,28 @@ document.body.addEventListener('htmx:sendError', () => {
 	showToast('Network error');
 });
 
+// ── Cover zoom ──────────────────────────────────────────────────────────────
+
+// Fullscreen lightbox for a player cover. The overlay lives in base.gohtml,
+// outside the SSE-swapped sections, so it survives section re-renders.
+function openArtZoom(img) {
+	const overlay = document.getElementById('art-overlay');
+	if (!overlay) return;
+	overlay.querySelector('img').src = img.src;
+	overlay.classList.remove('hidden');
+}
+
+function closeArtZoom() {
+	const overlay = document.getElementById('art-overlay');
+	if (!overlay) return;
+	overlay.classList.add('hidden');
+	overlay.querySelector('img').removeAttribute('src');
+}
+
+document.addEventListener('keydown', e => {
+	if (e.key === 'Escape') closeArtZoom();
+});
+
 // ── Transport buttons ───────────────────────────────────────────────────────
 
 // Both icons live in the button as <span>; group-data-[playing=true]: variants
