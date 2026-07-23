@@ -95,11 +95,19 @@ func (m *MPRISBackend) ReplaceTracklist(busName string, tracks []Track) error {
 }
 
 // AddTrackToCache inserts a track after afterTrack (TrackAdded signal).
+// Track IDs are unique within a tracklist per spec, so a TrackAdded for an
+// already-cached ID is a duplicate signal and is ignored.
 func (m *MPRISBackend) AddTrackToCache(busName string, track Track, afterTrack string) error {
 	return m.mutateTracklist(busName, func(p *Player) bool {
 		// A player emitting TrackList signals supports the interface even if
 		// the initial GetAll failed (lazy init).
 		p.TracklistSupported = true
+		for i := range p.Tracklist {
+			if p.Tracklist[i].TrackID == track.TrackID {
+				logger.Debug("[mpris] ignoring duplicate TrackAdded %s for %s", track.TrackID, busName)
+				return false
+			}
+		}
 		p.Tracklist = insertTrack(p.Tracklist, track, afterTrack)
 		return true
 	})
