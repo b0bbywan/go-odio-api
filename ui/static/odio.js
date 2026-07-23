@@ -97,6 +97,7 @@ document.addEventListener('keydown', e => {
 // detailsState; the entry is dropped when the tracklist no longer renders
 // (shrunk below 2 tracks) so the card can't restore into an empty slot.
 var tracklistViews = {};
+var tracklistScroll = {};
 
 function toggleTracklistView(btn) {
 	const card = btn.closest('.player-card');
@@ -104,6 +105,16 @@ function toggleTracklistView(btn) {
 	card.dataset.view = next;
 	tracklistViews[card.id] = next;
 }
+
+// Swaps recreate the scroll container, so capture each tracklist's scrollTop
+// before the message and reapply it after the view is restored (a hidden
+// element has no scroll box — order matters).
+document.addEventListener('htmx:sseBeforeMessage', function() {
+	document.querySelectorAll('.player-card .tracklist').forEach(function(el) {
+		const card = el.closest('.player-card');
+		if (card) tracklistScroll[card.id] = el.scrollTop;
+	});
+});
 
 document.addEventListener('htmx:afterSwap', function() {
 	Object.keys(tracklistViews).forEach(function(id) {
@@ -113,6 +124,15 @@ document.addEventListener('htmx:afterSwap', function() {
 			card.dataset.view = tracklistViews[id];
 		} else {
 			delete tracklistViews[id];
+		}
+	});
+	Object.keys(tracklistScroll).forEach(function(id) {
+		const card = document.getElementById(id);
+		const el = card && card.querySelector('.tracklist');
+		if (el) {
+			el.scrollTop = tracklistScroll[id];
+		} else {
+			delete tracklistScroll[id];
 		}
 	});
 });
