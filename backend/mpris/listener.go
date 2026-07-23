@@ -124,7 +124,7 @@ func (l *Listener) handlePropertiesChanged(sig *dbus.Signal) {
 
 	// Check if PlaybackStatus changed for deduplication
 	if statusVar, hasStatus := changed["PlaybackStatus"]; hasStatus {
-		if status, ok := extractString(statusVar); ok {
+		if status, ok := extract[string](statusVar); ok {
 			newStatus := PlaybackStatus(status)
 
 			// Deduplication

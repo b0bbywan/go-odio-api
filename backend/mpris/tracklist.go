@@ -168,7 +168,7 @@ func (m *MPRISBackend) UpdateTrackMetadataInCache(busName, oldTrackID string, tr
 
 // UpdateCanEditTracks handles CanEditTracks arriving via PropertiesChanged.
 func (m *MPRISBackend) UpdateCanEditTracks(busName string, variant dbus.Variant) error {
-	val, ok := extractBool(variant)
+	val, ok := extract[bool](variant)
 	if !ok {
 		return nil
 	}
