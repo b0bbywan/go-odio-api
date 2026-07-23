@@ -889,3 +889,160 @@ func TestConvertServices(t *testing.T) {
 		})
 	}
 }
+
+// TestConvertTracks verifies label fallback, path-escaped refs and
+// current-track matching.
+func TestConvertTracks(t *testing.T) {
+	tracks := []Track{
+		{TrackID: "/org/mpd/track/1", Metadata: map[string]string{"xesam:title": "Song One", "xesam:artist": "Artist"}},
+		{TrackID: "/org/mpd/track/2", Metadata: map[string]string{}},
+	}
+
+	result := convertTracks(tracks, "/org/mpd/track/2")
+	if len(result) != 2 {
+		t.Fatalf("expected 2 tracks, got %d", len(result))
+	}
+	if result[0].Label != "Song One" {
+		t.Errorf("expected title label 'Song One', got %q", result[0].Label)
+	}
+	if result[0].Artist != "Artist" {
+		t.Errorf("expected artist 'Artist', got %q", result[0].Artist)
+	}
+	if result[0].Ref != "%2Forg%2Fmpd%2Ftrack%2F1" {
+		t.Errorf("expected path-escaped full ID ref, got %q", result[0].Ref)
+	}
+	if result[1].Label != "2" {
+		t.Errorf("expected ID last-segment fallback label '2', got %q", result[1].Label)
+	}
+	if result[0].Current || !result[1].Current {
+		t.Errorf("expected only track 2 current, got %v/%v", result[0].Current, result[1].Current)
+	}
+}
+
+// TestShowTracklist verifies the toggle threshold: below 2 tracks the
+// tracklist view offers nothing over the cover.
+func TestShowTracklist(t *testing.T) {
+	for count, want := range map[int]bool{0: false, 1: false, 2: true, 3: true} {
+		v := PlayerView{Tracks: make([]TrackView, count)}
+		if v.ShowTracklist() != want {
+			t.Errorf("ShowTracklist with %d tracks: expected %v", count, want)
+		}
+	}
+}
+
+// TestGetPlayersAttachesTracklists verifies that supporting players get their
+// tracklist fetched and converted, non-supporting players are left alone, and
+// a tracklist fetch failure costs only the tracklist, not the players call.
+func TestGetPlayersAttachesTracklists(t *testing.T) {
+	playersJSON := `[
+		{"bus_name": "org.mpris.MediaPlayer2.mpd", "playback_status": "Playing",
+		 "tracklist_supported": true,
+		 "metadata": {"mpris:trackid": "/org/mpd/track/2"}},
+		{"bus_name": "org.mpris.MediaPlayer2.spotify", "playback_status": "Playing",
+		 "metadata": {}},
+		{"bus_name": "org.mpris.MediaPlayer2.broken", "playback_status": "Playing",
+		 "tracklist_supported": true,
+		 "metadata": {}}
+	]`
+	tracklistJSON := `{"can_edit_tracks": true, "tracks": [
+		{"track_id": "/org/mpd/track/1", "metadata": {"xesam:title": "One"}},
+		{"track_id": "/org/mpd/track/2", "metadata": {"xesam:title": "Two"}}
+	]}`
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/players", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if _, err := w.Write([]byte(playersJSON)); err != nil {
+			t.Errorf("write players: %v", err)
+		}
+	})
+	mux.HandleFunc("/players/org.mpris.MediaPlayer2.mpd/tracklist", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if _, err := w.Write([]byte(tracklistJSON)); err != nil {
+			t.Errorf("write tracklist: %v", err)
+		}
+	})
+	mux.HandleFunc("/players/org.mpris.MediaPlayer2.broken/tracklist", func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "boom", http.StatusInternalServerError)
+	})
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	views, err := NewAPIClient(testAPIPort(t, server)).GetPlayers()
+	if err != nil {
+		t.Fatalf("GetPlayers failed: %v", err)
+	}
+	if len(views) != 3 {
+		t.Fatalf("expected 3 players, got %d", len(views))
+	}
+
+	mpd := views[0]
+	if !mpd.CanEditTracks {
+		t.Error("expected mpd CanEditTracks true")
+	}
+	if len(mpd.Tracks) != 2 {
+		t.Fatalf("expected 2 mpd tracks, got %d", len(mpd.Tracks))
+	}
+	if mpd.Tracks[0].Current || !mpd.Tracks[1].Current {
+		t.Errorf("expected only track 2 current, got %v/%v", mpd.Tracks[0].Current, mpd.Tracks[1].Current)
+	}
+	if len(views[1].Tracks) != 0 {
+		t.Errorf("expected no tracks for non-supporting player, got %d", len(views[1].Tracks))
+	}
+	if len(views[2].Tracks) != 0 || views[2].CanEditTracks {
+		t.Errorf("expected failed tracklist fetch to leave player untouched, got %d tracks", len(views[2].Tracks))
+	}
+}
+
+// TestMprisPlayerTracklistRendering verifies the toggle and tracklist only
+// render with at least 2 tracks, and remove buttons only when editable.
+func TestMprisPlayerTracklistRendering(t *testing.T) {
+	tmpl := LoadTemplates()
+	twoTracks := []TrackView{
+		{Ref: "%2Fa%2F1", Label: "One", Current: true},
+		{Ref: "%2Fa%2F2", Label: "Two"},
+	}
+
+	render := func(t *testing.T, v PlayerView) string {
+		t.Helper()
+		var buf bytes.Buffer
+		if err := tmpl.ExecuteTemplate(&buf, "mpris-player", v); err != nil {
+			t.Fatalf("render failed: %v", err)
+		}
+		return buf.String()
+	}
+
+	t.Run("editable tracklist renders toggle, rows and removes", func(t *testing.T) {
+		html := render(t, PlayerView{Name: "p", State: "Playing", Tracks: twoTracks, CanEditTracks: true})
+		for _, want := range []string{
+			"player-view-toggle",
+			"tracklist-current",
+			"tracklist-remove",
+			`hx-post="/players/p/tracklist/goto/%2Fa%2F1"`,
+			`hx-post="/players/p/tracklist/remove/%2Fa%2F2"`,
+		} {
+			if !strings.Contains(html, want) {
+				t.Errorf("expected rendered card to contain %q", want)
+			}
+		}
+	})
+
+	t.Run("read-only tracklist has no remove buttons", func(t *testing.T) {
+		html := render(t, PlayerView{Name: "p", State: "Playing", Tracks: twoTracks})
+		if !strings.Contains(html, "tracklist-goto") {
+			t.Error("expected tracklist rows")
+		}
+		if strings.Contains(html, "tracklist-remove") {
+			t.Error("expected no remove buttons when CanEditTracks is false")
+		}
+	})
+
+	t.Run("single track renders neither toggle nor tracklist", func(t *testing.T) {
+		html := render(t, PlayerView{Name: "p", State: "Playing", Tracks: twoTracks[:1]})
+		for _, banned := range []string{"player-view-toggle", "tracklist-goto"} {
+			if strings.Contains(html, banned) {
+				t.Errorf("expected no %q with a single track", banned)
+			}
+		}
+	})
+}
