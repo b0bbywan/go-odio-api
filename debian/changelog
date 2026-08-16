@@ -1,3 +1,14 @@
+odio-api (0.16.2) trixie; urgency=low
+
+  Bluetooth Client Volume Fix
+
+  * PulseAudio: per-client volume and mute now resolve Bluetooth A2DP
+    sources by the display name exposed by /audio/clients, fixing the
+    failing slider for loopback streams (#137).
+
+ -- Mathieu Réquillart <mathieu.requillart@gmail.com>  Sun, 16 Aug 2026 00:00:00 +0000
+
+
 odio-api (0.16.1) trixie; urgency=low
 
   Tracklist & Client Naming Fixes
