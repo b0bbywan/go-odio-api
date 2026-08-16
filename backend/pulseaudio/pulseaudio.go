@@ -393,11 +393,25 @@ func (pa *PulseAudioBackend) findSinkInput(name string) (pulseaudio.SinkInput, e
 		return pulseaudio.SinkInput{}, fmt.Errorf("failed to list sink inputs: %w", err)
 	}
 	for _, s := range inputs {
-		if strings.EqualFold(clientName(s.PropList), name) {
+		if sinkInputMatchesName(s.PropList, name) {
 			return s, nil
 		}
 	}
 	return pulseaudio.SinkInput{}, &NotFoundError{Resource: "client", Name: name}
+}
+
+// sinkInputMatchesName accepts both the raw PulseAudio stream name and the
+// Bluetooth display name exposed by parsePulseBluetoothSink. Bluetooth A2DP
+// inputs are implemented as module-loopback streams whose raw media.name is
+// "Loopback from <device>", while the API deliberately exposes just <device>.
+func sinkInputMatchesName(props map[string]string, name string) bool {
+	if strings.EqualFold(clientName(props), name) {
+		return true
+	}
+	if props["media.icon_name"] == "audio-card-bluetooth" {
+		return strings.EqualFold(strings.TrimPrefix(props["media.name"], "Loopback from "), name)
+	}
+	return false
 }
 
 func (pa *PulseAudioBackend) parseSinkInput(s pulseaudio.SinkInput) AudioClient {

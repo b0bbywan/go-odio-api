@@ -127,6 +127,49 @@ func TestCloneProps(t *testing.T) {
 	}
 }
 
+func TestSinkInputMatchesName(t *testing.T) {
+	tests := []struct {
+		name   string
+		props  map[string]string
+		target string
+		want   bool
+	}{
+		{
+			name: "regular stream name",
+			props: map[string]string{
+				"media.name": "Playback",
+			},
+			target: "Playback",
+			want:   true,
+		},
+		{
+			name: "bluetooth display name",
+			props: map[string]string{
+				"media.name":      "Loopback from Cloud Remaster",
+				"media.icon_name": "audio-card-bluetooth",
+			},
+			target: "Cloud Remaster",
+			want:   true,
+		},
+		{
+			name: "non-bluetooth prefix is not stripped",
+			props: map[string]string{
+				"media.name": "Loopback from Cloud Remaster",
+			},
+			target: "Cloud Remaster",
+			want:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := sinkInputMatchesName(tt.props, tt.target); got != tt.want {
+				t.Fatalf("sinkInputMatchesName() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestExtractModuleSource(t *testing.T) {
 	tests := []struct {
 		name     string
