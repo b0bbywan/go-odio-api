@@ -35,6 +35,8 @@ type PulseAudioBackend struct {
 	outputCache cache.Value[[]AudioOutput]
 	listener    *Listener
 	events      chan events.Event
+
+	btCodecAttempted sync.Map // source index → attempted
 }
 
 type ServerInfo struct {

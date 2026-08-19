@@ -507,6 +507,7 @@ func (pa *PulseAudioBackend) parsePulseBluetoothSink(s *proto.GetSinkInputInfoRe
 	if err != nil {
 		return AudioClient{}, false
 	}
+	pa.ensureBluetoothCodec(src)
 
 	btProps := maps.Clone(props)
 	for k, v := range src.Properties {
