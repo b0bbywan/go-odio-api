@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/b0bbywan/go-odio-api/logger"
 	"github.com/jfreymuth/pulse/proto"
@@ -13,6 +14,11 @@ import (
 // preferredBluetoothCodecs lists A2DP codecs by preference; the first one the
 // server offers is forced on the device.
 var preferredBluetoothCodecs = []string{"aptx_hd", "aptx"}
+
+// bluetoothCodecSettleDelay lets the A2DP transport settle after connection:
+// remotes ignore a reconfiguration issued while the stream is still being
+// set up, and PulseAudio then drops the connection.
+const bluetoothCodecSettleDelay = 10 * time.Second
 
 // ensureBluetoothCodec switches the device behind src to the best preferred
 // codec when a better one than the active one may be available. Each device
@@ -28,11 +34,26 @@ func (pa *PulseAudioBackend) ensureBluetoothCodec(src *proto.GetSourceInfoReply)
 		return
 	}
 
-	go pa.switchBluetoothCodec(src.CardIndex, current)
+	go pa.switchBluetoothCodec(src.SourceName)
 }
 
-func (pa *PulseAudioBackend) switchBluetoothCodec(cardIndex uint32, current string) {
-	card, err := pa.findCard(cardIndex)
+// switchBluetoothCodec waits for the transport to settle, then re-reads the
+// source (it may be gone or renegotiated meanwhile) before switching.
+func (pa *PulseAudioBackend) switchBluetoothCodec(sourceName string) {
+	select {
+	case <-time.After(bluetoothCodecSettleDelay):
+	case <-pa.ctx.Done():
+		return
+	}
+
+	src, err := pa.findSourceByName(sourceName)
+	if err != nil {
+		logger.Debug("[pulseaudio] bluetooth codec: %s gone before switching", sourceName)
+		return
+	}
+	current := src.Properties["bluetooth.codec"].String()
+
+	card, err := pa.findCard(src.CardIndex)
 	if err != nil {
 		logger.Warn("[pulseaudio] bluetooth codec: %v", err)
 		return
@@ -53,7 +74,7 @@ func (pa *PulseAudioBackend) switchBluetoothCodec(cardIndex uint32, current stri
 		logger.Warn("[pulseaudio] bluetooth codec: %v", err)
 		return
 	}
-	logger.Info("[pulseaudio] switched %s from %s to %s", card.CardName, current, target)
+	logger.Info("[pulseaudio] requested %s switch from %s to %s", card.CardName, current, target)
 }
 
 // bluetoothAddress extracts the device address from a bluez source name
