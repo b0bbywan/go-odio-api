@@ -741,3 +741,117 @@ func TestClientName(t *testing.T) {
 		})
 	}
 }
+
+func TestVolumeOf(t *testing.T) {
+	tests := []struct {
+		name     string
+		cv       proto.ChannelVolumes
+		expected float32
+	}{
+		{name: "empty", cv: nil, expected: 0},
+		{name: "normal", cv: proto.ChannelVolumes{proto.VolumeNorm, proto.VolumeNorm}, expected: 1},
+		{name: "half rounded", cv: proto.ChannelVolumes{proto.VolumeNorm / 2}, expected: 0.5},
+		{name: "first channel wins", cv: proto.ChannelVolumes{proto.VolumeNorm / 4, proto.VolumeNorm}, expected: 0.25},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := volumeOf(tt.cv); got != tt.expected {
+				t.Errorf("volumeOf() = %v, want %v", got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestChannelVolumes(t *testing.T) {
+	cv := channelVolumes(2, 0.5)
+	if len(cv) != 2 {
+		t.Fatalf("channelVolumes() len = %d, want 2", len(cv))
+	}
+	for i, v := range cv {
+		if v != proto.VolumeNorm/2 {
+			t.Errorf("channelVolumes()[%d] = %d, want %d", i, v, proto.VolumeNorm/2)
+		}
+	}
+	if got := channelVolumes(0, 1); len(got) != 1 {
+		t.Errorf("channelVolumes(0) len = %d, want 1", len(got))
+	}
+}
+
+func TestParsePulseSink(t *testing.T) {
+	pa := &PulseAudioBackend{kind: ServerPulse}
+	sink := &proto.GetSinkInfoReply{
+		SinkIndex:      3,
+		SinkName:       "tunnel.remote",
+		Device:         "Remote tunnel",
+		Mute:           true,
+		ChannelVolumes: proto.ChannelVolumes{proto.VolumeNorm / 2, proto.VolumeNorm / 2},
+		State:          1,
+		Driver:         "module-tunnel-sink.c",
+		Flags:          0x20000,
+		ActivePortName: "",
+		Properties:     proto.PropList{"device.description": proto.PropListString("Remote")},
+	}
+
+	out := pa.parseSink(sink, "tunnel.remote")
+
+	if out.Index != 3 || out.Name != "tunnel.remote" || out.Description != "Remote tunnel" {
+		t.Errorf("identity fields = %+v", out)
+	}
+	if !out.Muted || out.Volume != 0.5 || out.State != "idle" || !out.Default {
+		t.Errorf("state fields = %+v", out)
+	}
+	if !out.IsNetwork || out.Nick != "Remote" || out.Driver != "module-tunnel-sink.c" {
+		t.Errorf("pulse-specific fields = %+v", out)
+	}
+}
+
+func TestParsePipeWireSink(t *testing.T) {
+	pa := &PulseAudioBackend{kind: ServerPipeWire}
+	sink := &proto.GetSinkInfoReply{
+		SinkIndex:      7,
+		SinkName:       "raop_sink.kitchen",
+		ChannelVolumes: proto.ChannelVolumes{proto.VolumeNorm},
+		State:          2,
+		Properties: proto.PropList{
+			"node.nick":    proto.PropListString("Kitchen"),
+			"node.network": proto.PropListString("true"),
+		},
+	}
+
+	out := pa.parseSink(sink, "other")
+
+	if out.Default || out.Volume != 1 || out.State != "suspended" {
+		t.Errorf("state fields = %+v", out)
+	}
+	if !out.IsNetwork || out.Nick != "Kitchen" {
+		t.Errorf("pipewire-specific fields = %+v", out)
+	}
+}
+
+func TestParseSinkInput(t *testing.T) {
+	input := &proto.GetSinkInputInfoReply{
+		SinkInputIndex: 42,
+		MediaName:      "Playback",
+		ChannelVolumes: proto.ChannelVolumes{proto.VolumeNorm / 4, proto.VolumeNorm / 4},
+		Muted:          true,
+		Corked:         true,
+		Properties: proto.PropList{
+			"media.name":                 proto.PropListString("Playback"),
+			"application.name":           proto.PropListString("Chrome"),
+			"application.process.binary": proto.PropListString("chrome"),
+		},
+	}
+
+	for _, kind := range []AudioServerKind{ServerPulse, ServerPipeWire} {
+		t.Run(string(kind), func(t *testing.T) {
+			pa := &PulseAudioBackend{kind: kind}
+			c := pa.parseSinkInput(input)
+			if c.ID != 42 || c.Name != "Playback" || c.App != "Chrome" || c.Binary != "chrome" {
+				t.Errorf("identity fields = %+v", c)
+			}
+			if !c.Muted || c.Volume != 0.25 || c.Backend != kind {
+				t.Errorf("state fields = %+v", c)
+			}
+		})
+	}
+}
