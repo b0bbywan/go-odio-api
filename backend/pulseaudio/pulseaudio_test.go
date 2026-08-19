@@ -5,7 +5,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/b0bbywan/go-odio-api/cache"
 	"github.com/jfreymuth/pulse/proto"
 )
 
@@ -512,10 +511,7 @@ func TestDiffOutputs(t *testing.T) {
 
 func TestServerInfoFromCache(t *testing.T) {
 	t.Run("cache miss returns error", func(t *testing.T) {
-		pa := &PulseAudioBackend{
-			kind:        ServerPipeWire,
-			outputCache: newOutputCache(),
-		}
+		pa := &PulseAudioBackend{kind: ServerPipeWire}
 		_, err := pa.ServerInfo()
 		if err == nil {
 			t.Error("expected error on cache miss, got nil")
@@ -523,11 +519,8 @@ func TestServerInfoFromCache(t *testing.T) {
 	})
 
 	t.Run("no default sink returns error", func(t *testing.T) {
-		pa := &PulseAudioBackend{
-			kind:        ServerPipeWire,
-			outputCache: newOutputCache(),
-		}
-		pa.outputCache.Set(outputCacheKey, []AudioOutput{
+		pa := &PulseAudioBackend{kind: ServerPipeWire}
+		pa.outputCache.Store([]AudioOutput{
 			{Name: "sink1", Default: false},
 			{Name: "sink2", Default: false},
 		})
@@ -538,11 +531,8 @@ func TestServerInfoFromCache(t *testing.T) {
 	})
 
 	t.Run("reconstructs from default output", func(t *testing.T) {
-		pa := &PulseAudioBackend{
-			kind:        ServerPipeWire,
-			outputCache: newOutputCache(),
-		}
-		pa.outputCache.Set(outputCacheKey, []AudioOutput{
+		pa := &PulseAudioBackend{kind: ServerPipeWire}
+		pa.outputCache.Store([]AudioOutput{
 			{Name: "sink1", Default: false, Volume: 0.3, Muted: false},
 			{Name: "sink2", Default: true, Volume: 0.7, Muted: true},
 		})
@@ -563,10 +553,6 @@ func TestServerInfoFromCache(t *testing.T) {
 			t.Error("Muted = false, want true")
 		}
 	})
-}
-
-func newOutputCache() *cache.Cache[[]AudioOutput] {
-	return cache.New[[]AudioOutput](0)
 }
 
 func TestCookie(t *testing.T) {

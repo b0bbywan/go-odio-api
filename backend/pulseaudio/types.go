@@ -31,8 +31,8 @@ type PulseAudioBackend struct {
 	server      *proto.GetServerInfoReply
 	kind        AudioServerKind
 
-	cache       *cache.Cache[[]AudioClient]
-	outputCache *cache.Cache[[]AudioOutput]
+	cache       cache.Value[[]AudioClient]
+	outputCache cache.Value[[]AudioOutput]
 	listener    *Listener
 	events      chan events.Event
 }
