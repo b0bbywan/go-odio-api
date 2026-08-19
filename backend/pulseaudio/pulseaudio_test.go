@@ -6,46 +6,46 @@ import (
 	"testing"
 
 	"github.com/b0bbywan/go-odio-api/cache"
-	"github.com/the-jonsey/pulseaudio"
+	"github.com/jfreymuth/pulse/proto"
 )
 
 func TestDetectServerKind(t *testing.T) {
 	tests := []struct {
 		name     string
-		server   *pulseaudio.Server
+		server   *proto.GetServerInfoReply
 		expected AudioServerKind
 	}{
 		{
 			name: "PulseAudio server",
-			server: &pulseaudio.Server{
+			server: &proto.GetServerInfoReply{
 				PackageName: "pulseaudio",
 			},
 			expected: ServerPulse,
 		},
 		{
 			name: "PipeWire server (lowercase)",
-			server: &pulseaudio.Server{
+			server: &proto.GetServerInfoReply{
 				PackageName: "pipewire-pulse",
 			},
 			expected: ServerPipeWire,
 		},
 		{
 			name: "PipeWire server (uppercase)",
-			server: &pulseaudio.Server{
+			server: &proto.GetServerInfoReply{
 				PackageName: "PipeWire",
 			},
 			expected: ServerPipeWire,
 		},
 		{
 			name: "PipeWire server (mixed case)",
-			server: &pulseaudio.Server{
+			server: &proto.GetServerInfoReply{
 				PackageName: "PiPeWiRe",
 			},
 			expected: ServerPipeWire,
 		},
 		{
 			name: "Unknown server defaults to PulseAudio",
-			server: &pulseaudio.Server{
+			server: &proto.GetServerInfoReply{
 				PackageName: "unknown-audio-server",
 			},
 			expected: ServerPulse,
@@ -65,7 +65,7 @@ func TestDetectServerKind(t *testing.T) {
 func TestCloneProps(t *testing.T) {
 	tests := []struct {
 		name     string
-		input    map[string]string
+		input    proto.PropList
 		expected map[string]string
 	}{
 		{
@@ -75,15 +75,15 @@ func TestCloneProps(t *testing.T) {
 		},
 		{
 			name:     "empty map",
-			input:    map[string]string{},
+			input:    proto.PropList{},
 			expected: map[string]string{},
 		},
 		{
 			name: "map with values",
-			input: map[string]string{
-				"key1": "value1",
-				"key2": "value2",
-				"key3": "value3",
+			input: proto.PropList{
+				"key1": proto.PropListString("value1"),
+				"key2": proto.PropListString("value2"),
+				"key3": proto.PropListString("value3"),
 			},
 			expected: map[string]string{
 				"key1": "value1",
@@ -118,7 +118,7 @@ func TestCloneProps(t *testing.T) {
 
 			// Ensure it's a deep copy (modifying original shouldn't affect clone)
 			if len(tt.input) > 0 {
-				tt.input["new_key"] = "new_value"
+				tt.input["new_key"] = proto.PropListString("new_value")
 				if _, exists := result["new_key"]; exists {
 					t.Error("cloneProps() did not create a deep copy")
 				}
@@ -509,11 +509,6 @@ func TestDiffOutputs(t *testing.T) {
 		})
 	}
 }
-
-// parsePulseSink/parsePipeWireSink cannot be unit tested directly:
-// pulseaudio.Sink.GetVolume() panics on a zero-initialized Sink because
-// the lib's cvolume type is an unexported slice that requires protocol
-// deserialization to be valid.
 
 func TestServerInfoFromCache(t *testing.T) {
 	t.Run("cache miss returns error", func(t *testing.T) {
