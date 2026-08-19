@@ -3,6 +3,7 @@ package pulseaudio
 import (
 	"context"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,7 +13,7 @@ import (
 	"github.com/b0bbywan/go-odio-api/config"
 	"github.com/b0bbywan/go-odio-api/events"
 	"github.com/b0bbywan/go-odio-api/logger"
-	"github.com/the-jonsey/pulseaudio"
+	"github.com/jfreymuth/pulse/proto"
 )
 
 const (
@@ -44,12 +45,12 @@ func (pa *PulseAudioBackend) Start() error {
 	logger.Debug("[pulseaudio] starting backend")
 	pa.mu.Lock()
 	defer pa.mu.Unlock()
-	var err error
-	if pa.client, err = pulseaudio.NewClient(pa.address); err != nil {
+	if err := pa.connect(); err != nil {
 		return err
 	}
 
-	if pa.server, err = pa.client.ServerInfo(); err != nil {
+	var err error
+	if pa.server, err = pa.serverInfo(); err != nil {
 		return err
 	}
 	pa.kind = detectServerKind(pa.server)
@@ -88,7 +89,7 @@ func (pa *PulseAudioBackend) heartbeat() {
 		case <-pa.ctx.Done():
 			return
 		case <-ticker.C:
-			if pa.client == nil || !pa.client.Connected() {
+			if pa.client == nil || !pa.connected.Load() {
 				pa.reconnectWithBackoff()
 				return
 			}
@@ -156,7 +157,7 @@ func (pa *PulseAudioBackend) ListClients() ([]AudioClient, error) {
 
 // refreshCache reloads from pulseaudio and updates the cache
 func (pa *PulseAudioBackend) refreshCache() ([]AudioClient, error) {
-	sinks, err := pa.client.SinkInputs()
+	sinks, err := pa.sinkInputs()
 	if err != nil {
 		return nil, err
 	}
@@ -175,7 +176,7 @@ func (pa *PulseAudioBackend) refreshCache() ([]AudioClient, error) {
 	return updatedClients, nil
 }
 
-func (pa *PulseAudioBackend) mergeClients(oldClients []AudioClient, sinks []pulseaudio.SinkInput) []AudioClient {
+func (pa *PulseAudioBackend) mergeClients(oldClients []AudioClient, sinks []*proto.GetSinkInputInfoReply) []AudioClient {
 	// temporary map for lookup by Name
 	oldMap := make(map[string]AudioClient, len(oldClients))
 	for _, c := range oldClients {
@@ -267,7 +268,7 @@ func (pa *PulseAudioBackend) UpdateClient(updated AudioClient) error {
 
 // RefreshClient reloads a specific client from pulseaudio and updates the cache
 func (pa *PulseAudioBackend) RefreshClient(name string) (*AudioClient, error) {
-	sink, err := pa.client.GetSinkInputByName(name)
+	sink, err := pa.findSinkInput(name)
 	if err != nil {
 		// Client no longer exists, reload everything
 		if _, err := pa.ListClients(); err != nil {
@@ -304,7 +305,9 @@ func (pa *PulseAudioBackend) closeConnections() {
 		pa.listener = nil
 	}
 	if pa.client != nil {
-		pa.client.Close()
+		if err := pa.conn.Close(); err != nil {
+			logger.Warn("[pulseaudio] failed to close connection: %v", err)
+		}
 		pa.client = nil
 	}
 }
@@ -348,14 +351,27 @@ func (pa *PulseAudioBackend) cookie() ([]byte, error) {
 }
 
 func (pa *PulseAudioBackend) ToggleMuteMaster() error {
-	if _, err := pa.client.ToggleMute(); err != nil {
+	sink, err := pa.findDefaultSink()
+	if err != nil {
 		return fmt.Errorf("failed to get default sink: %w", err)
 	}
-	return nil
+	return pa.setSinkMute(sink, !sink.Mute)
 }
 
 func (pa *PulseAudioBackend) SetVolumeMaster(volume float32) error {
-	return pa.client.SetVolume(volume)
+	sink, err := pa.findDefaultSink()
+	if err != nil {
+		return fmt.Errorf("failed to get default sink: %w", err)
+	}
+	return pa.setSinkVolume(sink, volume)
+}
+
+func (pa *PulseAudioBackend) findDefaultSink() (*proto.GetSinkInfoReply, error) {
+	srv, err := pa.serverInfo()
+	if err != nil {
+		return nil, err
+	}
+	return pa.findSinkByName(srv.DefaultSinkName)
 }
 
 func (pa *PulseAudioBackend) ToggleMute(name string) error {
@@ -365,7 +381,7 @@ func (pa *PulseAudioBackend) ToggleMute(name string) error {
 		return err
 	}
 
-	if err := sink.ToggleMute(); err != nil {
+	if err := pa.setSinkInputMute(sink, !sink.Muted); err != nil {
 		return err
 	}
 	return nil
@@ -378,7 +394,7 @@ func (pa *PulseAudioBackend) SetVolume(name string, vol float32) error {
 		return err
 	}
 
-	if err := sink.SetVolume(vol); err != nil {
+	if err := pa.setSinkInputVolume(sink, vol); err != nil {
 		return err
 	}
 
@@ -387,17 +403,17 @@ func (pa *PulseAudioBackend) SetVolume(name string, vol float32) error {
 
 // findSinkInput matches a sink input by the same derived name the parsers
 // expose, so clients registering empty names stay addressable.
-func (pa *PulseAudioBackend) findSinkInput(name string) (pulseaudio.SinkInput, error) {
-	inputs, err := pa.client.SinkInputs()
+func (pa *PulseAudioBackend) findSinkInput(name string) (*proto.GetSinkInputInfoReply, error) {
+	inputs, err := pa.sinkInputs()
 	if err != nil {
-		return pulseaudio.SinkInput{}, fmt.Errorf("failed to list sink inputs: %w", err)
+		return nil, fmt.Errorf("failed to list sink inputs: %w", err)
 	}
 	for _, s := range inputs {
-		if sinkInputMatchesName(s.PropList, name) {
+		if sinkInputMatchesName(cloneProps(s.Properties), name) {
 			return s, nil
 		}
 	}
-	return pulseaudio.SinkInput{}, &NotFoundError{Resource: "client", Name: name}
+	return nil, &NotFoundError{Resource: "client", Name: name}
 }
 
 // sinkInputMatchesName accepts both the raw PulseAudio stream name and the
@@ -414,7 +430,7 @@ func sinkInputMatchesName(props map[string]string, name string) bool {
 	return false
 }
 
-func (pa *PulseAudioBackend) parseSinkInput(s pulseaudio.SinkInput) AudioClient {
+func (pa *PulseAudioBackend) parseSinkInput(s *proto.GetSinkInputInfoReply) AudioClient {
 	switch pa.kind {
 	case ServerPipeWire:
 		return pa.parsePipeWireSinkInput(s)
@@ -423,22 +439,22 @@ func (pa *PulseAudioBackend) parseSinkInput(s pulseaudio.SinkInput) AudioClient 
 	}
 }
 
-func (pa *PulseAudioBackend) parsePulseSinkInput(s pulseaudio.SinkInput) AudioClient {
-	props := cloneProps(s.PropList)
+func (pa *PulseAudioBackend) parsePulseSinkInput(s *proto.GetSinkInputInfoReply) AudioClient {
+	props := cloneProps(s.Properties)
 
 	if props["media.icon_name"] == "audio-card-bluetooth" && strings.HasPrefix(props["media.name"], "Loopback from") {
 		if client, ok := pa.parsePulseBluetoothSink(s, props); ok {
 			return client
 		}
-		logger.Warn("[pulseaudio] failed to resolve bluetooth sink %s", s.Name)
+		logger.Warn("[pulseaudio] failed to resolve bluetooth sink %s", s.MediaName)
 	}
 
 	return AudioClient{
-		ID:      s.Index,
+		ID:      s.SinkInputIndex,
 		Name:    clientName(props),
 		App:     props["application.name"],
-		Muted:   s.IsMute(),
-		Volume:  s.GetVolume(),
+		Muted:   s.Muted,
+		Volume:  volumeOf(s.ChannelVolumes),
 		Corked:  s.Corked,
 		Backend: ServerPulse,
 		Binary:  props["application.process.binary"],
@@ -460,33 +476,34 @@ func clientName(props map[string]string) string {
 	return ""
 }
 
-func detectServerKind(s *pulseaudio.Server) AudioServerKind {
+func detectServerKind(s *proto.GetServerInfoReply) AudioServerKind {
 	if strings.Contains(strings.ToLower(s.PackageName), "pipewire") {
 		return ServerPipeWire
 	}
 	return ServerPulse
 }
 
-func cloneProps(in map[string]string) map[string]string {
+// cloneProps converts a protocol property list into a plain string map.
+func cloneProps(in proto.PropList) map[string]string {
 	if in == nil {
 		return nil
 	}
 	out := make(map[string]string, len(in))
 	for k, v := range in {
-		out[k] = v
+		out[k] = v.String()
 	}
 	return out
 }
 
-func (pa *PulseAudioBackend) parsePulseBluetoothSink(s pulseaudio.SinkInput, props map[string]string) (AudioClient, bool) {
+func (pa *PulseAudioBackend) parsePulseBluetoothSink(s *proto.GetSinkInputInfoReply, props map[string]string) (AudioClient, bool) {
 	// retrieve the module-loopback
-	mod, err := pa.findModule(s.OwnerModule, "module-loopback")
+	mod, err := pa.findModule(s.ModuleIndex, "module-loopback")
 	if err != nil {
 		return AudioClient{}, false
 	}
 
 	// extract the bluez source
-	sourceName := extractModuleSource(mod.Argument)
+	sourceName := extractModuleSource(mod.ModuleArgs)
 	if sourceName == "" {
 		return AudioClient{}, false
 	}
@@ -497,23 +514,23 @@ func (pa *PulseAudioBackend) parsePulseBluetoothSink(s pulseaudio.SinkInput, pro
 		return AudioClient{}, false
 	}
 
-	btProps := cloneProps(props)
-	for k, v := range src.PropList {
-		btProps[k] = v
+	btProps := maps.Clone(props)
+	for k, v := range src.Properties {
+		btProps[k] = v.String()
 	}
 
 	// enrich props
-	name := src.PropList["device.description"]
+	name := btProps["device.description"]
 	if name == "" {
 		name = strings.TrimPrefix(props["media.name"], "Loopback from ")
 	}
 
 	return AudioClient{
-		ID:      s.Index,
+		ID:      s.SinkInputIndex,
 		Name:    name,
 		App:     "bluetooth",
-		Muted:   s.IsMute(),
-		Volume:  s.GetVolume(),
+		Muted:   s.Muted,
+		Volume:  volumeOf(s.ChannelVolumes),
 		Corked:  s.Corked,
 		Backend: ServerPulse,
 		Binary:  "bluez",
@@ -524,27 +541,27 @@ func (pa *PulseAudioBackend) parsePulseBluetoothSink(s pulseaudio.SinkInput, pro
 
 }
 
-func (pa *PulseAudioBackend) findModule(index uint32, name string) (*pulseaudio.Module, error) {
-	mods, err := pa.client.ModuleList()
+func (pa *PulseAudioBackend) findModule(index uint32, name string) (*proto.GetModuleInfoReply, error) {
+	mods, err := pa.modules()
 	if err != nil {
 		return nil, err
 	}
 	for _, m := range mods {
-		if m.Index == index && m.Name == name {
-			return &m, nil
+		if m.ModuleIndex == index && m.ModuleName == name {
+			return m, nil
 		}
 	}
 	return nil, &NotFoundError{Resource: "module", Name: fmt.Sprintf("%s %d", name, index)}
 }
 
-func (pa *PulseAudioBackend) findSourceByName(name string) (*pulseaudio.Source, error) {
-	sources, err := pa.client.Sources()
+func (pa *PulseAudioBackend) findSourceByName(name string) (*proto.GetSourceInfoReply, error) {
+	sources, err := pa.sources()
 	if err != nil {
 		return nil, err
 	}
 	for _, s := range sources {
-		if s.Name == name {
-			return &s, nil
+		if s.SourceName == name {
+			return s, nil
 		}
 	}
 	return nil, &NotFoundError{Resource: "source", Name: name}
@@ -561,12 +578,12 @@ func (pa *PulseAudioBackend) ListOutputs() ([]AudioOutput, error) {
 }
 
 func (pa *PulseAudioBackend) refreshOutputCache() ([]AudioOutput, error) {
-	srv, err := pa.client.ServerInfo()
+	srv, err := pa.serverInfo()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get server info: %w", err)
 	}
 
-	sinks, err := pa.client.Sinks()
+	sinks, err := pa.sinks()
 	if err != nil {
 		return nil, err
 	}
@@ -575,7 +592,7 @@ func (pa *PulseAudioBackend) refreshOutputCache() ([]AudioOutput, error) {
 
 	outputs := make([]AudioOutput, 0, len(sinks))
 	for _, s := range sinks {
-		outputs = append(outputs, pa.parseSink(s, srv.DefaultSink))
+		outputs = append(outputs, pa.parseSink(s, srv.DefaultSinkName))
 	}
 
 	pa.outputCache.Set(outputCacheKey, outputs)
@@ -624,7 +641,7 @@ func (pa *PulseAudioBackend) OutputCacheUpdatedAt() time.Time {
 
 func (pa *PulseAudioBackend) SetDefaultOutput(name string) error {
 	logger.Debug("[pulseaudio] setting default output to %q", name)
-	return pa.client.SetDefaultSink(name)
+	return pa.setDefaultSink(name)
 }
 
 func (pa *PulseAudioBackend) ToggleMuteOutput(name string) error {
@@ -633,7 +650,7 @@ func (pa *PulseAudioBackend) ToggleMuteOutput(name string) error {
 	if err != nil {
 		return err
 	}
-	return sink.ToggleMute()
+	return pa.setSinkMute(sink, !sink.Mute)
 }
 
 func (pa *PulseAudioBackend) SetVolumeOutput(name string, vol float32) error {
@@ -642,23 +659,23 @@ func (pa *PulseAudioBackend) SetVolumeOutput(name string, vol float32) error {
 	if err != nil {
 		return err
 	}
-	return sink.SetVolume(vol)
+	return pa.setSinkVolume(sink, vol)
 }
 
-func (pa *PulseAudioBackend) findSinkByName(name string) (*pulseaudio.Sink, error) {
-	sinks, err := pa.client.Sinks()
+func (pa *PulseAudioBackend) findSinkByName(name string) (*proto.GetSinkInfoReply, error) {
+	sinks, err := pa.sinks()
 	if err != nil {
 		return nil, err
 	}
 	for _, s := range sinks {
-		if s.Name == name {
-			return &s, nil
+		if s.SinkName == name {
+			return s, nil
 		}
 	}
 	return nil, &NotFoundError{Resource: "sink", Name: name}
 }
 
-func (pa *PulseAudioBackend) parseSink(s pulseaudio.Sink, defaultName string) AudioOutput {
+func (pa *PulseAudioBackend) parseSink(s *proto.GetSinkInfoReply, defaultName string) AudioOutput {
 	switch pa.kind {
 	case ServerPipeWire:
 		return pa.parsePipeWireSink(s, defaultName)
@@ -667,18 +684,18 @@ func (pa *PulseAudioBackend) parseSink(s pulseaudio.Sink, defaultName string) Au
 	}
 }
 
-func (pa *PulseAudioBackend) parsePulseSink(s pulseaudio.Sink, defaultName string) AudioOutput {
-	props := cloneProps(s.PropList)
+func (pa *PulseAudioBackend) parsePulseSink(s *proto.GetSinkInfoReply, defaultName string) AudioOutput {
+	props := cloneProps(s.Properties)
 	const paNetworkFlag uint32 = 0x20000
 	return AudioOutput{
-		Index:       s.Index,
-		Name:        s.Name,
-		Description: s.Description,
+		Index:       s.SinkIndex,
+		Name:        s.SinkName,
+		Description: s.Device,
 		Nick:        props["device.description"],
-		Muted:       s.IsMute(),
-		Volume:      s.GetVolume(),
-		State:       sinkStateString(s.SinkState),
-		Default:     s.Name == defaultName,
+		Muted:       s.Mute,
+		Volume:      volumeOf(s.ChannelVolumes),
+		State:       sinkStateString(s.State),
+		Default:     s.SinkName == defaultName,
 		Driver:      s.Driver,
 		ActivePort:  s.ActivePortName,
 		IsNetwork:   s.Flags&paNetworkFlag != 0,

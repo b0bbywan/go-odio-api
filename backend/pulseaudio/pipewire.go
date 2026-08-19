@@ -1,20 +1,20 @@
 package pulseaudio
 
 import (
-	"github.com/the-jonsey/pulseaudio"
+	"github.com/jfreymuth/pulse/proto"
 )
 
-func (pa *PulseAudioBackend) parsePipeWireSink(s pulseaudio.Sink, defaultName string) AudioOutput {
-	props := cloneProps(s.PropList)
+func (pa *PulseAudioBackend) parsePipeWireSink(s *proto.GetSinkInfoReply, defaultName string) AudioOutput {
+	props := cloneProps(s.Properties)
 	return AudioOutput{
-		Index:       s.Index,
-		Name:        s.Name,
-		Description: s.Description,
+		Index:       s.SinkIndex,
+		Name:        s.SinkName,
+		Description: s.Device,
 		Nick:        props["node.nick"],
-		Muted:       s.IsMute(),
-		Volume:      s.GetVolume(),
-		State:       sinkStateString(s.SinkState),
-		Default:     s.Name == defaultName,
+		Muted:       s.Mute,
+		Volume:      volumeOf(s.ChannelVolumes),
+		State:       sinkStateString(s.State),
+		Default:     s.SinkName == defaultName,
 		Driver:      s.Driver,
 		ActivePort:  s.ActivePortName,
 		IsNetwork:   props["node.network"] == "true",
@@ -22,15 +22,15 @@ func (pa *PulseAudioBackend) parsePipeWireSink(s pulseaudio.Sink, defaultName st
 	}
 }
 
-func (pa *PulseAudioBackend) parsePipeWireSinkInput(s pulseaudio.SinkInput) AudioClient {
-	props := cloneProps(s.PropList)
+func (pa *PulseAudioBackend) parsePipeWireSinkInput(s *proto.GetSinkInputInfoReply) AudioClient {
+	props := cloneProps(s.Properties)
 
 	return AudioClient{
-		ID:      s.Index,
+		ID:      s.SinkInputIndex,
 		Name:    clientName(props),
 		App:     props["application.name"],
-		Muted:   s.IsMute(),
-		Volume:  s.GetVolume(),
+		Muted:   s.Muted,
+		Volume:  volumeOf(s.ChannelVolumes),
 		Corked:  props["pulse.corked"] == "true",
 		Binary:  props["application.process.binary"],
 		User:    props["application.process.user"],
