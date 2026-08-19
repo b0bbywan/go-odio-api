@@ -605,6 +605,7 @@ func TestPlayerDisplayName(t *testing.T) {
 }
 
 // TestGetAudio_FilterCorked verifies that corked audio clients are excluded
+// unless they are muted, which must stay visible to be unmuted.
 func TestGetAudio_FilterCorked(t *testing.T) {
 	apiMux := http.NewServeMux()
 	apiMux.HandleFunc("/audio", func(w http.ResponseWriter, r *http.Request) {
@@ -613,7 +614,8 @@ func TestGetAudio_FilterCorked(t *testing.T) {
 			"kind": "pipewire",
 			"clients": [
 				{"index": 1, "name": "Spotify", "app": "spotify", "volume": 1.0, "muted": false, "corked": false},
-				{"index": 2, "name": "Firefox", "app": "firefox", "volume": 0.5, "muted": false, "corked": true}
+				{"index": 2, "name": "Firefox", "app": "firefox", "volume": 0.5, "muted": false, "corked": true},
+				{"index": 3, "name": "Chrome", "app": "chrome", "volume": 0.5, "muted": true, "corked": true}
 			],
 			"outputs": []
 		}`)); err != nil {
@@ -631,11 +633,11 @@ func TestGetAudio_FilterCorked(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetAudio failed: %v", err)
 	}
-	if len(data.Clients) != 1 {
-		t.Fatalf("expected 1 client, got %d", len(data.Clients))
+	if len(data.Clients) != 2 {
+		t.Fatalf("expected 2 clients, got %d", len(data.Clients))
 	}
-	if data.Clients[0].Name != "Spotify" {
-		t.Errorf("expected Spotify, got %s", data.Clients[0].Name)
+	if data.Clients[0].Name != "Spotify" || data.Clients[1].Name != "Chrome" {
+		t.Errorf("expected Spotify and Chrome, got %s and %s", data.Clients[0].Name, data.Clients[1].Name)
 	}
 }
 

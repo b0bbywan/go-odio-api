@@ -202,9 +202,11 @@ func (c *APIClient) GetAudio() (*AudioData, error) {
 	if err := c.get("/audio", &raw); err != nil {
 		return nil, err
 	}
+	// Corked streams are idle and hidden, unless muted: those must stay
+	// reachable so the user can unmute them.
 	clients := make([]AudioClient, 0, len(raw.Clients))
 	for _, cl := range raw.Clients {
-		if !cl.Corked {
+		if !cl.Corked || cl.Muted {
 			clients = append(clients, cl)
 		}
 	}
