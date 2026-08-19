@@ -67,16 +67,31 @@ func TestPickBluetoothCodec(t *testing.T) {
 	}
 }
 
+func TestBluetoothAddress(t *testing.T) {
+	tests := []struct {
+		name     string
+		expected string
+	}{
+		{"bluez_source.C8_2A_DD_A7_D5_0D.a2dp_source", "C8_2A_DD_A7_D5_0D"},
+		{"bluez_source.C8_2A_DD_A7_D5_0D", "C8_2A_DD_A7_D5_0D"},
+	}
+	for _, tt := range tests {
+		if got := bluetoothAddress(tt.name); got != tt.expected {
+			t.Errorf("bluetoothAddress(%q) = %q, want %q", tt.name, got, tt.expected)
+		}
+	}
+}
+
 func TestEnsureBluetoothCodecSkipsBest(t *testing.T) {
 	pa := &PulseAudioBackend{}
 	src := &proto.GetSourceInfoReply{
-		SourceIndex: 7,
-		Properties:  proto.PropList{"bluetooth.codec": proto.PropListString(preferredBluetoothCodecs[0])},
+		SourceName: "bluez_source.C8_2A_DD_A7_D5_0D.a2dp_source",
+		Properties: proto.PropList{"bluetooth.codec": proto.PropListString(preferredBluetoothCodecs[0])},
 	}
 
 	pa.ensureBluetoothCodec(src)
 
-	if _, attempted := pa.btCodecAttempted.Load(src.SourceIndex); attempted {
-		t.Errorf("source already on %s must not be attempted", preferredBluetoothCodecs[0])
+	if _, attempted := pa.btCodecAttempted.Load("C8_2A_DD_A7_D5_0D"); attempted {
+		t.Errorf("device already on %s must not be attempted", preferredBluetoothCodecs[0])
 	}
 }
