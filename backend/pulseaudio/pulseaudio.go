@@ -6,19 +6,14 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
-	"github.com/b0bbywan/go-odio-api/cache"
 	"github.com/b0bbywan/go-odio-api/config"
 	"github.com/b0bbywan/go-odio-api/events"
 	"github.com/b0bbywan/go-odio-api/logger"
 	"github.com/jfreymuth/pulse/proto"
-)
-
-const (
-	cacheKey       = "clients"
-	outputCacheKey = "outputs"
 )
 
 func New(ctx context.Context, cfg *config.PulseAudioConfig) (*PulseAudioBackend, error) {
@@ -32,8 +27,6 @@ func New(ctx context.Context, cfg *config.PulseAudioConfig) (*PulseAudioBackend,
 		address:     address,
 		serveCookie: cfg.ServeCookie,
 		ctx:         ctx,
-		cache:       cache.New[[]AudioClient](0),
-		outputCache: cache.New[[]AudioOutput](0),
 		events:      make(chan events.Event, 32),
 	}
 
@@ -125,8 +118,8 @@ func (pa *PulseAudioBackend) reconnectWithBackoff() {
 }
 
 func (pa *PulseAudioBackend) ServerInfo() (*ServerInfo, error) {
-	outputs, ok := pa.outputCache.Get(outputCacheKey)
-	if !ok {
+	outputs := pa.outputCache.Load()
+	if outputs == nil {
 		return nil, &NotReadyError{Message: "output cache not ready"}
 	}
 
@@ -146,7 +139,7 @@ func (pa *PulseAudioBackend) ServerInfo() (*ServerInfo, error) {
 
 func (pa *PulseAudioBackend) ListClients() ([]AudioClient, error) {
 	// Check the cache
-	if cached, ok := pa.cache.Get(cacheKey); ok {
+	if cached := pa.cache.Load(); cached != nil {
 		logger.Debug("[pulseaudio] returning %d clients from cache", len(cached))
 		return cached, nil
 	}
@@ -165,13 +158,13 @@ func (pa *PulseAudioBackend) refreshCache() ([]AudioClient, error) {
 	logger.Debug("[pulseaudio] loaded %d sink inputs", len(sinks))
 
 	// retrieve the old cache
-	oldClients, _ := pa.cache.Get(cacheKey)
+	oldClients := pa.cache.Load()
 
 	// generate the new cache with updates/additions
 	updatedClients := pa.mergeClients(oldClients, sinks)
 
 	// Cache it
-	pa.cache.Set(cacheKey, updatedClients)
+	pa.cache.Store(updatedClients)
 
 	return updatedClients, nil
 }
@@ -226,8 +219,8 @@ func (pa *PulseAudioBackend) removeMissingClients(oldMap map[string]AudioClient,
 
 // GetClient retrieves a specific client from the cache
 func (pa *PulseAudioBackend) GetClient(name string) (*AudioClient, bool) {
-	clients, ok := pa.cache.Get(cacheKey)
-	if !ok {
+	clients := pa.cache.Load()
+	if clients == nil {
 		return nil, false
 	}
 
@@ -241,12 +234,13 @@ func (pa *PulseAudioBackend) GetClient(name string) (*AudioClient, bool) {
 
 // UpdateClient updates a specific client in the cache
 func (pa *PulseAudioBackend) UpdateClient(updated AudioClient) error {
-	clients, ok := pa.cache.Get(cacheKey)
-	if !ok {
+	clients := pa.cache.Load()
+	if clients == nil {
 		// If no cache, reload everything
 		_, err := pa.ListClients()
 		return err
 	}
+	clients = slices.Clone(clients)
 
 	found := false
 	for i, client := range clients {
@@ -262,7 +256,7 @@ func (pa *PulseAudioBackend) UpdateClient(updated AudioClient) error {
 		clients = append(clients, updated)
 	}
 
-	pa.cache.Set(cacheKey, clients)
+	pa.cache.Store(clients)
 	return nil
 }
 
@@ -306,7 +300,7 @@ func (pa *PulseAudioBackend) CacheUpdatedAt() time.Time {
 
 // InvalidateCache invalidates the entire cache
 func (pa *PulseAudioBackend) InvalidateCache() {
-	pa.cache.Delete(cacheKey)
+	pa.cache.Reset()
 }
 
 // closeConnections stops the listener and closes the client without closing the events channel.
@@ -580,7 +574,7 @@ func (pa *PulseAudioBackend) findSourceByName(name string) (*proto.GetSourceInfo
 }
 
 func (pa *PulseAudioBackend) ListOutputs() ([]AudioOutput, error) {
-	if cached, ok := pa.outputCache.Get(outputCacheKey); ok {
+	if cached := pa.outputCache.Load(); cached != nil {
 		logger.Debug("[pulseaudio] returning %d outputs from cache", len(cached))
 		return cached, nil
 	}
@@ -607,13 +601,13 @@ func (pa *PulseAudioBackend) refreshOutputCache() ([]AudioOutput, error) {
 		outputs = append(outputs, pa.parseSink(s, srv.DefaultSinkName))
 	}
 
-	pa.outputCache.Set(outputCacheKey, outputs)
+	pa.outputCache.Store(outputs)
 	return outputs, nil
 }
 
 func (pa *PulseAudioBackend) GetOutput(name string) (*AudioOutput, bool) {
-	outputs, ok := pa.outputCache.Get(outputCacheKey)
-	if !ok {
+	outputs := pa.outputCache.Load()
+	if outputs == nil {
 		return nil, false
 	}
 	for _, o := range outputs {
@@ -625,11 +619,12 @@ func (pa *PulseAudioBackend) GetOutput(name string) (*AudioOutput, bool) {
 }
 
 func (pa *PulseAudioBackend) UpdateOutput(updated AudioOutput) error {
-	outputs, ok := pa.outputCache.Get(outputCacheKey)
-	if !ok {
+	outputs := pa.outputCache.Load()
+	if outputs == nil {
 		_, err := pa.ListOutputs()
 		return err
 	}
+	outputs = slices.Clone(outputs)
 
 	found := false
 	for i, o := range outputs {
@@ -643,7 +638,7 @@ func (pa *PulseAudioBackend) UpdateOutput(updated AudioOutput) error {
 		outputs = append(outputs, updated)
 	}
 
-	pa.outputCache.Set(outputCacheKey, outputs)
+	pa.outputCache.Store(outputs)
 	return nil
 }
 
