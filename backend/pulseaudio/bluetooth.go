@@ -15,16 +15,16 @@ import (
 var preferredBluetoothCodecs = []string{"aptx_hd", "aptx"}
 
 // ensureBluetoothCodec switches the device behind src to the best preferred
-// codec when a better one than the active one may be available. Each source
-// index is only attempted once: a successful switch recreates the source
-// under a new index.
+// codec when a better one than the active one may be available. Each device
+// is only attempted once: the switch makes the remote reconnect, and a device
+// that renegotiates the old codec must not be bounced again.
 func (pa *PulseAudioBackend) ensureBluetoothCodec(src *proto.GetSourceInfoReply) {
 	current := src.Properties["bluetooth.codec"].String()
 	if current == preferredBluetoothCodecs[0] {
 		return
 	}
 
-	if _, seen := pa.btCodecAttempted.LoadOrStore(src.SourceIndex, struct{}{}); seen {
+	if _, seen := pa.btCodecAttempted.LoadOrStore(bluetoothAddress(src.SourceName), struct{}{}); seen {
 		return
 	}
 
@@ -54,6 +54,16 @@ func (pa *PulseAudioBackend) switchBluetoothCodec(cardIndex uint32, current stri
 		return
 	}
 	logger.Info("[pulseaudio] switched %s from %s to %s", card.CardName, current, target)
+}
+
+// bluetoothAddress extracts the device address from a bluez source name
+// ("bluez_source.<ADDR>.<profile>").
+func bluetoothAddress(sourceName string) string {
+	addr := strings.TrimPrefix(sourceName, "bluez_source.")
+	if i := strings.Index(addr, "."); i >= 0 {
+		addr = addr[:i]
+	}
+	return addr
 }
 
 // pickBluetoothCodec returns the first preferred codec the device offers, or
