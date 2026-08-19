@@ -3,7 +3,7 @@ package pulseaudio
 import (
 	"context"
 
-	"github.com/the-jonsey/pulseaudio"
+	"github.com/jfreymuth/pulse/proto"
 
 	"github.com/b0bbywan/go-odio-api/events"
 	"github.com/b0bbywan/go-odio-api/logger"
@@ -27,9 +27,24 @@ func NewListener(backend *PulseAudioBackend) *Listener {
 
 // Start starts listening for pulseaudio events
 func (l *Listener) Start() error {
+	// Coalesce protocol callbacks into a signal channel
+	updates := make(chan struct{}, 1)
+	l.backend.client.Callback = func(msg interface{}) {
+		switch msg.(type) {
+		case *proto.SubscribeEvent:
+			select {
+			case updates <- struct{}{}:
+			default:
+			}
+		case *proto.ConnectionClosed:
+			l.backend.connected.Store(false)
+			close(updates)
+		}
+	}
+
 	// Subscribe to sink, sink input and server changes
-	updates, err := l.backend.client.UpdatesByType(pulseaudio.SUBSCRIPTION_MASK_SINK | pulseaudio.SUBSCRIPTION_MASK_SINK_INPUT | pulseaudio.SUBSCRIPTION_MASK_SERVER)
-	if err != nil {
+	mask := proto.SubscriptionMaskSink | proto.SubscriptionMaskSinkInput | proto.SubscriptionMaskServer
+	if err := l.backend.client.Request(&proto.Subscribe{Mask: mask}, nil); err != nil {
 		return err
 	}
 

@@ -2,9 +2,11 @@ package pulseaudio
 
 import (
 	"context"
+	"net"
 	"sync"
+	"sync/atomic"
 
-	"github.com/the-jonsey/pulseaudio"
+	"github.com/jfreymuth/pulse/proto"
 
 	"github.com/b0bbywan/go-odio-api/cache"
 	"github.com/b0bbywan/go-odio-api/events"
@@ -23,8 +25,10 @@ type PulseAudioBackend struct {
 
 	address     string
 	serveCookie bool
-	client      *pulseaudio.Client
-	server      *pulseaudio.Server
+	client      *proto.Client
+	conn        net.Conn
+	connected   atomic.Bool
+	server      *proto.GetServerInfoReply
 	kind        AudioServerKind
 
 	cache       *cache.Cache[[]AudioClient]
