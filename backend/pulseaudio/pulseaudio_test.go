@@ -841,3 +841,40 @@ func TestParseSinkInput(t *testing.T) {
 		})
 	}
 }
+
+func TestRemoveClient(t *testing.T) {
+	pa := &PulseAudioBackend{}
+	pa.cache.Store([]AudioClient{{ID: 1, Name: "a"}, {ID: 2, Name: "b"}, {ID: 3, Name: "c"}})
+
+	removed, ok := pa.removeClient(2)
+	if !ok || removed.Name != "b" {
+		t.Fatalf("removeClient(2) = %+v, %v; want b, true", removed, ok)
+	}
+	if got := pa.cache.Load(); len(got) != 2 || got[0].ID != 1 || got[1].ID != 3 {
+		t.Errorf("cache after remove = %+v, want ids 1,3", got)
+	}
+
+	if _, ok := pa.removeClient(42); ok {
+		t.Error("removeClient(42) = true, want false for unknown index")
+	}
+	if got := pa.cache.Load(); len(got) != 2 {
+		t.Errorf("cache modified by unknown remove: %+v", got)
+	}
+}
+
+func TestRemoveOutput(t *testing.T) {
+	pa := &PulseAudioBackend{}
+	pa.outputCache.Store([]AudioOutput{{Index: 10, Name: "x"}, {Index: 11, Name: "y"}})
+
+	removed, ok := pa.removeOutput(10)
+	if !ok || removed.Name != "x" {
+		t.Fatalf("removeOutput(10) = %+v, %v; want x, true", removed, ok)
+	}
+	if got := pa.outputCache.Load(); len(got) != 1 || got[0].Index != 11 {
+		t.Errorf("cache after remove = %+v, want index 11", got)
+	}
+
+	if _, ok := pa.removeOutput(99); ok {
+		t.Error("removeOutput(99) = true, want false for unknown index")
+	}
+}
