@@ -266,6 +266,18 @@ func (pa *PulseAudioBackend) UpdateClient(updated AudioClient) error {
 	return nil
 }
 
+// removeClient drops the client with the given sink input index from the cache.
+func (pa *PulseAudioBackend) removeClient(index uint32) (AudioClient, bool) {
+	clients := pa.cache.Load()
+	for i, c := range clients {
+		if c.ID == index {
+			pa.cache.Store(slices.Delete(slices.Clone(clients), i, i+1))
+			return c, true
+		}
+	}
+	return AudioClient{}, false
+}
+
 // RefreshClient reloads a specific client from pulseaudio and updates the cache
 func (pa *PulseAudioBackend) RefreshClient(name string) (*AudioClient, error) {
 	sink, err := pa.findSinkInput(name)
@@ -633,6 +645,18 @@ func (pa *PulseAudioBackend) UpdateOutput(updated AudioOutput) error {
 
 	pa.outputCache.Set(outputCacheKey, outputs)
 	return nil
+}
+
+// removeOutput drops the output with the given sink index from the cache.
+func (pa *PulseAudioBackend) removeOutput(index uint32) (AudioOutput, bool) {
+	outputs := pa.outputCache.Load()
+	for i, o := range outputs {
+		if o.Index == index {
+			pa.outputCache.Store(slices.Delete(slices.Clone(outputs), i, i+1))
+			return o, true
+		}
+	}
+	return AudioOutput{}, false
 }
 
 func (pa *PulseAudioBackend) OutputCacheUpdatedAt() time.Time {
