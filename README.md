@@ -74,7 +74,7 @@ The built-in Odio UI is accessible at:
 
 It's a **100% local**, **responsive** (mobile + desktop), web interface designed to control your entire Linux multimedia setup from one place: MPRIS players, per-app/global volume, systemd user services, PipeWire/PulseAudio server, and more.
 
-There's also an **[installable PWA](https://odio-pwa.vercel.app/)** to install on your phone/desktop to easily access your remote and navigate between several instances.
+There's also an **[installable PWA](https://pwa.odio.love/)** to install on your phone/desktop to easily access your remote and navigate between several instances.
 
 [More info](UI.md)
 
@@ -321,7 +321,7 @@ api:
   sse:
     enabled: true
   cors:
-    origins: ["https://odio-pwa.vercel.app"] # default for PWA
+    origins: ["https://pwa.odio.love", "https://odio-pwa.vercel.app"] # defaults for PWA
     # origins: ["https://app.example.com"]  # specific origins
 ```
 
@@ -599,7 +599,7 @@ task package:rpm:linux-armhf     # .rpm armv6hl
 - [spf13/viper](https://github.com/spf13/viper) — configuration
 - [godbus/dbus](https://github.com/godbus/dbus) — D-Bus bindings
 - [coreos/go-systemd](https://github.com/coreos/go-systemd) — systemd D-Bus bindings
-- [the-jonsey/pulseaudio](https://github.com/the-jonsey/pulseaudio) — pure-Go PulseAudio native protocol (no libpulse)
+- [jfreymuth/pulse](https://github.com/jfreymuth/pulse) — pure-Go PulseAudio native protocol (no libpulse)
 - [grandcat/zeroconf](https://github.com/grandcat/zeroconf) — mDNS / DNS-SD
 - [HTMX](https://htmx.org/)
 - [TailwindCSS](https://tailwindcss.com/)

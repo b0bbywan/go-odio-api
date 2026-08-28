@@ -3,7 +3,7 @@
 - **Total control**: MPRIS media players, global + per-app volume, systemd user services, power management
 - **100% local, zero cloud**
 - **Responsive everywhere**: phone, tablet, desktop, TV/HTPC  
-- **Installable PWA** to manage multiple devices (HTPC + NAS + Raspberry Pi) [from one app](https://odio-pwa.vercel.app/)
+- **Installable PWA** to manage multiple devices (HTPC + NAS + Raspberry Pi) [from one app](https://pwa.odio.love/)
 - **lightweight**
 
 The built-in Odio UI is accessible at:
@@ -34,7 +34,7 @@ Note: Necessary cors for the PWA are included by default but can be overridden.
   - Layout automatically adapts according to your configuration and enabled backends
 
 - **Installable PWA**
-  - Central app to manage multiple Odio instances: https://odio-pwa.vercel.app/
+  - Central app to manage multiple Odio instances: https://pwa.odio.love/
   - Add to home screen (Android/iOS)
 
 - **Dynamic & Adaptive Sections**
@@ -88,7 +88,7 @@ https://github.com/user-attachments/assets/07e0f04e-8758-452e-9561-4984c1dee554
 
 ### How to Install the Central PWA App
 
-1. Open https://odio-pwa.vercel.app/ on your phone or tablet
+1. Open https://pwa.odio.love/ on your phone or tablet
 2. Add to home screen (Chrome/Android: menu → Add to home screen | Safari/iOS: Share → Add to Home Screen)
 3. Add your Odio instances (e.g. http://htpc.local:8018/ui, http://nas.local:8018/ui)
 
