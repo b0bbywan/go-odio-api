@@ -38,6 +38,7 @@ type Config struct {
 
 type UIConfig struct {
 	Enabled bool
+	Admin   string
 }
 
 type SSEConfig struct {
@@ -275,6 +276,7 @@ func New(cfgFile *string) (*Config, error) {
 
 	uiCfg := UIConfig{
 		Enabled: viper.GetBool("api.ui.enabled"),
+		Admin:   viper.GetString("api.ui.admin"),
 	}
 
 	if uiCfg.Enabled && !hasLoopback(listens, portStr) {
