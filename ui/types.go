@@ -224,6 +224,7 @@ type DashboardView struct {
 	Services   []ServiceView
 	Bluetooth  *BluetoothView
 	Upgrade    *UpgradeStatus
+	Admin      string
 }
 
 // PlayerView is a view-optimized version of Player for templates
