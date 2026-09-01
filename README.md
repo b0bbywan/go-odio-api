@@ -318,6 +318,7 @@ api:
   port: 8018
   ui:
     enabled: true
+    # admin: ":8021"  # optional link to an admin web app, same forms as service urls
   sse:
     enabled: true
   cors:
