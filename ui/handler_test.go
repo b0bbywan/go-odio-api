@@ -801,6 +801,44 @@ func TestSystemdUnitTemplate_URLLink(t *testing.T) {
 	}
 }
 
+func TestDashboardTemplate_AdminLink(t *testing.T) {
+	tmpl := LoadTemplates()
+
+	tests := []struct {
+		name    string
+		admin   string
+		wantSub string
+		denySub string
+	}{
+		{
+			name:    "admin set renders link",
+			admin:   ":8021",
+			wantSub: `onclick="openServiceUrl(':8021'); return false;"`,
+		},
+		{
+			name:    "admin unset renders no link",
+			denySub: "openServiceUrl",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			view := DashboardView{Title: "Odio", ServerInfo: &ServerInfo{}, Admin: tt.admin}
+			if err := tmpl.ExecuteTemplate(&buf, "dashboard", view); err != nil {
+				t.Fatalf("ExecuteTemplate: %v", err)
+			}
+			out := buf.String()
+			if tt.wantSub != "" && !strings.Contains(out, tt.wantSub) {
+				t.Errorf("expected %q in output, got:\n%s", tt.wantSub, out)
+			}
+			if tt.denySub != "" && strings.Contains(out, tt.denySub) {
+				t.Errorf("did not expect %q in output, got:\n%s", tt.denySub, out)
+			}
+		})
+	}
+}
+
 // TestConvertServices verifies service conversion logic
 func TestConvertServices(t *testing.T) {
 	tests := []struct {
