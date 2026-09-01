@@ -111,6 +111,36 @@ func TestNew_UIConfig(t *testing.T) {
 	}
 }
 
+func TestNew_UIAdmin(t *testing.T) {
+	tests := []struct {
+		name  string
+		set   any
+		admin string
+	}{
+		{"unset by default", nil, ""},
+		{"port-only form", ":8021", ":8021"},
+		{"full URL", "https://admin.example.com", "https://admin.example.com"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			viper.Reset()
+			if tt.set != nil {
+				viper.Set("api.ui.admin", tt.set)
+			}
+			t.Setenv("HOME", t.TempDir())
+
+			cfg, err := New(nil)
+			if err != nil {
+				t.Fatalf("New(nil) returned error: %v", err)
+			}
+			if cfg.Api.UI.Admin != tt.admin {
+				t.Errorf("Api.UI.Admin = %q, want %q", cfg.Api.UI.Admin, tt.admin)
+			}
+		})
+	}
+}
+
 func TestNew_UIEnabledByDefault(t *testing.T) {
 	viper.Reset()
 	t.Setenv("HOME", t.TempDir())
