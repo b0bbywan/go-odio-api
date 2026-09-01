@@ -59,14 +59,16 @@ type Handler struct {
 	tmpl        *template.Template
 	client      *APIClient
 	broadcaster *backend.Broadcaster
+	admin       string
 }
 
 // NewHandler creates a new UI handler with API client and event broadcaster
-func NewHandler(apiPort int, broadcaster *backend.Broadcaster) *Handler {
+func NewHandler(apiPort int, broadcaster *backend.Broadcaster, admin string) *Handler {
 	return &Handler{
 		tmpl:        LoadTemplates(),
 		client:      NewAPIClient(apiPort),
 		broadcaster: broadcaster,
+		admin:       admin,
 	}
 }
 
@@ -91,6 +93,7 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 	data := DashboardView{
 		Title:      "Odio",
 		ServerInfo: serverInfo,
+		Admin:      h.admin,
 	}
 
 	// Conditionally fetch data based on enabled backends
