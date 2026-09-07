@@ -144,7 +144,7 @@ Run progress streams over a Unix socket, not a file or the journal: progress is 
 
 - `<50ms` p95 response time, `0%` CPU on idle — tested on Raspberry Pi B and B+
 - Localhost binding by default, configurable per network interface
-- Zeroconf/mDNS auto-discovery on the LAN (opt-in)
+- Zeroconf/mDNS auto-discovery on the LAN (enabled by default, inactive on `lo`-only binds)
 
 ## Platform Support
 
@@ -392,7 +392,7 @@ For `upgrade`, the result file is the source of truth for availability; the scri
 - **Localhost binding by default** — prevents accidental network exposure
 - **Systemd disabled by default** — service control must be explicitly enabled and configured
 - **Read-only Docker mounts** — all volume mounts are read-only in the provided `docker-compose.yml`
-- **Zeroconf opt-in** — must be enabled, then mDNS adapts to `bind`: disabled on `lo`, enabled on specific interfaces, or `all` interfaces without `lo`
+- **Zeroconf follows `bind`** — enabled by default but inactive on `lo`; announces on specific interfaces, or `all` interfaces without `lo`
 
 ## API Endpoints
 
