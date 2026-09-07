@@ -290,7 +290,7 @@ func TestPowerOff_CapabilityDisabled_NoEvent(t *testing.T) {
 	}
 }
 
-// --- Tests pour la structure Login1Backend ---
+// --- Login1Backend struct tests ---
 
 func TestLogin1Backend_DefaultValues(t *testing.T) {
 	b := &Login1Backend{}

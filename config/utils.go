@@ -170,7 +170,7 @@ func getZeroconfInterfaces(binds []string) []net.Interface {
 	return result
 }
 
-// getAllActiveNonLoopback retourne toutes interfaces UP sauf loopback
+// getAllActiveNonLoopback returns every UP interface except loopback
 func getAllActiveNonLoopback() []net.Interface {
 	ifaces, err := net.Interfaces()
 	if err != nil {
