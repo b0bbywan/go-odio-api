@@ -520,176 +520,38 @@ func TestValidateBusName(t *testing.T) {
 
 // D-Bus extractor tests
 
-func TestExtractString(t *testing.T) {
-	tests := []struct {
-		name      string
-		variant   dbus.Variant
-		wantValue string
-		wantOk    bool
-	}{
-		{
-			name:      "valid string",
-			variant:   dbus.MakeVariant("test string"),
-			wantValue: "test string",
-			wantOk:    true,
-		},
-		{
-			name:      "empty string",
-			variant:   dbus.MakeVariant(""),
-			wantValue: "",
-			wantOk:    true,
-		},
-		{
-			name:      "not a string",
-			variant:   dbus.MakeVariant(123),
-			wantValue: "",
-			wantOk:    false,
-		},
+func TestExtract(t *testing.T) {
+	check := func(t *testing.T, name string, got, want any, ok, wantOk bool) {
+		t.Helper()
+		if ok != wantOk {
+			t.Errorf("%s ok = %v, want %v", name, ok, wantOk)
+		}
+		if got != want {
+			t.Errorf("%s value = %v, want %v", name, got, want)
+		}
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			value, ok := extract[string](tt.variant)
-			if ok != tt.wantOk {
-				t.Errorf("extract[string]() ok = %v, want %v", ok, tt.wantOk)
-			}
-			if value != tt.wantValue {
-				t.Errorf("extract[string]() value = %q, want %q", value, tt.wantValue)
-			}
-		})
-	}
-}
+	t.Run("matching types", func(t *testing.T) {
+		v, ok := extract[string](dbus.MakeVariant("test string"))
+		check(t, "extract[string]", v, "test string", ok, true)
+		i, ok := extract[int64](dbus.MakeVariant(int64(-999)))
+		check(t, "extract[int64]", i, int64(-999), ok, true)
+		f, ok := extract[float64](dbus.MakeVariant(0.75))
+		check(t, "extract[float64]", f, 0.75, ok, true)
+		b, ok := extract[bool](dbus.MakeVariant(true))
+		check(t, "extract[bool]", b, true, ok, true)
+	})
 
-func TestExtractBool(t *testing.T) {
-	tests := []struct {
-		name      string
-		variant   dbus.Variant
-		wantValue bool
-		wantOk    bool
-	}{
-		{
-			name:      "true",
-			variant:   dbus.MakeVariant(true),
-			wantValue: true,
-			wantOk:    true,
-		},
-		{
-			name:      "false",
-			variant:   dbus.MakeVariant(false),
-			wantValue: false,
-			wantOk:    true,
-		},
-		{
-			name:      "not a bool",
-			variant:   dbus.MakeVariant("true"),
-			wantValue: false,
-			wantOk:    false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			value, ok := extract[bool](tt.variant)
-			if ok != tt.wantOk {
-				t.Errorf("extract[bool]() ok = %v, want %v", ok, tt.wantOk)
-			}
-			if value != tt.wantValue {
-				t.Errorf("extract[bool]() value = %v, want %v", value, tt.wantValue)
-			}
-		})
-	}
-}
-
-func TestExtractInt64(t *testing.T) {
-	tests := []struct {
-		name      string
-		variant   dbus.Variant
-		wantValue int64
-		wantOk    bool
-	}{
-		{
-			name:      "positive int64",
-			variant:   dbus.MakeVariant(int64(12345)),
-			wantValue: 12345,
-			wantOk:    true,
-		},
-		{
-			name:      "negative int64",
-			variant:   dbus.MakeVariant(int64(-999)),
-			wantValue: -999,
-			wantOk:    true,
-		},
-		{
-			name:      "zero",
-			variant:   dbus.MakeVariant(int64(0)),
-			wantValue: 0,
-			wantOk:    true,
-		},
-		{
-			name:      "not an int64",
-			variant:   dbus.MakeVariant("123"),
-			wantValue: 0,
-			wantOk:    false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			value, ok := extract[int64](tt.variant)
-			if ok != tt.wantOk {
-				t.Errorf("extract[int64]() ok = %v, want %v", ok, tt.wantOk)
-			}
-			if value != tt.wantValue {
-				t.Errorf("extract[int64]() value = %v, want %v", value, tt.wantValue)
-			}
-		})
-	}
-}
-
-func TestExtractFloat64(t *testing.T) {
-	tests := []struct {
-		name      string
-		variant   dbus.Variant
-		wantValue float64
-		wantOk    bool
-	}{
-		{
-			name:      "float64",
-			variant:   dbus.MakeVariant(0.75),
-			wantValue: 0.75,
-			wantOk:    true,
-		},
-		{
-			name:      "zero",
-			variant:   dbus.MakeVariant(0.0),
-			wantValue: 0.0,
-			wantOk:    true,
-		},
-		{
-			name:      "negative",
-			variant:   dbus.MakeVariant(-3.14),
-			wantValue: -3.14,
-			wantOk:    true,
-		},
-		{
-			name:      "not a float64",
-			variant:   dbus.MakeVariant(int64(123)),
-			wantValue: 0,
-			wantOk:    false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			value, ok := extract[float64](tt.variant)
-			if ok != tt.wantOk {
-				t.Errorf("extract[float64]() ok = %v, want %v", ok, tt.wantOk)
-			}
-			if value != tt.wantValue {
-				t.Errorf("extract[float64]() value = %v, want %v", value, tt.wantValue)
-			}
-		})
-	}
+	t.Run("mismatched types yield zero value", func(t *testing.T) {
+		v, ok := extract[string](dbus.MakeVariant(123))
+		check(t, "extract[string]", v, "", ok, false)
+		i, ok := extract[int64](dbus.MakeVariant("123"))
+		check(t, "extract[int64]", i, int64(0), ok, false)
+		f, ok := extract[float64](dbus.MakeVariant(int64(123)))
+		check(t, "extract[float64]", f, 0.0, ok, false)
+		b, ok := extract[bool](dbus.MakeVariant("true"))
+		check(t, "extract[bool]", b, false, ok, false)
+	})
 }
 
 func TestExtractMetadataMap(t *testing.T) {
