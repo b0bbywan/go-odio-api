@@ -144,21 +144,16 @@ func TestPowerCapabilitiesHandler(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			b := &login1.Login1Backend{
+			s := &Server{mux: http.NewServeMux()}
+			s.registerLogin1Routes(&login1.Login1Backend{
 				CanReboot:   tt.canReboot,
 				CanPoweroff: tt.canPoweroff,
-			}
-			handler := JSONHandler(func(w http.ResponseWriter, r *http.Request) (any, error) {
-				return map[string]bool{
-					"reboot":    b.CanReboot,
-					"power_off": b.CanPoweroff,
-				}, nil
 			})
 
 			req := httptest.NewRequest("GET", "/power", nil)
 			w := httptest.NewRecorder()
 
-			handler(w, req)
+			s.mux.ServeHTTP(w, req)
 
 			if w.Code != http.StatusOK {
 				t.Errorf("status = %d, want %d", w.Code, http.StatusOK)
