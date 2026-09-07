@@ -12,11 +12,11 @@ api:
   #   origins: ["https://odio-pwa.vercel.app"] # default for PWA
   #   origins: ["https://app.example.com"]  # specific origins
   ui:
-    enabled: false
+    enabled: false              # default: true
 
 
 zeroconf:
-  enabled: false
+  enabled: false                # default: true; inactive on lo-only binds anyway
 
 systemd:
   enabled: false
