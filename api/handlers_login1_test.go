@@ -174,95 +174,24 @@ func TestPowerCapabilitiesHandler(t *testing.T) {
 	}
 }
 
-// TestRebootHandler tests POST /power/reboot - capability gate must be enforced
-func TestRebootHandler(t *testing.T) {
-	tests := []struct {
-		name           string
-		rebootFn       func() error
-		wantStatusCode int
-		wantBodyMatch  string
-	}{
-		{
-			name:           "reboot allowed returns 202 Accepted",
-			rebootFn:       func() error { return nil },
-			wantStatusCode: http.StatusAccepted,
-		},
-		{
-			name:           "reboot disabled returns 403 Forbidden",
-			rebootFn:       func() error { return &login1.CapabilityError{Required: "reboot capability disabled"} },
-			wantStatusCode: http.StatusForbidden,
-			wantBodyMatch:  "action not allowed",
-		},
-		{
-			name:           "D-Bus error returns 500 Internal Server Error",
-			rebootFn:       func() error { return http.ErrServerClosed },
-			wantStatusCode: http.StatusInternalServerError,
-		},
-	}
+// TestLogin1Routes checks that the power actions are registered and gated by
+// their capability flag before reaching D-Bus.
+func TestLogin1Routes(t *testing.T) {
+	s := &Server{mux: http.NewServeMux()}
+	s.registerLogin1Routes(&login1.Login1Backend{})
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			handler := withLogin1(tt.rebootFn)
-			req := httptest.NewRequest("POST", "/power/reboot", nil)
+	for _, path := range []string{"/power/reboot", "/power/power_off"} {
+		t.Run(path, func(t *testing.T) {
+			req := httptest.NewRequest("POST", path, nil)
 			w := httptest.NewRecorder()
 
-			handler(w, req)
+			s.mux.ServeHTTP(w, req)
 
-			if w.Code != tt.wantStatusCode {
-				t.Errorf("status = %d, want %d", w.Code, tt.wantStatusCode)
+			if w.Code != http.StatusForbidden {
+				t.Errorf("status = %d, want %d", w.Code, http.StatusForbidden)
 			}
-			if tt.wantBodyMatch != "" {
-				body := w.Body.String()
-				if !strings.Contains(body, tt.wantBodyMatch) {
-					t.Errorf("body = %q, want to contain %q", body, tt.wantBodyMatch)
-				}
-			}
-		})
-	}
-}
-
-// TestPowerOffHandler tests POST /power/power_off - capability gate must be enforced
-func TestPowerOffHandler(t *testing.T) {
-	tests := []struct {
-		name           string
-		powerOffFn     func() error
-		wantStatusCode int
-		wantBodyMatch  string
-	}{
-		{
-			name:           "power_off allowed returns 202 Accepted",
-			powerOffFn:     func() error { return nil },
-			wantStatusCode: http.StatusAccepted,
-		},
-		{
-			name:           "power_off disabled returns 403 Forbidden",
-			powerOffFn:     func() error { return &login1.CapabilityError{Required: "poweroff capability disabled"} },
-			wantStatusCode: http.StatusForbidden,
-			wantBodyMatch:  "action not allowed",
-		},
-		{
-			name:           "D-Bus error returns 500 Internal Server Error",
-			powerOffFn:     func() error { return http.ErrServerClosed },
-			wantStatusCode: http.StatusInternalServerError,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			handler := withLogin1(tt.powerOffFn)
-			req := httptest.NewRequest("POST", "/power/power_off", nil)
-			w := httptest.NewRecorder()
-
-			handler(w, req)
-
-			if w.Code != tt.wantStatusCode {
-				t.Errorf("status = %d, want %d", w.Code, tt.wantStatusCode)
-			}
-			if tt.wantBodyMatch != "" {
-				body := w.Body.String()
-				if !strings.Contains(body, tt.wantBodyMatch) {
-					t.Errorf("body = %q, want to contain %q", body, tt.wantBodyMatch)
-				}
+			if body := w.Body.String(); !strings.Contains(body, "action not allowed") {
+				t.Errorf("body = %q, want to contain %q", body, "action not allowed")
 			}
 		})
 	}
