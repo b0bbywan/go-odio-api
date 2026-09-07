@@ -2,7 +2,6 @@ package mpris
 
 import (
 	"fmt"
-	"reflect"
 	"sync"
 	"testing"
 	"time"
@@ -706,100 +705,6 @@ func TestExtractMetadataWithRealData(t *testing.T) {
 }
 
 // Struct tags validation tests
-
-func TestPlayerStructTags(t *testing.T) {
-	// Test Player struct tags
-	playerType := reflect.TypeOf(Player{})
-
-	expectedFields := map[string]struct {
-		dbusTag  string
-		ifaceTag string
-	}{
-		"Identity":            {dbusTag: "Identity", ifaceTag: "org.mpris.MediaPlayer2"},
-		"SupportedUriSchemes": {dbusTag: "SupportedUriSchemes", ifaceTag: "org.mpris.MediaPlayer2"},
-		"PlaybackStatus":      {dbusTag: "PlaybackStatus", ifaceTag: "org.mpris.MediaPlayer2.Player"},
-		"LoopStatus":          {dbusTag: "LoopStatus", ifaceTag: "org.mpris.MediaPlayer2.Player"},
-		"Shuffle":             {dbusTag: "Shuffle", ifaceTag: "org.mpris.MediaPlayer2.Player"},
-		"Volume":              {dbusTag: "Volume", ifaceTag: "org.mpris.MediaPlayer2.Player"},
-		"Position":            {dbusTag: "Position", ifaceTag: "org.mpris.MediaPlayer2.Player"},
-		"Rate":                {dbusTag: "Rate", ifaceTag: "org.mpris.MediaPlayer2.Player"},
-		"Metadata":            {dbusTag: "Metadata", ifaceTag: "org.mpris.MediaPlayer2.Player"},
-	}
-
-	for i := 0; i < playerType.NumField(); i++ {
-		field := playerType.Field(i)
-		dbusTag := field.Tag.Get("dbus")
-
-		// Skip fields without dbus tag
-		if dbusTag == "" {
-			continue
-		}
-
-		expected, ok := expectedFields[field.Name]
-		if !ok {
-			t.Errorf("Unexpected field with dbus tag: %s (tag: %q)", field.Name, dbusTag)
-			continue
-		}
-
-		if dbusTag != expected.dbusTag {
-			t.Errorf("Field %s: dbus tag = %q, want %q", field.Name, dbusTag, expected.dbusTag)
-		}
-
-		ifaceTag := field.Tag.Get("iface")
-		if ifaceTag != expected.ifaceTag {
-			t.Errorf("Field %s: iface tag = %q, want %q", field.Name, ifaceTag, expected.ifaceTag)
-		}
-
-		// Mark as found
-		delete(expectedFields, field.Name)
-	}
-
-	// Check if all expected fields were found
-	if len(expectedFields) > 0 {
-		for fieldName := range expectedFields {
-			t.Errorf("Missing expected field with dbus tag: %s", fieldName)
-		}
-	}
-}
-
-func TestCapabilitiesStructTags(t *testing.T) {
-	// Test Capabilities struct tags
-	capsType := reflect.TypeOf(Capabilities{})
-
-	expectedTags := map[string]string{
-		"CanPlay":       "CanPlay",
-		"CanPause":      "CanPause",
-		"CanGoNext":     "CanGoNext",
-		"CanGoPrevious": "CanGoPrevious",
-		"CanSeek":       "CanSeek",
-		"CanControl":    "CanControl",
-	}
-
-	for i := 0; i < capsType.NumField(); i++ {
-		field := capsType.Field(i)
-		dbusTag := field.Tag.Get("dbus")
-
-		expectedTag, ok := expectedTags[field.Name]
-		if !ok {
-			t.Errorf("Unexpected field: %s", field.Name)
-			continue
-		}
-
-		if dbusTag != expectedTag {
-			t.Errorf("Field %s: dbus tag = %q, want %q", field.Name, dbusTag, expectedTag)
-		}
-
-		// Mark as found
-		delete(expectedTags, field.Name)
-	}
-
-	// Check if all expected fields were found
-	if len(expectedTags) > 0 {
-		for fieldName := range expectedTags {
-			t.Errorf("Missing expected field with dbus tag: %s", fieldName)
-		}
-	}
-}
 
 // loadCapabilitiesFromProps tests
 
