@@ -176,16 +176,14 @@ func (pa *PulseAudioBackend) mergeClients(oldClients []AudioClient, sinks []*pro
 		oldMap[c.Name] = c
 	}
 
-	// create the new slice and update / add clients
+	// clients absent from sinks are dropped by construction
 	newClients := make([]AudioClient, 0, len(sinks))
 	for _, s := range sinks {
 		client := pa.parseSinkInput(s)
 		client = pa.updateOrAddClient(oldMap, client)
 		newClients = append(newClients, client)
 	}
-
-	// remove missing clients
-	return pa.removeMissingClients(oldMap, newClients)
+	return newClients
 }
 
 func (pa *PulseAudioBackend) updateOrAddClient(oldMap map[string]AudioClient, client AudioClient) AudioClient {
@@ -205,16 +203,6 @@ func clientChanged(a, b AudioClient) bool {
 	return a.Volume != b.Volume ||
 		a.Muted != b.Muted ||
 		a.Corked != b.Corked
-}
-
-func (pa *PulseAudioBackend) removeMissingClients(oldMap map[string]AudioClient, newClients []AudioClient) []AudioClient {
-	final := make([]AudioClient, 0, len(newClients))
-	for _, c := range newClients {
-		if _, exists := oldMap[c.Name]; exists {
-			final = append(final, c)
-		}
-	}
-	return final
 }
 
 // GetClient retrieves a specific client from the cache
