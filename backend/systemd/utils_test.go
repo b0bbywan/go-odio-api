@@ -75,6 +75,11 @@ func TestDecodeUnitName(t *testing.T) {
 			encoded:  "simple",
 			expected: "simple",
 		},
+		{
+			name:     "invalid escape kept verbatim",
+			encoded:  "bad_zzname",
+			expected: "bad_zzname",
+		},
 	}
 
 	for _, tt := range tests {
@@ -135,7 +140,7 @@ func TestParseHexByte(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var result byte
-			ok, _ := parseHexByte(tt.input, &result)
+			ok := parseHexByte(tt.input, &result)
 			if ok != tt.wantOk {
 				t.Errorf("parseHexByte(%q) ok = %v, want %v", tt.input, ok, tt.wantOk)
 			}

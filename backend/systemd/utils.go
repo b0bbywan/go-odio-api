@@ -29,7 +29,7 @@ func decodeUnitName(encoded string) string {
 			// Escape sequence _XX (hex)
 			hex := encoded[i+1 : i+3]
 			var b byte
-			if _, err := parseHexByte(hex, &b); err == nil {
+			if parseHexByte(hex, &b) {
 				result.WriteByte(b)
 				i += 2
 				continue
@@ -40,9 +40,9 @@ func decodeUnitName(encoded string) string {
 	return result.String()
 }
 
-func parseHexByte(s string, b *byte) (bool, error) {
+func parseHexByte(s string, b *byte) bool {
 	if len(s) != 2 {
-		return false, nil
+		return false
 	}
 	val := 0
 	for _, c := range s {
@@ -55,11 +55,11 @@ func parseHexByte(s string, b *byte) (bool, error) {
 		case c >= 'A' && c <= 'F':
 			val |= int(c - 'A' + 10)
 		default:
-			return false, nil
+			return false
 		}
 	}
 	*b = byte(val)
-	return true, nil
+	return true
 }
 
 // stateKey generates a unique key for the service/scope pair
