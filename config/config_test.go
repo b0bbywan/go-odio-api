@@ -92,14 +92,10 @@ func TestNew_UIConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			viper.Reset()
+			isolate(t)
 			viper.Set("api.ui.enabled", tt.uiEnabled)
-			t.Setenv("HOME", t.TempDir())
 
-			cfg, err := New(nil)
-			if err != nil {
-				t.Fatalf("New(nil) returned error: %v", err)
-			}
+			cfg := mustNew(t, nil)
 
 			if cfg.Api.UI == nil {
 				t.Fatal("Api.UI should not be nil")
@@ -142,13 +138,9 @@ func TestNew_UIAdmin(t *testing.T) {
 }
 
 func TestNew_UIEnabledByDefault(t *testing.T) {
-	viper.Reset()
-	t.Setenv("HOME", t.TempDir())
+	isolate(t)
 
-	cfg, err := New(nil)
-	if err != nil {
-		t.Fatalf("New() returned error: %v", err)
-	}
+	cfg := mustNew(t, nil)
 	if cfg.Api.UI == nil {
 		t.Fatal("Api.UI should not be nil")
 	}
@@ -164,19 +156,9 @@ func BenchmarkParseLogLevel(b *testing.B) {
 }
 
 func TestNew_Defaults(t *testing.T) {
-	// Reset viper to ensure clean state
-	viper.Reset()
+	isolate(t)
 
-	// Isolate from user's config files by using a temp directory
-	t.Setenv("HOME", t.TempDir())
-
-	// Set XDG_SESSION_DESKTOP to avoid headless mode detection
-	t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
-
-	cfg, err := New(nil)
-	if err != nil {
-		t.Fatalf("New(nil) returned error: %v", err)
-	}
+	cfg := mustNew(t, nil)
 
 	// Test default port
 	if cfg.Api.Port != 8018 {
@@ -204,22 +186,12 @@ func TestNew_Defaults(t *testing.T) {
 }
 
 func TestNew_CustomPort(t *testing.T) {
-	// Reset viper to ensure clean state
-	viper.Reset()
+	isolate(t)
 
 	// Set custom port
 	viper.Set("api.port", 9090)
 
-	// Isolate from user's config files by using a temp directory
-	t.Setenv("HOME", t.TempDir())
-
-	// Set XDG_SESSION_DESKTOP to avoid headless mode detection
-	t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
-
-	cfg, err := New(nil)
-	if err != nil {
-		t.Fatalf("New(nil) returned error: %v", err)
-	}
+	cfg := mustNew(t, nil)
 
 	if cfg.Api.Port != 9090 {
 		t.Errorf("Api.Port = %d, want 9090", cfg.Api.Port)
@@ -239,17 +211,10 @@ func TestNew_InvalidPort(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Reset viper to ensure clean state
-			viper.Reset()
+			isolate(t)
 
 			// Set invalid port
 			viper.Set("api.port", tt.port)
-
-			// Isolate from user's config files by using a temp directory
-			t.Setenv("HOME", t.TempDir())
-
-			// Set XDG_SESSION_DESKTOP to avoid headless mode detection
-			t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
 
 			cfg, err := New(nil)
 			if err == nil {
@@ -276,21 +241,11 @@ func TestNew_CustomLogLevel(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.level, func(t *testing.T) {
-			// Reset viper to ensure clean state
-			viper.Reset()
+			isolate(t)
 
 			viper.Set("LogLevel", tt.level)
 
-			// Isolate from user's config files by using a temp directory
-			t.Setenv("HOME", t.TempDir())
-
-			// Set XDG_SESSION_DESKTOP to avoid headless mode detection
-			t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
-
-			cfg, err := New(nil)
-			if err != nil {
-				t.Fatalf("New(nil) returned error: %v", err)
-			}
+			cfg := mustNew(t, nil)
 
 			if cfg.LogLevel != tt.expected {
 				t.Errorf("LogLevel = %d, want %d (%s)", cfg.LogLevel, tt.expected, tt.level)
@@ -313,9 +268,7 @@ func TestValidateConfigPath_ValidFiles(t *testing.T) {
 			// Create a temporary file with the given extension
 			tmpDir := t.TempDir()
 			tmpFile := tmpDir + "/config" + tt.extension
-			if err := os.WriteFile(tmpFile, []byte("test: value"), 0644); err != nil {
-				t.Fatalf("Failed to create test file: %v", err)
-			}
+			writeFile(t, tmpFile, "test: value")
 
 			// Validate the file
 			err := validateConfigPath(tmpFile)
@@ -343,9 +296,7 @@ func TestValidateConfigPath_InvalidExtensions(t *testing.T) {
 			// Create a temporary file with invalid extension
 			tmpDir := t.TempDir()
 			tmpFile := tmpDir + "/config" + tt.extension
-			if err := os.WriteFile(tmpFile, []byte("test: value"), 0644); err != nil {
-				t.Fatalf("Failed to create test file: %v", err)
-			}
+			writeFile(t, tmpFile, "test: value")
 
 			// Validate should fail
 			err := validateConfigPath(tmpFile)
@@ -402,16 +353,11 @@ func TestValidateConfigPath_PathTraversal(t *testing.T) {
 }
 
 func TestNew_InvalidConfigFile(t *testing.T) {
-	viper.Reset()
+	isolate(t)
 
 	tmpDir := t.TempDir()
 	invalidFile := tmpDir + "/invalid.txt"
-	if err := os.WriteFile(invalidFile, []byte("test"), 0644); err != nil {
-		t.Fatalf("Failed to create test file: %v", err)
-	}
-
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
+	writeFile(t, invalidFile, "test")
 
 	cfg, err := New(&invalidFile)
 	if err == nil {
@@ -423,7 +369,7 @@ func TestNew_InvalidConfigFile(t *testing.T) {
 }
 
 func TestNew_ValidConfigFile(t *testing.T) {
-	viper.Reset()
+	isolate(t)
 
 	// Create a valid YAML config file
 	tmpDir := t.TempDir()
@@ -434,17 +380,9 @@ api:
   enabled: true
 logLevel: DEBUG
 `
-	if err := os.WriteFile(validFile, []byte(configContent), 0644); err != nil {
-		t.Fatalf("Failed to create test file: %v", err)
-	}
+	writeFile(t, validFile, configContent)
 
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
-
-	cfg, err := New(&validFile)
-	if err != nil {
-		t.Fatalf("New() with valid config file returned error: %v", err)
-	}
+	cfg := mustNew(t, &validFile)
 	if cfg.Api.Port != 9999 {
 		t.Errorf("Api.Port = %d, want 9999", cfg.Api.Port)
 	}
@@ -499,15 +437,9 @@ func TestLogin1CapabilitiesStructFields(t *testing.T) {
 }
 
 func TestNew_Login1DisabledByDefault(t *testing.T) {
-	viper.Reset()
+	isolate(t)
 
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
-
-	cfg, err := New(nil)
-	if err != nil {
-		t.Fatalf("New(nil) returned error: %v", err)
-	}
+	cfg := mustNew(t, nil)
 
 	if cfg.Login1 == nil {
 		t.Fatal("Login1 config should not be nil")
@@ -519,15 +451,9 @@ func TestNew_Login1DisabledByDefault(t *testing.T) {
 }
 
 func TestNew_Login1CapabilitiesDisabledByDefault(t *testing.T) {
-	viper.Reset()
+	isolate(t)
 
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
-
-	cfg, err := New(nil)
-	if err != nil {
-		t.Fatalf("New(nil) returned error: %v", err)
-	}
+	cfg := mustNew(t, nil)
 
 	if cfg.Login1.Capabilities == nil {
 		t.Fatal("Login1.Capabilities should not be nil")
@@ -541,16 +467,10 @@ func TestNew_Login1CapabilitiesDisabledByDefault(t *testing.T) {
 }
 
 func TestNew_Login1ExplicitlyEnabled(t *testing.T) {
-	viper.Reset()
+	isolate(t)
 	viper.Set("power.enabled", true)
 
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
-
-	cfg, err := New(nil)
-	if err != nil {
-		t.Fatalf("New(nil) returned error: %v", err)
-	}
+	cfg := mustNew(t, nil)
 
 	if !cfg.Login1.Enabled {
 		t.Error("Login1.Enabled should be true when explicitly enabled")
@@ -571,18 +491,12 @@ func TestNew_Login1CapabilitiesFromViper(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			viper.Reset()
+			isolate(t)
 			viper.Set("power.enabled", true)
 			viper.Set("power.capabilities.reboot", tt.reboot)
 			viper.Set("power.capabilities.poweroff", tt.poweroff)
 
-			t.Setenv("HOME", t.TempDir())
-			t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
-
-			cfg, err := New(nil)
-			if err != nil {
-				t.Fatalf("New(nil) returned error: %v", err)
-			}
+			cfg := mustNew(t, nil)
 
 			if cfg.Login1.Capabilities.CanReboot != tt.reboot {
 				t.Errorf("CanReboot = %v, want %v", cfg.Login1.Capabilities.CanReboot, tt.reboot)
@@ -595,7 +509,7 @@ func TestNew_Login1CapabilitiesFromViper(t *testing.T) {
 }
 
 func TestNew_Login1FromConfigFile(t *testing.T) {
-	viper.Reset()
+	isolate(t)
 
 	tmpDir := t.TempDir()
 	configFile := tmpDir + "/config.yaml"
@@ -606,17 +520,9 @@ power:
     reboot: true
     poweroff: false
 `
-	if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
-		t.Fatalf("Failed to create test config file: %v", err)
-	}
+	writeFile(t, configFile, configContent)
 
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
-
-	cfg, err := New(&configFile)
-	if err != nil {
-		t.Fatalf("New() returned error: %v", err)
-	}
+	cfg := mustNew(t, &configFile)
 
 	if !cfg.Login1.Enabled {
 		t.Error("Login1.Enabled should be true from config file")
@@ -633,15 +539,9 @@ power:
 }
 
 func TestNew_Login1SecurityDefaults(t *testing.T) {
-	viper.Reset()
+	isolate(t)
 
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
-
-	cfg, err := New(nil)
-	if err != nil {
-		t.Fatalf("New(nil) returned error: %v", err)
-	}
+	cfg := mustNew(t, nil)
 
 	// Verify all login1 security defaults
 	securityTests := []struct {
@@ -682,15 +582,9 @@ func TestNew_Login1SecurityDefaults(t *testing.T) {
 // Security-focused API and Zeroconf tests
 
 func TestNew_DefaultBindLocalhost(t *testing.T) {
-	viper.Reset()
+	isolate(t)
 
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
-
-	cfg, err := New(nil)
-	if err != nil {
-		t.Fatalf("New(nil) returned error: %v", err)
-	}
+	cfg := mustNew(t, nil)
 
 	// Should always include localhost for security
 	loopback := "127.0.0.1:8018"
@@ -729,17 +623,11 @@ func TestNew_CustomBindAddress(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			viper.Reset()
+			isolate(t)
 			viper.Set("bind", tt.bind)
 			viper.Set("api.port", tt.port)
 
-			t.Setenv("HOME", t.TempDir())
-			t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
-
-			cfg, err := New(nil)
-			if err != nil {
-				t.Fatalf("New(nil) returned error: %v", err)
-			}
+			cfg := mustNew(t, nil)
 
 			found := false
 			for _, l := range cfg.Api.Listens {
@@ -756,16 +644,10 @@ func TestNew_CustomBindAddress(t *testing.T) {
 }
 
 func TestNew_ZeroconfDisabledOnLocalhost(t *testing.T) {
-	viper.Reset()
+	isolate(t)
 	viper.Set("bind", "lo")
 
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
-
-	cfg, err := New(nil)
-	if err != nil {
-		t.Fatalf("New(nil) returned error: %v", err)
-	}
+	cfg := mustNew(t, nil)
 
 	// Zeroconf should be enabled by default
 	if !cfg.Zeroconf.Enabled {
@@ -779,16 +661,10 @@ func TestNew_ZeroconfDisabledOnLocalhost(t *testing.T) {
 }
 
 func TestNew_ZeroconfExplicitlyDisabled(t *testing.T) {
-	viper.Reset()
+	isolate(t)
 	viper.Set("zeroconf.enabled", false)
 
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
-
-	cfg, err := New(nil)
-	if err != nil {
-		t.Fatalf("New(nil) returned error: %v", err)
-	}
+	cfg := mustNew(t, nil)
 
 	if cfg.Zeroconf.Enabled {
 		t.Error("Zeroconf.Enabled should be false when explicitly disabled")
@@ -796,15 +672,9 @@ func TestNew_ZeroconfExplicitlyDisabled(t *testing.T) {
 }
 
 func TestNew_SystemdDisabledByDefault(t *testing.T) {
-	viper.Reset()
+	isolate(t)
 
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
-
-	cfg, err := New(nil)
-	if err != nil {
-		t.Fatalf("New(nil) returned error: %v", err)
-	}
+	cfg := mustNew(t, nil)
 
 	// Systemd should be DISABLED by default for security
 	if cfg.Systemd.Enabled {
@@ -821,17 +691,11 @@ func TestNew_SystemdDisabledByDefault(t *testing.T) {
 }
 
 func TestNew_SystemdExplicitlyEnabled(t *testing.T) {
-	viper.Reset()
+	isolate(t)
 	viper.Set("systemd.enabled", true)
 	viper.Set("systemd.user", []string{"test.service"})
 
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
-
-	cfg, err := New(nil)
-	if err != nil {
-		t.Fatalf("New(nil) returned error: %v", err)
-	}
+	cfg := mustNew(t, nil)
 
 	if !cfg.Systemd.Enabled {
 		t.Error("Systemd.Enabled should be true when explicitly enabled")
@@ -843,15 +707,9 @@ func TestNew_SystemdExplicitlyEnabled(t *testing.T) {
 }
 
 func TestNew_SecurityDefaults(t *testing.T) {
-	viper.Reset()
+	isolate(t)
 
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
-
-	cfg, err := New(nil)
-	if err != nil {
-		t.Fatalf("New(nil) returned error: %v", err)
-	}
+	cfg := mustNew(t, nil)
 
 	// Verify all security-critical defaults
 	tests := []struct {
@@ -958,16 +816,10 @@ func TestGetZeroconfInterfaces_NonexistentIP(t *testing.T) {
 }
 
 func TestNew_ZeroconfAllInterfaces(t *testing.T) {
-	viper.Reset()
+	isolate(t)
 	viper.Set("bind", "all")
 
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
-
-	cfg, err := New(nil)
-	if err != nil {
-		t.Fatalf("New(nil) returned error: %v", err)
-	}
+	cfg := mustNew(t, nil)
 
 	if !cfg.Zeroconf.Enabled {
 		t.Error("Zeroconf.Enabled should be true by default")
@@ -986,13 +838,9 @@ func TestNew_ZeroconfAllInterfaces(t *testing.T) {
 // --- Tests CORSConfig ---
 
 func TestNew_CORSDefaultOrigin(t *testing.T) {
-	viper.Reset()
-	t.Setenv("HOME", t.TempDir())
+	isolate(t)
 
-	cfg, err := New(nil)
-	if err != nil {
-		t.Fatalf("New(nil) returned error: %v", err)
-	}
+	cfg := mustNew(t, nil)
 	if cfg.Api.CORS == nil {
 		t.Fatal("Api.CORS should not be nil with default origin")
 	}
@@ -1009,14 +857,10 @@ func TestNew_CORSDefaultOrigin(t *testing.T) {
 }
 
 func TestNew_CORSWildcard(t *testing.T) {
-	viper.Reset()
+	isolate(t)
 	viper.Set("api.cors.origins", []string{"*"})
-	t.Setenv("HOME", t.TempDir())
 
-	cfg, err := New(nil)
-	if err != nil {
-		t.Fatalf("New(nil) returned error: %v", err)
-	}
+	cfg := mustNew(t, nil)
 	if cfg.Api.CORS == nil {
 		t.Fatal("Api.CORS should not be nil when origins are configured")
 	}
@@ -1026,15 +870,11 @@ func TestNew_CORSWildcard(t *testing.T) {
 }
 
 func TestNew_CORSSpecificOrigins(t *testing.T) {
-	viper.Reset()
+	isolate(t)
 	origins := []string{"https://app.example.com", "https://other.example.com"}
 	viper.Set("api.cors.origins", origins)
-	t.Setenv("HOME", t.TempDir())
 
-	cfg, err := New(nil)
-	if err != nil {
-		t.Fatalf("New(nil) returned error: %v", err)
-	}
+	cfg := mustNew(t, nil)
 	if cfg.Api.CORS == nil {
 		t.Fatal("Api.CORS should not be nil when origins are configured")
 	}
@@ -1049,7 +889,7 @@ func TestNew_CORSSpecificOrigins(t *testing.T) {
 }
 
 func TestNew_CORSFromConfigFile(t *testing.T) {
-	viper.Reset()
+	isolate(t)
 
 	tmpDir := t.TempDir()
 	configFile := tmpDir + "/config.yaml"
@@ -1059,17 +899,9 @@ api:
     origins:
       - "*"
 `
-	if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
-		t.Fatalf("Failed to create test config file: %v", err)
-	}
+	writeFile(t, configFile, configContent)
 
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
-
-	cfg, err := New(&configFile)
-	if err != nil {
-		t.Fatalf("New() returned error: %v", err)
-	}
+	cfg := mustNew(t, &configFile)
 	if cfg.Api.CORS == nil {
 		t.Fatal("Api.CORS should not be nil when loaded from config file")
 	}
@@ -1079,14 +911,10 @@ api:
 }
 
 func TestNew_CORSEmptyOriginsStaysNil(t *testing.T) {
-	viper.Reset()
+	isolate(t)
 	viper.Set("api.cors.origins", []string{})
-	t.Setenv("HOME", t.TempDir())
 
-	cfg, err := New(nil)
-	if err != nil {
-		t.Fatalf("New(nil) returned error: %v", err)
-	}
+	cfg := mustNew(t, nil)
 	if cfg.Api.CORS != nil {
 		t.Errorf("Api.CORS should be nil for empty origins list, got %+v", cfg.Api.CORS)
 	}
@@ -1240,7 +1068,7 @@ func TestParseSystemdServices_TopLevelNotAList(t *testing.T) {
 
 // End-to-end: URL declared in YAML flows through to SystemdConfig.
 func TestNew_SystemdServicesWithURLFromConfigFile(t *testing.T) {
-	viper.Reset()
+	isolate(t)
 
 	tmpDir := t.TempDir()
 	configFile := tmpDir + "/config.yaml"
@@ -1253,17 +1081,9 @@ systemd:
       url: ":8080"
     - pipewire-pulse.service
 `
-	if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
-		t.Fatalf("Failed to create config file: %v", err)
-	}
+	writeFile(t, configFile, configContent)
 
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
-
-	cfg, err := New(&configFile)
-	if err != nil {
-		t.Fatalf("New() returned error: %v", err)
-	}
+	cfg := mustNew(t, &configFile)
 
 	want := []SystemdService{
 		{Name: "mpd.service"},
@@ -1282,35 +1102,22 @@ systemd:
 
 // End-to-end: a conf.d snippet may also use the object form.
 func TestNew_SystemdServicesWithURLFromConfD(t *testing.T) {
-	viper.Reset()
+	isolate(t)
 
 	tmpDir := t.TempDir()
 	mainConfig := tmpDir + "/config.yaml"
-	if err := os.WriteFile(mainConfig, []byte("systemd:\n  enabled: true\n  user: [mpd.service]\n"), 0644); err != nil {
-		t.Fatalf("Failed to write main config: %v", err)
-	}
+	writeFile(t, mainConfig, "systemd:\n  enabled: true\n  user: [mpd.service]\n")
 
 	confDir := tmpDir + "/conf.d"
-	if err := os.Mkdir(confDir, 0755); err != nil {
-		t.Fatalf("Failed to create conf.d: %v", err)
-	}
 	override := `
 systemd:
   user:
     - name: mympd.service
       url: ":8080"
 `
-	if err := os.WriteFile(confDir+"/10-override.yaml", []byte(override), 0644); err != nil {
-		t.Fatalf("Failed to write override: %v", err)
-	}
+	writeFile(t, confDir+"/10-override.yaml", override)
 
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
-
-	cfg, err := New(&mainConfig)
-	if err != nil {
-		t.Fatalf("New() returned error: %v", err)
-	}
+	cfg := mustNew(t, &mainConfig)
 
 	if len(cfg.Systemd.UserServices) != 1 {
 		t.Fatalf("UserServices len = %d, want 1 (conf.d replaces). Got: %+v",
@@ -1327,16 +1134,11 @@ systemd:
 
 // Surface a malformed YAML entry as an error from New() rather than silent drop.
 func TestNew_SystemdInvalidEntryType(t *testing.T) {
-	viper.Reset()
+	isolate(t)
 
 	tmpDir := t.TempDir()
 	configFile := tmpDir + "/config.yaml"
-	if err := os.WriteFile(configFile, []byte("systemd:\n  enabled: true\n  user: [42]\n"), 0644); err != nil {
-		t.Fatalf("Failed to create config file: %v", err)
-	}
-
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
+	writeFile(t, configFile, "systemd:\n  enabled: true\n  user: [42]\n")
 
 	cfg, err := New(&configFile)
 	if err == nil {
@@ -1381,16 +1183,9 @@ func TestMergeConfDir_AlphabeticalOrder(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	confDir := tmpDir + "/conf.d"
-	if err := os.Mkdir(confDir, 0755); err != nil {
-		t.Fatalf("Failed to create conf.d: %v", err)
-	}
 
-	if err := os.WriteFile(confDir+"/10-base.yaml", []byte("api:\n  port: 1111\n"), 0644); err != nil {
-		t.Fatalf("Failed to write 10-base.yaml: %v", err)
-	}
-	if err := os.WriteFile(confDir+"/99-final.yaml", []byte("api:\n  port: 7777\n"), 0644); err != nil {
-		t.Fatalf("Failed to write 99-final.yaml: %v", err)
-	}
+	writeFile(t, confDir+"/10-base.yaml", "api:\n  port: 1111\n")
+	writeFile(t, confDir+"/99-final.yaml", "api:\n  port: 7777\n")
 
 	if err := mergeConfDir(tmpDir + "/config.yaml"); err != nil {
 		t.Fatalf("mergeConfDir() returned error: %v", err)
@@ -1416,12 +1211,7 @@ func TestMergeConfDir_OverridesExistingValues(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	confDir := tmpDir + "/conf.d"
-	if err := os.Mkdir(confDir, 0755); err != nil {
-		t.Fatalf("Failed to create conf.d: %v", err)
-	}
-	if err := os.WriteFile(confDir+"/override.yaml", []byte("api:\n  port: 9999\n"), 0644); err != nil {
-		t.Fatalf("Failed to write override.yaml: %v", err)
-	}
+	writeFile(t, confDir+"/override.yaml", "api:\n  port: 9999\n")
 
 	if err := mergeConfDir(tmpDir + "/config.yaml"); err != nil {
 		t.Fatalf("mergeConfDir() returned error: %v", err)
@@ -1443,20 +1233,11 @@ func TestMergeConfDir_IgnoresNonYAMLAndHidden(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	confDir := tmpDir + "/conf.d"
-	if err := os.Mkdir(confDir, 0755); err != nil {
-		t.Fatalf("Failed to create conf.d: %v", err)
-	}
 
 	// Files that should be ignored — if any were merged, port would change.
-	if err := os.WriteFile(confDir+"/notes.txt", []byte("api:\n  port: 1111\n"), 0644); err != nil {
-		t.Fatalf("Failed to write notes.txt: %v", err)
-	}
-	if err := os.WriteFile(confDir+"/config.json", []byte(`{"api":{"port":2222}}`), 0644); err != nil {
-		t.Fatalf("Failed to write config.json: %v", err)
-	}
-	if err := os.WriteFile(confDir+"/.hidden.yaml", []byte("api:\n  port: 3333\n"), 0644); err != nil {
-		t.Fatalf("Failed to write .hidden.yaml: %v", err)
-	}
+	writeFile(t, confDir+"/notes.txt", "api:\n  port: 1111\n")
+	writeFile(t, confDir+"/config.json", `{"api":{"port":2222}}`)
+	writeFile(t, confDir+"/.hidden.yaml", "api:\n  port: 3333\n")
 
 	if err := mergeConfDir(tmpDir + "/config.yaml"); err != nil {
 		t.Fatalf("mergeConfDir() returned error: %v", err)
@@ -1473,16 +1254,9 @@ func TestMergeConfDir_AcceptsBothYamlAndYmlExtensions(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	confDir := tmpDir + "/conf.d"
-	if err := os.Mkdir(confDir, 0755); err != nil {
-		t.Fatalf("Failed to create conf.d: %v", err)
-	}
 
-	if err := os.WriteFile(confDir+"/10-a.yaml", []byte("api:\n  port: 1111\n"), 0644); err != nil {
-		t.Fatalf("Failed to write 10-a.yaml: %v", err)
-	}
-	if err := os.WriteFile(confDir+"/20-b.yml", []byte("logLevel: DEBUG\n"), 0644); err != nil {
-		t.Fatalf("Failed to write 20-b.yml: %v", err)
-	}
+	writeFile(t, confDir+"/10-a.yaml", "api:\n  port: 1111\n")
+	writeFile(t, confDir+"/20-b.yml", "logLevel: DEBUG\n")
 
 	if err := mergeConfDir(tmpDir + "/config.yaml"); err != nil {
 		t.Fatalf("mergeConfDir() returned error: %v", err)
@@ -1521,15 +1295,8 @@ func TestMergeConfDir_InvalidYAMLFailsFast(t *testing.T) {
 	viper.SetConfigType("yaml")
 
 	tmpDir := t.TempDir()
-	confDir := tmpDir + "/conf.d"
-	if err := os.Mkdir(confDir, 0755); err != nil {
-		t.Fatalf("Failed to create conf.d: %v", err)
-	}
-
-	badPath := confDir + "/bad.yaml"
-	if err := os.WriteFile(badPath, []byte("api:\n  port: [unclosed\n"), 0644); err != nil {
-		t.Fatalf("Failed to write bad.yaml: %v", err)
-	}
+	badPath := tmpDir + "/conf.d/bad.yaml"
+	writeFile(t, badPath, "api:\n  port: [unclosed\n")
 
 	err := mergeConfDir(tmpDir + "/config.yaml")
 	if err == nil {
@@ -1541,7 +1308,7 @@ func TestMergeConfDir_InvalidYAMLFailsFast(t *testing.T) {
 }
 
 func TestNew_ConfDOverridesMainConfig(t *testing.T) {
-	viper.Reset()
+	isolate(t)
 
 	tmpDir := t.TempDir()
 	mainConfig := tmpDir + "/config.yaml"
@@ -1551,30 +1318,17 @@ api:
   enabled: true
 logLevel: INFO
 `
-	if err := os.WriteFile(mainConfig, []byte(mainContent), 0644); err != nil {
-		t.Fatalf("Failed to write main config: %v", err)
-	}
+	writeFile(t, mainConfig, mainContent)
 
 	confDir := tmpDir + "/conf.d"
-	if err := os.Mkdir(confDir, 0755); err != nil {
-		t.Fatalf("Failed to create conf.d: %v", err)
-	}
 	override := `
 api:
   port: 9999
 logLevel: DEBUG
 `
-	if err := os.WriteFile(confDir+"/10-override.yaml", []byte(override), 0644); err != nil {
-		t.Fatalf("Failed to write 10-override.yaml: %v", err)
-	}
+	writeFile(t, confDir+"/10-override.yaml", override)
 
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
-
-	cfg, err := New(&mainConfig)
-	if err != nil {
-		t.Fatalf("New() returned error: %v", err)
-	}
+	cfg := mustNew(t, &mainConfig)
 
 	if cfg.Api.Port != 9999 {
 		t.Errorf("Api.Port = %d, want 9999 (conf.d override should win)", cfg.Api.Port)
@@ -1594,7 +1348,7 @@ logLevel: DEBUG
 // caught immediately.
 
 func TestNew_ConfDSystemdServicesReplacedNotAppended(t *testing.T) {
-	viper.Reset()
+	isolate(t)
 
 	tmpDir := t.TempDir()
 	mainConfig := tmpDir + "/config.yaml"
@@ -1608,30 +1362,17 @@ systemd:
     - mpd.service
     - pipewire-pulse.service
 `
-	if err := os.WriteFile(mainConfig, []byte(mainContent), 0644); err != nil {
-		t.Fatalf("Failed to write main config: %v", err)
-	}
+	writeFile(t, mainConfig, mainContent)
 
 	confDir := tmpDir + "/conf.d"
-	if err := os.Mkdir(confDir, 0755); err != nil {
-		t.Fatalf("Failed to create conf.d: %v", err)
-	}
 	override := `
 systemd:
   system:
     - shairport-sync.service
 `
-	if err := os.WriteFile(confDir+"/10-override.yaml", []byte(override), 0644); err != nil {
-		t.Fatalf("Failed to write 10-override.yaml: %v", err)
-	}
+	writeFile(t, confDir+"/10-override.yaml", override)
 
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
-
-	cfg, err := New(&mainConfig)
-	if err != nil {
-		t.Fatalf("New() returned error: %v", err)
-	}
+	cfg := mustNew(t, &mainConfig)
 
 	want := []string{"shairport-sync.service"}
 	if len(cfg.Systemd.SystemServices) != len(want) {
@@ -1659,7 +1400,7 @@ systemd:
 }
 
 func TestNew_ConfDSystemdUserServicesReplacedNotAppended(t *testing.T) {
-	viper.Reset()
+	isolate(t)
 
 	tmpDir := t.TempDir()
 	mainConfig := tmpDir + "/config.yaml"
@@ -1673,30 +1414,17 @@ systemd:
     - mpd.service
     - pipewire-pulse.service
 `
-	if err := os.WriteFile(mainConfig, []byte(mainContent), 0644); err != nil {
-		t.Fatalf("Failed to write main config: %v", err)
-	}
+	writeFile(t, mainConfig, mainContent)
 
 	confDir := tmpDir + "/conf.d"
-	if err := os.Mkdir(confDir, 0755); err != nil {
-		t.Fatalf("Failed to create conf.d: %v", err)
-	}
 	override := `
 systemd:
   user:
     - shairport-sync.service
 `
-	if err := os.WriteFile(confDir+"/10-override.yaml", []byte(override), 0644); err != nil {
-		t.Fatalf("Failed to write 10-override.yaml: %v", err)
-	}
+	writeFile(t, confDir+"/10-override.yaml", override)
 
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
-
-	cfg, err := New(&mainConfig)
-	if err != nil {
-		t.Fatalf("New() returned error: %v", err)
-	}
+	cfg := mustNew(t, &mainConfig)
 
 	want := []string{"shairport-sync.service"}
 	if len(cfg.Systemd.UserServices) != len(want) {
@@ -1723,7 +1451,7 @@ systemd:
 }
 
 func TestNew_ConfDSystemdEmptyArrayClearsList(t *testing.T) {
-	viper.Reset()
+	isolate(t)
 
 	tmpDir := t.TempDir()
 	mainConfig := tmpDir + "/config.yaml"
@@ -1734,30 +1462,17 @@ systemd:
     - bluetooth.service
     - upmpdcli.service
 `
-	if err := os.WriteFile(mainConfig, []byte(mainContent), 0644); err != nil {
-		t.Fatalf("Failed to write main config: %v", err)
-	}
+	writeFile(t, mainConfig, mainContent)
 
 	confDir := tmpDir + "/conf.d"
-	if err := os.Mkdir(confDir, 0755); err != nil {
-		t.Fatalf("Failed to create conf.d: %v", err)
-	}
 	// Explicit empty list — admin wants to wipe the inherited list.
 	override := `
 systemd:
   system: []
 `
-	if err := os.WriteFile(confDir+"/99-clear.yaml", []byte(override), 0644); err != nil {
-		t.Fatalf("Failed to write 99-clear.yaml: %v", err)
-	}
+	writeFile(t, confDir+"/99-clear.yaml", override)
 
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
-
-	cfg, err := New(&mainConfig)
-	if err != nil {
-		t.Fatalf("New() returned error: %v", err)
-	}
+	cfg := mustNew(t, &mainConfig)
 
 	if len(cfg.Systemd.SystemServices) != 0 {
 		t.Errorf("SystemServices = %v, want [] (explicit empty list should clear)", cfg.Systemd.SystemServices)
@@ -1765,32 +1480,17 @@ systemd:
 }
 
 func TestNew_ConfDSystemdMultipleSnippetsLastWins(t *testing.T) {
-	viper.Reset()
+	isolate(t)
 
 	tmpDir := t.TempDir()
 	mainConfig := tmpDir + "/config.yaml"
-	if err := os.WriteFile(mainConfig, []byte("systemd:\n  enabled: true\n  system: [a.service]\n"), 0644); err != nil {
-		t.Fatalf("Failed to write main config: %v", err)
-	}
+	writeFile(t, mainConfig, "systemd:\n  enabled: true\n  system: [a.service]\n")
 
 	confDir := tmpDir + "/conf.d"
-	if err := os.Mkdir(confDir, 0755); err != nil {
-		t.Fatalf("Failed to create conf.d: %v", err)
-	}
-	if err := os.WriteFile(confDir+"/10-first.yaml", []byte("systemd:\n  system: [b.service, c.service]\n"), 0644); err != nil {
-		t.Fatalf("Failed to write 10-first.yaml: %v", err)
-	}
-	if err := os.WriteFile(confDir+"/20-second.yaml", []byte("systemd:\n  system: [d.service]\n"), 0644); err != nil {
-		t.Fatalf("Failed to write 20-second.yaml: %v", err)
-	}
+	writeFile(t, confDir+"/10-first.yaml", "systemd:\n  system: [b.service, c.service]\n")
+	writeFile(t, confDir+"/20-second.yaml", "systemd:\n  system: [d.service]\n")
 
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
-
-	cfg, err := New(&mainConfig)
-	if err != nil {
-		t.Fatalf("New() returned error: %v", err)
-	}
+	cfg := mustNew(t, &mainConfig)
 
 	want := []string{"d.service"}
 	if len(cfg.Systemd.SystemServices) != len(want) {
@@ -1805,32 +1505,17 @@ func TestNew_ConfDSystemdMultipleSnippetsLastWins(t *testing.T) {
 }
 
 func TestNew_ConfDAlphabeticalOrderEndToEnd(t *testing.T) {
-	viper.Reset()
+	isolate(t)
 
 	tmpDir := t.TempDir()
 	mainConfig := tmpDir + "/config.yaml"
-	if err := os.WriteFile(mainConfig, []byte("api:\n  port: 8018\n"), 0644); err != nil {
-		t.Fatalf("Failed to write main config: %v", err)
-	}
+	writeFile(t, mainConfig, "api:\n  port: 8018\n")
 
 	confDir := tmpDir + "/conf.d"
-	if err := os.Mkdir(confDir, 0755); err != nil {
-		t.Fatalf("Failed to create conf.d: %v", err)
-	}
-	if err := os.WriteFile(confDir+"/10-base.yaml", []byte("api:\n  port: 1111\n"), 0644); err != nil {
-		t.Fatalf("Failed to write 10-base.yaml: %v", err)
-	}
-	if err := os.WriteFile(confDir+"/99-final.yaml", []byte("api:\n  port: 7777\n"), 0644); err != nil {
-		t.Fatalf("Failed to write 99-final.yaml: %v", err)
-	}
+	writeFile(t, confDir+"/10-base.yaml", "api:\n  port: 1111\n")
+	writeFile(t, confDir+"/99-final.yaml", "api:\n  port: 7777\n")
 
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
-
-	cfg, err := New(&mainConfig)
-	if err != nil {
-		t.Fatalf("New() returned error: %v", err)
-	}
+	cfg := mustNew(t, &mainConfig)
 
 	if cfg.Api.Port != 7777 {
 		t.Errorf("Api.Port = %d, want 7777 (last alphabetical conf.d wins)", cfg.Api.Port)
@@ -1838,15 +1523,9 @@ func TestNew_ConfDAlphabeticalOrderEndToEnd(t *testing.T) {
 }
 
 func TestNew_BluetoothPowerOnStartDisabledByDefault(t *testing.T) {
-	viper.Reset()
+	isolate(t)
 
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
-
-	cfg, err := New(nil)
-	if err != nil {
-		t.Fatalf("New(nil) returned error: %v", err)
-	}
+	cfg := mustNew(t, nil)
 
 	if cfg.Bluetooth == nil {
 		t.Fatal("Bluetooth config should not be nil")
@@ -1857,16 +1536,10 @@ func TestNew_BluetoothPowerOnStartDisabledByDefault(t *testing.T) {
 }
 
 func TestNew_BluetoothPowerOnStartExplicitlyEnabled(t *testing.T) {
-	viper.Reset()
+	isolate(t)
 	viper.Set("bluetooth.poweronstart", true)
 
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("XDG_SESSION_DESKTOP", "test-desktop")
-
-	cfg, err := New(nil)
-	if err != nil {
-		t.Fatalf("New(nil) returned error: %v", err)
-	}
+	cfg := mustNew(t, nil)
 
 	if !cfg.Bluetooth.PowerOnStart {
 		t.Error("Bluetooth.PowerOnStart should be true when explicitly enabled")
