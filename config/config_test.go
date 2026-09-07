@@ -885,7 +885,7 @@ func TestGetZeroconfInterfaces_AllInterfaces(t *testing.T) {
 	// 0.0.0.0 should return all active non-loopback interfaces
 	interfaces := getZeroconfInterfaces([]string{"all"})
 
-	// Should call getAllActiveInterfaces() which filters loopback
+	// Should call getAllActiveNonLoopback() which filters loopback
 	for _, iface := range interfaces {
 		if iface.Flags&net.FlagLoopback != 0 {
 			t.Errorf("getZeroconfInterfaces(all) returned loopback interface: %s", iface.Name)
