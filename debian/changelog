@@ -1,3 +1,21 @@
+odio-api (0.17.0) trixie; urgency=low
+
+  PulseAudio Client Rewrite & Admin Link
+
+  * PulseAudio: backend migrated from the unmaintained the-jonsey/pulseaudio
+    client to jfreymuth/pulse. Subscription events are routed per facility
+    so sink and stream changes refresh only their own cache; client and
+    output caches are lock-free snapshots; volume writes carry one value
+    per channel as the native protocol requires.
+  * Config: new api.ui.admin setting links an admin web app from the
+    dashboard header, accepting the same forms as service URLs.
+  * Systemd: malformed _XX escapes in unit names are kept verbatim instead
+    of decoding to a NUL byte.
+  * UI: muted corked clients stay visible so they can be unmuted (#102).
+
+ -- Mathieu Réquillart <mathieu.requillart@gmail.com>  Tue, 08 Sep 2026 00:00:00 +0000
+
+
 odio-api (0.16.2) trixie; urgency=low
 
   Bluetooth Client Volume Fix
