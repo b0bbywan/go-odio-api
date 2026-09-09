@@ -1,6 +1,8 @@
 package mpris
 
 import (
+	"context"
+	"errors"
 	"strings"
 	"time"
 
@@ -22,46 +24,40 @@ func validateBusName(busName string) error {
 	return nil
 }
 
-// callWithTimeout executes a D-Bus call with timeout
-func callWithTimeout(call *dbus.Call, timeout time.Duration) error {
-	done := make(chan error, 1)
-
-	go func() {
-		done <- call.Err
-	}()
-
-	select {
-	case err := <-done:
-		return err
-	case <-time.After(timeout):
-		return &dbusTimeoutError{}
+// call issues a method call bounded by timeout. The deadline must be on the
+// call itself: obj.Call blocks until a reply, and some players (Kodi) never
+// reply to interfaces they don't implement, which used to freeze the caller
+// until the player left the bus.
+func call(obj dbus.BusObject, timeout time.Duration, method string, args ...interface{}) *dbus.Call {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	c := obj.CallWithContext(ctx, method, 0, args...)
+	if errors.Is(c.Err, context.DeadlineExceeded) {
+		c.Err = &dbusTimeoutError{}
 	}
+	return c
 }
 
-// callWithTimeout receiver method for MPRISBackend
-func (m *MPRISBackend) callWithTimeout(call *dbus.Call) error {
-	return callWithTimeout(call, m.timeout)
+func (m *MPRISBackend) call(obj dbus.BusObject, method string, args ...interface{}) *dbus.Call {
+	return call(obj, m.timeout, method, args...)
 }
 
-// callMethod calls an MPRIS method on a player with timeout
 func (m *MPRISBackend) callMethod(busName, method string, args ...interface{}) error {
 	obj := m.conn.Object(busName, MPRIS_PATH)
-	return m.callWithTimeout(obj.Call(method, 0, args...))
+	return m.call(obj, method, args...).Err
 }
 
-// setProperty sets a property on a player
 func (m *MPRISBackend) setProperty(busName, property string, value interface{}) error {
 	obj := m.conn.Object(busName, MPRIS_PATH)
-	return m.callWithTimeout(obj.Call(DBUS_PROP_SET, 0, MPRIS_PLAYER_IFACE, property, dbus.MakeVariant(value)))
+	return m.call(obj, DBUS_PROP_SET, MPRIS_PLAYER_IFACE, property, dbus.MakeVariant(value)).Err
 }
 
-// getProperty retrieves a property from D-Bus for a given busName
 func (m *MPRISBackend) getProperty(busName, iface, prop string) (dbus.Variant, error) {
 	obj := m.conn.Object(busName, MPRIS_PATH)
 	var v dbus.Variant
-	call := obj.Call(DBUS_PROP_GET, 0, iface, prop)
-	if err := m.callWithTimeout(call); err != nil {
-		return dbus.Variant{}, err
+	call := m.call(obj, DBUS_PROP_GET, iface, prop)
+	if call.Err != nil {
+		return dbus.Variant{}, call.Err
 	}
 	if err := call.Store(&v); err != nil {
 		return dbus.Variant{}, err
@@ -72,9 +68,9 @@ func (m *MPRISBackend) getProperty(busName, iface, prop string) (dbus.Variant, e
 // listDBusNames retrieves the list of all bus names on D-Bus
 func (m *MPRISBackend) listDBusNames() ([]string, error) {
 	var names []string
-	call := m.conn.BusObject().Call(DBUS_LIST_NAMES_METHOD, 0)
-	if err := m.callWithTimeout(call); err != nil {
-		return nil, err
+	call := m.call(m.conn.BusObject(), DBUS_LIST_NAMES_METHOD)
+	if call.Err != nil {
+		return nil, call.Err
 	}
 	if err := call.Store(&names); err != nil {
 		return nil, err
@@ -84,8 +80,7 @@ func (m *MPRISBackend) listDBusNames() ([]string, error) {
 
 // addMatchRule subscribes to a D-Bus signal via a match rule
 func (m *MPRISBackend) addMatchRule(rule string) error {
-	call := m.conn.BusObject().Call(DBUS_ADD_MATCH_METHOD, 0, rule)
-	return m.callWithTimeout(call)
+	return m.call(m.conn.BusObject(), DBUS_ADD_MATCH_METHOD, rule).Err
 }
 
 // addListenMatchRules subscribes to the necessary D-Bus signals for the listener.
@@ -114,9 +109,9 @@ func (m *MPRISBackend) addListenMatchRules() error {
 
 func (m *MPRISBackend) getNameOwner(busName string) (string, error) {
 	var owner string
-	call := m.conn.BusObject().Call(DBUS_GET_NAME_OWNER, 0, busName)
-	if err := m.callWithTimeout(call); err != nil {
-		return "", err
+	call := m.call(m.conn.BusObject(), DBUS_GET_NAME_OWNER, busName)
+	if call.Err != nil {
+		return "", call.Err
 	}
 	if err := call.Store(&owner); err != nil {
 		return "", err
@@ -141,19 +136,17 @@ func extract[T any](v dbus.Variant) (T, bool) {
 	return val, ok
 }
 
-// callWithTimeout receiver method for Player
-func (p *Player) callWithTimeout(call *dbus.Call) error {
-	return callWithTimeout(call, p.timeout)
+func (p *Player) call(method string, args ...interface{}) *dbus.Call {
+	return call(p.conn.Object(p.BusName, MPRIS_PATH), p.timeout, method, args...)
 }
 
 // getAllProperties retrieves all properties of a D-Bus interface in a single call
 func (p *Player) getAllProperties(iface string) (map[string]dbus.Variant, error) {
-	obj := p.conn.Object(p.BusName, MPRIS_PATH)
 	var props map[string]dbus.Variant
 
-	call := obj.Call(DBUS_PROP_GET_ALL, 0, iface)
-	if err := p.callWithTimeout(call); err != nil {
-		return nil, err
+	call := p.call(DBUS_PROP_GET_ALL, iface)
+	if call.Err != nil {
+		return nil, call.Err
 	}
 
 	err := call.Store(&props)
@@ -163,12 +156,11 @@ func (p *Player) getAllProperties(iface string) (map[string]dbus.Variant, error)
 // getTracksMetadata retrieves metadata for the given track IDs in a single call.
 // The spec guarantees results in the same order as the requested IDs.
 func (p *Player) getTracksMetadata(ids []dbus.ObjectPath) ([]map[string]dbus.Variant, error) {
-	obj := p.conn.Object(p.BusName, MPRIS_PATH)
 	var metas []map[string]dbus.Variant
 
-	call := obj.Call(MPRIS_METHOD_GET_TRACKS_METADATA, 0, ids)
-	if err := p.callWithTimeout(call); err != nil {
-		return nil, err
+	call := p.call(MPRIS_METHOD_GET_TRACKS_METADATA, ids)
+	if call.Err != nil {
+		return nil, call.Err
 	}
 
 	err := call.Store(&metas)

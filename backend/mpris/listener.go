@@ -34,7 +34,11 @@ func (l *Listener) Start() error {
 	ch := make(chan *dbus.Signal, 10)
 	conn.Signal(ch)
 
-	go l.listen(ch)
+	l.wg.Add(1)
+	go func() {
+		defer l.wg.Done()
+		l.listen(ch)
+	}()
 
 	logger.Info("[mpris] listener started (D-Bus signal-based)")
 	return nil
@@ -322,9 +326,11 @@ func (l *Listener) handleTrackMetadataChanged(busName string, sig *dbus.Signal) 
 	}
 }
 
-// Stop stops the listener
+// Stop returns once the listen goroutine has exited, so callers know no
+// handler can still touch the backend afterwards.
 func (l *Listener) Stop() {
 	logger.Info("[mpris] stopping listener")
 	l.cancel()
+	l.wg.Wait()
 	logger.Debug("[mpris] listener stopped")
 }
