@@ -1,3 +1,20 @@
+odio-api (0.17.1) trixie; urgency=low
+
+  D-Bus Call Deadlines
+
+  * MPRIS: D-Bus calls now carry a real deadline (mpris.timeout). The old
+    wrapper never timed out, so a player that ignores calls on interfaces
+    it does not implement (Kodi, on the TrackList probe) froze the listener
+    until it left the bus and never showed up in /players.
+  * MPRIS: shutdown waits for the listener and heartbeat goroutines before
+    closing the event channel, fixing a "send on closed channel" panic
+    when a player appeared right before stop.
+  * Login1, Bluetooth: same deadline fix; Device1.Connect keeps the pairing
+    timeout since a first connect bonds the device.
+
+ -- Mathieu Réquillart <mathieu.requillart@gmail.com>  Wed, 09 Sep 2026 00:00:00 +0000
+
+
 odio-api (0.17.0) trixie; urgency=low
 
   PulseAudio Client Rewrite & Admin Link
