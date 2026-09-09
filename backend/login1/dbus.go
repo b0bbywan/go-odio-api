@@ -1,42 +1,34 @@
 package login1
 
 import (
-	"time"
+	"context"
+	"errors"
 
 	"github.com/godbus/dbus/v5"
 )
 
-// callWithTimeout executes a D-Bus call with timeout
-func callWithTimeout(call *dbus.Call, timeout time.Duration) error {
-	done := make(chan error, 1)
-
-	go func() {
-		done <- call.Err
-	}()
-
-	select {
-	case err := <-done:
-		return err
-	case <-time.After(timeout):
-		return &dbusTimeoutError{}
+// call issues a method call bounded by the backend timeout. The deadline has
+// to be on the call itself: obj.Call blocks until a reply, so wrapping it
+// afterwards never times out.
+func (l *Login1Backend) call(obj dbus.BusObject, method string, args ...interface{}) *dbus.Call {
+	ctx, cancel := context.WithTimeout(context.Background(), l.timeout)
+	defer cancel()
+	c := obj.CallWithContext(ctx, method, 0, args...)
+	if errors.Is(c.Err, context.DeadlineExceeded) {
+		c.Err = &dbusTimeoutError{}
 	}
+	return c
 }
 
 func (l *Login1Backend) callMethod(busName, method string, args ...interface{}) error {
-	obj := l.conn.Object(busName, LOGIN1_PATH)
-	return l.callWithTimeout(obj.Call(method, 0, args...))
-}
-
-func (l *Login1Backend) callWithTimeout(call *dbus.Call) error {
-	return callWithTimeout(call, l.timeout)
+	return l.call(l.conn.Object(busName, LOGIN1_PATH), method, args...).Err
 }
 
 // callDBusMethod calls a D-Bus method and returns the call for further processing
 func (l *Login1Backend) callDBusMethod(method string, args ...interface{}) (*dbus.Call, error) {
-	obj := l.conn.Object(LOGIN1_PREFIX, LOGIN1_PATH)
-	call := obj.Call(method, 0, args...)
-	if err := l.callWithTimeout(call); err != nil {
-		return nil, err
+	call := l.call(l.conn.Object(LOGIN1_PREFIX, LOGIN1_PATH), method, args...)
+	if call.Err != nil {
+		return nil, call.Err
 	}
 	return call, nil
 }
