@@ -549,22 +549,24 @@ func (m *MPRISBackend) InvalidateCache() {
 	m.players.Reset()
 }
 
-// Close cleanly closes connections and stops the listener
+// Close fails in-flight D-Bus calls first so the listener and heartbeat can be
+// waited for promptly. The listener goes before the heartbeat because a
+// handler may restart it, and events is closed only once neither can notify().
 func (m *MPRISBackend) Close() {
-	if m.heartbeat != nil {
-		m.heartbeat.Stop()
-		m.heartbeat = nil
+	if m.conn != nil {
+		if err := m.conn.Close(); err != nil {
+			logger.Info("Failed to close D-Bus connection: %v", err)
+		}
 	}
 	if m.listener != nil {
 		m.listener.Stop()
 		m.listener = nil
 	}
-	if m.conn != nil {
-		if err := m.conn.Close(); err != nil {
-			logger.Info("Failed to close D-Bus connection: %v", err)
-		}
-		m.conn = nil
+	if m.heartbeat != nil {
+		m.heartbeat.Stop()
+		m.heartbeat = nil
 	}
+	m.conn = nil
 	close(m.events)
 }
 

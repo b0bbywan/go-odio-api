@@ -18,6 +18,7 @@ type Heartbeat struct {
 
 	mu     sync.Mutex
 	active bool
+	wg     sync.WaitGroup
 }
 
 // NewHeartbeat creates a new heartbeat manager
@@ -42,12 +43,15 @@ func (h *Heartbeat) Start() {
 	}
 
 	h.active = true
+	h.wg.Add(1)
 	go h.run()
 }
 
-// Stop stops the heartbeat
+// Stop returns once the run goroutine has exited; the heartbeat cannot be
+// restarted afterwards.
 func (h *Heartbeat) Stop() {
 	h.cancel()
+	h.wg.Wait()
 }
 
 // IsRunning returns true if the heartbeat is active
@@ -63,6 +67,7 @@ func (h *Heartbeat) run() {
 		h.mu.Lock()
 		h.active = false
 		h.mu.Unlock()
+		h.wg.Done()
 		logger.Debug("[mpris] position heartbeat stopped")
 	}()
 

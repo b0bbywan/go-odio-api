@@ -42,6 +42,7 @@ type Listener struct {
 	backend *MPRISBackend
 	ctx     context.Context
 	cancel  context.CancelFunc
+	wg      sync.WaitGroup
 
 	// Deduplication: last known state per player
 	lastState   map[string]PlaybackStatus
