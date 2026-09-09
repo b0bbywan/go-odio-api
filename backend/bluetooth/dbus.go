@@ -1,6 +1,8 @@
 package bluetooth
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -14,43 +16,37 @@ import (
 
 var macRegex = regexp.MustCompile(`^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$`)
 
-// callWithTimeout executes a D-Bus call with timeout
-func callWithTimeout(call *dbus.Call, timeout time.Duration) error {
-	done := make(chan error, 1)
-
-	go func() {
-		done <- call.Err
-	}()
-
-	select {
-	case err := <-done:
-		return err
-	case <-time.After(timeout):
-		return &dbusTimeoutError{}
+// call issues a method call bounded by timeout. The deadline has to be on the
+// call itself: obj.Call blocks until a reply, so wrapping it afterwards never
+// times out.
+func call(obj dbus.BusObject, timeout time.Duration, method string, args ...interface{}) *dbus.Call {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	c := obj.CallWithContext(ctx, method, 0, args...)
+	if errors.Is(c.Err, context.DeadlineExceeded) {
+		c.Err = &dbusTimeoutError{}
 	}
+	return c
 }
 
-// callWithTimeout receiver method for BluetoothBackend
-func (b *BluetoothBackend) callWithTimeout(call *dbus.Call) error {
-	return callWithTimeout(call, b.timeout)
+func (b *BluetoothBackend) call(obj dbus.BusObject, method string, args ...interface{}) *dbus.Call {
+	return call(obj, b.timeout, method, args...)
 }
 
-// callMethod calls a method on an object with timeout
 func (b *BluetoothBackend) callMethod(obj dbus.BusObject, method string, args ...interface{}) error {
-	return b.callWithTimeout(obj.Call(method, 0, args...))
+	return b.call(obj, method, args...).Err
 }
 
 func (b *BluetoothBackend) setProperty(obj dbus.BusObject, iface, prop string, value interface{}) error {
-	call := obj.Call(DBUS_PROP_SET, 0, iface, prop, dbus.MakeVariant(value))
-	return b.callWithTimeout(call)
+	return b.call(obj, DBUS_PROP_SET, iface, prop, dbus.MakeVariant(value)).Err
 }
 
 // getProperty retrieves a property from D-Bus for a given busName
 func (b *BluetoothBackend) getProperty(obj dbus.BusObject, iface, prop string) (dbus.Variant, error) {
 	var v dbus.Variant
-	call := obj.Call(DBUS_PROP_GET, 0, iface, prop)
-	if err := b.callWithTimeout(call); err != nil {
-		return dbus.Variant{}, err
+	call := b.call(obj, DBUS_PROP_GET, iface, prop)
+	if call.Err != nil {
+		return dbus.Variant{}, call.Err
 	}
 	if err := call.Store(&v); err != nil {
 		return dbus.Variant{}, err
@@ -67,14 +63,7 @@ func (b *BluetoothBackend) adapter() dbus.BusObject {
 }
 
 func (b *BluetoothBackend) setAdapterProp(prop string, value interface{}) error {
-	call := b.adapter().Call(
-		DBUS_PROP_SET,
-		0,
-		BLUETOOTH_ADAPTER,
-		prop,
-		dbus.MakeVariant(value),
-	)
-	return b.callWithTimeout(call)
+	return b.setProperty(b.adapter(), BLUETOOTH_ADAPTER, prop, value)
 }
 
 func extractBool(v dbus.Variant) (bool, bool) {
@@ -255,8 +244,10 @@ func (b *BluetoothBackend) setDiscoveryFilter() error {
 	return nil
 }
 
+// connectDevice gets the pairing deadline: a first connect bonds the device
+// and takes several seconds, well past the generic call timeout.
 func (b *BluetoothBackend) connectDevice(path dbus.ObjectPath) error {
-	return b.callMethod(b.getObj(BLUETOOTH_PREFIX, string(path)), DEVICE_CONNECT)
+	return call(b.getObj(BLUETOOTH_PREFIX, string(path)), b.pairingTimeout, DEVICE_CONNECT).Err
 }
 
 func (b *BluetoothBackend) disconnectDevice(path dbus.ObjectPath) error {
@@ -356,7 +347,7 @@ func (b *BluetoothBackend) SetTimeOut(prop string) error {
 func (b *BluetoothBackend) getManagedObjects() (map[dbus.ObjectPath]map[string]map[string]dbus.Variant, error) {
 	objManager := b.getObj(BLUETOOTH_PREFIX, "/")
 	var managedObjects map[dbus.ObjectPath]map[string]map[string]dbus.Variant
-	if err := objManager.Call(MANAGED_OBJECTS, 0).Store(&managedObjects); err != nil {
+	if err := b.call(objManager, MANAGED_OBJECTS).Store(&managedObjects); err != nil {
 		logger.Warn("[bluetooth] failed to query BlueZ managed objects: %v", err)
 		return nil, err
 	}
