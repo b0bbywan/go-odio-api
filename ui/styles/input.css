@@ -2,6 +2,24 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Preflight resets buttons through a selector list that contains :where(),
+ * understood by chromium 88 and up. Older engines drop the whole rule, the
+ * leading bare `button` selector included, and fall back to native button
+ * chrome: a white box that swallows the icon drawn inside it in currentColor.
+ * QtWebEngine 5.15 ships chromium 87, so restate the reset without :where().
+ */
+@layer base {
+	button,
+	[type='button'],
+	[type='reset'],
+	[type='submit'] {
+		-webkit-appearance: button;
+		background-color: transparent;
+		background-image: none;
+	}
+}
+
 /* Remove native <details> disclosure marker */
 details > summary {
 	list-style: none;
