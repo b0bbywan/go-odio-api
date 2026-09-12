@@ -230,14 +230,21 @@ button.htmx-request {
 		@apply rotate-180;
 	}
 
+	/* Container queries land in chromium 105 and the framebuffer browser runs
+	   87, where the cqw declaration is dropped and the cap with it: the art
+	   stretches and the tracklist grows instead of scrolling, which swamps a
+	   480px tall pi screen. The vh fallback has to stay the same on both so
+	   the card keeps its height when toggling between the two views. */
 	.player-art {
 		@apply mx-auto w-full max-w-[75%] rounded-md mb-2 cursor-zoom-in;
+		max-height: 50vh;
 		max-height: 75cqw;
 	}
 
 	/* Tracklist view — capped to the cover's footprint, scrolls inside */
 	.tracklist {
 		@apply mb-3 overflow-y-auto rounded-md px-2;
+		max-height: 50vh;
 		max-height: 75cqw;
 	}
 
