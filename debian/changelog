@@ -1,3 +1,19 @@
+odio-api (0.17.2) trixie; urgency=low
+
+  Framebuffer Browser UI Fixes
+
+  * UI: the button reset is restated without :where() (chromium 88), which
+    invalidated the whole rule on the QtWebEngine 5.15 browser the pi
+    setups run: every button fell back to native chrome, a white box
+    swallowing the icon drawn in currentColor.
+  * UI: the cover art and tracklist cap carries a vh fallback ahead of the
+    cqw value (container queries, chromium 105), so the art keeps its
+    aspect and the tracklist scrolls inside its card instead of pushing
+    the page off the 480px tall screens.
+
+ -- Mathieu Réquillart <mathieu.requillart@gmail.com>  Sat, 12 Sep 2026 00:00:00 +0000
+
+
 odio-api (0.17.1) trixie; urgency=low
 
   D-Bus Call Deadlines
