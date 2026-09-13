@@ -1,3 +1,18 @@
+odio-api (0.17.3) trixie; urgency=low
+
+  Systemd User Unit Tracking
+
+  * Systemd: user units caught mid-transition when odio-api starts are now
+    followed until they settle. fsnotify only reports invocation links, so
+    a unit still activating at startup (odio-screen waiting for odio-api to
+    serve its UI) stayed listed as not running.
+  * Systemd: a restart no longer leaves a user unit shown as inactive. Its
+    start event landed while the stop was still being watched and was
+    dropped; the watcher now reads the state again before settling.
+
+ -- Mathieu Réquillart <mathieu.requillart@gmail.com>  Sun, 13 Sep 2026 00:00:00 +0000
+
+
 odio-api (0.17.2) trixie; urgency=low
 
   Framebuffer Browser UI Fixes
