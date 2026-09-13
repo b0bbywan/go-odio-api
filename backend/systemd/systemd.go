@@ -72,7 +72,8 @@ func (s *SystemdBackend) Start() error {
 	logger.Debug("[systemd] starting backend (utmp=%v)", s.config.SupportsUTMP)
 
 	// Load the cache at startup
-	if _, err := s.ListServices(); err != nil {
+	services, err := s.ListServices()
+	if err != nil {
 		return err
 	}
 
@@ -81,6 +82,7 @@ func (s *SystemdBackend) Start() error {
 	if err := s.listener.Start(); err != nil {
 		return err
 	}
+	s.listener.trackTransitional(services)
 
 	logger.Info("[systemd] backend started successfully")
 	return nil

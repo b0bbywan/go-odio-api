@@ -105,16 +105,53 @@ func (l *Listener) dispatchFSNotify(event fsnotify.Event) {
 		return
 	}
 
-	if _, loaded := l.watcherMap.LoadOrStore(serviceName, true); !loaded {
-		go l.waitForStableState(serviceName)
+	l.track(serviceName)
+}
+
+// track starts a watcher for service, or marks the running one: an event it
+// has not seen may postdate the state it is about to settle on (a restart).
+func (l *Listener) track(service string) {
+	l.watchMu.Lock()
+	defer l.watchMu.Unlock()
+	if l.watching == nil {
+		l.watching = make(map[string]bool)
 	}
+	if _, running := l.watching[service]; running {
+		l.watching[service] = true
+		return
+	}
+	l.watching[service] = false
+	go l.waitForStableState(service)
+}
+
+// settle ends the watch on service, unless an event came in meanwhile: then it
+// clears the mark and reports false, and the watcher reads the state again.
+func (l *Listener) settle(service string) bool {
+	l.watchMu.Lock()
+	defer l.watchMu.Unlock()
+	if l.watching[service] {
+		l.watching[service] = false
+		return false
+	}
+	delete(l.watching, service)
+	return true
+}
+
+func (l *Listener) untrack(service string) {
+	l.watchMu.Lock()
+	defer l.watchMu.Unlock()
+	delete(l.watching, service)
 }
 
 func (l *Listener) waitForStableState(service string) {
 	timeout := l.backend.config.Timeout
 	ctx, cancel := context.WithTimeout(l.backend.ctx, timeout)
+	settled := false
 	defer func() {
-		l.watcherMap.Delete(service)
+		// Once settled the entry may already belong to a newer watcher.
+		if !settled {
+			l.untrack(service)
+		}
 		if ctx.Err() == context.DeadlineExceeded {
 			logger.Warn("[systemd] %s failed to start in less than %s, cache might be out of sync", service, timeout)
 			refreshCtx, refreshCancel := context.WithTimeout(l.backend.ctx, 5*time.Second)
@@ -146,8 +183,13 @@ func (l *Listener) waitForStableState(service string) {
 				timer.Reset(waitTime)
 				continue
 			}
-			switch unit.ActiveState {
-			case "active", "inactive", "failed":
+			if isStableState(unit.ActiveState) {
+				if !l.settle(service) {
+					logger.Debug("[systemd] %s/%s changed while settling on %s, reading again", ScopeUser, service, unit.ActiveState)
+					timer.Reset(0)
+					continue
+				}
+				settled = true
 				logger.Debug("[systemd] %s/%s reached stable state: %s", ScopeUser, service, unit.ActiveState)
 				l.backend.notifyService(*unit)
 				return
@@ -161,4 +203,34 @@ func (l *Listener) waitForStableState(service string) {
 			}
 		}
 	}
+}
+
+func isStableState(state string) bool {
+	switch state {
+	case "active", "inactive", "failed":
+		return true
+	}
+	return false
+}
+
+// trackTransitional follows the watched user units the startup snapshot caught
+// mid-transition: their invocation link predates the watcher, so no event comes.
+func (l *Listener) trackTransitional(services []Service) {
+	if l.supportsUTMP {
+		return // D-Bus signals report the end of the transition
+	}
+	for _, name := range transitionalUnits(services, l.userWatched) {
+		l.track(name)
+	}
+}
+
+// transitionalUnits lists the watched user units not yet in a stable state.
+func transitionalUnits(services []Service, watched map[string]bool) []string {
+	var names []string
+	for _, svc := range services {
+		if svc.Scope == ScopeUser && watched[svc.Name] && !isStableState(svc.ActiveState) {
+			names = append(names, svc.Name)
+		}
+	}
+	return names
 }
