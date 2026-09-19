@@ -53,15 +53,16 @@ type SystemdBackend struct {
 }
 
 type Service struct {
-	Name        string    `json:"name"`
-	Scope       UnitScope `json:"scope"`
-	ActiveState string    `json:"active_state,omitempty"`
-	Running     bool      `json:"running"`
-	Enabled     bool      `json:"enabled"`
-	Exists      bool      `json:"exists"`
-	Description string    `json:"description,omitempty"`
-	URL         string    `json:"url,omitempty"`
-	Internal    bool      `json:"-"` // triggerable but hidden from listings/events
+	Name        string          `json:"name"`
+	Scope       UnitScope       `json:"scope"`
+	ActiveState string          `json:"active_state,omitempty"`
+	Running     bool            `json:"running"`
+	Enabled     bool            `json:"enabled"`
+	Exists      bool            `json:"exists"`
+	Description string          `json:"description,omitempty"`
+	URL         string          `json:"url,omitempty"`
+	Open        config.OpenMode `json:"open,omitempty"`
+	Internal    bool            `json:"-"` // triggerable but hidden from listings/events
 }
 
 type unitActionFunc func(ctx context.Context, conn *dbus.Conn, name string) error
