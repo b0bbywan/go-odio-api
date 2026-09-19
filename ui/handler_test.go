@@ -807,6 +807,7 @@ func TestDashboardTemplate_AdminLink(t *testing.T) {
 	tests := []struct {
 		name    string
 		admin   string
+		proxied bool
 		wantSub string
 		denySub string
 	}{
@@ -814,6 +815,13 @@ func TestDashboardTemplate_AdminLink(t *testing.T) {
 			name:    "admin set renders link",
 			admin:   ":8021",
 			wantSub: `onclick="openServiceUrl(':8021'); return false;"`,
+		},
+		{
+			name:    "proxied admin renders a same-tab link",
+			admin:   "/ui/admin/",
+			proxied: true,
+			wantSub: `href="/ui/admin/"`,
+			denySub: "openServiceUrl",
 		},
 		{
 			name:    "admin unset renders no link",
@@ -824,7 +832,7 @@ func TestDashboardTemplate_AdminLink(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var buf bytes.Buffer
-			view := DashboardView{Title: "Odio", ServerInfo: &ServerInfo{}, Admin: tt.admin}
+			view := DashboardView{Title: "Odio", ServerInfo: &ServerInfo{}, Admin: tt.admin, AdminProxied: tt.proxied}
 			if err := tmpl.ExecuteTemplate(&buf, "dashboard", view); err != nil {
 				t.Fatalf("ExecuteTemplate: %v", err)
 			}
