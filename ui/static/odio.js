@@ -86,7 +86,10 @@ function closeArtZoom() {
 }
 
 document.addEventListener('keydown', e => {
-	if (e.key === 'Escape') closeArtZoom();
+	if (e.key === 'Escape') {
+		closeArtZoom();
+		closeServicePanel();
+	}
 });
 
 // ── Tracklist view ──────────────────────────────────────────────────────────
@@ -273,19 +276,54 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 document.addEventListener('htmx:afterSwap', updateCountdowns);
 
-// Open a service URL declared in the systemd config. Accepts ":port" /
-// "/path" / "//host/..." / full URLs and resolves the missing parts against
-// the page's current location so the link works from any host the dashboard
-// is reachable from.
+// Resolve a service URL declared in the systemd config. Accepts ":port" /
+// "/path" / "//host/..." / full URLs and fills the missing parts from the
+// page's current location so the link works from any host the dashboard is
+// reachable from.
+function resolveServiceUrl(u) {
+	if (u.startsWith(':')) {
+		return window.location.protocol + '//' + window.location.hostname + u;
+	} else if (u.startsWith('/') && !u.startsWith('//')) {
+		return window.location.protocol + '//' + window.location.host + u;
+	} else if (u.startsWith('//')) {
+		return window.location.protocol + u;
+	}
+	return u;
+}
+
 function openServiceUrl(u) {
 	if (!u) return;
-	if (u.startsWith(':')) {
-		u = window.location.protocol + '//' + window.location.hostname + u;
-	} else if (u.startsWith('/') && !u.startsWith('//')) {
-		u = window.location.protocol + '//' + window.location.host + u;
-	} else if (u.startsWith('//')) {
-		u = window.location.protocol + u;
-	}
+	window.open(resolveServiceUrl(u), '_blank', 'noopener,noreferrer');
+}
+
+// ── Service panel ───────────────────────────────────────────────────────────
+
+function openServicePanel(u, title) {
+	const panel = document.getElementById('service-panel');
+	if (!panel || !u) return;
+	panel.dataset.url = resolveServiceUrl(u);
+	panel.querySelector('.service-panel-title').textContent = title;
+	const frame = panel.querySelector('iframe');
+	frame.title = title;
+	frame.src = panel.dataset.url;
+	panel.classList.remove('hidden');
+	document.body.classList.add('panel-open');
+}
+
+function closeServicePanel() {
+	const panel = document.getElementById('service-panel');
+	if (!panel || panel.classList.contains('hidden')) return;
+	panel.classList.add('hidden');
+	document.body.classList.remove('panel-open');
+	// Unloading drops the app's connections, and any playback it started.
+	panel.querySelector('iframe').src = 'about:blank';
+}
+
+function openServicePanelInTab() {
+	const panel = document.getElementById('service-panel');
+	if (!panel) return;
+	const u = panel.dataset.url;
+	closeServicePanel();
 	window.open(u, '_blank', 'noopener,noreferrer');
 }
 

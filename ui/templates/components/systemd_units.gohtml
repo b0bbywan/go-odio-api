@@ -3,7 +3,12 @@
 	<!-- Service info -->
 	<div class="content-area">
 		<div class="player-name mb-1">
-			{{ if .URL }}
+			{{ if .Panel }}
+			<a href="#"
+			   onclick="openServicePanel('{{ .URL }}', '{{ if .Description }}{{ .Description }}{{ else }}{{ .Name }}{{ end }}'); return false;"
+			   title="{{ .URL }}"
+			   class="hover:underline">{{ if .Description }}{{ .Description }}{{ else }}{{ .Name }}{{ end }} <span class="inline-flex align-middle opacity-60 [&_svg]:h-3.5 [&_svg]:w-3.5"><span class="hidden sm:inline">{{ template "icon-panel-right" }}</span><span class="sm:hidden">{{ template "icon-panel-bottom" }}</span></span></a>
+			{{ else if .URL }}
 			<a href="#"
 			   onclick="openServiceUrl('{{ .URL }}'); return false;"
 			   title="{{ .URL }}"

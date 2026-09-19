@@ -179,6 +179,7 @@ type Service struct {
 	SubState    string `json:"sub_state"`
 	Scope       string `json:"scope"` // "system" or "user"
 	URL         string `json:"url,omitempty"`
+	Panel       bool   `json:"panel,omitempty"`
 }
 
 // BluetoothDevice represents a Bluetooth device from /bluetooth
@@ -281,6 +282,7 @@ type ServiceView struct {
 	State       string
 	IsUser      bool   // true if scope is "user", false if "system"
 	URL         string // optional, may be ":port" / "/path" / full URL — resolved client-side
+	Panel       bool   // URL opens in the dashboard's panel, not a new tab
 }
 
 // BluetoothView is the view model for the bluetooth section

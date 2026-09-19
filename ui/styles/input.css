@@ -279,6 +279,41 @@ button.htmx-request {
 		@apply max-h-full max-w-full rounded-lg shadow-2xl;
 	}
 
+	.service-panel {
+		@apply fixed inset-0 z-50;
+	}
+
+	.service-panel-scrim {
+		@apply absolute inset-0 bg-zinc-950/60 backdrop-blur-sm;
+	}
+
+	/* Side drawer; a bottom sheet on phones. The app scrolls inside its frame. */
+	.service-panel-sheet {
+		@apply absolute inset-y-0 right-0 flex w-full max-w-[400px] flex-col border-l border-zinc-800 bg-zinc-900 shadow-2xl;
+		overscroll-behavior: contain;
+	}
+
+	@media (max-width: 639px) {
+		.service-panel-sheet {
+			@apply top-auto max-w-none rounded-t-xl border-l-0 border-t;
+			height: 88vh;
+		}
+	}
+
+	.service-panel-header {
+		@apply flex items-center justify-between gap-2 border-b border-zinc-800 px-4 py-2 text-sm font-semibold text-zinc-200;
+	}
+
+	/* A framed app on its "system" theme follows this into dark mode. */
+	.service-panel iframe {
+		@apply w-full flex-1 border-0;
+		color-scheme: dark;
+	}
+
+	body.panel-open {
+		overflow: hidden;
+	}
+
 	.btn {
 		@apply rounded-lg bg-zinc-700/50 px-3 py-2 text-sm transition-colors hover:bg-zinc-700 active:scale-95;
 	}
