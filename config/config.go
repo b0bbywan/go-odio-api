@@ -81,9 +81,20 @@ type PulseAudioConfig struct {
 	ServeCookie   bool
 }
 
+// OpenMode is where the dashboard opens a service's URL: `open: tab | panel |
+// self` in config, tab being the default and stored empty.
+type OpenMode string
+
+const (
+	OpenTab   OpenMode = ""
+	OpenPanel OpenMode = "panel"
+	OpenSelf  OpenMode = "self"
+)
+
 type SystemdService struct {
 	Name string
 	URL  string
+	Open OpenMode
 	// Internal units are triggerable but hidden from the /services listing and
 	// service.updated events. Set programmatically (e.g. by the upgrade
 	// backend), never from user config.

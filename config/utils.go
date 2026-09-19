@@ -42,10 +42,11 @@ func getDuration(key string, fallback time.Duration) time.Duration {
 // parseSystemdServices accepts viper's raw value for a service list and
 // supports two YAML shapes interchangeably within the same list:
 //   - bare string  →  SystemdService{Name: s}
-//   - object       →  SystemdService{Name: name, URL: url}
+//   - object       →  SystemdService{Name: name, URL: url, Open: open}
 //
 // A mapstructure DecodeHook routes both shapes to SystemdService in one pass;
-// the post-decode loop enforces the non-empty Name invariant the hook can't.
+// the post-decode loop enforces what the hook can't: a non-empty Name, and a
+// known Open mode, and only where there is a URL to open.
 func parseSystemdServices(raw any) ([]SystemdService, error) {
 	if raw == nil {
 		return nil, nil
@@ -65,6 +66,18 @@ func parseSystemdServices(raw any) ([]SystemdService, error) {
 	for i, s := range services {
 		if s.Name == "" {
 			return nil, fmt.Errorf("entry %d: missing or empty 'name' field", i)
+		}
+		switch s.Open {
+		case OpenTab, OpenPanel, OpenSelf:
+		case "tab":
+			services[i].Open = OpenTab
+		default:
+			logger.Warn("[config] %s: unknown 'open' %q, opening in a new tab", s.Name, s.Open)
+			services[i].Open = OpenTab
+		}
+		if services[i].Open != OpenTab && s.URL == "" {
+			logger.Warn("[config] %s: 'open' without 'url', ignored", s.Name)
+			services[i].Open = OpenTab
 		}
 	}
 	return services, nil
