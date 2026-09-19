@@ -48,11 +48,11 @@ func isCleanPath(p string) bool {
 
 // adminLink prefers the proxy while the socket exists; with systemd socket
 // activation it does before the app itself is started.
-func (h *Handler) adminLink() string {
+func (h *Handler) adminLink() (link string, proxied bool) {
 	if h.adminSocket != "" {
 		if _, err := os.Stat(h.adminSocket); err == nil {
-			return adminPrefix + "/"
+			return adminPrefix + "/", true
 		}
 	}
-	return h.admin
+	return h.admin, false
 }

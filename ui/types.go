@@ -217,14 +217,15 @@ type BluetoothStatus struct {
 
 // DashboardView is the main view model for the dashboard page
 type DashboardView struct {
-	Title      string
-	ServerInfo *ServerInfo
-	Players    []PlayerView
-	AudioData  *AudioData
-	Services   []ServiceView
-	Bluetooth  *BluetoothView
-	Upgrade    *UpgradeStatus
-	Admin      string
+	Title        string
+	ServerInfo   *ServerInfo
+	Players      []PlayerView
+	AudioData    *AudioData
+	Services     []ServiceView
+	Bluetooth    *BluetoothView
+	Upgrade      *UpgradeStatus
+	Admin        string
+	AdminProxied bool
 }
 
 // PlayerView is a view-optimized version of Player for templates
