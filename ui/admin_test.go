@@ -275,22 +275,23 @@ func TestAdminLink(t *testing.T) {
 	socket := adminSocket(t, http.NotFoundHandler())
 
 	tests := []struct {
-		name   string
-		admin  string
-		socket string
-		want   string
+		name    string
+		admin   string
+		socket  string
+		want    string
+		proxied bool
 	}{
-		{"nothing configured", "", "", ""},
-		{"port link only", ":8021", "", ":8021"},
-		{"socket present wins", ":8021", socket, "/ui/admin/"},
-		{"socket missing falls back", ":8021", socket + ".missing", ":8021"},
-		{"socket missing, no fallback", "", socket + ".missing", ""},
+		{"nothing configured", "", "", "", false},
+		{"port link only", ":8021", "", ":8021", false},
+		{"socket present wins", ":8021", socket, "/ui/admin/", true},
+		{"socket missing falls back", ":8021", socket + ".missing", ":8021", false},
+		{"socket missing, no fallback", "", socket + ".missing", "", false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			h := &Handler{admin: tt.admin, adminSocket: tt.socket}
-			if got := h.adminLink(); got != tt.want {
-				t.Errorf("adminLink() = %q, want %q", got, tt.want)
+			if got, proxied := h.adminLink(); got != tt.want || proxied != tt.proxied {
+				t.Errorf("adminLink() = %q, %v, want %q, %v", got, proxied, tt.want, tt.proxied)
 			}
 		})
 	}
