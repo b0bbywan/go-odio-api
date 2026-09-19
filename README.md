@@ -319,6 +319,7 @@ api:
   ui:
     enabled: true
     # admin: ":8021"  # optional link to an admin web app, same forms as service urls
+    # adminSocket: /run/user/1000/odioctl-web.sock  # admin app on a Unix socket, proxied at /ui/admin/ (sends X-Forwarded-Prefix, e.g. odioctl >= 0.4.0); the link uses it while the socket exists, `admin` otherwise
   sse:
     enabled: true
   cors:

@@ -37,8 +37,9 @@ type Config struct {
 }
 
 type UIConfig struct {
-	Enabled bool
-	Admin   string
+	Enabled     bool
+	Admin       string
+	AdminSocket string // admin app's Unix socket, proxied at /ui/admin/
 }
 
 type SSEConfig struct {
@@ -275,8 +276,9 @@ func New(cfgFile *string) (*Config, error) {
 	}
 
 	uiCfg := UIConfig{
-		Enabled: viper.GetBool("api.ui.enabled"),
-		Admin:   viper.GetString("api.ui.admin"),
+		Enabled:     viper.GetBool("api.ui.enabled"),
+		Admin:       viper.GetString("api.ui.admin"),
+		AdminSocket: viper.GetString("api.ui.adminSocket"),
 	}
 
 	if uiCfg.Enabled && !hasLoopback(listens, portStr) {

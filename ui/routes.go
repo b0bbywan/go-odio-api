@@ -26,6 +26,10 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/ui/sections/bluetooth", h.BluetoothSection)
 	mux.HandleFunc("/ui/sections/upgrade", h.UpgradeSection)
 
+	if h.adminSocket != "" {
+		mux.Handle(adminPrefix+"/", adminProxy(h.adminSocket))
+	}
+
 	// Static assets with ETag support (embed.FS has no useful Last-Modified)
 	mux.Handle("/ui/static/", etagHandler(http.StripPrefix("/ui/", http.FileServer(http.FS(staticFS)))))
 }

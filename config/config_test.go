@@ -137,6 +137,20 @@ func TestNew_UIAdmin(t *testing.T) {
 	}
 }
 
+func TestNew_UIAdminSocket(t *testing.T) {
+	viper.Reset()
+	viper.Set("api.ui.adminSocket", "/run/user/1000/odioctl-web.sock")
+	t.Setenv("HOME", t.TempDir())
+
+	cfg, err := New(nil)
+	if err != nil {
+		t.Fatalf("New(nil) returned error: %v", err)
+	}
+	if cfg.Api.UI.AdminSocket != "/run/user/1000/odioctl-web.sock" {
+		t.Errorf("Api.UI.AdminSocket = %q", cfg.Api.UI.AdminSocket)
+	}
+}
+
 func TestNew_UIEnabledByDefault(t *testing.T) {
 	isolate(t)
 
