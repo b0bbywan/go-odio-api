@@ -782,6 +782,56 @@ func TestSystemdUnitTemplate_URLLink(t *testing.T) {
 			view:    ServiceView{Name: "mpd.service", Description: "MPD", Active: true},
 			denySub: "openServiceUrl",
 		},
+		{
+			name:    "panel opens the panel",
+			view:    ServiceView{Name: "snapclient.service", Description: "Snapcast client", URL: ":1780", Open: "panel"},
+			wantSub: `onclick="openServicePanel(':1780', 'Snapcast client'); return false;"`,
+		},
+		{
+			name:    "panel titled by name without description",
+			view:    ServiceView{Name: "snapclient.service", URL: ":1780", Open: "panel"},
+			wantSub: `openServicePanel(':1780', 'snapclient.service')`,
+		},
+		{
+			name:    "panel has no new-tab link",
+			view:    ServiceView{Name: "snapclient.service", Description: "Snapcast client", URL: ":1780", Open: "panel"},
+			denySub: "openServiceUrl",
+		},
+		{
+			name:    "panel shows a side-panel icon from sm up",
+			view:    ServiceView{Name: "snapclient.service", Description: "Snapcast client", URL: ":1780", Open: "panel"},
+			wantSub: `<span class="hidden sm:inline"><svg`,
+		},
+		{
+			name:    "panel shows a bottom-sheet icon on phones",
+			view:    ServiceView{Name: "snapclient.service", Description: "Snapcast client", URL: ":1780", Open: "panel"},
+			wantSub: `<span class="sm:hidden"><svg`,
+		},
+		{
+			name:    "new-tab link has no panel icon",
+			view:    ServiceView{Name: "mympd.service", Description: "myMPD", URL: ":8080"},
+			denySub: "sm:hidden",
+		},
+		{
+			name:    "self opens in this tab",
+			view:    ServiceView{Name: "mympd.service", Description: "myMPD", URL: ":8080", Open: "self"},
+			wantSub: `onclick="openServiceHere(':8080'); return false;"`,
+		},
+		{
+			name:    "self has no new-tab link",
+			view:    ServiceView{Name: "mympd.service", Description: "myMPD", URL: ":8080", Open: "self"},
+			denySub: "openServiceUrl",
+		},
+		{
+			name:    "self has no external-link arrow",
+			view:    ServiceView{Name: "mympd.service", Description: "myMPD", URL: ":8080", Open: "self"},
+			denySub: "↗",
+		},
+		{
+			name:    "panel has no external-link arrow",
+			view:    ServiceView{Name: "snapclient.service", Description: "Snapcast client", URL: ":1780", Open: "panel"},
+			denySub: "↗",
+		},
 	}
 
 	for _, tt := range tests {
@@ -847,6 +897,30 @@ func TestDashboardTemplate_AdminLink(t *testing.T) {
 	}
 }
 
+// The panel lives outside the SSE-swapped sections: a service update re-renders
+// section-systemd, and an iframe inside it would reload on every one.
+func TestServicePanelOutsideSSESections(t *testing.T) {
+	tmpl := LoadTemplates()
+	services := []ServiceView{{Name: "snapclient.service", URL: ":1780", Open: "panel"}}
+
+	var page bytes.Buffer
+	view := DashboardView{Title: "Odio", ServerInfo: &ServerInfo{}, Services: services}
+	if err := tmpl.ExecuteTemplate(&page, "dashboard", view); err != nil {
+		t.Fatalf("ExecuteTemplate dashboard: %v", err)
+	}
+	if n := strings.Count(page.String(), `id="service-panel"`); n != 1 {
+		t.Errorf("dashboard has %d service panels, want 1", n)
+	}
+
+	var section bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&section, "section-systemd", services); err != nil {
+		t.Fatalf("ExecuteTemplate section-systemd: %v", err)
+	}
+	if strings.Contains(section.String(), "service-panel") {
+		t.Error("section-systemd renders the panel, an SSE update would reload its iframe")
+	}
+}
+
 // TestConvertServices verifies service conversion logic
 func TestConvertServices(t *testing.T) {
 	tests := []struct {
@@ -899,6 +973,15 @@ func TestConvertServices(t *testing.T) {
 					IsUser:      true,
 					URL:         ":8080",
 				},
+			},
+		},
+		{
+			name: "service opened in the panel",
+			input: []Service{
+				{Name: "snapclient.service", Scope: "user", URL: ":1780", Open: "panel"},
+			},
+			expected: []ServiceView{
+				{Name: "snapclient.service", IsUser: true, URL: ":1780", Open: "panel"},
 			},
 		},
 		{

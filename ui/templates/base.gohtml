@@ -138,6 +138,25 @@
 		<img alt="cover">
 	</div>
 
+	<!-- A service's app over the page, one at a time, unloaded on close -->
+	<div id="service-panel" class="service-panel hidden">
+		<div class="service-panel-scrim" onclick="closeServicePanel()"></div>
+		<aside class="service-panel-sheet">
+			<header class="service-panel-header">
+				<span class="service-panel-title truncate"></span>
+				<div class="flex shrink-0 items-center gap-3">
+					<button type="button" class="hover:scale-110 transition-transform"
+					        onclick="openServicePanelInTab()"
+					        title="Open in a new tab">↗</button>
+					<button type="button" class="hover:scale-110 transition-transform"
+					        onclick="closeServicePanel()"
+					        title="Close">{{ template "icon-x" }}</button>
+				</div>
+			</header>
+			<iframe allow="autoplay; fullscreen"></iframe>
+		</aside>
+	</div>
+
 	<script src="/ui/static/odio.js"></script>
 </body>
 </html>
