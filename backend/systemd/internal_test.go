@@ -1,6 +1,8 @@
 package systemd
 
 import (
+	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/b0bbywan/go-odio-api/cache"
@@ -91,6 +93,60 @@ func TestPublicServicesFiltersInternal(t *testing.T) {
 	for _, svc := range public {
 		if svc.Internal {
 			t.Errorf("PublicServices leaked internal unit %q", svc.Name)
+		}
+	}
+}
+
+func TestConfigured(t *testing.T) {
+	backend := &SystemdBackend{
+		config: &config.SystemdConfig{
+			SystemServices: []config.SystemdService{{Name: "sys.service", URL: ":9000"}},
+			UserServices: []config.SystemdService{
+				{Name: "snapclient.service", URL: ":1780", Panel: true},
+				{Name: "mympd.service", URL: ":8080"},
+			},
+		},
+	}
+
+	cases := []struct {
+		name  string
+		unit  string
+		scope UnitScope
+		want  config.SystemdService
+	}{
+		{"panel service", "snapclient.service", ScopeUser, config.SystemdService{Name: "snapclient.service", URL: ":1780", Panel: true}},
+		{"link service", "mympd.service", ScopeUser, config.SystemdService{Name: "mympd.service", URL: ":8080"}},
+		{"system scope", "sys.service", ScopeSystem, config.SystemdService{Name: "sys.service", URL: ":9000"}},
+		{"wrong scope", "snapclient.service", ScopeSystem, config.SystemdService{}},
+		{"unknown unit", "nope.service", ScopeUser, config.SystemdService{}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := backend.configured(tc.unit, tc.scope); got != tc.want {
+				t.Errorf("configured(%q, %q) = %+v, want %+v", tc.unit, tc.scope, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestServiceJSONPanel(t *testing.T) {
+	cases := []struct {
+		svc  Service
+		want string
+	}{
+		{Service{Name: "snapclient.service", URL: ":1780", Panel: true}, `"panel":true`},
+		{Service{Name: "mympd.service", URL: ":8080"}, ""},
+	}
+	for _, tc := range cases {
+		b, err := json.Marshal(tc.svc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if tc.want != "" && !strings.Contains(string(b), tc.want) {
+			t.Errorf("%s: %s lacks %s", tc.svc.Name, b, tc.want)
+		}
+		if tc.want == "" && strings.Contains(string(b), "panel") {
+			t.Errorf("%s: %s should omit panel", tc.svc.Name, b)
 		}
 	}
 }

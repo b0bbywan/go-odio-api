@@ -1032,6 +1032,34 @@ func TestParseSystemdServices_ObjectWithoutURL(t *testing.T) {
 	}
 }
 
+func TestParseSystemdServices_Panel(t *testing.T) {
+	tests := []struct {
+		name  string
+		entry any
+		want  SystemdService
+	}{
+		{"panel with url", map[string]any{"name": "snapclient.service", "url": ":1780", "panel": true},
+			SystemdService{Name: "snapclient.service", URL: ":1780", Panel: true}},
+		{"panel off", map[string]any{"name": "snapclient.service", "url": ":1780", "panel": false},
+			SystemdService{Name: "snapclient.service", URL: ":1780"}},
+		{"panel without url is dropped", map[string]any{"name": "snapclient.service", "panel": true},
+			SystemdService{Name: "snapclient.service"}},
+		{"bare string", "snapclient.service",
+			SystemdService{Name: "snapclient.service"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parseSystemdServices([]any{tt.entry})
+			if err != nil {
+				t.Fatalf("parseSystemdServices() error: %v", err)
+			}
+			if len(got) != 1 || got[0] != tt.want {
+				t.Errorf("got %+v, want [%+v]", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestParseSystemdServices_EmptyName(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -1073,6 +1101,15 @@ func TestParseSystemdServices_WrongFieldType(t *testing.T) {
 	}
 }
 
+func TestParseSystemdServices_PanelNotABool(t *testing.T) {
+	_, err := parseSystemdServices([]any{
+		map[string]any{"name": "snapclient.service", "url": ":1780", "panel": "yes"},
+	})
+	if err == nil {
+		t.Error("expected error when 'panel' is not a bool")
+	}
+}
+
 func TestParseSystemdServices_TopLevelNotAList(t *testing.T) {
 	_, err := parseSystemdServices("not a list")
 	if err == nil {
@@ -1093,6 +1130,9 @@ systemd:
     - mpd.service
     - name: mympd.service
       url: ":8080"
+    - name: snapclient.service
+      url: "http://snapserver:1780"
+      panel: true
     - pipewire-pulse.service
 `
 	writeFile(t, configFile, configContent)
@@ -1102,6 +1142,7 @@ systemd:
 	want := []SystemdService{
 		{Name: "mpd.service"},
 		{Name: "mympd.service", URL: ":8080"},
+		{Name: "snapclient.service", URL: "http://snapserver:1780", Panel: true},
 		{Name: "pipewire-pulse.service"},
 	}
 	if len(cfg.Systemd.UserServices) != len(want) {

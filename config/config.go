@@ -82,8 +82,9 @@ type PulseAudioConfig struct {
 }
 
 type SystemdService struct {
-	Name string
-	URL  string
+	Name  string
+	URL   string
+	Panel bool // open URL in the dashboard's panel instead of a new tab
 	// Internal units are triggerable but hidden from the /services listing and
 	// service.updated events. Set programmatically (e.g. by the upgrade
 	// backend), never from user config.

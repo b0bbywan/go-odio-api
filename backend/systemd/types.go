@@ -61,6 +61,7 @@ type Service struct {
 	Exists      bool      `json:"exists"`
 	Description string    `json:"description,omitempty"`
 	URL         string    `json:"url,omitempty"`
+	Panel       bool      `json:"panel,omitempty"`
 	Internal    bool      `json:"-"` // triggerable but hidden from listings/events
 }
 
