@@ -1032,7 +1032,7 @@ func TestParseSystemdServices_MixedEntries(t *testing.T) {
 	}
 	want := []SystemdService{
 		{Name: "mpd.service"},
-		{Name: "mympd.service", URL: ":8080"},
+		{Name: "mympd.service", URL: ":8080", Open: OpenTab},
 		{Name: "pipewire-pulse.service"},
 	}
 	if len(got) != len(want) {
@@ -1055,6 +1055,40 @@ func TestParseSystemdServices_ObjectWithoutURL(t *testing.T) {
 	}
 	if len(got) != 1 || got[0].Name != "mpd.service" || got[0].URL != "" {
 		t.Errorf("got %+v, want [{mpd.service }]", got)
+	}
+}
+
+func TestParseSystemdServices_Open(t *testing.T) {
+	tests := []struct {
+		name  string
+		entry any
+		want  SystemdService
+	}{
+		{"panel", map[string]any{"name": "snapclient.service", "url": ":1780", "open": "panel"},
+			SystemdService{Name: "snapclient.service", URL: ":1780", Open: OpenPanel}},
+		{"self", map[string]any{"name": "mympd.service", "url": ":8080", "open": "self"},
+			SystemdService{Name: "mympd.service", URL: ":8080", Open: OpenSelf}},
+		{"tab", map[string]any{"name": "snapclient.service", "url": ":1780", "open": "tab"},
+			SystemdService{Name: "snapclient.service", URL: ":1780", Open: OpenTab}},
+		{"a url without a mode opens in a tab", map[string]any{"name": "snapclient.service", "url": ":1780"},
+			SystemdService{Name: "snapclient.service", URL: ":1780", Open: OpenTab}},
+		{"unknown falls back to tab", map[string]any{"name": "snapclient.service", "url": ":1780", "open": "popup"},
+			SystemdService{Name: "snapclient.service", URL: ":1780", Open: OpenTab}},
+		{"open without url is dropped", map[string]any{"name": "snapclient.service", "open": "panel"},
+			SystemdService{Name: "snapclient.service"}},
+		{"bare string has nothing to open", "snapclient.service",
+			SystemdService{Name: "snapclient.service"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parseSystemdServices([]any{tt.entry})
+			if err != nil {
+				t.Fatalf("parseSystemdServices() error: %v", err)
+			}
+			if len(got) != 1 || got[0] != tt.want {
+				t.Errorf("got %+v, want [%+v]", got, tt.want)
+			}
+		})
 	}
 }
 
@@ -1099,6 +1133,15 @@ func TestParseSystemdServices_WrongFieldType(t *testing.T) {
 	}
 }
 
+func TestParseSystemdServices_OpenNotAString(t *testing.T) {
+	_, err := parseSystemdServices([]any{
+		map[string]any{"name": "snapclient.service", "url": ":1780", "open": true},
+	})
+	if err == nil {
+		t.Error("expected error when 'open' is not a string")
+	}
+}
+
 func TestParseSystemdServices_TopLevelNotAList(t *testing.T) {
 	_, err := parseSystemdServices("not a list")
 	if err == nil {
@@ -1119,6 +1162,9 @@ systemd:
     - mpd.service
     - name: mympd.service
       url: ":8080"
+    - name: snapclient.service
+      url: "http://snapserver:1780"
+      open: panel
     - pipewire-pulse.service
 `
 	writeFile(t, configFile, configContent)
@@ -1127,7 +1173,8 @@ systemd:
 
 	want := []SystemdService{
 		{Name: "mpd.service"},
-		{Name: "mympd.service", URL: ":8080"},
+		{Name: "mympd.service", URL: ":8080", Open: OpenTab},
+		{Name: "snapclient.service", URL: "http://snapserver:1780", Open: OpenPanel},
 		{Name: "pipewire-pulse.service"},
 	}
 	if len(cfg.Systemd.UserServices) != len(want) {

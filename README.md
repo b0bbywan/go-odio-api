@@ -343,7 +343,7 @@ bind: lo                      # loopback only (default)
 
 #### systemd (opt-in, whitelist required)
 
-Each entry is a bare service name or an object `{name, url}` (mixable). When `url` is set the dashboard renders a clickable link; the shorthand `:8080` resolves to the current host client-side.
+Each entry is a bare service name or an object `{name, url, open}` (mixable). When `url` is set the dashboard renders a clickable link; `open` picks where it goes: `tab` (default) a new tab, `panel` a panel over the dashboard (the app must allow being framed), `self` this tab, for an app that links back to odio. The shorthand `:8080` resolves to the current host client-side.
 
 ```yaml
 systemd:
@@ -356,11 +356,42 @@ systemd:
     - spotifyd.service
     - name: snapclient.service
       url: "http://<snapserver>:1780"
+      open: panel
     - name: mympd.service
       url: ":8080"
+      open: self
 ```
 
-Players that need extra setup for MPRIS (MPD, shairport-sync, spotifyd, Kodi…) are covered in the [systemd reference](https://docs.odio.love/api/systemd/).
+##### `open: panel`
+
+The app opens in an iframe over the dashboard, so it has to accept being framed
+from another origin. Check its response headers before enabling it:
+
+```bash
+curl -sI http://<host>:<port>/ | grep -iE 'x-frame-options|content-security-policy'
+```
+
+- nothing, or a CSP with `frame-ancestors *`: fine
+- `X-Frame-Options: DENY|SAMEORIGIN`, or a restrictive `frame-ancestors`: the
+  browser refuses it; keep `open: tab`
+
+Other things that break in a frame:
+
+- **login and sessions**: cookies are partitioned in a third-party iframe, so
+  apps you sign in to (streaming services) usually fail there; leave them on
+  `open: tab`
+- **mixed content**: desktop Firefox and Safari block an `http` app framed in
+  an `https` page. Inside the PWA this changes nothing: those browsers already
+  refuse the PWA's own connection to odio-api for the same reason
+
+Known to work: snapweb, myMPD. Not frameable: open.spotify.com.
+
+##### `open: self`
+
+The app replaces the dashboard in the tab, so it needs a link back to odio —
+the browser's back button is the only way out otherwise. In the PWA the app
+loads in the same frame, so both stay inside it. myMPD does this with a home
+icon pointing at odio (`openExternalLink`, `newWindow` `false`).
 
 #### Other backends
 

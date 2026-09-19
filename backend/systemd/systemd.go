@@ -260,10 +260,11 @@ func (s *SystemdBackend) RefreshService(ctx context.Context, name string, scope 
 	}
 
 	svc := serviceFromProps(name, scope, props)
-	// URL and Internal are config-derived, not D-Bus-derived, so serviceFromProps
-	// can't know about them. Without this lookup, every refresh wipes them.
-	svc.URL = s.configuredURL(name, scope)
-	svc.Internal = s.configuredInternal(name, scope)
+	// URL, Open and Internal are config-derived, not D-Bus-derived, so
+	// serviceFromProps can't know about them. Without this lookup, every
+	// refresh wipes them.
+	cfg := s.configured(name, scope)
+	svc.URL, svc.Open, svc.Internal = cfg.URL, cfg.Open, cfg.Internal
 
 	if err := s.UpdateService(svc); err != nil {
 		logger.Debug("[systemd] failed to update %s: %v", name, err)
@@ -273,9 +274,9 @@ func (s *SystemdBackend) RefreshService(ctx context.Context, name string, scope 
 	return &svc, nil
 }
 
-// configuredURL returns the URL declared in the config for this service, or
-// "" if the service has no URL or isn't in the configured list.
-func (s *SystemdBackend) configuredURL(name string, scope UnitScope) string {
+// configured returns the config entry for this service, the zero value if
+// it isn't in the configured list.
+func (s *SystemdBackend) configured(name string, scope UnitScope) config.SystemdService {
 	var configured []config.SystemdService
 	switch scope {
 	case ScopeSystem:
@@ -285,10 +286,10 @@ func (s *SystemdBackend) configuredURL(name string, scope UnitScope) string {
 	}
 	for _, svc := range configured {
 		if svc.Name == name {
-			return svc.URL
+			return svc
 		}
 	}
-	return ""
+	return config.SystemdService{}
 }
 
 // IsInternal reports whether the unit is registered as internal.
@@ -296,24 +297,7 @@ func (s *SystemdBackend) IsInternal(name string, scope UnitScope) bool {
 	if s == nil {
 		return false
 	}
-	return s.configuredInternal(name, scope)
-}
-
-// configuredInternal reports whether the named unit was registered as internal.
-func (s *SystemdBackend) configuredInternal(name string, scope UnitScope) bool {
-	var configured []config.SystemdService
-	switch scope {
-	case ScopeSystem:
-		configured = s.config.SystemServices
-	case ScopeUser:
-		configured = s.config.UserServices
-	}
-	for _, svc := range configured {
-		if svc.Name == name {
-			return svc.Internal
-		}
-	}
-	return false
+	return s.configured(name, scope).Internal
 }
 
 func (s *SystemdBackend) listServices(
@@ -326,16 +310,10 @@ func (s *SystemdBackend) listServices(
 		return nil, nil
 	}
 	names := make([]string, len(configured))
-	urls := make(map[string]string, len(configured))
-	internal := make(map[string]bool, len(configured))
+	byName := make(map[string]config.SystemdService, len(configured))
 	for i, svc := range configured {
 		names[i] = svc.Name
-		if svc.URL != "" {
-			urls[svc.Name] = svc.URL
-		}
-		if svc.Internal {
-			internal[svc.Name] = true
-		}
+		byName[svc.Name] = svc
 	}
 	services := make([]Service, 0, len(names))
 	units, err := conn.ListUnitsByNamesContext(ctx, names)
@@ -351,8 +329,9 @@ func (s *SystemdBackend) listServices(
 				ActiveState: unit.ActiveState,
 				Running:     unit.SubState == "running",
 				Exists:      loaded,
-				URL:         urls[unit.Name],
-				Internal:    internal[unit.Name],
+				URL:         byName[unit.Name].URL,
+				Open:        byName[unit.Name].Open,
+				Internal:    byName[unit.Name].Internal,
 			}
 			enabled, err := conn.GetUnitPropertyContext(ctx, unit.Name, "UnitFileState")
 			if err != nil {
