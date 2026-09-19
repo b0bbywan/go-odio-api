@@ -95,8 +95,8 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 	data := DashboardView{
 		Title:      "Odio",
 		ServerInfo: serverInfo,
-		Admin:      h.adminLink(),
 	}
+	data.Admin, data.AdminProxied = h.adminLink()
 
 	// Conditionally fetch data based on enabled backends
 	if serverInfo.Backends.MPRIS {

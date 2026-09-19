@@ -72,7 +72,11 @@
 						</span>
 						{{ end }}
 					</div>
-					{{ if .Admin }}
+					{{ if .AdminProxied }}
+					<a href="{{ .Admin }}"
+					   class="hover:scale-110 transition-transform"
+					   title="Admin">{{ template "icon-settings" }}</a>
+					{{ else if .Admin }}
 					<a href="#"
 					   onclick="openServiceUrl('{{ .Admin }}'); return false;"
 					   class="hover:scale-110 transition-transform"
