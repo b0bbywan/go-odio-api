@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/b0bbywan/go-odio-api/logger"
@@ -25,6 +26,14 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/ui/sections/systemd", h.SystemdSection)
 	mux.HandleFunc("/ui/sections/bluetooth", h.BluetoothSection)
 	mux.HandleFunc("/ui/sections/upgrade", h.UpgradeSection)
+
+	if h.adminSocket != "" {
+		// Only a hint: with socket activation the socket may appear later.
+		if _, err := os.Stat(h.adminSocket); err != nil {
+			logger.Warn("[ui] admin socket not reachable, link hidden until it is: %v", err)
+		}
+		mux.Handle(adminPrefix+"/", adminProxy(h.adminSocket))
+	}
 
 	// Static assets with ETag support (embed.FS has no useful Last-Modified)
 	mux.Handle("/ui/static/", etagHandler(http.StripPrefix("/ui/", http.FileServer(http.FS(staticFS)))))
