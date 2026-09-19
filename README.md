@@ -109,6 +109,8 @@ Each backend has a full reference on **[docs.odio.love](https://docs.odio.love/a
 
 Auto-discovers all MPRIS players in real time — Spotify, VLC, Firefox, MPD, Kodi, etc. Add a player and it appears immediately, zero config. Full playback control (play/pause/stop/next/previous, seek, position, volume, shuffle, loop), tracklist browsing and editing (jump/add/remove) on players that expose it, real-time state via D-Bus signals, smart caching, position heartbeat. → [reference](https://docs.odio.love/api/mpris/)
 
+Players that need extra setup for MPRIS: [MPD](https://docs.odio.love/guides/mpd/), [shairport-sync](https://docs.odio.love/guides/airplay/), [spotifyd](https://docs.odio.love/guides/spotify/), [Kodi](https://docs.odio.love/guides/use-case-htpc/).
+
 ### Audio Management (PulseAudio/PipeWire)
 
 Server info and default output, global and per-client volume/mute, real-time audio events via native PulseAudio monitoring (pure Go, no libpulse). Limited PipeWire support via `pipewire-pulse`. → [reference](https://docs.odio.love/api/pulseaudio/)
