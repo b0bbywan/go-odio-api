@@ -190,3 +190,9 @@ func systemdHasUTMP() bool {
 	_, err := os.Stat("/run/utmp")
 	return err == nil
 }
+
+// isUnixSocket reports whether path names an existing Unix socket.
+func isUnixSocket(path string) bool {
+	fi, err := os.Stat(path)
+	return err == nil && fi.Mode()&os.ModeSocket != 0
+}

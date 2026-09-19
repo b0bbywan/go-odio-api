@@ -3,6 +3,7 @@ package config
 import (
 	"net"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -134,6 +135,45 @@ func TestNew_UIAdmin(t *testing.T) {
 				t.Errorf("Api.UI.Admin = %q, want %q", cfg.Api.UI.Admin, tt.admin)
 			}
 		})
+	}
+}
+
+func TestNew_UIAdminIgnoresUnixSocket(t *testing.T) {
+	socket := filepath.Join(t.TempDir(), "admin.sock")
+	ln, err := net.Listen("unix", socket)
+	if err != nil {
+		t.Fatalf("listen on %s: %v", socket, err)
+	}
+	defer func() {
+		if err := ln.Close(); err != nil {
+			logger.Warn("close %s: %v", socket, err)
+		}
+	}()
+
+	viper.Reset()
+	viper.Set("api.ui.admin", socket)
+	t.Setenv("HOME", t.TempDir())
+
+	cfg, err := New(nil)
+	if err != nil {
+		t.Fatalf("New(nil) returned error: %v", err)
+	}
+	if cfg.Api.UI.Admin != "" {
+		t.Errorf("Api.UI.Admin = %q, want it dropped", cfg.Api.UI.Admin)
+	}
+}
+
+func TestNew_UIAdminSocket(t *testing.T) {
+	viper.Reset()
+	viper.Set("api.ui.adminSocket", "/run/user/1000/odioctl-web.sock")
+	t.Setenv("HOME", t.TempDir())
+
+	cfg, err := New(nil)
+	if err != nil {
+		t.Fatalf("New(nil) returned error: %v", err)
+	}
+	if cfg.Api.UI.AdminSocket != "/run/user/1000/odioctl-web.sock" {
+		t.Errorf("Api.UI.AdminSocket = %q", cfg.Api.UI.AdminSocket)
 	}
 }
 
