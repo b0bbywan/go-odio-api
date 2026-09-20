@@ -1,15 +1,23 @@
 package api
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"net/http"
 	"time"
 
 	"github.com/b0bbywan/go-odio-api/logger"
 )
 
-const maxRequestBodySize = 1 << 20 // 1 MB
+const (
+	maxRequestBodySize = 1 << 20 // 1 MB
+	// How much of a rejected body is logged: enough to tell a truncated payload
+	// from a wrongly encoded one, short enough to stay one journal line.
+	maxLoggedBodySize = 256
+)
 
 type setVolumeRequest struct {
 	Volume float32 `json:"volume"`
@@ -71,19 +79,32 @@ func withBody[T any](
 
 		r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodySize)
 
-		var req T
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		// Read the body rather than decode straight from it: a rejected payload is
+		// useless to diagnose without seeing what was actually sent.
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
 			var maxBytesErr *http.MaxBytesError
 			if errors.As(err, &maxBytesErr) {
 				http.Error(w, "request body too large", http.StatusRequestEntityTooLarge)
 				return
 			}
+			logger.Warn("%s %s: failed to read request body: %v", r.Method, r.URL.Path, err)
+			http.Error(w, "invalid JSON payload", http.StatusBadRequest)
+			return
+		}
+
+		var req T
+		if err := json.NewDecoder(bytes.NewReader(body)).Decode(&req); err != nil {
+			logger.Warn("%s %s: invalid JSON payload: %v (body %s, User-Agent %q)",
+				r.Method, r.URL.Path, err, bodySnippet(body), r.UserAgent())
 			http.Error(w, "invalid JSON payload", http.StatusBadRequest)
 			return
 		}
 
 		if validate != nil {
 			if err := validate(&req); err != nil {
+				logger.Warn("%s %s: rejected payload: %v (body %s)",
+					r.Method, r.URL.Path, err, bodySnippet(body))
 				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
 			}
@@ -91,6 +112,14 @@ func withBody[T any](
 
 		next(w, r, &req)
 	}
+}
+
+// bodySnippet quotes a request body for the log, truncated to maxLoggedBodySize.
+func bodySnippet(body []byte) string {
+	if len(body) > maxLoggedBodySize {
+		return fmt.Sprintf("%q… (%d bytes)", body[:maxLoggedBodySize], len(body))
+	}
+	return fmt.Sprintf("%q", body)
 }
 
 // setCacheHeader sets X-Cache-Updated-At to the given timestamp.

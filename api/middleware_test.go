@@ -66,6 +66,16 @@ func TestWithBody(t *testing.T) {
 			wantCalls:      0,
 		},
 		{
+			// What the kiosk sent when htmx's json-enc extension threw and htmx
+			// silently fell back to urlencoding, keeping the JSON Content-Type.
+			name:           "urlencoded body sent as JSON returns 400 Bad Request",
+			body:           `value=42`,
+			validate:       nil,
+			wantStatusCode: http.StatusBadRequest,
+			wantBodyMatch:  "invalid JSON payload",
+			wantCalls:      0,
+		},
+		{
 			name:           "empty body returns 400 Bad Request",
 			body:           ``,
 			validate:       nil,
