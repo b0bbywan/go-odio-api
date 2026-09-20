@@ -48,6 +48,31 @@ func TestLoadTemplates(t *testing.T) {
 	}
 }
 
+// TestBaseTemplateHasOwnPolyfill guards the Object.hasOwn polyfill the framebuffer
+// kiosk needs: QtWebEngine 5 is Chromium 87, json-enc calls Object.hasOwn (Chromium
+// 93+), and htmx swallows the TypeError, posting a urlencoded body as JSON. The
+// polyfill has to be defined before the extension script.
+func TestBaseTemplateHasOwnPolyfill(t *testing.T) {
+	var buf bytes.Buffer
+	if err := LoadTemplates().ExecuteTemplate(&buf, "base", DashboardView{Title: "odio", ServerInfo: &ServerInfo{}}); err != nil {
+		t.Fatalf("ExecuteTemplate(base) failed: %v", err)
+	}
+
+	html := buf.String()
+	polyfill := strings.Index(html, "Object.hasOwn =")
+	if polyfill < 0 {
+		t.Fatal("base template defines no Object.hasOwn polyfill")
+	}
+
+	ext := strings.Index(html, "htmx-ext-json-enc")
+	if ext < 0 {
+		t.Fatal("base template does not load the json-enc extension")
+	}
+	if polyfill > ext {
+		t.Errorf("Object.hasOwn polyfill at %d comes after the json-enc script at %d", polyfill, ext)
+	}
+}
+
 // TestSectionTemplates verifies all section templates can be executed without panic
 func TestSectionTemplates(t *testing.T) {
 	tmpl := LoadTemplates()

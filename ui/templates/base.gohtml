@@ -15,6 +15,17 @@
 	<!-- HTMX -->
 	<script src="/ui/static/htmx.v2.0.8.min.js"></script>
 	<script src="/ui/static/htmx-sse.js"></script>
+	<!-- json-enc calls Object.hasOwn (Chromium 93+), and the framebuffer kiosk runs
+	     QtWebEngine 5 (Chromium 87). htmx swallows the TypeError the extension throws
+	     and falls back to a urlencoded body, still sent as application/json, which the
+	     API rejects as an invalid payload. Defined before the extension loads. -->
+	<script>
+		if (!Object.hasOwn) {
+			Object.hasOwn = function (obj, key) {
+				return Object.prototype.hasOwnProperty.call(obj, key)
+			}
+		}
+	</script>
 	<script src="/ui/static/htmx-ext-json-enc.v2.0.2.js"></script>
 
 
