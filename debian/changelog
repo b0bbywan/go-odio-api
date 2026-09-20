@@ -1,3 +1,22 @@
+odio-api (0.17.4) trixie; urgency=low
+
+  Admin App Proxy And Service Open Modes
+
+  * UI: an admin web app listening on a Unix socket (api.ui.adminSocket) is
+    proxied at /ui/admin/ and its link opens in the same tab. The proxy
+    sends X-Forwarded-Prefix, so the app roots its URLs under that path
+    (odioctl >= 0.4.0). The link falls back to api.ui.admin while the
+    socket is missing, and an api.ui.admin pointing at a socket is ignored
+    with a warning.
+  * Systemd: a configured service's url now carries an open mode, tab
+    (default), panel or self. panel opens the app in a frame over the
+    dashboard, a side drawer or a bottom sheet on phones, unloaded on close;
+    self hands the tab over to an app that links back to odio, myMPD for
+    instance. The mode reaches /services and service.updated beside the URL.
+
+ -- Mathieu Réquillart <mathieu.requillart@gmail.com>  Sun, 20 Sep 2026 00:00:00 +0000
+
+
 odio-api (0.17.3) trixie; urgency=low
 
   Systemd User Unit Tracking
