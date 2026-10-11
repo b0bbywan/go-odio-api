@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/fsnotify/fsnotify"
 	evdev "github.com/holoplot/go-evdev"
 
 	"github.com/b0bbywan/go-odio-api/backend/action"
@@ -115,5 +116,6 @@ type InputBackend struct {
 	// never stalls a device read.
 	presses chan binding
 	events  chan events.Event
+	watcher *fsnotify.Watcher
 	wg      sync.WaitGroup
 }

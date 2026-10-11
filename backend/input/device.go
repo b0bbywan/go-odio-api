@@ -2,7 +2,9 @@ package input
 
 import (
 	"errors"
+	"fmt"
 	"io/fs"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -17,6 +19,32 @@ const (
 	keyPressed  = 1
 	keyRepeated = 2
 )
+
+func openDevice(path string) (keySource, error) {
+	dev, err := evdev.OpenWithFlags(path, os.O_RDONLY)
+	if err != nil {
+		return nil, err
+	}
+	if err := dev.Grab(); err != nil {
+		_ = dev.Close()
+		return nil, fmt.Errorf("grab: %w", err)
+	}
+	// Non-blocking is what lets Close interrupt a pending ReadOne. It must come
+	// last: any later ioctl on the device flips the descriptor back to blocking.
+	if err := dev.NonBlock(); err != nil {
+		_ = dev.Close()
+		return nil, fmt.Errorf("set non-blocking: %w", err)
+	}
+	return dev, nil
+}
+
+var linuxHost = host{
+	devRoot:    "/dev/input",
+	sysRoot:    "/sys/class/input",
+	open:       openDevice,
+	retryDelay: 50 * time.Millisecond,
+	retryFor:   2 * time.Second,
+}
 
 // attach starts handling an event node if it classifies as a remote. It is a
 // no-op for a node already opening or active, and a fresh attempt for a
