@@ -98,6 +98,23 @@ func stringToSystemdServiceHook(from, to reflect.Type, data any) (any, error) {
 	return SystemdService{Name: data.(string)}, nil
 }
 
+const (
+	defaultVolumeStep = 0.05
+	// The audio backend reports volumes rounded to two decimals, so a smaller
+	// step would never move it.
+	minVolumeStep = 0.01
+)
+
+func pulseVolumeStep() float32 {
+	step := viper.GetFloat64("pulseaudio.volumestep")
+	if step < minVolumeStep || step > 1 {
+		logger.Warn("[config] pulseaudio.volumeStep %v out of range [%v, 1], using %v",
+			step, minVolumeStep, defaultVolumeStep)
+		return defaultVolumeStep
+	}
+	return float32(step)
+}
+
 // resolveIfaceToIP returns the IPv4 address of a single named interface.
 func resolveIfaceToIP(bind string) (string, error) {
 	iface, err := net.InterfaceByName(bind)

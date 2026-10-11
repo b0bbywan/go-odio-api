@@ -25,6 +25,7 @@ type PulseAudioBackend struct {
 
 	address     string
 	serveCookie bool
+	volumeStep  float32
 	client      *proto.Client
 	conn        net.Conn
 	connected   atomic.Bool

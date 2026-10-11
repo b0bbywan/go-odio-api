@@ -79,6 +79,7 @@ type PulseAudioConfig struct {
 	Enabled       bool
 	XDGRuntimeDir string
 	ServeCookie   bool
+	VolumeStep    float32 // relative master volume step
 }
 
 // OpenMode is where the dashboard opens a service's URL: `open: tab | panel |
@@ -246,6 +247,7 @@ func New(cfgFile *string) (*Config, error) {
 
 	viper.SetDefault("pulseaudio.enabled", true)
 	viper.SetDefault("pulseaudio.serve_cookie", false)
+	viper.SetDefault("pulseaudio.volumestep", defaultVolumeStep)
 
 	viper.SetDefault("systemd.enabled", false)
 	viper.SetDefault("systemd.system", []string{})
@@ -347,6 +349,7 @@ func New(cfgFile *string) (*Config, error) {
 		Enabled:       viper.GetBool("pulseaudio.enabled"),
 		XDGRuntimeDir: xdgRuntimeDir,
 		ServeCookie:   viper.GetBool("pulseaudio.serve_cookie"),
+		VolumeStep:    pulseVolumeStep(),
 	}
 
 	sysServices, err := parseSystemdServices(viper.Get("systemd.system"))

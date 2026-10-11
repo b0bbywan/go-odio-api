@@ -215,6 +215,9 @@ func TestNew_Defaults(t *testing.T) {
 	if !cfg.Pulseaudio.Enabled {
 		t.Error("Pulseaudio.Enabled should be true by default")
 	}
+	if cfg.Pulseaudio.VolumeStep != defaultVolumeStep {
+		t.Errorf("Pulseaudio.VolumeStep = %v, want %v", cfg.Pulseaudio.VolumeStep, defaultVolumeStep)
+	}
 	if !cfg.MPRIS.Enabled {
 		t.Error("MPRIS.Enabled should be true by default")
 	}
@@ -1630,5 +1633,34 @@ func TestNew_BluetoothPowerOnStartExplicitlyEnabled(t *testing.T) {
 
 	if !cfg.Bluetooth.PowerOnStart {
 		t.Error("Bluetooth.PowerOnStart should be true when explicitly enabled")
+	}
+}
+
+func TestNew_PulseaudioVolumeStepFromConfigFile(t *testing.T) {
+	isolate(t)
+
+	configFile := t.TempDir() + "/config.yaml"
+	writeFile(t, configFile, `
+pulseaudio:
+  volumeStep: 0.1
+`)
+
+	cfg := mustNew(t, &configFile)
+
+	if cfg.Pulseaudio.VolumeStep != 0.1 {
+		t.Errorf("Pulseaudio.VolumeStep = %v, want 0.1", cfg.Pulseaudio.VolumeStep)
+	}
+}
+
+func TestNew_PulseaudioVolumeStepOutOfRange(t *testing.T) {
+	for _, step := range []float64{0, 0.001, -0.1, 1.5} {
+		isolate(t)
+		viper.Set("pulseaudio.volumestep", step)
+
+		cfg := mustNew(t, nil)
+
+		if cfg.Pulseaudio.VolumeStep != defaultVolumeStep {
+			t.Errorf("volumeStep %v: got %v, want fallback %v", step, cfg.Pulseaudio.VolumeStep, defaultVolumeStep)
+		}
 	}
 }

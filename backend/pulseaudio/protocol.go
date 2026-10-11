@@ -118,6 +118,12 @@ func volumeOf(cv proto.ChannelVolumes) float32 {
 	return float32(math.Round(float64(cv[0])/float64(proto.VolumeNorm)*100)) / 100
 }
 
+// stepVolume moves cur by delta within [0, 1]. A sink already amplified past 1
+// keeps its level on a step up instead of being pulled back down to 1.
+func stepVolume(cur, delta float32) float32 {
+	return min(max(cur+delta, 0), max(cur, 1))
+}
+
 // channelVolumes spreads vol evenly over n channels, matching the object's
 // channel count as the server requires.
 func channelVolumes(n int, vol float32) proto.ChannelVolumes {

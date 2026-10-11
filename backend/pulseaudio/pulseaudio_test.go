@@ -676,6 +676,28 @@ func TestVolumeOf(t *testing.T) {
 	}
 }
 
+func TestStepVolume(t *testing.T) {
+	tests := []struct {
+		name       string
+		cur, delta float32
+		expected   float32
+	}{
+		{name: "up", cur: 0.5, delta: 0.25, expected: 0.75},
+		{name: "down", cur: 0.5, delta: -0.25, expected: 0.25},
+		{name: "capped at 1", cur: 0.9, delta: 0.25, expected: 1},
+		{name: "floored at 0", cur: 0.1, delta: -0.25, expected: 0},
+		{name: "amplified sink stays put on a step up", cur: 1.5, delta: 0.25, expected: 1.5},
+		{name: "amplified sink steps down", cur: 1.5, delta: -0.25, expected: 1.25},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := stepVolume(tt.cur, tt.delta); got != tt.expected {
+				t.Errorf("stepVolume(%v, %v) = %v, want %v", tt.cur, tt.delta, got, tt.expected)
+			}
+		})
+	}
+}
+
 func TestChannelVolumes(t *testing.T) {
 	cv := channelVolumes(2, 0.5)
 	if len(cv) != 2 {
