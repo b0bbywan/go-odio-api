@@ -3,7 +3,9 @@ package backend
 import (
 	"context"
 
+	"github.com/b0bbywan/go-odio-api/backend/action"
 	"github.com/b0bbywan/go-odio-api/backend/bluetooth"
+	"github.com/b0bbywan/go-odio-api/backend/input"
 	"github.com/b0bbywan/go-odio-api/backend/login1"
 	"github.com/b0bbywan/go-odio-api/backend/mpris"
 	"github.com/b0bbywan/go-odio-api/backend/pulseaudio"
@@ -15,6 +17,7 @@ import (
 
 type Backend struct {
 	Bluetooth *bluetooth.BluetoothBackend
+	Input     *input.InputBackend
 	Login1    *login1.Login1Backend
 	MPRIS     *mpris.MPRISBackend
 	Pulse     *pulseaudio.PulseAudioBackend
@@ -28,6 +31,7 @@ type Backend struct {
 func New(
 	ctx context.Context,
 	btcfg *config.BluetoothConfig,
+	inputcfg *config.InputConfig,
 	login1cfg *config.Login1Config,
 	mpriscfg *config.MPRISConfig,
 	pulscfg *config.PulseAudioConfig,
@@ -55,6 +59,13 @@ func New(
 	}
 
 	if b.Systemd, err = systemd.New(ctx, syscfg); err != nil {
+		return nil, err
+	}
+
+	// Input's actions drive the player, audio, power, service and bluetooth
+	// backends, so it must be created after them.
+	actions := action.New(b.MPRIS, b.Pulse, b.Login1, b.Systemd, b.Bluetooth)
+	if b.Input, err = input.New(ctx, inputcfg, actions); err != nil {
 		return nil, err
 	}
 
@@ -110,6 +121,14 @@ func (b *Backend) Start() error {
 		}
 	}
 
+	// A key can reach the other backends as soon as Input reads devices, so it
+	// starts once they are all up.
+	if b.Input != nil {
+		if err := b.Input.Start(); err != nil {
+			return err
+		}
+	}
+
 	if b.Upgrade != nil {
 		if err := b.Upgrade.Start(); err != nil {
 			return err
@@ -128,6 +147,9 @@ func (b *Backend) Start() error {
 func (b *Backend) Close() {
 	if b.Bluetooth != nil {
 		b.Bluetooth.Close()
+	}
+	if b.Input != nil {
+		b.Input.Close()
 	}
 	if b.Login1 != nil {
 		b.Login1.Close()

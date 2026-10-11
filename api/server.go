@@ -119,6 +119,10 @@ func (s *Server) register(b *backend.Backend) {
 		s.registerBluetoothRoutes(b.Bluetooth)
 	}
 
+	if b.Input != nil {
+		s.registerInputRoutes(b.Input)
+	}
+
 	if b.Login1 != nil {
 		s.registerLogin1Routes(b.Login1)
 	}
