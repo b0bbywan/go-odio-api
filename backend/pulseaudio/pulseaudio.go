@@ -26,6 +26,7 @@ func New(ctx context.Context, cfg *config.PulseAudioConfig) (*PulseAudioBackend,
 	backend := &PulseAudioBackend{
 		address:     address,
 		serveCookie: cfg.ServeCookie,
+		volumeStep:  cfg.VolumeStep,
 		ctx:         ctx,
 		events:      make(chan events.Event, 32),
 	}
@@ -358,6 +359,24 @@ func (pa *PulseAudioBackend) SetVolumeMaster(volume float32) error {
 		return fmt.Errorf("failed to get default sink: %w", err)
 	}
 	return pa.setSinkVolume(sink, volume)
+}
+
+// VolumeUpMaster and VolumeDownMaster move the default sink by the configured
+// step.
+func (pa *PulseAudioBackend) VolumeUpMaster() error {
+	return pa.stepVolumeMaster(pa.volumeStep)
+}
+
+func (pa *PulseAudioBackend) VolumeDownMaster() error {
+	return pa.stepVolumeMaster(-pa.volumeStep)
+}
+
+func (pa *PulseAudioBackend) stepVolumeMaster(delta float32) error {
+	sink, err := pa.findDefaultSink()
+	if err != nil {
+		return fmt.Errorf("failed to get default sink: %w", err)
+	}
+	return pa.setSinkVolume(sink, stepVolume(volumeOf(sink.ChannelVolumes), delta))
 }
 
 func (pa *PulseAudioBackend) findDefaultSink() (*proto.GetSinkInfoReply, error) {
