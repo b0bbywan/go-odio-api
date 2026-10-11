@@ -4,6 +4,7 @@ import (
 	"errors"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 
 	evdev "github.com/holoplot/go-evdev"
@@ -13,11 +14,14 @@ import (
 )
 
 // fakeActions resolves the names resolves accepts, all of them when nil, into
-// actions that record their run.
+// actions that record their run. It is locked because the dispatcher
+// goroutine runs them while the test reads them back.
 type fakeActions struct {
 	resolves func(name, unit string) bool
 	repeat   map[string]bool
-	runs     []string
+
+	mu   sync.Mutex
+	runs []string
 }
 
 func (f *fakeActions) Resolve(name, unit string) (action.Action, error) {
@@ -26,9 +30,17 @@ func (f *fakeActions) Resolve(name, unit string) (action.Action, error) {
 	}
 	run := strings.TrimSpace(name + " " + unit)
 	return action.Action{Repeat: f.repeat[name], Run: func() error {
+		f.mu.Lock()
+		defer f.mu.Unlock()
 		f.runs = append(f.runs, run)
 		return nil
 	}}, nil
+}
+
+func (f *fakeActions) recorded() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.runs...)
 }
 
 // published strips the resolved actions, which cannot be compared.
@@ -127,7 +139,7 @@ func TestBuildKeymapKeepsResolvedAction(t *testing.T) {
 	if err := keymap[evdev.KEY_RED].run(); err != nil {
 		t.Fatalf("run() = %v", err)
 	}
-	if got, want := actions.runs, []string{"service.restart kodi.service"}; !reflect.DeepEqual(got, want) {
+	if got, want := actions.recorded(), []string{"service.restart kodi.service"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("runs = %v, want %v", got, want)
 	}
 }
