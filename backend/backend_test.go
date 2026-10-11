@@ -70,7 +70,7 @@ func TestBackendDisabled(t *testing.T) {
 			zeroconfCfg := &config.ZeroConfig{Enabled: tt.zeroconfEnabled}
 			upgradeCfg := &config.UpgradeConfig{Enabled: tt.upgradeEnabled}
 
-			backend, err := New(ctx, bluetoothCfg, login1Cfg, mprisCfg, pulseCfg, systemdCfg, upgradeCfg, zeroconfCfg)
+			backend, err := New(ctx, bluetoothCfg, &config.InputConfig{}, login1Cfg, mprisCfg, pulseCfg, systemdCfg, upgradeCfg, zeroconfCfg)
 
 			// Bluetooth and other D-Bus backends may fail in test environment
 			// This is expected and we should skip the test
@@ -128,6 +128,7 @@ func TestSystemdWithEmptyConfig(t *testing.T) {
 	backend, err := New(
 		ctx,
 		&config.BluetoothConfig{Enabled: false},
+		&config.InputConfig{Enabled: false},
 		&config.Login1Config{Enabled: false},
 		&config.MPRISConfig{Enabled: false},
 		&config.PulseAudioConfig{Enabled: false},
@@ -157,6 +158,7 @@ func TestZeroconfWithLocalhostBind(t *testing.T) {
 	backend, err := New(
 		ctx,
 		&config.BluetoothConfig{Enabled: false},
+		&config.InputConfig{Enabled: false},
 		&config.Login1Config{Enabled: false},
 		&config.MPRISConfig{Enabled: false},
 		&config.PulseAudioConfig{Enabled: false},
@@ -214,6 +216,7 @@ func TestLogin1DisabledInBackend(t *testing.T) {
 	backend, err := New(
 		ctx,
 		&config.BluetoothConfig{Enabled: false},
+		&config.InputConfig{Enabled: false},
 		login1Cfg,
 		&config.MPRISConfig{Enabled: false},
 		&config.PulseAudioConfig{Enabled: false},
@@ -246,6 +249,7 @@ func TestLogin1DisabledWithCapabilities(t *testing.T) {
 	backend, err := New(
 		ctx,
 		&config.BluetoothConfig{Enabled: false},
+		&config.InputConfig{Enabled: false},
 		login1Cfg,
 		&config.MPRISConfig{Enabled: false},
 		&config.PulseAudioConfig{Enabled: false},
@@ -283,6 +287,7 @@ func TestBackendNew_Login1FieldInitialisedToNil(t *testing.T) {
 	backend, err := New(
 		ctx,
 		&config.BluetoothConfig{Enabled: false},
+		&config.InputConfig{Enabled: false},
 		&config.Login1Config{Enabled: false},
 		&config.MPRISConfig{Enabled: false},
 		&config.PulseAudioConfig{Enabled: false},

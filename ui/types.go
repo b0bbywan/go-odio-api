@@ -26,6 +26,7 @@ type ServerInfo struct {
 // Backends indicates which backends are enabled
 type Backends struct {
 	Bluetooth  bool `json:"bluetooth"`
+	Input      bool `json:"input"`
 	MPRIS      bool `json:"mpris"`
 	Power      bool `json:"power"`
 	PulseAudio bool `json:"pulseaudio"`
