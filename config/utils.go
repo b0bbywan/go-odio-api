@@ -115,6 +115,26 @@ func pulseVolumeStep() float32 {
 	return float32(step)
 }
 
+func parseInputBindings(raw any) ([]InputBinding, error) {
+	if raw == nil {
+		return nil, nil
+	}
+
+	var bindings []InputBinding
+	if err := mapstructure.Decode(raw, &bindings); err != nil {
+		return nil, err
+	}
+	for i, b := range bindings {
+		if b.Key == "" {
+			return nil, fmt.Errorf("entry %d: missing or empty 'key' field", i)
+		}
+		if b.Action == "" {
+			return nil, fmt.Errorf("entry %d: missing or empty 'action' field", i)
+		}
+	}
+	return bindings, nil
+}
+
 // resolveIfaceToIP returns the IPv4 address of a single named interface.
 func resolveIfaceToIP(bind string) (string, error) {
 	iface, err := net.InterfaceByName(bind)
