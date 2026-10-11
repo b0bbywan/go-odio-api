@@ -13,6 +13,8 @@ import (
 
 	evdev "github.com/holoplot/go-evdev"
 
+	"github.com/b0bbywan/go-odio-api/backend/action"
+	"github.com/b0bbywan/go-odio-api/config"
 	"github.com/b0bbywan/go-odio-api/events"
 )
 
@@ -380,5 +382,74 @@ func TestOnKeyDropsWhenDispatcherBusy(t *testing.T) {
 	}
 	if got := len(b.presses); got != cap(b.presses) {
 		t.Errorf("queued %d presses, want %d", got, cap(b.presses))
+	}
+}
+
+func TestNewDisabled(t *testing.T) {
+	for name, cfg := range map[string]*config.InputConfig{
+		"nil":      nil,
+		"disabled": {Enabled: false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			b, err := New(context.Background(), cfg, nil)
+			if b != nil || err != nil {
+				t.Errorf("New() = (%v, %v), want (nil, nil)", b, err)
+			}
+		})
+	}
+}
+
+// With every target disabled no default binding resolves: none must be kept,
+// or it would panic on a key press.
+func TestNewWithoutTargets(t *testing.T) {
+	b, err := New(context.Background(), &config.InputConfig{Enabled: true}, action.New(nil, nil, nil, nil, nil))
+	if err != nil || b == nil {
+		t.Fatalf("New() = (%v, %v), want a backend", b, err)
+	}
+	defer b.Close()
+	if len(b.keymap) != 0 {
+		t.Errorf("keymap = %v, want empty", b.keymap)
+	}
+}
+
+func TestStartScansAndWatches(t *testing.T) {
+	b := newBackend(t)
+	if err := os.MkdirAll(b.devRoot, 0755); err != nil {
+		t.Fatal(err)
+	}
+	b.open = func(string) (keySource, error) { return newFakeSource(), nil }
+	touch := func(node string) {
+		t.Helper()
+		if err := os.WriteFile(filepath.Join(b.devRoot, node), nil, 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	device := func(node, name string, kind Kind) Device {
+		return Device{Path: filepath.Join(b.devRoot, node), Name: name, Kind: kind, State: StateActive}
+	}
+
+	addNode(t, b, "event0", "AT Translated Set 2 keyboard", "", "")
+	addNode(t, b, "event3", "gpio_ir_recv", "subsystem", "../../../class/rc")
+	touch("event0")
+	touch("event3")
+	touch("mice")
+
+	if err := b.Start(); err != nil {
+		t.Fatalf("Start() = %v", err)
+	}
+	waitDevices(t, b, []Device{device("event3", "gpio_ir_recv", KindIR)})
+
+	addNode(t, b, "event7", "gpio-keys", "driver", "../../../bus/platform/drivers/gpio-keys")
+	touch("event7")
+	waitDevices(t, b, []Device{
+		device("event3", "gpio_ir_recv", KindIR),
+		device("event7", "gpio-keys", KindGPIO),
+	})
+}
+
+func TestStartWithoutDevRoot(t *testing.T) {
+	b := newBackend(t)
+	if err := b.Start(); err != nil {
+		t.Errorf("Start() = %v, want nil", err)
 	}
 }
