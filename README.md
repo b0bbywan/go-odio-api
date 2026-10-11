@@ -132,6 +132,14 @@ Setup needs a few system steps (Odio isn't root): add the user to the `bluetooth
 
 Remote reboot and power-off via the REST API — no SSH for day-to-day ops. Disabled by default, uses `org.freedesktop.login1`. On desktop, logind handles permissions automatically; on headless systems a polkit rule is required to allow the user to reboot/power-off (full rule → [reference](https://docs.odio.love/api/power/)).
 
+### Remote Controls (IR, GPIO, Bluetooth, USB)
+
+Physical remotes drive Odio directly, no client needed: a key press becomes play/pause, next, volume, mute… on the active player and the default output. Reads Linux input devices (`/dev/input/event*`) through evdev. Infrared receivers (kernel `rc` devices: `gpio-ir`, MCE USB receivers) and `gpio-keys` buttons are picked up automatically; HDMI-CEC adapters are opt-in with `input.cec`, Bluetooth and USB remotes are opt-in, listed by device name. Nothing else is ever opened — keyboards, mice and touchscreens are left alone. Hotplug is handled, so a Bluetooth remote that sleeps and reconnects just works. Disabled by default.
+
+Media keys work out of the box (`KEY_PLAYPAUSE`, `KEY_NEXTSONG`, `KEY_VOLUMEUP`, `KEY_MUTE`, …); `input.bindings` remaps any key to a player, volume, power, service or bluetooth action. Bound keys are also published as `input.key` SSE events; the others are ignored.
+
+Two things to know. Odio isn't root, so the user must be in the `input` group (`sudo usermod -aG input <user>`, then log out and back in — restarting the service is not enough). And handled devices are **grabbed**: their keys reach Odio only, no longer Kodi or the desktop.
+
 ### Software Upgrades
 
 Agnostic upgrade frontend — Odio implements neither detection nor upgrade logic. It reads a result file written by an external detector (current/latest version, availability) and can trigger two systemd **user** units: one to re-check, one to run the upgrade. Capabilities are additive: the result file alone enables status reads (`GET /upgrade`), and each configured unit enables its trigger (`POST /upgrade/check`, `POST /upgrade/start`). Configured units are registered as internal — triggerable, but hidden from `/services` and the event stream. Disabled by default.
@@ -140,7 +148,7 @@ Run progress streams over a Unix socket, not a file or the journal: progress is 
 
 ### Real-time Event Stream (SSE)
 
-`GET /events` streams live state changes to any HTTP client — no polling. One event type per backend (`player.updated`, `audio.updated`, `service.updated`, `bluetooth.updated`, `power.action`, `upgrade.info`, …), filterable with `types`, `backend`, and `exclude` query params (`server.info` is always delivered). → [reference](https://docs.odio.love/api/events/)
+`GET /events` streams live state changes to any HTTP client — no polling. One event type per backend (`player.updated`, `audio.updated`, `service.updated`, `bluetooth.updated`, `input.key`, `power.action`, `upgrade.info`, …), filterable with `types`, `backend`, and `exclude` query params (`server.info` is always delivered). → [reference](https://docs.odio.love/api/events/)
 
 ### REST API
 
@@ -409,6 +417,7 @@ power:
 pulseaudio:
   enabled: true
   serve_cookie: true           # exposes GET /audio/cookie for network audio clients
+  volumeStep: 0.05             # volume.up / volume.down step of a remote (0.01–1)
 zeroconf:
   enabled: true                # mDNS (_http._tcp.local. → odio-api); disabled on `lo`
 upgrade:                       # agnostic upgrade frontend (opt-in)
@@ -417,9 +426,20 @@ upgrade:                       # agnostic upgrade frontend (opt-in)
   checkUnit: odio-check-upgrade.service     # optional internal user unit → enables POST /upgrade/check
   upgradeUnit: odio-upgrade.service         # optional internal user unit → enables POST /upgrade/start
   # progressSocket default: $XDG_RUNTIME_DIR/odio-api/upgrade.sock (tmpfs, no SD writes)
+input:                         # IR / GPIO / Bluetooth / USB remotes (opt-in)
+  enabled: true
+  cec: true                    # also handle HDMI-CEC adapters (TV remote)
+  devices:                     # Bluetooth / USB remotes to handle, by device name
+    - "flirc.tv flirc"
+  bindings:                    # override or extend the default media keys
+    - { key: KEY_POWER, action: power.poweroff }
+    - { key: KEY_RED, action: service.restart, unit: kodi.service }
+    - { key: KEY_MUTE, action: none }       # unmap a default
 ```
 
-For `upgrade`, the result file is the source of truth for availability; the script reports live progress over the socket (`begin`/`progress`/`end`). Units are optional — omit both for a read-only status badge, or add either to enable its POST. Full per-option detail on [docs.odio.love](https://docs.odio.love/api/).
+For `upgrade`, the result file is the source of truth for availability; the script reports live progress over the socket (`begin`/`progress`/`end`). Units are optional — omit both for a read-only status badge, or add either to enable its POST. For `input`, device names are the ones in `/proc/bus/input/devices` (matched case-insensitively) and key names are the kernel's (`evtest` shows both, and `logLevel: debug` logs each unmapped key pressed on a handled device; an IR receiver also needs its kernel keymap loaded, see `ir-keytable`). Actions: `player.{playpause,play,pause,stop,next,previous,forward,rewind}` on the active player (forward/rewind seek 10 s), `volume.{up,down,mute}` on the default output, `power.{poweroff,reboot}`, `service.{start,stop,restart}` with a `unit` listed in `systemd.user`, `bluetooth.{powerup,powerdown,pairing}`, and `none`. An action whose backend is disabled is skipped with a warning. `conf.d` snippets replace the `bindings` list, they don't append to it.
+
+Full per-option detail on [docs.odio.love](https://docs.odio.love/api/).
 
 ### Security defaults
 
@@ -440,6 +460,7 @@ Full per-route reference with request bodies and responses lives on **[docs.odio
 | systemd | `GET /services`, `POST /services/{scope}/{unit}/{start,stop,restart,enable,disable}` | [systemd](https://docs.odio.love/api/systemd/) |
 | Bluetooth | `GET /bluetooth`, `/bluetooth/devices`, `POST /bluetooth/{power_up,power_down,pairing_mode,scan,scan/stop,connect,disconnect}` | [bluetooth](https://docs.odio.love/api/bluetooth/) |
 | Power | `GET /power/`, `POST /power/{power_off,reboot}` | [power](https://docs.odio.love/api/power/) |
+| Input | `GET /input` (handled devices, effective bindings) | [input](https://docs.odio.love/api/input/) |
 | Upgrade | `GET /upgrade`, `POST /upgrade/{check,start}` | [below](#software-upgrades-1) |
 | SSE | `GET /events` | [events](https://docs.odio.love/api/events/) |
 
@@ -490,7 +511,7 @@ Detector status and run lifecycle stream as `upgrade.info`; live run progress st
 
 ```
 GET /events                        # all events (text/event-stream)
-GET /events?backend=mpris,audio    # filter by backend (mpris, audio, systemd, bluetooth, power, upgrade)
+GET /events?backend=mpris,audio    # filter by backend (mpris, audio, systemd, bluetooth, input, power, upgrade)
 GET /events?types=player.updated   # filter by event type
 GET /events?exclude=player.position
 GET /events?keepalive=60
@@ -518,6 +539,10 @@ Systemd control is disabled by default and requires an explicit whitelist. Odio 
 
 **You must knowingly enable this at your own risk.** Odio is free software and comes with no warranty.
 
+### Input backend
+
+Disabled by default. Reading `/dev/input/event*` requires the `input` group, which lets **any** process of that user read **every** input device, keyboards included. Odio itself only opens infrared receivers, `gpio-keys` devices, HDMI-CEC adapters when `input.cec` is set, and the devices named in `input.devices`, decided from sysfs before any device is opened. Only keys with a binding are published on `GET /events`; the others are dropped, and named in the log at `logLevel: debug` only.
+
 ### REST API
 
 ⚠️ **Security Notice:** No authentication mechanism is provided. **Never expose this API to untrusted networks or the Internet.** Designed for localhost or trusted LAN use only.
@@ -534,6 +559,7 @@ All multimedia services run as systemd user units, not system-wide daemons. This
 - **PulseAudio Backend** — native PulseAudio protocol (pure Go, no libpulse), real-time event monitoring
 - **Systemd Backend** — D-Bus with filesystem monitoring fallback (`/run/user/{uid}/systemd/units`)
 - **Power Backend** — `org.freedesktop.login1` D-Bus interface
+- **Input Backend** — evdev key events from remotes (pure Go), exclusive grab, hotplug via filesystem monitoring of `/dev/input`
 
 ### Performance
 
@@ -636,6 +662,7 @@ task package:rpm:linux-armhf     # .rpm armv6hl
 - [coreos/go-systemd](https://github.com/coreos/go-systemd) — systemd D-Bus bindings
 - [jfreymuth/pulse](https://github.com/jfreymuth/pulse) — pure-Go PulseAudio native protocol (no libpulse)
 - [grandcat/zeroconf](https://github.com/grandcat/zeroconf) — mDNS / DNS-SD
+- [holoplot/go-evdev](https://github.com/holoplot/go-evdev) — pure-Go Linux input devices (evdev)
 - [HTMX](https://htmx.org/)
 - [TailwindCSS](https://tailwindcss.com/)
 
