@@ -27,6 +27,7 @@ var AppVersion = "dev"
 type Config struct {
 	Api        *ApiConfig
 	Bluetooth  *BluetoothConfig
+	Input      *InputConfig
 	Login1     *Login1Config
 	MPRIS      *MPRISConfig
 	Pulseaudio *PulseAudioConfig
@@ -130,6 +131,20 @@ type BluetoothConfig struct {
 	Timeout        time.Duration
 	IdleTimeout    time.Duration
 	ScanTimeout    time.Duration
+}
+
+// InputBinding maps an evdev key name to an action. The names are checked by
+// the input backend and the action package, which own the two tables.
+type InputBinding struct {
+	Key    string
+	Action string
+	Unit   string // service.* actions only
+}
+
+type InputConfig struct {
+	Enabled  bool
+	Devices  []string // Bluetooth/USB remotes to grab, by evdev device name
+	Bindings []InputBinding
 }
 
 type ZeroConfig struct {
@@ -238,6 +253,8 @@ func New(cfgFile *string) (*Config, error) {
 	viper.SetDefault("bluetooth.idletimeout", "30m")
 	viper.SetDefault("bluetooth.scantimeout", "60s")
 
+	viper.SetDefault("input.enabled", false)
+
 	viper.SetDefault("power.enabled", false)
 	viper.SetDefault("power.capabilities.reboot", false)
 	viper.SetDefault("power.capabilities.poweroff", false)
@@ -319,6 +336,16 @@ func New(cfgFile *string) (*Config, error) {
 
 	if origins := viper.GetStringSlice("api.cors.origins"); len(origins) > 0 {
 		apiCfg.CORS = &CORSConfig{Origins: origins}
+	}
+
+	bindings, err := parseInputBindings(viper.Get("input.bindings"))
+	if err != nil {
+		return nil, fmt.Errorf("invalid input.bindings: %w", err)
+	}
+	inputcfg := InputConfig{
+		Enabled:  viper.GetBool("input.enabled"),
+		Devices:  viper.GetStringSlice("input.devices"),
+		Bindings: bindings,
 	}
 
 	loginCapabilities := Login1Capabilities{
@@ -407,6 +434,7 @@ func New(cfgFile *string) (*Config, error) {
 	cfg := Config{
 		Api:        &apiCfg,
 		Bluetooth:  &bluetoothcfg,
+		Input:      &inputcfg,
 		Login1:     &logincfg,
 		MPRIS:      &mpriscfg,
 		Pulseaudio: &pulsecfg,
