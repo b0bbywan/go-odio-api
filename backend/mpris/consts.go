@@ -1,5 +1,7 @@
 package mpris
 
+import "time"
+
 const (
 	// MPRIS D-Bus constants
 	MPRIS_PREFIX    = "org.mpris.MediaPlayer2"
@@ -49,6 +51,9 @@ const (
 // MPRIS_NO_TRACK is the well-known track ID meaning "no current track".
 // SetPosition is a no-op for this value, so we fall back to relative Seek.
 const MPRIS_NO_TRACK = "/org/mpris/MediaPlayer2/TrackList/NoTrack"
+
+// seekStep is the offset of Forward and Rewind, in microseconds.
+const seekStep = int64(10 * time.Second / time.Microsecond)
 
 const (
 	StatusPlaying PlaybackStatus = "Playing"

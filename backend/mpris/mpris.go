@@ -470,6 +470,15 @@ func (m *MPRISBackend) Seek(busName string, offset int64) error {
 	return m.callMethod(busName, MPRIS_METHOD_SEEK, offset)
 }
 
+// Forward and Rewind seek by a fixed step.
+func (m *MPRISBackend) Forward(busName string) error {
+	return m.Seek(busName, seekStep)
+}
+
+func (m *MPRISBackend) Rewind(busName string) error {
+	return m.Seek(busName, -seekStep)
+}
+
 // SetPosition seeks to an absolute position in microseconds.
 // trackID may be empty; if so it is resolved from the cached player metadata.
 // Falls back to a relative Seek when no valid track ID is available.
