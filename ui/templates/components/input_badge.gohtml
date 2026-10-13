@@ -1,0 +1,14 @@
+{{/*
+	Remote controls badge for the footer. Data is *ui.InputStatus (may be nil).
+	One icon per handled remote, named in its tooltip: red when it is not
+	readable, dimmed while it opens. Nothing is drawn without a remote.
+*/}}
+{{ define "section-input" }}
+{{- with .Remotes -}}
+<span class="inline-flex items-center gap-1 rounded-full bg-zinc-700/40 px-2 py-0.5 text-zinc-500 [&_svg]:h-3 [&_svg]:w-3">
+	{{- range . -}}
+	<span{{ if .Denied }} class="text-red-400"{{ else if not .Active }} class="opacity-50"{{ end }} title="{{ .Title }}">{{ template "icon-remote" }}</span>
+	{{- end -}}
+</span>
+{{- end -}}
+{{ end }}

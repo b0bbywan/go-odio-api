@@ -124,6 +124,9 @@
 					{{ if .ServerInfo.Backends.Zeroconf }}
 					<span class="inline-flex items-center gap-1 rounded-full bg-zinc-700/40 px-2 py-0.5 text-zinc-500 [&_svg]:h-3 [&_svg]:w-3">{{ template "icon-radio" }} zeroconf</span>
 					{{ end }}
+					{{ if .ServerInfo.Backends.Input }}
+					<span class="contents" sse-swap="section-input" hx-swap="innerHTML">{{ template "section-input" .Input }}</span>
+					{{ end }}
 				</div>
 				<div>
 					{{ .ServerInfo.OSPlatform }} 🐧
