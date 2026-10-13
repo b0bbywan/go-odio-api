@@ -36,6 +36,7 @@ func TestLoadTemplates(t *testing.T) {
 		"section-bluetooth",
 		"section-upgrade",
 		"upgrade-ring",
+		"section-input",
 		"mpris-player",
 		"pulseaudio-sink",
 		"systemd-unit",
@@ -126,6 +127,11 @@ func TestSectionTemplates(t *testing.T) {
 			template: "section-upgrade",
 			data:     (*UpgradeStatus)(nil),
 		},
+		{
+			name:     "Input badge with a remote",
+			template: "section-input",
+			data:     &InputStatus{Devices: []InputDevice{{Name: "gpio_ir_recv", Kind: "ir", State: "active"}}},
+		},
 	}
 
 	for _, tt := range tests {
@@ -206,6 +212,75 @@ func TestUpgradeBadgeTemplate(t *testing.T) {
 			}
 			if gotConfirm := strings.Contains(out, "hx-confirm="); gotConfirm != tt.wantConfirm {
 				t.Errorf("hx-confirm present = %v, want %v; output: %s", gotConfirm, tt.wantConfirm, out)
+			}
+		})
+	}
+}
+
+// TestInputBadgeTemplate asserts the badge draws one icon per remote, named in
+// its tooltip, red when denied and dimmed while opening, and nothing at all
+// without a remote.
+func TestInputBadgeTemplate(t *testing.T) {
+	tmpl := LoadTemplates()
+
+	tests := []struct {
+		name      string
+		status    *InputStatus
+		wantIcons []string // one opening tag per icon, in order
+	}{
+		{name: "no status", status: nil},
+		{name: "no device", status: &InputStatus{}},
+		{
+			name: "one icon per active device",
+			status: &InputStatus{Devices: []InputDevice{
+				{Name: "vc4-hdmi", Kind: "cec", State: "active"},
+				{Name: "gpio_ir_recv", Kind: "ir", State: "active"},
+			}},
+			wantIcons: []string{
+				`<span title="vc4-hdmi (cec)">`,
+				`<span title="gpio_ir_recv (ir)">`,
+			},
+		},
+		{
+			name: "an opening device is dimmed",
+			status: &InputStatus{Devices: []InputDevice{
+				{Name: "gpio_ir_recv", Kind: "ir", State: "opening"},
+			}},
+			wantIcons: []string{`<span class="opacity-50" title="gpio_ir_recv (ir) · opening">`},
+		},
+		{
+			name: "a denied device is red, the others are not",
+			status: &InputStatus{Devices: []InputDevice{
+				{Name: "gpio_ir_recv", Kind: "ir", State: "active"},
+				{Name: "Logitech K400", Kind: "forced", State: "denied"},
+			}},
+			wantIcons: []string{
+				`<span title="gpio_ir_recv (ir)">`,
+				`<span class="text-red-400" title="Logitech K400 (forced) · denied">`,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			if err := tmpl.ExecuteTemplate(&buf, "section-input", tt.status); err != nil {
+				t.Fatalf("execute section-input: %v", err)
+			}
+			out := buf.String()
+			if len(tt.wantIcons) == 0 && out != "" {
+				t.Errorf("expected no output without a remote, got: %q", out)
+			}
+			if got := strings.Count(out, "<svg"); got != len(tt.wantIcons) {
+				t.Errorf("%d icons drawn, want %d, got: %s", got, len(tt.wantIcons), out)
+			}
+			rest := out
+			for _, want := range tt.wantIcons {
+				i := strings.Index(rest, want)
+				if i < 0 {
+					t.Fatalf("expected %q, in order, in output: %s", want, out)
+				}
+				rest = rest[i+len(want):]
 			}
 		})
 	}
