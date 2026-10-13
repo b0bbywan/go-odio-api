@@ -291,6 +291,15 @@ func (c *APIClient) GetUpgrade() (*UpgradeStatus, error) {
 	return &v, nil
 }
 
+// GetInput returns the handled remotes from /input.
+func (c *APIClient) GetInput() (*InputStatus, error) {
+	var v InputStatus
+	if err := c.get("/input", &v); err != nil {
+		return nil, err
+	}
+	return &v, nil
+}
+
 func convertServices(raw []Service) []ServiceView {
 	views := make([]ServiceView, 0, len(raw))
 	for _, s := range raw {

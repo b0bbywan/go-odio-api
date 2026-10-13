@@ -100,6 +100,40 @@ func (u *UpgradeStatus) CheckedAtLabel() string {
 	return u.CheckedAt.Local().Format("02 Jan 2006, 15:04")
 }
 
+// InputDevice is a handled remote from GET /input.
+type InputDevice struct {
+	Name  string `json:"name"`
+	Kind  string `json:"kind"`
+	State string `json:"state"`
+}
+
+func (d InputDevice) Active() bool { return d.State == "active" }
+
+// Denied reports a remote that is handled but not readable.
+func (d InputDevice) Denied() bool { return d.State == "denied" }
+
+// Title is the badge tooltip of the remote.
+func (d InputDevice) Title() string {
+	title := d.Name + " (" + d.Kind + ")"
+	if !d.Active() {
+		title += " · " + d.State
+	}
+	return title
+}
+
+// InputStatus is the GET /input payload; the bindings are unused here.
+type InputStatus struct {
+	Devices []InputDevice `json:"devices"`
+}
+
+// Remotes is the device list, nil-safe for the badge template.
+func (s *InputStatus) Remotes() []InputDevice {
+	if s == nil {
+		return nil
+	}
+	return s.Devices
+}
+
 // PlayerCapabilities represents what transport actions a player supports
 type PlayerCapabilities struct {
 	CanPlay       bool `json:"can_play"`
@@ -226,6 +260,7 @@ type DashboardView struct {
 	Services     []ServiceView
 	Bluetooth    *BluetoothView
 	Upgrade      *UpgradeStatus
+	Input        *InputStatus
 	Admin        string
 	AdminProxied bool
 }
