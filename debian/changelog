@@ -1,3 +1,25 @@
+odio-api (0.18.0) trixie; urgency=low
+
+  Remote Controls
+
+  * Input: new backend reading remote controls through evdev, so a key
+    press drives the active player and the default output with no client.
+    Infrared receivers and gpio-keys buttons are picked up automatically,
+    HDMI-CEC adapters with input.cec, Bluetooth and USB remotes when named
+    in input.devices. Handled devices are grabbed and hotplug is followed.
+    Disabled by default; the user must be in the input group.
+  * Input: media keys are bound out of the box and input.bindings maps any
+    key to a player, volume, power, service or bluetooth action. Bound keys
+    are published as input.key and device changes as input.updated; GET
+    /input lists the devices and the effective bindings.
+  * PulseAudio: pulseaudio.volumeStep sets how far volume.up and
+    volume.down move the default output (default 0.05).
+  * UI: the footer shows one icon per handled remote, red when a device is
+    not readable, updated as remotes come and go.
+
+ -- Mathieu Réquillart <mathieu.requillart@gmail.com>  Tue, 13 Oct 2026 00:00:00 +0000
+
+
 odio-api (0.17.4) trixie; urgency=low
 
   Admin App Proxy And Service Open Modes
