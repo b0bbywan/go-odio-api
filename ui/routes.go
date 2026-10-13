@@ -26,6 +26,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/ui/sections/systemd", h.SystemdSection)
 	mux.HandleFunc("/ui/sections/bluetooth", h.BluetoothSection)
 	mux.HandleFunc("/ui/sections/upgrade", h.UpgradeSection)
+	mux.HandleFunc("/ui/sections/input", h.InputSection)
 
 	if h.adminSocket != "" {
 		// Only a hint: with socket activation the socket may appear later.

@@ -149,6 +149,16 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if serverInfo.Backends.Input {
+		logger.Debug("[ui] → API GET /input")
+		if inputStatus, err := h.client.GetInput(); err == nil {
+			data.Input = inputStatus
+			logger.Debug("[ui] ← API /input: %d devices", len(inputStatus.Devices))
+		} else {
+			logger.Warn("[ui] Failed to fetch input status: %v", err)
+		}
+	}
+
 	// Render template
 	if err := h.tmpl.ExecuteTemplate(w, "dashboard", data); err != nil {
 		logger.Error("[ui] Template execution failed: %v", err)
@@ -251,6 +261,25 @@ func (h *Handler) UpgradeSection(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// InputSection renders just the remote controls badge (for HTMX updates)
+func (h *Handler) InputSection(w http.ResponseWriter, r *http.Request) {
+	logger.Debug("[ui] %s %s (HTMX section refresh)", r.Method, r.URL.Path)
+
+	logger.Debug("[ui] → API GET /input")
+	status, err := h.client.GetInput()
+	if err != nil {
+		logger.Error("[ui] Failed to fetch input status: %v", err)
+		http.Error(w, "Failed to load input status", http.StatusInternalServerError)
+		return
+	}
+	logger.Debug("[ui] ← API /input: %d devices", len(status.Devices))
+
+	if err := h.tmpl.ExecuteTemplate(w, "section-input", status); err != nil {
+		logger.Error("[ui] Template execution failed: %v", err)
+		http.Error(w, "Failed to render section", http.StatusInternalServerError)
+	}
+}
+
 // sseSection maps an event type to the SSE event name and the section data fetcher.
 type sseSection struct {
 	name    string
@@ -282,6 +311,11 @@ func fetchUpgrade(h *Handler) (string, any, error) {
 	return "section-upgrade", status, err
 }
 
+func fetchInput(h *Handler) (string, any, error) {
+	status, err := h.client.GetInput()
+	return "section-input", status, err
+}
+
 func fetchUpgradeRing(h *Handler) (string, any, error) {
 	status, err := h.client.GetUpgrade()
 	var run *UpgradeRun
@@ -298,6 +332,7 @@ var (
 	bluetoothSection   = &sseSection{name: "section-bluetooth", fetchFn: fetchBluetooth}
 	upgradeSection     = &sseSection{name: "section-upgrade", fetchFn: fetchUpgrade}
 	upgradeRingSection = &sseSection{name: "upgrade-progress", fetchFn: fetchUpgradeRing}
+	inputSection       = &sseSection{name: "section-input", fetchFn: fetchInput}
 
 	eventToSection = map[string]*sseSection{
 		events.TypePlayerUpdated:   mprisSection,
@@ -319,6 +354,8 @@ var (
 		events.TypeBluetoothUpdated: bluetoothSection,
 		events.TypeUpgradeInfo:      upgradeSection,
 		events.TypeUpgradeProgress:  upgradeRingSection,
+		// input.key is not mapped: a key press does not change the device list.
+		events.TypeInputUpdated: inputSection,
 	}
 )
 
