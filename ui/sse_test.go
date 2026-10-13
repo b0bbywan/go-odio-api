@@ -249,6 +249,13 @@ func TestSSEEvents_EventMapping(t *testing.T) {
 			wantSSEEvent: "event: section-upgrade",
 		},
 		{
+			name:         "input.updated maps to section-input",
+			eventType:    events.TypeInputUpdated,
+			apiEndpoint:  "/input",
+			apiResponse:  `{"devices":[{"path":"/dev/input/event0","name":"vc4-hdmi","kind":"cec","state":"active"}],"bindings":[]}`,
+			wantSSEEvent: "event: section-input",
+		},
+		{
 			name:         "upgrade.progress maps to upgrade-progress",
 			eventType:    events.TypeUpgradeProgress,
 			apiEndpoint:  "/upgrade",
