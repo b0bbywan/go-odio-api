@@ -7,7 +7,7 @@ require (
 	github.com/coreos/go-systemd/v22 v22.7.0
 	github.com/fsnotify/fsnotify v1.10.1
 	github.com/go-viper/mapstructure/v2 v2.5.0
-	github.com/godbus/dbus/v5 v5.2.2
+	github.com/godbus/dbus/v5 v5.2.3
 	github.com/grandcat/zeroconf v1.0.0
 	github.com/holoplot/go-evdev v0.0.0-20260909133534-d873ed210bda
 	github.com/jfreymuth/pulse v0.1.3
