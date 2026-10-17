@@ -555,6 +555,21 @@ func TestServerInfoFromCache(t *testing.T) {
 	})
 }
 
+// Before the first connection (or after a drop) a call answers NotReady, which
+// the API maps to 503, instead of dereferencing a nil client.
+func TestNotConnectedIsNotReady(t *testing.T) {
+	pa := &PulseAudioBackend{}
+	for name, call := range map[string]func() error{
+		"ListClients": func() error { _, err := pa.ListClients(); return err },
+		"ListOutputs": func() error { _, err := pa.ListOutputs(); return err },
+	} {
+		var notReady *NotReadyError
+		if err := call(); !errors.As(err, &notReady) {
+			t.Errorf("%s: err = %v, want NotReadyError", name, err)
+		}
+	}
+}
+
 func TestCookie(t *testing.T) {
 	t.Run("disabled returns DisabledError", func(t *testing.T) {
 		pa := &PulseAudioBackend{serveCookie: false}

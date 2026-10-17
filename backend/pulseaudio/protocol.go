@@ -42,9 +42,19 @@ func (pa *PulseAudioBackend) connect() error {
 	return nil
 }
 
+// request sends req to the server; with no connection yet, or between a drop
+// and the reconnect, it answers NotReady rather than dereferencing nil.
+func (pa *PulseAudioBackend) request(req proto.RequestArgs, reply proto.Reply) error {
+	client := pa.client
+	if client == nil {
+		return &NotReadyError{Message: "pulseaudio not connected"}
+	}
+	return client.Request(req, reply)
+}
+
 func (pa *PulseAudioBackend) serverInfo() (*proto.GetServerInfoReply, error) {
 	var reply proto.GetServerInfoReply
-	if err := pa.client.Request(&proto.GetServerInfo{}, &reply); err != nil {
+	if err := pa.request(&proto.GetServerInfo{}, &reply); err != nil {
 		return nil, err
 	}
 	return &reply, nil
@@ -52,7 +62,7 @@ func (pa *PulseAudioBackend) serverInfo() (*proto.GetServerInfoReply, error) {
 
 func (pa *PulseAudioBackend) sinks() ([]*proto.GetSinkInfoReply, error) {
 	var reply proto.GetSinkInfoListReply
-	if err := pa.client.Request(&proto.GetSinkInfoList{}, &reply); err != nil {
+	if err := pa.request(&proto.GetSinkInfoList{}, &reply); err != nil {
 		return nil, err
 	}
 	return reply, nil
@@ -60,7 +70,7 @@ func (pa *PulseAudioBackend) sinks() ([]*proto.GetSinkInfoReply, error) {
 
 func (pa *PulseAudioBackend) sinkInputs() ([]*proto.GetSinkInputInfoReply, error) {
 	var reply proto.GetSinkInputInfoListReply
-	if err := pa.client.Request(&proto.GetSinkInputInfoList{}, &reply); err != nil {
+	if err := pa.request(&proto.GetSinkInputInfoList{}, &reply); err != nil {
 		return nil, err
 	}
 	return reply, nil
@@ -68,7 +78,7 @@ func (pa *PulseAudioBackend) sinkInputs() ([]*proto.GetSinkInputInfoReply, error
 
 func (pa *PulseAudioBackend) sources() ([]*proto.GetSourceInfoReply, error) {
 	var reply proto.GetSourceInfoListReply
-	if err := pa.client.Request(&proto.GetSourceInfoList{}, &reply); err != nil {
+	if err := pa.request(&proto.GetSourceInfoList{}, &reply); err != nil {
 		return nil, err
 	}
 	return reply, nil
@@ -76,14 +86,14 @@ func (pa *PulseAudioBackend) sources() ([]*proto.GetSourceInfoReply, error) {
 
 func (pa *PulseAudioBackend) modules() ([]*proto.GetModuleInfoReply, error) {
 	var reply proto.GetModuleInfoListReply
-	if err := pa.client.Request(&proto.GetModuleInfoList{}, &reply); err != nil {
+	if err := pa.request(&proto.GetModuleInfoList{}, &reply); err != nil {
 		return nil, err
 	}
 	return reply, nil
 }
 
 func (pa *PulseAudioBackend) setSinkVolume(s *proto.GetSinkInfoReply, vol float32) error {
-	return pa.client.Request(&proto.SetSinkVolume{
+	return pa.request(&proto.SetSinkVolume{
 		SinkIndex:      proto.Undefined,
 		SinkName:       s.SinkName,
 		ChannelVolumes: channelVolumes(len(s.ChannelVolumes), vol),
@@ -91,22 +101,22 @@ func (pa *PulseAudioBackend) setSinkVolume(s *proto.GetSinkInfoReply, vol float3
 }
 
 func (pa *PulseAudioBackend) setSinkMute(s *proto.GetSinkInfoReply, mute bool) error {
-	return pa.client.Request(&proto.SetSinkMute{SinkIndex: proto.Undefined, SinkName: s.SinkName, Mute: mute}, nil)
+	return pa.request(&proto.SetSinkMute{SinkIndex: proto.Undefined, SinkName: s.SinkName, Mute: mute}, nil)
 }
 
 func (pa *PulseAudioBackend) setSinkInputVolume(s *proto.GetSinkInputInfoReply, vol float32) error {
-	return pa.client.Request(&proto.SetSinkInputVolume{
+	return pa.request(&proto.SetSinkInputVolume{
 		SinkInputIndex: s.SinkInputIndex,
 		ChannelVolumes: channelVolumes(len(s.ChannelVolumes), vol),
 	}, nil)
 }
 
 func (pa *PulseAudioBackend) setSinkInputMute(s *proto.GetSinkInputInfoReply, mute bool) error {
-	return pa.client.Request(&proto.SetSinkInputMute{SinkInputIndex: s.SinkInputIndex, Mute: mute}, nil)
+	return pa.request(&proto.SetSinkInputMute{SinkInputIndex: s.SinkInputIndex, Mute: mute}, nil)
 }
 
 func (pa *PulseAudioBackend) setDefaultSink(name string) error {
-	return pa.client.Request(&proto.SetDefaultSink{SinkName: name}, nil)
+	return pa.request(&proto.SetDefaultSink{SinkName: name}, nil)
 }
 
 // volumeOf reports the first channel's volume as a fraction of normal volume,
