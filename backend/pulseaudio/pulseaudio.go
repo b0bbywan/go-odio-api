@@ -34,8 +34,8 @@ func New(ctx context.Context, cfg *config.PulseAudioConfig) (*PulseAudioBackend,
 	return backend, nil
 }
 
-// Start loads the initial cache and starts the listener
-func (pa *PulseAudioBackend) Start() error {
+// start loads the initial cache and starts the listener
+func (pa *PulseAudioBackend) start() error {
 	logger.Debug("[pulseaudio] starting backend")
 	pa.mu.Lock()
 	defer pa.mu.Unlock()
@@ -70,9 +70,19 @@ func (pa *PulseAudioBackend) Start() error {
 	return nil
 }
 
+// Start starts the backend, or keeps trying in the background: at boot the
+// socket accepts before the server answers, within its 1s auth timeout.
+func (pa *PulseAudioBackend) Start() error {
+	if err := pa.start(); err != nil {
+		logger.Warn("[pulseaudio] not ready, retrying in background: %v", err)
+		go pa.reconnectWithBackoff()
+	}
+	return nil
+}
+
 func (pa *PulseAudioBackend) Reconnect() error {
 	pa.closeConnections()
-	return pa.Start()
+	return pa.start()
 }
 
 func (pa *PulseAudioBackend) heartbeat() {

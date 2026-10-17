@@ -1,8 +1,10 @@
 package pulseaudio
 
 import (
+	"context"
 	"errors"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/jfreymuth/pulse/proto"
@@ -567,6 +569,24 @@ func TestNotConnectedIsNotReady(t *testing.T) {
 		if err := call(); !errors.As(err, &notReady) {
 			t.Errorf("%s: err = %v, want NotReadyError", name, err)
 		}
+	}
+}
+
+// A server not answering yet does not fail the start: the backend stays not
+// ready while it retries, and the retry ends with the context.
+func TestStartOnUnreachableServer(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	pa := &PulseAudioBackend{address: filepath.Join(t.TempDir(), "native"), ctx: ctx}
+	if err := pa.Start(); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	if pa.connected.Load() {
+		t.Error("connected to a missing socket")
+	}
+	var notReady *NotReadyError
+	if _, err := pa.ListOutputs(); !errors.As(err, &notReady) {
+		t.Errorf("ListOutputs: err = %v, want NotReadyError", err)
 	}
 }
 
