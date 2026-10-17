@@ -1,7 +1,6 @@
 [Unit]
 Description=Odio Remote Api
 Documentation=https://github.com/b0bbywan/go-odio-api
-After=default.target
 
 [Service]
 ExecStart=/usr/bin/odio-api
