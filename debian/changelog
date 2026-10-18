@@ -1,3 +1,20 @@
+odio-api (0.18.1) trixie; urgency=low
+
+  Start With The Session
+
+  * Packaging: odio-api starts with the user session instead of waiting
+    for default.target, which held the API behind mpd's startup (~85s on
+    a Pi B+). Players and the audio server are picked up when they appear.
+  * Zeroconf: a publish failing because the network has no address yet no
+    longer stops odio-api; it is retried in the background until the
+    service is announced.
+  * PulseAudio: a server not answering yet at startup no longer stops
+    odio-api; the connection is retried in the background. Requests made
+    while disconnected get a 503 instead of crashing the API.
+
+ -- Mathieu Réquillart <mathieu.requillart@gmail.com>  Sun, 18 Oct 2026 00:00:00 +0000
+
+
 odio-api (0.18.0) trixie; urgency=low
 
   Remote Controls
