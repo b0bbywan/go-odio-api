@@ -134,3 +134,19 @@ func sortedSet(v string) string {
 	slices.Sort(entries)
 	return strings.Join(slices.Compact(entries), ";")
 }
+
+// present reports whether every required module of f is loaded.
+func (f feature) present(loaded []*proto.GetModuleInfoReply) bool {
+	for _, s := range f.modules {
+		if s.optional {
+			continue
+		}
+		if !slices.ContainsFunc(loaded, func(m *proto.GetModuleInfoReply) bool {
+			_, ok := s.match(m)
+			return ok
+		}) {
+			return false
+		}
+	}
+	return true
+}
