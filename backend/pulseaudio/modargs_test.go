@@ -115,3 +115,36 @@ func TestParseModuleArgs_Invalid(t *testing.T) {
 		})
 	}
 }
+
+func TestFormatModuleArgs(t *testing.T) {
+	tests := []struct {
+		name string
+		args map[string]string
+		want string
+	}{
+		{"none", map[string]string{}, ""},
+		{
+			"sorted bare values",
+			map[string]string{"sink_name": "mono", "channels": "1", "auth-ip-acl": "127.0.0.1;192.168.1.0/24"},
+			"auth-ip-acl=127.0.0.1;192.168.1.0/24 channels=1 sink_name=mono",
+		},
+		{"empty value", map[string]string{"a": ""}, `a=""`},
+		{"space", map[string]string{"a": "Mono test"}, `a="Mono test"`},
+		{"quotes and backslash", map[string]string{"a": `say "hi" it's \o/`}, `a="say \"hi\" it's \\o/"`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := formatModuleArgs(tt.args)
+			if got != tt.want {
+				t.Errorf("formatModuleArgs(%v) = %q, want %q", tt.args, got, tt.want)
+			}
+			back, err := parseModuleArgs(got)
+			if err != nil {
+				t.Fatalf("parseModuleArgs(%q) error: %v", got, err)
+			}
+			if !reflect.DeepEqual(back, tt.args) {
+				t.Errorf("round trip = %v, want %v", back, tt.args)
+			}
+		})
+	}
+}
