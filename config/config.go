@@ -19,6 +19,9 @@ const (
 	AppName     = "odio-api"
 	serviceType = "_http._tcp"
 	domain      = "local."
+
+	processingStateFile    = "90-processing-state.yaml"
+	defaultNetworkSinkPort = 4713
 )
 
 // AppVersion is set at build time via -ldflags "-X github.com/b0bbywan/go-odio-api/config.AppVersion=x.y.z"
@@ -81,6 +84,30 @@ type PulseAudioConfig struct {
 	XDGRuntimeDir string
 	ServeCookie   bool
 	VolumeStep    float32 // relative master volume step
+	Processing    *ProcessingConfig
+}
+
+// ProcessingConfig drives the server modules odio loads itself. StateFile is
+// the conf.d drop-in persisting API toggles, empty without a loaded config.
+type ProcessingConfig struct {
+	Enabled     bool
+	StateFile   string
+	Mono        *MonoConfig
+	NetworkSink *NetworkSinkConfig
+}
+
+type MonoConfig struct {
+	Enabled bool
+}
+
+// NetworkSinkConfig is the TCP sink. With ACL, clients are restricted to
+// loopback, the subnets of Interfaces and ExtraACL; without, any is accepted.
+type NetworkSinkConfig struct {
+	Enabled    bool
+	Port       int
+	ACL        bool
+	ExtraACL   []string
+	Interfaces []net.Interface // from bind, as for zeroconf
 }
 
 // OpenMode is where the dashboard opens a service's URL: `open: tab | panel |
@@ -266,6 +293,8 @@ func New(cfgFile *string) (*Config, error) {
 	viper.SetDefault("pulseaudio.enabled", true)
 	viper.SetDefault("pulseaudio.serve_cookie", false)
 	viper.SetDefault("pulseaudio.volumestep", defaultVolumeStep)
+	viper.SetDefault("pulseaudio.processing.networkSink.port", defaultNetworkSinkPort)
+	viper.SetDefault("pulseaudio.processing.networkSink.acl", true)
 
 	viper.SetDefault("systemd.enabled", false)
 	viper.SetDefault("systemd.system", []string{})
@@ -374,11 +403,41 @@ func New(cfgFile *string) (*Config, error) {
 		ScanTimeout:    getDuration("bluetooth.scantimeout", 60*time.Second),
 	}
 
+	interfaces := getZeroconfInterfaces(binds)
+
+	sinkPort := viper.GetInt("pulseaudio.processing.networkSink.port")
+	if sinkPort <= 0 || sinkPort > 65535 {
+		return nil, fmt.Errorf("invalid pulseaudio.processing.networkSink.port: %d", sinkPort)
+	}
+	extraACL, err := parseACL(viper.GetString("pulseaudio.processing.networkSink.extraAcl"))
+	if err != nil {
+		return nil, fmt.Errorf("invalid pulseaudio.processing.networkSink.extraAcl: %w", err)
+	}
+	var processingState string
+	if used := viper.ConfigFileUsed(); used != "" {
+		processingState = filepath.Join(filepath.Dir(used), "conf.d", processingStateFile)
+	}
+	processingcfg := ProcessingConfig{
+		Enabled:   viper.GetBool("pulseaudio.processing.enabled"),
+		StateFile: processingState,
+		Mono: &MonoConfig{
+			Enabled: viper.GetBool("pulseaudio.processing.mono.enabled"),
+		},
+		NetworkSink: &NetworkSinkConfig{
+			Enabled:    viper.GetBool("pulseaudio.processing.networkSink.enabled"),
+			Port:       sinkPort,
+			ACL:        viper.GetBool("pulseaudio.processing.networkSink.acl"),
+			ExtraACL:   extraACL,
+			Interfaces: interfaces,
+		},
+	}
+
 	pulsecfg := PulseAudioConfig{
 		Enabled:       viper.GetBool("pulseaudio.enabled"),
 		XDGRuntimeDir: xdgRuntimeDir,
 		ServeCookie:   viper.GetBool("pulseaudio.serve_cookie"),
 		VolumeStep:    pulseVolumeStep(),
+		Processing:    &processingcfg,
 	}
 
 	sysServices, err := parseSystemdServices(viper.Get("systemd.system"))
@@ -422,7 +481,6 @@ func New(cfgFile *string) (*Config, error) {
 		ProgressSocket: progressSocket,
 	}
 
-	interfaces := getZeroconfInterfaces(binds)
 	zerocfg := ZeroConfig{
 		Enabled:      viper.GetBool("zeroconf.enabled"),
 		InstanceName: AppName,
