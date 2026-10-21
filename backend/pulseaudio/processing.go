@@ -34,6 +34,9 @@ type moduleSpec struct {
 	ignore   []string          // loaded keys left out of the drift check
 	sets     []string          // ;-separated values compared regardless of order
 	optional bool              // a load failure only warns
+	// A sink loaded on top of the default one, which it replaces; that master
+	// is restored as default before unload.
+	takesDefault bool
 }
 
 // feature is a toggle and the modules it loads. err is set when the config
@@ -73,8 +76,9 @@ func monoFeature(cfg *config.MonoConfig) feature {
 				"channel_map":     "mono",
 				"sink_properties": "device.description=Mono",
 			},
-			identity: []string{"sink_name"},
-			ignore:   []string{"master"},
+			identity:     []string{"sink_name"},
+			ignore:       []string{"master"},
+			takesDefault: true,
 		}},
 	}
 }
