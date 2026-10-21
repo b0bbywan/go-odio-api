@@ -30,6 +30,7 @@ func New(ctx context.Context, cfg *config.PulseAudioConfig) (*PulseAudioBackend,
 		ctx:         ctx,
 		events:      make(chan events.Event, 32),
 	}
+	backend.processing = newProcessing(cfg.Processing, backend)
 
 	return backend, nil
 }
@@ -49,6 +50,12 @@ func (pa *PulseAudioBackend) start() error {
 	}
 	pa.kind = detectServerKind(pa.server)
 	logger.Debug("[pulseaudio] detected server: %s (type=%s)", pa.server.PackageName, pa.kind)
+
+	// Before the caches, which then see the sinks it adds, and the listener,
+	// which then doesn't get its own changes.
+	if pa.processing != nil {
+		pa.processing.reconcile(pa.kind, pa.server.DefaultSinkName, interfaceAddrs(pa.processing.cfg.NetworkSink.Interfaces))
+	}
 
 	// Load the cache at startup
 	if _, err := pa.ListClients(); err != nil {
