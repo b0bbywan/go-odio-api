@@ -8,29 +8,42 @@ import (
 	"github.com/jfreymuth/pulse/proto"
 )
 
-// moduleAction loads a module, or unloads the loaded one at index.
+type actionKind int
+
+const (
+	actionLoad actionKind = iota
+	actionUnload
+	actionSetDefault
+)
+
+// moduleAction is one step on the server: load module with args, unload the
+// module at index, or make sink the default.
 type moduleAction struct {
-	load     bool
-	index    uint32
+	kind     actionKind
 	module   string
 	args     string
-	optional bool
+	index    uint32
+	sink     string
+	optional bool // a failure only warns
 }
 
 // plan compares the loaded modules with f and returns what to unload and load,
 // unloads first. Disabled or in error, f ends with none of its modules loaded.
-func (f feature) plan(loaded []*proto.GetModuleInfoReply) []moduleAction {
+// defaultSink is the server's current one.
+func (f feature) plan(loaded []*proto.GetModuleInfoReply, defaultSink string) []moduleAction {
 	want := f.enabled && f.err == nil
 	var actions []moduleAction
 	for _, s := range f.modules {
-		actions = append(actions, s.actions(loaded, want)...)
+		actions = append(actions, s.actions(loaded, want, defaultSink)...)
 	}
 	return actions
 }
 
 // actions keeps the first matching instance without drift when wanted, and
-// unloads every other match: drifted ones are reloaded.
-func (s moduleSpec) actions(loaded []*proto.GetModuleInfoReply, want bool) []moduleAction {
+// unloads every other match: drifted ones are reloaded. A sink taking the
+// default takes it after load, and hands it back to its master before unload
+// if still the default.
+func (s moduleSpec) actions(loaded []*proto.GetModuleInfoReply, want bool, defaultSink string) []moduleAction {
 	var actions []moduleAction
 	kept := false
 	for _, m := range loaded {
@@ -42,15 +55,29 @@ func (s moduleSpec) actions(loaded []*proto.GetModuleInfoReply, want bool) []mod
 			kept = true
 			continue
 		}
-		actions = append(actions, moduleAction{index: m.ModuleIndex, module: m.ModuleName})
+		if master := args["master"]; s.takesDefault && master != "" && defaultSink == args["sink_name"] {
+			actions = append(actions, moduleAction{kind: actionSetDefault, sink: master, optional: true})
+			defaultSink = master
+		}
+		actions = append(actions, moduleAction{kind: actionUnload, module: m.ModuleName, index: m.ModuleIndex})
 	}
-	if want && !kept {
-		actions = append(actions, moduleAction{
-			load:     true,
-			module:   s.name,
-			args:     formatModuleArgs(s.args),
-			optional: s.optional,
-		})
+	if !want || kept {
+		return actions
+	}
+
+	args := s.args
+	if s.takesDefault && defaultSink != "" {
+		args = maps.Clone(args)
+		args["master"] = defaultSink
+	}
+	actions = append(actions, moduleAction{
+		kind:     actionLoad,
+		module:   s.name,
+		args:     formatModuleArgs(args),
+		optional: s.optional,
+	})
+	if s.takesDefault {
+		actions = append(actions, moduleAction{kind: actionSetDefault, sink: s.args["sink_name"]})
 	}
 	return actions
 }
