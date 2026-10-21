@@ -135,6 +135,17 @@ func parseInputBindings(raw any) ([]InputBinding, error) {
 	return bindings, nil
 }
 
+func validateACL(acl []string) error {
+	for _, entry := range acl {
+		if net.ParseIP(entry) == nil {
+			if _, _, err := net.ParseCIDR(entry); err != nil {
+				return fmt.Errorf("%q is neither an IP nor a CIDR", entry)
+			}
+		}
+	}
+	return nil
+}
+
 // resolveIfaceToIP returns the IPv4 address of a single named interface.
 func resolveIfaceToIP(bind string) (string, error) {
 	iface, err := net.InterfaceByName(bind)
