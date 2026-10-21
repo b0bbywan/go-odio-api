@@ -1,6 +1,10 @@
 package pulseaudio
 
-import "net"
+import (
+	"net"
+
+	"github.com/b0bbywan/go-odio-api/logger"
+)
 
 // deriveACL builds the network sink's auth-ip-acl: loopback first, then the
 // private IPv4 subnet of each address in order, then extra, deduplicated.
@@ -31,4 +35,18 @@ func deriveACL(addrs []net.Addr, extra []string) []string {
 		add(entry)
 	}
 	return acl
+}
+
+// interfaceAddrs reads the current addresses of ifaces, in order.
+func interfaceAddrs(ifaces []net.Interface) []net.Addr {
+	var addrs []net.Addr
+	for _, iface := range ifaces {
+		a, err := iface.Addrs()
+		if err != nil {
+			logger.Warn("[pulseaudio] reading addresses of %s: %v", iface.Name, err)
+			continue
+		}
+		addrs = append(addrs, a...)
+	}
+	return addrs
 }
