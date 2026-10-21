@@ -3,6 +3,8 @@ package pulseaudio
 import (
 	"errors"
 	"fmt"
+	"maps"
+	"slices"
 	"strings"
 )
 
@@ -90,6 +92,23 @@ func (r *argReader) until(stop func(byte) bool) (string, error) {
 		r.rest = r.rest[1:]
 	}
 	return v.String(), nil
+}
+
+// formatModuleArgs is the inverse of parseModuleArgs, keys sorted so the same
+// args always give the same string.
+func formatModuleArgs(args map[string]string) string {
+	parts := make([]string, 0, len(args))
+	for _, k := range slices.Sorted(maps.Keys(args)) {
+		parts = append(parts, k+"="+quoteModuleArg(args[k]))
+	}
+	return strings.Join(parts, " ")
+}
+
+func quoteModuleArg(v string) string {
+	if v != "" && !strings.ContainsAny(v, " \t\n\v\f\r'\"\\") {
+		return v
+	}
+	return `"` + strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(v) + `"`
 }
 
 func isSpace(c byte) bool {
