@@ -135,6 +135,24 @@ func parseInputBindings(raw any) ([]InputBinding, error) {
 	return bindings, nil
 }
 
+// parseACL splits a ;-separated list of IPs or CIDRs, as auth-ip-acl takes it.
+func parseACL(raw string) ([]string, error) {
+	var acl []string
+	for _, entry := range strings.Split(raw, ";") {
+		entry = strings.TrimSpace(entry)
+		if entry == "" {
+			continue
+		}
+		if net.ParseIP(entry) == nil {
+			if _, _, err := net.ParseCIDR(entry); err != nil {
+				return nil, fmt.Errorf("%q is neither an IP nor a CIDR", entry)
+			}
+		}
+		acl = append(acl, entry)
+	}
+	return acl, nil
+}
+
 // resolveIfaceToIP returns the IPv4 address of a single named interface.
 func resolveIfaceToIP(bind string) (string, error) {
 	iface, err := net.InterfaceByName(bind)
