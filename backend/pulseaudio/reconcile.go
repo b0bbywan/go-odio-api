@@ -1,6 +1,9 @@
 package pulseaudio
 
-import "maps"
+import (
+	"maps"
+	"slices"
+)
 
 type actionKind int
 
@@ -108,4 +111,14 @@ func (s moduleSpec) withoutIgnored(args map[string]string) map[string]string {
 		delete(n, k)
 	}
 	return n
+}
+
+// present reports whether every required module of f is owned.
+func (f feature) present(owned []record) bool {
+	for _, s := range f.modules {
+		if !s.optional && !slices.ContainsFunc(owned, func(r record) bool { return r.Name == s.name }) {
+			return false
+		}
+	}
+	return true
 }
