@@ -47,8 +47,10 @@ func (l *Listener) Start() error {
 		}
 	}
 
-	// Subscribe to sink, sink input and server changes
 	mask := proto.SubscriptionMaskSink | proto.SubscriptionMaskSinkInput | proto.SubscriptionMaskServer
+	if l.backend.processing != nil { // its modules unloaded by others
+		mask |= proto.SubscriptionMaskModule
+	}
 	if err := l.backend.client.Request(&proto.Subscribe{Mask: mask}, nil); err != nil {
 		return err
 	}
@@ -77,8 +79,9 @@ func (l *Listener) listen(evs <-chan proto.SubscribeEvent) {
 	}
 }
 
-// handle routes an event to the cache it affects: removals are applied by
-// index without querying the server, everything else reloads that cache.
+// handle routes an event to the cache it affects, or module ones to
+// processing: removals are applied by index without querying the server,
+// everything else reloads that cache.
 func (l *Listener) handle(ev proto.SubscribeEvent) {
 	logger.Debug("[pulseaudio] event: %s #%d", ev.Event, ev.Index)
 	remove := ev.Event.GetType() == proto.EventRemove
@@ -104,6 +107,9 @@ func (l *Listener) handle(ev proto.SubscribeEvent) {
 
 	case proto.EventServer:
 		l.refreshOutputs()
+
+	case proto.EventModule:
+		l.backend.processing.refresh()
 	}
 }
 
