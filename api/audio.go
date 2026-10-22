@@ -3,6 +3,7 @@ package api
 import (
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/b0bbywan/go-odio-api/backend/pulseaudio"
 	"github.com/b0bbywan/go-odio-api/logger"
@@ -18,19 +19,32 @@ func AudioHandler(pa *pulseaudio.PulseAudioBackend) http.HandlerFunc {
 		if err != nil {
 			return nil, err
 		}
-		clientsUpdated := pa.CacheUpdatedAt()
-		outputsUpdated := pa.OutputCacheUpdatedAt()
-		if outputsUpdated.After(clientsUpdated) {
-			setCacheHeader(w, outputsUpdated)
-		} else {
-			setCacheHeader(w, clientsUpdated)
-		}
-		return map[string]any{
+		resp := map[string]any{
 			"kind":    pa.Kind(),
 			"clients": clients,
 			"outputs": outputs,
-		}, nil
+		}
+		if pa.ProcessingEnabled() {
+			processing, err := pa.ListProcessing()
+			if err != nil {
+				return nil, err
+			}
+			resp["processing"] = processing
+		}
+		setCacheHeader(w, audioUpdatedAt(pa))
+		return resp, nil
 	})
+}
+
+// audioUpdatedAt is the latest update of the caches GET /audio serves.
+func audioUpdatedAt(pa *pulseaudio.PulseAudioBackend) time.Time {
+	updated := pa.CacheUpdatedAt()
+	for _, t := range []time.Time{pa.OutputCacheUpdatedAt(), pa.ProcessingUpdatedAt()} {
+		if t.After(updated) {
+			updated = t
+		}
+	}
+	return updated
 }
 
 func handleAudioError(w http.ResponseWriter, err error) {
@@ -117,6 +131,12 @@ func withOutput(
 			return
 		}
 		fn(w, r, output)
+	}
+}
+
+func withProcessing(action func(feature string) error) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		handleAudioError(w, action(r.PathValue("feature")))
 	}
 }
 
