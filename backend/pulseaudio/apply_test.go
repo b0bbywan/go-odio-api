@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	"github.com/jfreymuth/pulse/proto"
+
+	"github.com/b0bbywan/go-odio-api/events"
 )
 
 // fakeServer keeps a module list and the sinks remap modules add, and records
@@ -96,6 +98,12 @@ func newTestProcessing(t *testing.T, srv moduleServer, mono, networkSink bool) *
 func reconcile(t *testing.T, p *processing, kind AudioServerKind) []ProcessingFeature {
 	t.Helper()
 	return p.reconcile(kind, p.srv.(*fakeServer).def, hostAddrs(t, "192.168.1.42/24"))
+}
+
+// set toggles name like reconcile, with the fake's current default sink.
+func set(t *testing.T, p *processing, name featureName, enabled bool, kind AudioServerKind) ([]ProcessingFeature, error) {
+	t.Helper()
+	return p.set(name, enabled, kind, p.srv.(*fakeServer).def, hostAddrs(t, "192.168.1.42/24"))
 }
 
 func assertCalls(t *testing.T, srv *fakeServer, want ...string) {
@@ -359,4 +367,125 @@ func TestRefresh_LeavesErrorsAndSteadyState(t *testing.T) {
 	}
 	assertStatus(t, p, featureMono, active)
 	assertStatus(t, p, featureNetworkSink, ProcessingFeature{State: stateError, Error: "module initialization failed"})
+}
+
+func TestSet_TogglesOneFeature(t *testing.T) {
+	srv := newFakeServer(hwSink)
+	p := newTestProcessing(t, srv, false, false)
+	reconcile(t, p, ServerPulse)
+
+	changed, err := set(t, p, featureNetworkSink, true, ServerPulse)
+
+	if err != nil {
+		t.Fatalf("set error: %v", err)
+	}
+	assertCalls(t, srv,
+		"load "+tcpModule+" auth-ip-acl=127.0.0.1;192.168.1.0/24 port=4713",
+		"load "+zeroconfModule+" ",
+	)
+	if want := []ProcessingFeature{{Name: featureNetworkSink, State: stateActive}}; !reflect.DeepEqual(changed, want) {
+		t.Errorf("changed = %v, want %v", changed, want)
+	}
+	assertStatus(t, p, featureMono, disabled)
+
+	// the intention sticks: a server restart brings it back
+	srv.mods, srv.calls = nil, nil
+	reconcile(t, p, ServerPulse)
+	assertCalls(t, srv,
+		"load "+tcpModule+" auth-ip-acl=127.0.0.1;192.168.1.0/24 port=4713",
+		"load "+zeroconfModule+" ",
+	)
+}
+
+func TestSet_FeatureEndingInError(t *testing.T) {
+	srv := newFakeServer(hwSink)
+	p := newTestProcessing(t, srv, false, false)
+	reconcile(t, p, ServerPipeWire)
+
+	_, err := set(t, p, featureNetworkSink, true, ServerPipeWire)
+
+	if err == nil || err.Error() != errACLUnsupported.Error() {
+		t.Errorf("set error = %v, want %v", err, errACLUnsupported)
+	}
+	assertStatus(t, p, featureNetworkSink, ProcessingFeature{State: stateError, Error: errACLUnsupported.Error()})
+}
+
+func TestSet_Errors(t *testing.T) {
+	t.Run("unknown feature", func(t *testing.T) {
+		p := newTestProcessing(t, newFakeServer(hwSink), false, false)
+		reconcile(t, p, ServerPulse)
+
+		var notFound *NotFoundError
+		if _, err := set(t, p, "reverb", true, ServerPulse); !errors.As(err, &notFound) {
+			t.Errorf("set error = %v, want a NotFoundError", err)
+		}
+	})
+	t.Run("feature not enabled", func(t *testing.T) {
+		cfg := processingCfg()
+		cfg.NetworkSink.Enabled = false
+		p := newProcessing(cfg, newFakeServer(hwSink))
+		reconcile(t, p, ServerPulse)
+
+		var notFound *NotFoundError
+		if _, err := set(t, p, featureNetworkSink, true, ServerPulse); !errors.As(err, &notFound) {
+			t.Errorf("set error = %v, want a NotFoundError", err)
+		}
+	})
+	t.Run("listing failure", func(t *testing.T) {
+		srv := newFakeServer(hwSink)
+		p := newTestProcessing(t, srv, false, false)
+		reconcile(t, p, ServerPulse)
+		srv.failList = errors.New("connection closed")
+
+		if _, err := set(t, p, featureMono, true, ServerPulse); err == nil {
+			t.Error("set succeeded, want the listing error")
+		}
+		assertCalls(t, srv)
+		if p.enabled[featureMono] {
+			t.Error("mono wanted after a failed set")
+		}
+	})
+}
+
+func TestEnableProcessing_MonoOnCachedDefault(t *testing.T) {
+	srv := newFakeServer(hwSink)
+	pa := &PulseAudioBackend{events: make(chan events.Event, 2)}
+	pa.outputCache.Store([]AudioOutput{{Name: "alsa_output.hdmi"}, {Name: hwSink, Default: true}})
+	pa.processing = newTestProcessing(t, srv, false, false)
+	reconcile(t, pa.processing, ServerPulse)
+
+	if err := pa.EnableProcessing("mono"); err != nil {
+		t.Fatalf("EnableProcessing error: %v", err)
+	}
+
+	assertCalls(t, srv, "load "+remapModule+" "+monoArgs, "default mono")
+	want := events.Event{
+		Type: events.TypeAudioProcessing,
+		Data: []ProcessingFeature{{Name: featureMono, State: stateActive}},
+	}
+	select {
+	case got := <-pa.events:
+		if !reflect.DeepEqual(got, want) {
+			t.Errorf("event = %+v, want %+v", got, want)
+		}
+	default:
+		t.Fatal("no event")
+	}
+	list, err := pa.ListProcessing()
+	wantList := []ProcessingFeature{{Name: featureMono, State: stateActive}, {Name: featureNetworkSink, State: stateDisabled}}
+	if err != nil || !reflect.DeepEqual(list, wantList) {
+		t.Errorf("ListProcessing = %v, %v; want %v", list, err, wantList)
+	}
+}
+
+func TestProcessing_Disabled(t *testing.T) {
+	pa := &PulseAudioBackend{}
+
+	var disabled *DisabledError
+	if err := pa.EnableProcessing("mono"); !errors.As(err, &disabled) {
+		t.Errorf("EnableProcessing error = %v, want a DisabledError", err)
+	}
+	if _, err := pa.ListProcessing(); !errors.As(err, &disabled) {
+		t.Errorf("ListProcessing error = %v, want a DisabledError", err)
+	}
 }
