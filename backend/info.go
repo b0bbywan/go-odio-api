@@ -32,6 +32,7 @@ type Backends struct {
 	Input      bool `json:"input"`
 	MPRIS      bool `json:"mpris"`
 	Power      bool `json:"power"`
+	Processing bool `json:"processing"`
 	PulseAudio bool `json:"pulseaudio"`
 	Systemd    bool `json:"systemd"`
 	Upgrade    bool `json:"upgrade"`
@@ -104,6 +105,7 @@ func (b *Backend) GetServerDeviceInfo() (ServerDeviceInfo, error) {
 			Input:      b.Input != nil,
 			MPRIS:      b.MPRIS != nil,
 			Power:      b.Login1 != nil,
+			Processing: b.Pulse != nil && b.Pulse.ProcessingEnabled(),
 			PulseAudio: b.Pulse != nil,
 			Systemd:    b.Systemd != nil,
 			Upgrade:    b.Upgrade != nil,
