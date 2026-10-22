@@ -98,6 +98,12 @@ func reconcile(t *testing.T, p *processing, kind AudioServerKind) []ProcessingFe
 	return p.reconcile(kind, p.srv.(*fakeServer).def, hostAddrs(t, "192.168.1.42/24"))
 }
 
+// set toggles name like reconcile, with the fake's current default sink.
+func set(t *testing.T, p *processing, name featureName, enabled bool, kind AudioServerKind) ([]ProcessingFeature, error) {
+	t.Helper()
+	return p.set(name, enabled, kind, p.srv.(*fakeServer).def, hostAddrs(t, "192.168.1.42/24"))
+}
+
 func assertCalls(t *testing.T, srv *fakeServer, want ...string) {
 	t.Helper()
 	if !reflect.DeepEqual(srv.calls, want) {
@@ -343,4 +349,71 @@ func TestRefresh_LeavesErrorsAndSteadyState(t *testing.T) {
 	}
 	assertStatus(t, p, featureMono, active)
 	assertStatus(t, p, featureNetworkSink, ProcessingFeature{State: stateError, Error: "module initialization failed"})
+}
+
+func TestSet_TogglesOneFeature(t *testing.T) {
+	srv := newFakeServer(hwSink)
+	p := newTestProcessing(t, srv, false, false)
+	reconcile(t, p, ServerPulse)
+
+	changed, err := set(t, p, featureNetworkSink, true, ServerPulse)
+
+	if err != nil {
+		t.Fatalf("set error: %v", err)
+	}
+	assertCalls(t, srv,
+		"load "+tcpModule+" auth-ip-acl=127.0.0.1;192.168.1.0/24 port=4713",
+		"load "+zeroconfModule+" ",
+	)
+	if want := []ProcessingFeature{{Name: featureNetworkSink, State: stateActive}}; !reflect.DeepEqual(changed, want) {
+		t.Errorf("changed = %v, want %v", changed, want)
+	}
+	assertStatus(t, p, featureMono, disabled)
+
+	// the intention sticks: a server restart brings it back
+	srv.mods, srv.calls = nil, nil
+	reconcile(t, p, ServerPulse)
+	assertCalls(t, srv,
+		"load "+tcpModule+" auth-ip-acl=127.0.0.1;192.168.1.0/24 port=4713",
+		"load "+zeroconfModule+" ",
+	)
+}
+
+func TestSet_FeatureEndingInError(t *testing.T) {
+	srv := newFakeServer(hwSink)
+	p := newTestProcessing(t, srv, false, false)
+	reconcile(t, p, ServerPipeWire)
+
+	_, err := set(t, p, featureNetworkSink, true, ServerPipeWire)
+
+	if err == nil || err.Error() != errACLUnsupported.Error() {
+		t.Errorf("set error = %v, want %v", err, errACLUnsupported)
+	}
+	assertStatus(t, p, featureNetworkSink, ProcessingFeature{State: stateError, Error: errACLUnsupported.Error()})
+}
+
+func TestSet_Errors(t *testing.T) {
+	t.Run("unknown feature", func(t *testing.T) {
+		p := newTestProcessing(t, newFakeServer(hwSink), false, false)
+		reconcile(t, p, ServerPulse)
+
+		var notFound *NotFoundError
+		if _, err := set(t, p, "reverb", true, ServerPulse); !errors.As(err, &notFound) {
+			t.Errorf("set error = %v, want a NotFoundError", err)
+		}
+	})
+	t.Run("listing failure", func(t *testing.T) {
+		srv := newFakeServer(hwSink)
+		p := newTestProcessing(t, srv, false, false)
+		reconcile(t, p, ServerPulse)
+		srv.failList = errors.New("connection closed")
+
+		if _, err := set(t, p, featureMono, true, ServerPulse); err == nil {
+			t.Error("set succeeded, want the listing error")
+		}
+		assertCalls(t, srv)
+		if p.enabled[featureMono] {
+			t.Error("mono wanted after a failed set")
+		}
+	})
 }
