@@ -54,7 +54,8 @@ func (pa *PulseAudioBackend) start() error {
 	// Before the caches, which then see the sinks it adds, and the listener,
 	// which then doesn't get its own changes.
 	if pa.processing != nil {
-		pa.processing.reconcile(pa.kind, pa.server.DefaultSinkName, interfaceAddrs(pa.processing.cfg.NetworkSink.Interfaces))
+		changed := pa.processing.reconcile(pa.kind, pa.server.DefaultSinkName, interfaceAddrs(pa.processing.cfg.NetworkSink.Interfaces))
+		pa.notifyProcessing(changed)
 	}
 
 	// Load the cache at startup
@@ -329,6 +330,13 @@ func (pa *PulseAudioBackend) closeConnections() {
 func (pa *PulseAudioBackend) Close() {
 	pa.closeConnections()
 	close(pa.events)
+}
+
+// notifyProcessing emits the processing features whose state changed.
+func (pa *PulseAudioBackend) notifyProcessing(changed []ProcessingFeature) {
+	if len(changed) > 0 {
+		pa.notify(events.Event{Type: events.TypeAudioProcessing, Data: changed})
+	}
 }
 
 func (pa *PulseAudioBackend) notify(e events.Event) {
