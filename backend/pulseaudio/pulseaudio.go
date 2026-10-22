@@ -806,3 +806,54 @@ func extractModuleSource(arg string) string {
 	}
 	return ""
 }
+
+// ProcessingEnabled reports whether odio manages the processing modules.
+func (pa *PulseAudioBackend) ProcessingEnabled() bool {
+	return pa.processing != nil
+}
+
+// ListProcessing returns each processing feature's state, none until the
+// first reconcile.
+func (pa *PulseAudioBackend) ListProcessing() ([]ProcessingFeature, error) {
+	if pa.processing == nil {
+		return nil, &DisabledError{Feature: "processing"}
+	}
+	if features := pa.processing.state.Load(); features != nil {
+		return features, nil
+	}
+	return []ProcessingFeature{}, nil
+}
+
+func (pa *PulseAudioBackend) ProcessingUpdatedAt() time.Time {
+	if pa.processing == nil {
+		return time.Time{}
+	}
+	return pa.processing.state.UpdatedAt()
+}
+
+func (pa *PulseAudioBackend) EnableProcessing(name string) error {
+	return pa.setProcessing(name, true)
+}
+
+func (pa *PulseAudioBackend) DisableProcessing(name string) error {
+	return pa.setProcessing(name, false)
+}
+
+// setProcessing turns a processing feature on or off, mono on top of the
+// default sink as cached.
+func (pa *PulseAudioBackend) setProcessing(name string, enabled bool) error {
+	if pa.processing == nil {
+		return &DisabledError{Feature: "processing"}
+	}
+	logger.Debug("[pulseaudio] setting processing %s enabled=%t", name, enabled)
+	var defaultSink string
+	for _, o := range pa.outputCache.Load() {
+		if o.Default {
+			defaultSink = o.Name
+		}
+	}
+	addrs := interfaceAddrs(pa.processing.cfg.NetworkSink.Interfaces)
+	changed, err := pa.processing.set(featureName(name), enabled, pa.kind, defaultSink, addrs)
+	pa.notifyProcessing(changed)
+	return err
+}
