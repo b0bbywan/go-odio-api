@@ -94,6 +94,7 @@ func (p *processing) set(name featureName, enabled bool, kind AudioServerKind, d
 		p.enabled[name] = prev
 		return nil, err
 	}
+	saveToggle(p.cfg.StateFile, name, enabled)
 
 	for _, st := range p.state.Load() {
 		if st.Name == name && st.State == stateError {
