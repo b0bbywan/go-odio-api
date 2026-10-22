@@ -109,7 +109,7 @@ func (l *Listener) handle(ev proto.SubscribeEvent) {
 		l.refreshOutputs()
 
 	case proto.EventModule:
-		l.backend.processing.refresh()
+		l.backend.notifyProcessing(l.backend.processing.refresh())
 	}
 }
 
