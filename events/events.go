@@ -11,6 +11,7 @@ const (
 	TypeAudioRemoved        = "audio.removed"
 	TypeAudioOutputUpdated  = "audio.output.updated"
 	TypeAudioOutputRemoved  = "audio.output.removed"
+	TypeAudioProcessing     = "audio.processing.updated"
 	TypeServiceUpdated      = "service.updated"
 	TypeBluetoothUpdated    = "bluetooth.updated"
 	TypeBluetoothDiscovered = "bluetooth.discovered"
@@ -40,7 +41,7 @@ type Stream interface {
 // BackendTypes maps backend names to their event type constants.
 var BackendTypes = map[string][]string{
 	"mpris":     {TypePlayerUpdated, TypePlayerAdded, TypePlayerRemoved, TypePlayerPosition, TypePlayerTracklist},
-	"audio":     {TypeAudioUpdated, TypeAudioRemoved, TypeAudioOutputUpdated, TypeAudioOutputRemoved},
+	"audio":     {TypeAudioUpdated, TypeAudioRemoved, TypeAudioOutputUpdated, TypeAudioOutputRemoved, TypeAudioProcessing},
 	"systemd":   {TypeServiceUpdated},
 	"bluetooth": {TypeBluetoothUpdated, TypeBluetoothDiscovered},
 	"input":     {TypeInputKey, TypeInputUpdated},
