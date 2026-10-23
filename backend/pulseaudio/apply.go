@@ -1,6 +1,7 @@
 package pulseaudio
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"slices"
@@ -70,22 +71,56 @@ func (p *processing) reconcile(kind AudioServerKind, defaultSink string, addrs [
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
+	changed, err := p.reconcileLocked(kind, defaultSink, addrs)
+	if err != nil {
+		logger.Warn("[pulseaudio] processing: listing modules: %v", err)
+	}
+	return changed
+}
+
+// set turns name on or off, reconciles and returns the features whose state
+// changed; it fails if name ends in error.
+func (p *processing) set(name featureName, enabled bool, kind AudioServerKind, defaultSink string, addrs []net.Addr) ([]ProcessingFeature, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	prev, ok := p.enabled[name]
+	if !ok {
+		return nil, &NotFoundError{Resource: "processing feature", Name: string(name)}
+	}
+	p.enabled[name] = enabled
+	changed, err := p.reconcileLocked(kind, defaultSink, addrs)
+	if err != nil {
+		p.enabled[name] = prev
+		return nil, err
+	}
+	saveToggle(p.cfg.StateFile, name, enabled)
+
+	for _, st := range p.state.Load() {
+		if st.Name == name && st.State == stateError {
+			return changed, errors.New(st.Error)
+		}
+	}
+	return changed, nil
+}
+
+// reconcileLocked builds the features from the config and what odio wants,
+// and applies them; p.mu is held.
+func (p *processing) reconcileLocked(kind AudioServerKind, defaultSink string, addrs []net.Addr) ([]ProcessingFeature, error) {
 	features := buildFeatures(p.cfg, kind, addrs)
 	for i := range features {
 		features[i].enabled = p.enabled[features[i].name]
 	}
 	loaded, err := p.srv.modules()
 	if err != nil {
-		logger.Warn("[pulseaudio] processing: listing modules: %v", err)
-		return nil
+		return nil, err
 	}
-
 	next := make([]ProcessingFeature, 0, len(features))
 	for _, f := range features {
 		next = append(next, p.apply(f, f.plan(loaded, defaultSink)))
 	}
 	p.features = features
-	return p.store(next)
+	return p.store(next), nil
 }
 
 // refresh follows modules loaded or unloaded by someone else: an active
