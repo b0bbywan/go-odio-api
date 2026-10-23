@@ -49,6 +49,9 @@ func (l *Listener) Start() error {
 
 	// Subscribe to sink, sink input and server changes
 	mask := proto.SubscriptionMaskSink | proto.SubscriptionMaskSinkInput | proto.SubscriptionMaskServer
+	if l.backend.processing != nil { // modules loaded or unloaded by others
+		mask |= proto.SubscriptionMaskModule
+	}
 	if err := l.backend.client.Request(&proto.Subscribe{Mask: mask}, nil); err != nil {
 		return err
 	}
@@ -104,6 +107,9 @@ func (l *Listener) handle(ev proto.SubscribeEvent) {
 
 	case proto.EventServer:
 		l.refreshOutputs()
+
+	case proto.EventModule:
+		l.backend.notifyProcessing(l.backend.processing.refresh())
 	}
 }
 
