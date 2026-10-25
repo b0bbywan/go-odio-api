@@ -197,12 +197,21 @@ type AudioClient struct {
 	Corked      bool    `json:"corked"`
 }
 
+// ProcessingFeature is a server processing toggle from /audio. State is
+// "active", "disabled" or "error", Error its reason.
+type ProcessingFeature struct {
+	Name  string `json:"name"`
+	State string `json:"state"`
+	Error string `json:"error,omitempty"`
+}
+
 // AudioData holds the combined audio state from GET /audio
 type AudioData struct {
 	Kind        string       // "pulseaudio" or "pipewire"
 	DefaultSink *AudioOutput // the output with default=true
 	Clients     []AudioClient
 	Outputs     []AudioOutput
+	Processing  []ProcessingFeature // nil when odio manages no processing
 }
 
 // Service represents a systemd service from /services
