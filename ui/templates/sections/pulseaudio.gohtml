@@ -18,6 +18,10 @@
 	</summary>
 
 	{{ if .DefaultSink }}
+	{{ if .Processing }}
+	{{ template "audio-processing" .Processing }}
+	{{ end }}
+
 	<!-- Server info -->
 	<div class="info-card mb-4">
 		<div class="mb-2 text-xs text-subtle">Default Sink</div>
