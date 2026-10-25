@@ -1,0 +1,36 @@
+{{ define "audio-processing" }}
+<details id="audio-processing" class="player-card mb-4">
+	<summary class="player-summary gap-2">
+		<span class="text-xs text-subtle">Processing</span>
+		<span class="processing-active flex items-center gap-1.5">
+			{{ range . }}{{ if ne .State "disabled" }}
+			<span class="{{ if eq .State "error" }}text-red-400{{ else }}text-lime{{ end }}" title="{{ template "processing-label" .Name }}">{{ template "processing-icon" .Name }}</span>
+			{{ end }}{{ end }}
+		</span>
+		<span class="player-toggle ml-auto text-xs">▾</span>
+	</summary>
+	<ul class="divide-y divide-zinc-700">
+		{{ range . }}
+		{{/* An error is either a failed load or a failed unload: drawn on,
+		     disabling clears the first and retries the second. */}}
+		{{ $on := ne .State "disabled" }}
+		<li class="flex items-center gap-3 py-2">
+			<span class="{{ if eq .State "error" }}text-red-400{{ else }}text-muted{{ end }}">{{ template "processing-icon" .Name }}</span>
+			<div class="content-area">
+				<div class="truncate text-sm">{{ template "processing-label" .Name }}</div>
+				{{ if .Error }}<div class="text-xs text-red-400">{{ .Error }}</div>{{ end }}
+			</div>
+			<button role="switch" aria-checked="{{ $on }}" aria-label="{{ template "processing-label" .Name }}" class="switch"
+				hx-post="/audio/processing/{{ .Name }}/{{ if $on }}disable{{ else }}enable{{ end }}"
+				hx-swap="none">
+				<span class="switch-thumb"></span>
+			</button>
+		</li>
+		{{ end }}
+	</ul>
+</details>
+{{ end }}
+
+{{ define "processing-label" }}{{ if eq . "mono" }}Mono downmix{{ else if eq . "network_sink" }}Network audio sink{{ else }}{{ . }}{{ end }}{{ end }}
+
+{{ define "processing-icon" }}{{ if eq . "mono" }}{{ template "icon-mono" }}{{ else if eq . "network_sink" }}{{ template "icon-share" }}{{ end }}{{ end }}
