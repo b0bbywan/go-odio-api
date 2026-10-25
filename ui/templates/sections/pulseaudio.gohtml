@@ -43,6 +43,10 @@
 		{{ template "volume-slider" (dict "Target" "" "Type" "audio-server" "Volume" .DefaultSink.Volume "Muted" .DefaultSink.Muted "ShowMute" true "Title" "Master volume") }}
 	</div>
 
+	{{ if .Processing }}
+	{{ template "audio-processing" .Processing }}
+	{{ end }}
+
 	<!-- Audio clients -->
 	{{ if .Clients }}
 	<div class="space-y-2">
