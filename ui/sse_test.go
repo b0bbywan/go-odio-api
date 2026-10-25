@@ -242,6 +242,13 @@ func TestSSEEvents_EventMapping(t *testing.T) {
 			wantSSEEvent: "event: section-mpris",
 		},
 		{
+			name:         "audio.processing.updated maps to section-audio",
+			eventType:    events.TypeAudioProcessing,
+			apiEndpoint:  "/audio",
+			apiResponse:  `{"kind":"pulseaudio","clients":[],"outputs":[],"processing":[{"name":"mono","state":"active"}]}`,
+			wantSSEEvent: "event: section-audio",
+		},
+		{
 			name:         "upgrade.info maps to section-upgrade",
 			eventType:    events.TypeUpgradeInfo,
 			apiEndpoint:  "/upgrade",
