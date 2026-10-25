@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"reflect"
 	"strconv"
 	"strings"
 	"testing"
@@ -713,6 +714,54 @@ func TestGetAudio_FilterCorked(t *testing.T) {
 	}
 	if data.Clients[0].Name != "Spotify" || data.Clients[1].Name != "Chrome" {
 		t.Errorf("expected Spotify and Chrome, got %s and %s", data.Clients[0].Name, data.Clients[1].Name)
+	}
+}
+
+func TestGetAudio_Processing(t *testing.T) {
+	tests := []struct {
+		name string
+		body string
+		want []ProcessingFeature
+	}{
+		{
+			name: "managed",
+			body: `{"kind": "pulseaudio", "clients": [], "outputs": [], "processing": [
+				{"name": "mono", "state": "active"},
+				{"name": "network_sink", "state": "error", "error": "no private LAN subnet to allow"}
+			]}`,
+			want: []ProcessingFeature{
+				{Name: "mono", State: "active"},
+				{Name: "network_sink", State: "error", Error: "no private LAN subnet to allow"},
+			},
+		},
+		{
+			name: "not managed",
+			body: `{"kind": "pulseaudio", "clients": [], "outputs": []}`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			apiMux := http.NewServeMux()
+			apiMux.HandleFunc("/audio", func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				if _, err := w.Write([]byte(tt.body)); err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+				}
+			})
+			server := httptest.NewServer(apiMux)
+			defer server.Close()
+
+			u, _ := url.Parse(server.URL)
+			port, _ := strconv.Atoi(u.Port())
+
+			data, err := NewAPIClient(port).GetAudio()
+			if err != nil {
+				t.Fatalf("GetAudio failed: %v", err)
+			}
+			if !reflect.DeepEqual(data.Processing, tt.want) {
+				t.Errorf("Processing = %+v, want %+v", data.Processing, tt.want)
+			}
+		})
 	}
 }
 
