@@ -230,6 +230,26 @@ button.htmx-request {
 		@apply rotate-180;
 	}
 
+	details[open] > summary .processing-active {
+		@apply hidden;
+	}
+
+	.switch {
+		@apply relative h-6 w-11 shrink-0 rounded-full bg-zinc-600 transition-colors;
+	}
+
+	.switch[aria-checked="true"] {
+		@apply bg-lime;
+	}
+
+	.switch-thumb {
+		@apply absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-zinc-400 transition-transform;
+	}
+
+	.switch[aria-checked="true"] .switch-thumb {
+		@apply translate-x-5 bg-zinc-900;
+	}
+
 	/* Container queries land in chromium 105 and the framebuffer browser runs
 	   87, where the cqw declaration is dropped and the cap with it: the art
 	   stretches and the tracklist grows instead of scrolling, which swamps a

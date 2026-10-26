@@ -349,6 +349,7 @@ var (
 		events.TypeAudioRemoved:       audioSection,
 		events.TypeAudioOutputUpdated: audioSection,
 		events.TypeAudioOutputRemoved: audioSection,
+		events.TypeAudioProcessing:    audioSection,
 
 		events.TypeServiceUpdated:   systemdSection,
 		events.TypeBluetoothUpdated: bluetoothSection,
