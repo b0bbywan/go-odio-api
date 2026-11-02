@@ -114,36 +114,14 @@ func (l *Listener) handle(ev proto.SubscribeEvent) {
 }
 
 func (l *Listener) refreshClients() {
-	oldClients := l.backend.cache.Load()
-	clients, err := l.backend.refreshCache()
-	if err != nil {
+	if err := l.backend.reloadClients(); err != nil {
 		logger.Warn("[pulseaudio] failed to refresh clients: %v", err)
-		return
-	}
-	changed, removed := diffClients(oldClients, clients)
-	logger.Debug("[pulseaudio] client diff: %d changed, %d removed", len(changed), len(removed))
-	if len(changed) > 0 {
-		l.backend.notify(events.Event{Type: events.TypeAudioUpdated, Data: changed})
-	}
-	if len(removed) > 0 {
-		l.backend.notify(events.Event{Type: events.TypeAudioRemoved, Data: removed})
 	}
 }
 
 func (l *Listener) refreshOutputs() {
-	oldOutputs := l.backend.outputCache.Load()
-	outputs, err := l.backend.refreshOutputCache()
-	if err != nil {
+	if err := l.backend.reloadOutputs(); err != nil {
 		logger.Warn("[pulseaudio] failed to refresh outputs: %v", err)
-		return
-	}
-	changed, removed := diffOutputs(oldOutputs, outputs)
-	logger.Debug("[pulseaudio] output diff: %d changed, %d removed", len(changed), len(removed))
-	if len(changed) > 0 {
-		l.backend.notify(events.Event{Type: events.TypeAudioOutputUpdated, Data: changed})
-	}
-	if len(removed) > 0 {
-		l.backend.notify(events.Event{Type: events.TypeAudioOutputRemoved, Data: removed})
 	}
 }
 
