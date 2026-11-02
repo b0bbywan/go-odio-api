@@ -58,11 +58,11 @@ func (pa *PulseAudioBackend) start() error {
 		pa.notifyProcessing(changed)
 	}
 
-	// Load the cache at startup
-	if _, err := pa.ListClients(); err != nil {
+	// Reloaded even when cached: on a reconnect, the server may have restarted.
+	if err := pa.reloadClients(); err != nil {
 		return err
 	}
-	if _, err := pa.ListOutputs(); err != nil {
+	if err := pa.reloadOutputs(); err != nil {
 		return err
 	}
 
@@ -186,6 +186,24 @@ func (pa *PulseAudioBackend) refreshCache() ([]AudioClient, error) {
 	pa.cache.Store(updatedClients)
 
 	return updatedClients, nil
+}
+
+// reloadClients refreshes the client cache and emits what changed.
+func (pa *PulseAudioBackend) reloadClients() error {
+	old := pa.cache.Load()
+	clients, err := pa.refreshCache()
+	if err != nil {
+		return err
+	}
+	changed, removed := diffClients(old, clients)
+	logger.Debug("[pulseaudio] client diff: %d changed, %d removed", len(changed), len(removed))
+	if len(changed) > 0 {
+		pa.notify(events.Event{Type: events.TypeAudioUpdated, Data: changed})
+	}
+	if len(removed) > 0 {
+		pa.notify(events.Event{Type: events.TypeAudioRemoved, Data: removed})
+	}
+	return nil
 }
 
 func (pa *PulseAudioBackend) mergeClients(oldClients []AudioClient, sinks []*proto.GetSinkInputInfoReply) []AudioClient {
@@ -636,6 +654,24 @@ func (pa *PulseAudioBackend) refreshOutputCache() ([]AudioOutput, error) {
 
 	pa.outputCache.Store(outputs)
 	return outputs, nil
+}
+
+// reloadOutputs refreshes the output cache and emits what changed.
+func (pa *PulseAudioBackend) reloadOutputs() error {
+	old := pa.outputCache.Load()
+	outputs, err := pa.refreshOutputCache()
+	if err != nil {
+		return err
+	}
+	changed, removed := diffOutputs(old, outputs)
+	logger.Debug("[pulseaudio] output diff: %d changed, %d removed", len(changed), len(removed))
+	if len(changed) > 0 {
+		pa.notify(events.Event{Type: events.TypeAudioOutputUpdated, Data: changed})
+	}
+	if len(removed) > 0 {
+		pa.notify(events.Event{Type: events.TypeAudioOutputRemoved, Data: removed})
+	}
+	return nil
 }
 
 func (pa *PulseAudioBackend) GetOutput(name string) (*AudioOutput, bool) {
