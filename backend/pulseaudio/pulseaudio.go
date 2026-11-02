@@ -219,7 +219,8 @@ func (pa *PulseAudioBackend) updateOrAddClient(oldMap map[string]AudioClient, cl
 }
 
 func clientChanged(a, b AudioClient) bool {
-	return a.Volume != b.Volume ||
+	return a.ID != b.ID ||
+		a.Volume != b.Volume ||
 		a.Muted != b.Muted ||
 		a.Corked != b.Corked
 }
@@ -791,7 +792,8 @@ func diffOutputs(old, new []AudioOutput) (changed []AudioOutput, removed []Audio
 }
 
 func outputChanged(a, b AudioOutput) bool {
-	return a.Volume != b.Volume ||
+	return a.Index != b.Index ||
+		a.Volume != b.Volume ||
 		a.Muted != b.Muted ||
 		a.State != b.State ||
 		a.Default != b.Default
