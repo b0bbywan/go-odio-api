@@ -171,6 +171,9 @@ func (l *Listener) waitForStableState(service string) {
 	// fires immediately
 	timer := time.NewTimer(0)
 	defer timer.Stop()
+	// The first transitional read is announced once, as the D-Bus signals do:
+	// a backend following a unit learns it started, not only how it ended.
+	announced := false
 
 	for {
 		select {
@@ -195,6 +198,10 @@ func (l *Listener) waitForStableState(service string) {
 				return
 			}
 			logger.Debug("[systemd] %s/%s still in transitional state: %s", ScopeUser, service, unit.ActiveState)
+			if !announced {
+				announced = true
+				l.backend.notifyService(*unit)
+			}
 			timer.Reset(waitTime)
 
 			waitTime = time.Duration(float64(waitTime) * factor)
