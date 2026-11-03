@@ -5,7 +5,7 @@ Documentation=https://github.com/b0bbywan/go-odio-api
 [Service]
 ExecStart=/usr/bin/odio-api
 Restart=always
-RestartSec=12
+RestartSec=5
 TimeoutSec=30
 
 [Install]
