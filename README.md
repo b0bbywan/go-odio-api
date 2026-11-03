@@ -507,6 +507,8 @@ Detector status and run lifecycle stream as `upgrade.info`; live run progress st
 {"event": "end",      "success": true}
 ```
 
+A run is the upgrade unit's as soon as the unit is activating, whoever started it (`POST /upgrade/start`, the admin app, a shell): the unit's end is the verdict, and the socket only feeds `percent`/`step` — one unit may stream several `begin`…`end` (a disable, then the upgrade). A unit that fails before it was seen activating is still reported `failed`. Only a run with no unit behind it (`origin: "socket"`, a CLI upgrade) is closed by its `end` line.
+
 ### SSE Event Stream
 
 ```
