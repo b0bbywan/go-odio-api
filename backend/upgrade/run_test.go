@@ -169,13 +169,13 @@ func TestApplyRunProgressSocketLifecycle(t *testing.T) {
 	}
 }
 
-// TestResumeIfRunningSocketAwaitsReconnect: a restored socket run owns its
-// lifecycle, so resume re-announces it without consulting systemd.
+// TestResumeIfRunningSocketAwaitsReconnect: a restored socket run with no unit
+// running behind it is a CLI run, so resume re-announces it and waits.
 func TestResumeIfRunningSocketAwaitsReconnect(t *testing.T) {
 	u := &UpgradeBackend{
 		run:     newRun(""),
 		events:  make(chan events.Event, 16),
-		systemd: &systemd.SystemdBackend{}, // never touched on the socket path
+		systemd: &fakeSystemd{refreshSvc: &systemd.Service{ActiveState: "inactive"}},
 		ctx:     context.Background(),
 	}
 	u.run.start(originSocket)
@@ -187,5 +187,58 @@ func TestResumeIfRunningSocketAwaitsReconnect(t *testing.T) {
 	}
 	if rs, _ := e.Data.(RunState); rs.State != stateRunning || rs.Origin != originSocket {
 		t.Fatalf("resume event = %+v, want running/socket", e.Data)
+	}
+}
+
+// A socket end closes a socket run, not a systemd one: the unit has the last word.
+func TestRunFinishSocketLeavesSystemdRun(t *testing.T) {
+	r := newRun("")
+	r.start(originSystemd)
+	if r.finishSocket(true) {
+		t.Fatal("finishSocket closed a systemd run")
+	}
+	if !r.isRunning() {
+		t.Fatal("systemd run no longer running after a socket end")
+	}
+
+	r = newRun("")
+	r.begin(3)
+	if !r.finishSocket(false) {
+		t.Fatal("finishSocket did not close a socket run")
+	}
+}
+
+func TestRunClaim(t *testing.T) {
+	r := newRun("")
+	if !r.claim(originSystemd) || r.origin() != originSystemd || !r.isRunning() {
+		t.Fatalf("claim on idle = %+v, want running/systemd", r.snapshot())
+	}
+	if r.claim(originSystemd) {
+		t.Error("claiming its own run again reported a change")
+	}
+
+	r = newRun("")
+	r.begin(3)
+	r.progress(40, "mpd")
+	if !r.claim(originSystemd) {
+		t.Fatal("taking over a socket run reported no change")
+	}
+	if got := r.snapshot(); got.Origin != originSystemd || got.Percent == nil || *got.Percent != 40 {
+		t.Fatalf("after takeover = %+v, want systemd keeping percent 40", got)
+	}
+}
+
+func TestRunUnitFailed(t *testing.T) {
+	r := newRun("")
+	if !r.unitFailed() || r.snapshot().State != stateFailed {
+		t.Fatalf("unitFailed on idle = %+v, want failed", r.snapshot())
+	}
+	if r.unitFailed() {
+		t.Error("unitFailed on a failed verdict reported a change")
+	}
+	r = newRun("")
+	r.start(originSystemd)
+	if r.unitFailed() {
+		t.Error("unitFailed recorded over a run in flight")
 	}
 }

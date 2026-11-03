@@ -142,6 +142,25 @@ func (r *run) begin(total int) {
 	r.st.Step = nil
 }
 
+// claim makes the run origin's: a new one when none is in flight, or the one a
+// socket begin adopted, taken over by the unit that turns out to run it. It
+// reports whether anything changed.
+func (r *run) claim(origin string) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.st.State == stateRunning {
+		if r.st.Origin == origin {
+			return false
+		}
+		logger.Info("[upgrade] run taken over: origin %s -> %s", r.st.Origin, origin)
+		r.st.Origin = origin
+		return true
+	}
+	r.st = RunState{State: stateRunning, Origin: origin, StartedAt: nowRFC3339()}
+	logger.Info("[upgrade] run claimed (origin=%s)", origin)
+	return true
+}
+
 func (r *run) progress(pct int, step string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -160,6 +179,10 @@ func (r *run) progress(pct int, step string) {
 func (r *run) finish(success bool) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	return r.finishLocked(success)
+}
+
+func (r *run) finishLocked(success bool) bool {
 	if r.st.State != stateRunning {
 		return false
 	}
@@ -174,6 +197,34 @@ func (r *run) finish(success bool) bool {
 		FinishedAt: nowRFC3339(),
 	}
 	logger.Info("[upgrade] run finished: state=%s origin=%s", state, r.st.Origin)
+	return true
+}
+
+// finishSocket is the socket "end" line: it closes a run the socket owns. A
+// systemd run is left to its unit, which may run more than one playbook (a
+// disable, then the upgrade) and has the last word on how it went.
+func (r *run) finishSocket(success bool) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.st.State == stateRunning && r.st.Origin == originSystemd {
+		logger.Debug("[upgrade] socket end (success=%v) on a systemd run, waiting for the unit", success)
+		return false
+	}
+	return r.finishLocked(success)
+}
+
+// unitFailed records a failure for a unit that failed without a run in flight:
+// started elsewhere and gone before it was seen activating. It reports false
+// when there is a run to close instead, or the verdict is failed already.
+func (r *run) unitFailed() bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.st.State != stateIdle {
+		return false
+	}
+	now := nowRFC3339()
+	r.st = RunState{State: stateFailed, Origin: originSystemd, StartedAt: now, FinishedAt: now}
+	logger.Info("[upgrade] unit failed with no run seen, recording failed")
 	return true
 }
 
