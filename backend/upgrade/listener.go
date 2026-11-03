@@ -116,7 +116,8 @@ func parseProgress(line []byte) (progressLine, bool) {
 
 // applyRunProgress advances the run from the socket stream. begin and a closing
 // end emit upgrade.info so the badge flips state; progress rides the raw
-// upgrade.progress line the caller sends, so it needs no extra info event.
+// upgrade.progress line the caller sends, so it needs no extra info event. An
+// end only closes a run the socket owns: a unit's run ends with the unit.
 func (u *UpgradeBackend) applyRunProgress(p progressLine) {
 	switch *p.Event {
 	case "begin":
@@ -125,7 +126,7 @@ func (u *UpgradeBackend) applyRunProgress(p progressLine) {
 	case "progress":
 		u.run.progress(*p.Percent, *p.Step)
 	case "end":
-		if u.run.finish(*p.Success) {
+		if u.run.finishSocket(*p.Success) {
 			u.notify(events.Event{Type: events.TypeUpgradeInfo, Data: u.run.snapshot()})
 		}
 	}

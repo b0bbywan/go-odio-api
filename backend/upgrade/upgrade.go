@@ -215,58 +215,63 @@ func (u *UpgradeBackend) consumeEvents() {
 	}
 }
 
-// onServiceEvent emits the run verdict once the upgrade unit reaches a terminal
-// state. A socket-driven run owns its own lifecycle and is closed by its "end"
-// line, not by the unit. finish is idempotent, so a run that streams "end" and
-// also trips the unit's terminal state still emits finished exactly once.
+// onServiceEvent follows the upgrade unit, whoever started it (us, the admin
+// app, a shell): activating claims the run for the unit, a terminal state
+// closes it. A run the socket adopted outside the unit (a CLI upgrade) is
+// closed by its "end" line instead; finish is idempotent, so the two terminal
+// sources still emit finished exactly once.
 func (u *UpgradeBackend) onServiceEvent(e events.Event) {
 	svc, ok := e.Data.(systemd.Service)
 	if !ok || svc.Name != u.upgradeUnit || svc.Scope != systemd.ScopeUser {
 		return
 	}
 	switch svc.ActiveState {
+	case "activating":
+		if u.run.claim(originSystemd) {
+			logger.Info("[upgrade] %s activating, emitting running", u.upgradeUnit)
+			u.notify(events.Event{Type: events.TypeUpgradeInfo, Data: u.run.snapshot()})
+		}
+		return
 	case "active", "inactive", "failed": // terminal for a oneshot
 	default:
-		return // still activating
-	}
-	if u.run.origin() == originSocket {
 		return
 	}
 	success := svc.ActiveState != "failed"
-	if !u.run.finish(success) {
-		return
+	if u.run.isRunning() {
+		if u.run.origin() == originSocket || !u.run.finish(success) {
+			return
+		}
+	} else if success || !u.run.unitFailed() {
+		return // nothing in flight, nothing new to say
 	}
 	logger.Info("[upgrade] %s reached %s, emitting finished (success=%v)", u.upgradeUnit, svc.ActiveState, success)
 	u.notify(events.Event{Type: events.TypeUpgradeInfo, Data: u.run.snapshot()})
 }
 
-// resumeIfRunning reconciles a restored or out-of-band run at startup. A socket
-// run has no unit to consult and waits for its CLI client to reconnect. For a
-// systemd run it reads the unit: still activating means resume, already terminal
-// means the run finished while we were down, so record its verdict.
+// resumeIfRunning reconciles a restored or out-of-band run at startup by reading
+// the unit: still activating means resume, as the unit's run; already terminal
+// means a systemd run finished while we were down, so record its verdict. A
+// socket run with no unit behind it waits for its CLI client to reconnect.
 func (u *UpgradeBackend) resumeIfRunning() {
 	if u.systemd == nil {
 		return
 	}
-	if u.run.isRunning() && u.run.origin() == originSocket {
-		logger.Info("[upgrade] resuming socket run, awaiting client reconnect")
-		u.notify(events.Event{Type: events.TypeUpgradeInfo, Data: u.run.snapshot()})
-		return
-	}
+	socketRun := u.run.isRunning() && u.run.origin() == originSocket
 	ctx, cancel := context.WithTimeout(u.ctx, 5*time.Second)
 	svc, err := u.systemd.RefreshService(ctx, u.upgradeUnit, systemd.ScopeUser)
 	cancel()
-	if err != nil {
-		logger.Warn("[upgrade] cannot read %s state on startup: %v", u.upgradeUnit, err)
-		return
-	}
 	switch {
-	case svc.ActiveState == "activating":
-		// claim it unless we already hold a restored run for this unit.
-		if u.run.isRunning() || u.run.start(originSystemd) {
-			logger.Info("[upgrade] %s still running on startup, resuming", u.upgradeUnit)
-			u.notify(events.Event{Type: events.TypeUpgradeInfo, Data: u.run.snapshot()})
-		}
+	case err == nil && svc.ActiveState == "activating":
+		// the unit's, whether restored as such, adopted from the socket, or new.
+		u.run.claim(originSystemd)
+		logger.Info("[upgrade] %s still running on startup, resuming", u.upgradeUnit)
+		u.notify(events.Event{Type: events.TypeUpgradeInfo, Data: u.run.snapshot()})
+	case socketRun:
+		// a CLI run outside the unit: its client reconnects to end it.
+		logger.Info("[upgrade] resuming socket run, awaiting client reconnect")
+		u.notify(events.Event{Type: events.TypeUpgradeInfo, Data: u.run.snapshot()})
+	case err != nil:
+		logger.Warn("[upgrade] cannot read %s state on startup: %v", u.upgradeUnit, err)
 	case u.run.isRunning():
 		// restored running but the unit is terminal: it ended while we were down.
 		if u.run.finish(svc.ActiveState != "failed") {

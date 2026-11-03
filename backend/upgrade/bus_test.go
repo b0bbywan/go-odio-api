@@ -148,3 +148,110 @@ func TestOnServiceEventIgnoresSocketRun(t *testing.T) {
 		t.Error("socket run should still be running")
 	}
 }
+
+func unitEvent(state string) events.Event {
+	return events.Event{
+		Type: events.TypeServiceUpdated,
+		Data: systemd.Service{Name: "odio-upgrade.service", Scope: systemd.ScopeUser, ActiveState: state},
+	}
+}
+
+func expectNoEvent(t *testing.T, u *UpgradeBackend, why string) {
+	t.Helper()
+	if e, ok := recv(t, u.Events(), 200*time.Millisecond); ok {
+		t.Fatalf("%s: got %+v", why, e.Data)
+	}
+}
+
+// A unit started elsewhere (the admin app, a shell) is a run as soon as it is
+// activating, and its terminal state closes it.
+func TestOnServiceEventClaimsUnitStartedElsewhere(t *testing.T) {
+	u := newBackend(t, &fakeSystemd{})
+
+	u.onServiceEvent(unitEvent("activating"))
+	if rs := recvRunState(t, u); rs.State != stateRunning || rs.Origin != originSystemd {
+		t.Fatalf("activating = %+v, want running/systemd", rs)
+	}
+	u.onServiceEvent(unitEvent("activating"))
+	expectNoEvent(t, u, "a second activating re-announced the run")
+
+	u.onServiceEvent(unitEvent("inactive"))
+	if rs := recvRunState(t, u); rs.State != stateIdle || rs.FinishedAt == "" {
+		t.Fatalf("inactive = %+v, want idle (success) with finished_at", rs)
+	}
+}
+
+// A run the socket's begin adopted is the unit's once the unit shows up
+// activating, so the unit's end closes it.
+func TestOnServiceEventTakesOverSocketRun(t *testing.T) {
+	u := newBackend(t, &fakeSystemd{})
+	u.applyRunProgress(progressLine{Event: strp("begin"), Total: intp(3)})
+	recvRunState(t, u)
+
+	u.onServiceEvent(unitEvent("activating"))
+	if rs := recvRunState(t, u); rs.Origin != originSystemd {
+		t.Fatalf("after activating = %+v, want origin systemd", rs)
+	}
+	u.onServiceEvent(unitEvent("failed"))
+	if rs := recvRunState(t, u); rs.State != stateFailed {
+		t.Fatalf("failed = %+v, want failed", rs)
+	}
+}
+
+// The unit runs disable.yml then install.sh: each streams begin…end, and the
+// first end must not close the run.
+func TestSocketEndLeavesUnitRunOpen(t *testing.T) {
+	u := newBackend(t, &fakeSystemd{})
+	u.onServiceEvent(unitEvent("activating"))
+	recvRunState(t, u)
+
+	u.applyRunProgress(progressLine{Event: strp("begin"), Total: intp(2)})
+	recvRunState(t, u)
+	u.applyRunProgress(progressLine{Event: strp("progress"), Percent: intp(100), Current: intp(2), Step: strp("disable")})
+	u.applyRunProgress(progressLine{Event: strp("end"), Success: boolp(true)})
+	expectNoEvent(t, u, "the first playbook's end closed the unit's run")
+	if !u.run.isRunning() {
+		t.Fatal("run closed by a socket end")
+	}
+
+	u.applyRunProgress(progressLine{Event: strp("begin"), Total: intp(7)})
+	if rs := recvRunState(t, u); rs.State != stateRunning || rs.Percent == nil || *rs.Percent != 0 {
+		t.Fatalf("second begin = %+v, want running at 0%%", rs)
+	}
+	u.applyRunProgress(progressLine{Event: strp("end"), Success: boolp(true)})
+	expectNoEvent(t, u, "the last playbook's end closed the unit's run")
+
+	u.onServiceEvent(unitEvent("inactive"))
+	if rs := recvRunState(t, u); rs.State != stateIdle {
+		t.Fatalf("unit end = %+v, want idle", rs)
+	}
+}
+
+// A unit that fails before it was seen activating (refused at once) still
+// shows as failed; a success nobody saw says nothing.
+func TestOnServiceEventUnseenUnit(t *testing.T) {
+	u := newBackend(t, &fakeSystemd{})
+
+	u.onServiceEvent(unitEvent("inactive"))
+	expectNoEvent(t, u, "an unseen success was announced")
+
+	u.onServiceEvent(unitEvent("failed"))
+	if rs := recvRunState(t, u); rs.State != stateFailed || rs.Origin != originSystemd {
+		t.Fatalf("unseen failure = %+v, want failed/systemd", rs)
+	}
+	u.onServiceEvent(unitEvent("failed"))
+	expectNoEvent(t, u, "a repeated failure was announced again")
+}
+
+// A socket run restored at startup whose unit is still activating was the
+// unit's all along (adopted from begin by an odio-api that predates the
+// takeover): resume hands it to the unit.
+func TestResumeIfRunningSocketRunOfTheUnit(t *testing.T) {
+	u := newBackend(t, &fakeSystemd{refreshSvc: &systemd.Service{ActiveState: "activating"}})
+	u.run.start(originSocket)
+
+	u.resumeIfRunning()
+	if rs := recvRunState(t, u); rs.State != stateRunning || rs.Origin != originSystemd {
+		t.Fatalf("resume = %+v, want running/systemd", rs)
+	}
+}
