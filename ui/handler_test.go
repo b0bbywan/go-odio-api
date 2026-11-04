@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"reflect"
 	"strconv"
 	"strings"
 	"testing"
@@ -713,6 +714,99 @@ func TestGetAudio_FilterCorked(t *testing.T) {
 	}
 	if data.Clients[0].Name != "Spotify" || data.Clients[1].Name != "Chrome" {
 		t.Errorf("expected Spotify and Chrome, got %s and %s", data.Clients[0].Name, data.Clients[1].Name)
+	}
+}
+
+func TestGetAudio_Processing(t *testing.T) {
+	tests := []struct {
+		name string
+		body string
+		want []ProcessingFeature
+	}{
+		{
+			name: "managed",
+			body: `{"kind": "pulseaudio", "clients": [], "outputs": [], "processing": [
+				{"name": "mono", "state": "active"},
+				{"name": "network_sink", "state": "error", "error": "no private LAN subnet to allow"}
+			]}`,
+			want: []ProcessingFeature{
+				{Name: "mono", State: "active"},
+				{Name: "network_sink", State: "error", Error: "no private LAN subnet to allow"},
+			},
+		},
+		{
+			name: "not managed",
+			body: `{"kind": "pulseaudio", "clients": [], "outputs": []}`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			apiMux := http.NewServeMux()
+			apiMux.HandleFunc("/audio", func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				if _, err := w.Write([]byte(tt.body)); err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+				}
+			})
+			server := httptest.NewServer(apiMux)
+			defer server.Close()
+
+			u, _ := url.Parse(server.URL)
+			port, _ := strconv.Atoi(u.Port())
+
+			data, err := NewAPIClient(port).GetAudio()
+			if err != nil {
+				t.Fatalf("GetAudio failed: %v", err)
+			}
+			if !reflect.DeepEqual(data.Processing, tt.want) {
+				t.Errorf("Processing = %+v, want %+v", data.Processing, tt.want)
+			}
+		})
+	}
+}
+
+func TestAudioProcessingTemplate(t *testing.T) {
+	tmpl := LoadTemplates()
+	sink := &AudioOutput{Name: "sink", Description: "Sink", Volume: 0.5, Default: true}
+
+	t.Run("not managed", func(t *testing.T) {
+		var buf bytes.Buffer
+		if err := tmpl.ExecuteTemplate(&buf, "section-pulseaudio", &AudioData{DefaultSink: sink}); err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(buf.String(), "audio-processing") {
+			t.Error("processing block rendered without processing")
+		}
+	})
+
+	var buf bytes.Buffer
+	data := &AudioData{DefaultSink: sink, Processing: []ProcessingFeature{
+		{Name: "mono", State: "disabled"},
+		{Name: "network_sink", State: "error", Error: "no private LAN subnet to allow"},
+	}}
+	if err := tmpl.ExecuteTemplate(&buf, "section-pulseaudio", data); err != nil {
+		t.Fatal(err)
+	}
+	html := buf.String()
+	for _, want := range []string{
+		`id="audio-processing"`,
+		`aria-checked="false" aria-label="Mono downmix"`,
+		`hx-post="/audio/processing/mono/enable"`,
+		`aria-checked="true" aria-label="Network audio sink"`,
+		`hx-post="/audio/processing/network_sink/disable"`,
+		"no private LAN subnet to allow",
+	} {
+		if !strings.Contains(html, want) {
+			t.Errorf("missing %q", want)
+		}
+	}
+	block := html[strings.Index(html, `id="audio-processing"`):]
+	summary := block[:strings.Index(block, "</summary>")]
+	if strings.Contains(summary, `title="Mono downmix"`) {
+		t.Error("disabled mono shown in the collapsed summary")
+	}
+	if !strings.Contains(summary, `title="Network audio sink"`) {
+		t.Error("network sink in error missing from the collapsed summary")
 	}
 }
 

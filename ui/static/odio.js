@@ -352,6 +352,9 @@ document.addEventListener('htmx:sseBeforeMessage', function(e) {
 	});
 });
 document.addEventListener('htmx:afterSwap', function(e) {
+	// A request with hx-swap="none" fires afterSwap too, on its own element;
+	// restoring then would replay the state captured before the last message.
+	if (!e.detail.elt.hasAttribute('sse-swap')) return;
 	Object.keys(detailsState).forEach(function(id) {
 		var el = document.getElementById(id);
 		if (el && el.open !== detailsState[id]) {
