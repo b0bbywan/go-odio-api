@@ -411,6 +411,11 @@ bluetooth:
   powerOnStart: false          # power on adapter at startup
   idleTimeout: 30m             # auto power-off after inactivity (0 = never)
   scanTimeout: 60s             # auto-stop a scan (0 = never)
+  pairingTimeout: 60s          # pairing mode duration, also the connect timeout
+  timeout: 5s                  # D-Bus call timeout
+mpris:
+  enabled: true
+  timeout: 5s                  # D-Bus call timeout to players
 power:
   enabled: true
   capabilities: { poweroff: true, reboot: true }
@@ -427,6 +432,7 @@ upgrade:                       # agnostic upgrade frontend (opt-in)
   checkUnit: odio-check-upgrade.service     # optional internal user unit → enables POST /upgrade/check
   upgradeUnit: odio-upgrade.service         # optional internal user unit → enables POST /upgrade/start
   # progressSocket default: $XDG_RUNTIME_DIR/odio-api/upgrade.sock (tmpfs, no SD writes)
+  # stateFile default: ~/.cache/odio-api/upgrade-run.json (run state, kept across reboots)
 input:                         # IR / GPIO / Bluetooth / USB remotes (opt-in)
   enabled: true
   cec: true                    # also handle HDMI-CEC adapters (TV remote)
