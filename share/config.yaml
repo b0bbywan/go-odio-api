@@ -73,6 +73,16 @@ pulseaudio:
   enabled: true
   # serve_cookie: false           # exposes GET /audio/cookie for network audio clients
   # volumeStep: 0.05              # volume.up / volume.down step of a remote
+  # processing:                   # server modules odio loads itself, hidden unless enabled
+  #   mono:
+  #     enabled: false            # mono remap sink, set as default output while on
+  #     onBoot: false             # state when the session starts, then the last one is kept
+  #   networkSink:
+  #     enabled: false            # TCP sink + zeroconf-publish
+  #     onBoot: false
+  #     port: 4713
+  #     acl: true                 # loopback + private subnets of bind; must be false on PipeWire
+  #     extraAcl: ""              # more IPs / CIDRs, ;-separated
 
 mpris:
   enabled: true

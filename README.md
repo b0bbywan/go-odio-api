@@ -113,7 +113,7 @@ Players that need extra setup for MPRIS: [MPD](https://docs.odio.love/guides/mpd
 
 ### Audio Management (PulseAudio/PipeWire)
 
-Server info and default output, global and per-client volume/mute, real-time audio events via native PulseAudio monitoring (pure Go, no libpulse). Limited PipeWire support via `pipewire-pulse`. → [reference](https://docs.odio.love/api/pulseaudio/)
+Server info and default output, global and per-client volume/mute, opt-in mono output and network sink toggles, real-time audio events via native PulseAudio monitoring (pure Go, no libpulse). Limited PipeWire support via `pipewire-pulse`. → [reference](https://docs.odio.love/api/pulseaudio/)
 
 ### Service Management (systemd)
 
@@ -424,6 +424,16 @@ pulseaudio:
   enabled: true
   serve_cookie: true           # exposes GET /audio/cookie for network audio clients
   volumeStep: 0.05             # volume.up / volume.down step of a remote (0.01–1)
+  processing:                  # server modules odio loads itself (opt-in, each hidden unless enabled)
+    mono:
+      enabled: true            # mono remap sink, set as default output while on
+      onBoot: false            # state when the session starts
+    networkSink:
+      enabled: true            # TCP sink (module-native-protocol-tcp + zeroconf-publish)
+      onBoot: false
+      port: 4713
+      acl: true                # loopback + private subnets of `bind`; false = any client
+      # extraAcl: "10.8.0.0/24;192.168.50.7"  # more IPs / CIDRs, `;`-separated
 zeroconf:
   enabled: true                # mDNS (_http._tcp.local. → odio-api); disabled on `lo`
 upgrade:                       # agnostic upgrade frontend (opt-in)
@@ -443,6 +453,8 @@ input:                         # IR / GPIO / Bluetooth / USB remotes (opt-in)
     - { key: KEY_RED, action: service.restart, unit: kodi.service }
     - { key: KEY_MUTE, action: none }       # unmap a default
 ```
+
+For `pulseaudio.processing`, an enabled feature can be toggled from the API and the UI; `onBoot` is its state when the session starts, then odio keeps the last one across its own and the audio server's restarts. Stopping odio-api leaves the modules loaded. On PipeWire, `pipewire-pulse` ignores the IP ACL, so `networkSink` needs `acl: false` there (with `acl: true` the feature reports an error and loads nothing).
 
 For `upgrade`, the result file is the source of truth for availability; the script reports live progress over the socket (`begin`/`progress`/`end`). Units are optional — omit both for a read-only status badge, or add either to enable its POST. For `input`, device names are the ones in `/proc/bus/input/devices` (matched case-insensitively) and key names are the kernel's (`evtest` shows both, and `logLevel: debug` logs each unmapped key pressed on a handled device; an IR receiver also needs its kernel keymap loaded, see `ir-keytable`). Actions: `player.{playpause,play,pause,stop,next,previous,forward,rewind}` on the active player (forward/rewind seek 10 s), `volume.{up,down,mute}` on the default output, `power.{poweroff,reboot}`, `service.{start,stop,restart}` with a `unit` listed in `systemd.user`, `bluetooth.{powerup,powerdown,pairing}`, and `none`. An action whose backend is disabled is skipped with a warning. `conf.d` snippets replace the `bindings` list, they don't append to it.
 
@@ -507,7 +519,7 @@ Full per-route reference with request bodies and responses lives on **[docs.odio
 |---|---|---|
 | Server | `GET /server` | — |
 | MPRIS | `GET /players`, `/players/{player}/{cover,tracklist}`, `POST /players/{player}/{play,pause,play_pause,stop,next,previous,seek,position,volume,loop,shuffle}`, `POST /players/{player}/tracklist/{add,goto,remove}` | [mpris](https://docs.odio.love/api/mpris/) |
-| PulseAudio | `GET /audio`, `/audio/{server,clients,outputs,cookie}`, `POST /audio/server/{mute,volume}`, `/audio/{clients,outputs}/{id}/{mute,volume}`, `/audio/outputs/{id}/default` | [pulseaudio](https://docs.odio.love/api/pulseaudio/) |
+| PulseAudio | `GET /audio`, `/audio/{server,clients,outputs,cookie}`, `POST /audio/server/{mute,volume}`, `/audio/{clients,outputs}/{id}/{mute,volume}`, `/audio/outputs/{id}/default`, `GET /audio/processing`, `POST /audio/processing/{feature}/{enable,disable}` | [pulseaudio](https://docs.odio.love/api/pulseaudio/) |
 | systemd | `GET /services`, `POST /services/{scope}/{unit}/{start,stop,restart,enable,disable}` | [systemd](https://docs.odio.love/api/systemd/) |
 | Bluetooth | `GET /bluetooth`, `/bluetooth/devices`, `POST /bluetooth/{power_up,power_down,pairing_mode,scan,scan/stop,connect,disconnect}` | [bluetooth](https://docs.odio.love/api/bluetooth/) |
 | Power | `GET /power/`, `POST /power/{power_off,reboot}` | [power](https://docs.odio.love/api/power/) |
