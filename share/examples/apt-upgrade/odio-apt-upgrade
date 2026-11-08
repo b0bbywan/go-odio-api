@@ -1,0 +1,126 @@
+#!/bin/bash
+# apt detector and upgrader for odio-api's upgrade backend.
+#
+#   odio-apt-upgrade check   [--result FILE]
+#   odio-apt-upgrade upgrade [--result FILE] [--socket PATH]
+#
+# apt runs as root through `sudo odio-apt-upgrade apt-update|apt-upgrade`, the
+# only two commands the sudoers rule allows. The script must therefore be owned
+# by root and not writable by the user.
+set -euo pipefail
+
+SELF=$(readlink -f "$0")
+RESULT=${XDG_CACHE_HOME:-$HOME/.cache}/odio-api/upgrades.json
+SOCKET=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/odio-api/upgrade.sock
+
+usage() {
+	echo "usage: ${0##*/} check|upgrade [--result FILE] [--socket PATH]" >&2
+	exit 2
+}
+
+require_root() {
+	[ "$(id -u)" -eq 0 ] || { echo "${0##*/} $1: must run as root (through sudo)" >&2; exit 1; }
+}
+
+# Same selection as `apt upgrade`: new dependencies (a new kernel ABI) are
+# installed, nothing is removed.
+pending() {
+	LC_ALL=C apt-get -s --with-new-pkgs upgrade 2>/dev/null | awk '/^Inst /{print $2}'
+}
+
+write_result() {
+	local pkgs n current latest list=""
+	pkgs=$(pending)
+	n=$(grep -c . <<<"$pkgs" || true)
+	current=$(cat /etc/debian_version)
+	case $n in
+	0) latest=$current ;;
+	1) latest="1 package" ;;
+	*) latest="$n packages" ;;
+	esac
+	# shellcheck disable=SC2086 # one JSON string per package name
+	[ "$n" -eq 0 ] || list=$(printf '"%s",' $pkgs)
+
+	mkdir -p "$(dirname "$RESULT")"
+	# Renamed over the result so odio-api never reads a half-written file.
+	printf '{"current":"%s","latest":"%s","upgrade_available":%s,"checked_at":"%s","packages":[%s]}\n' \
+		"$current" "$latest" "$([ "$n" -gt 0 ] && echo true || echo false)" \
+		"$(date -u +%Y-%m-%dT%H:%M:%SZ)" "${list%,}" >"$RESULT.tmp"
+	mv "$RESULT.tmp" "$RESULT"
+}
+
+# Best effort: without odio-api or socat the upgrade runs the same, without live
+# progress. One connection per line, so a failed send never reaches apt.
+send() {
+	[ -S "$SOCKET" ] && command -v socat >/dev/null || return 0
+	printf '%s\n' "$1" | socat -u - "UNIX-CONNECT:$SOCKET" 2>/dev/null || true
+}
+
+json_escape() {
+	local s=${1//\\/\\\\}
+	printf '%s' "${s//\"/\\\"}"
+}
+
+# Turns apt's Status-Fd lines into progress events and passes the rest to the
+# journal. Download fills 0-30%, dpkg 30-100%, so the ring never goes back.
+progress() {
+	local line pct step
+	local -A seen=()
+	while IFS= read -r line; do
+		# pkg may carry an arch (libc6:amd64); arches never start with a digit.
+		if [[ $line =~ ^(dl|pm)status:([^:]+(:[a-z][^:]*)?):([0-9.]+):(.*)$ ]]; then
+			pct=${BASH_REMATCH[4]%.*}
+			if [ "${BASH_REMATCH[1]}" = dl ]; then
+				pct=$((pct * 3 / 10))
+			else
+				pct=$((30 + pct * 7 / 10))
+				[ "${BASH_REMATCH[2]}" = dpkg-exec ] || seen[${BASH_REMATCH[2]}]=1
+			fi
+			step=$(json_escape "${BASH_REMATCH[5]}")
+			send "{\"event\":\"progress\",\"percent\":$pct,\"current\":${#seen[@]},\"step\":\"$step\"}"
+		elif [[ $line != *status:* ]]; then
+			printf '%s\n' "$line" >&2
+		fi
+	done
+}
+
+check() {
+	sudo -n "$SELF" apt-update
+	write_result
+}
+
+upgrade() {
+	local ok=true
+	send "{\"event\":\"begin\",\"total\":$(pending | grep -c . || true)}"
+	sudo -n "$SELF" apt-upgrade | progress || ok=false
+	send "{\"event\":\"end\",\"success\":$ok}"
+	write_result
+	$ok
+}
+
+cmd=${1:-}
+[ $# -gt 0 ] && shift
+while [ $# -gt 0 ]; do
+	case $1 in
+	--result) RESULT=${2:?--result needs a path}; shift 2 ;;
+	--socket) SOCKET=${2:?--socket needs a path}; shift 2 ;;
+	*) usage ;;
+	esac
+done
+
+case $cmd in
+check) check ;;
+upgrade) upgrade ;;
+apt-update)
+	require_root "$cmd"
+	exec apt-get -qq update
+	;;
+apt-upgrade)
+	require_root "$cmd"
+	export DEBIAN_FRONTEND=noninteractive
+	exec apt-get -y -q -o APT::Status-Fd=1 \
+		-o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold \
+		--with-new-pkgs upgrade
+	;;
+*) usage ;;
+esac
