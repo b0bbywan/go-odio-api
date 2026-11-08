@@ -103,6 +103,12 @@ func (b *Backend) Start() error {
 		}
 	}
 
+	if b.Login1 != nil {
+		if err := b.Login1.Start(); err != nil {
+			return err
+		}
+	}
+
 	if b.MPRIS != nil {
 		if err := b.MPRIS.Start(); err != nil {
 			return err

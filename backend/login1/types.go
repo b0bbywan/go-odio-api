@@ -2,10 +2,13 @@ package login1
 
 import (
 	"context"
+	"sync"
 	"time"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/godbus/dbus/v5"
 
+	"github.com/b0bbywan/go-odio-api/cache"
 	"github.com/b0bbywan/go-odio-api/events"
 )
 
@@ -19,6 +22,17 @@ type Login1Backend struct {
 	CanPoweroff bool
 
 	eventsC chan events.Event
+
+	rebootFile string
+	rebootPkgs string
+	reboot     cache.Value[*RebootRequired]
+	watcher    *fsnotify.Watcher
+	wg         sync.WaitGroup
+}
+
+type RebootRequired struct {
+	Required bool
+	Packages []string // packages listed in the .pkgs file, in hook order
 }
 
 // PowerActionData is the payload of a power.action event.
