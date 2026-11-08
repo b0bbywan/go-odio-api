@@ -1664,3 +1664,33 @@ func TestNew_PulseaudioVolumeStepOutOfRange(t *testing.T) {
 		}
 	}
 }
+
+func TestNew_Login1RebootRequiredFiles(t *testing.T) {
+	tests := []struct {
+		name     string
+		set      any // nil leaves it unset
+		wantFile string
+		wantPkgs string
+	}{
+		{"unset by default", nil, "", ""},
+		{"debian", "/run/reboot-required", "/run/reboot-required", "/run/reboot-required.pkgs"},
+		{"empty", "", "", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			isolate(t)
+			if tt.set != nil {
+				viper.Set("power.rebootRequiredFile", tt.set)
+			}
+
+			cfg := mustNew(t, nil)
+
+			if cfg.Login1.RebootRequiredFile != tt.wantFile {
+				t.Errorf("RebootRequiredFile = %q, want %q", cfg.Login1.RebootRequiredFile, tt.wantFile)
+			}
+			if cfg.Login1.RebootRequiredPkgs != tt.wantPkgs {
+				t.Errorf("RebootRequiredPkgs = %q, want %q", cfg.Login1.RebootRequiredPkgs, tt.wantPkgs)
+			}
+		})
+	}
+}
