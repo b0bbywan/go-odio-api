@@ -39,3 +39,11 @@ type RebootRequired struct {
 type PowerActionData struct {
 	Action string `json:"action"`
 }
+
+// PowerStatus is the GET /power payload and the power.updated event data.
+type PowerStatus struct {
+	Reboot           bool     `json:"reboot"`
+	PowerOff         bool     `json:"power_off"`
+	RebootRequired   bool     `json:"reboot_required"`
+	RebootRequiredBy []string `json:"reboot_required_by"`
+}

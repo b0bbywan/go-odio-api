@@ -80,11 +80,14 @@ func (l *Login1Backend) Events() <-chan events.Event {
 }
 
 func (l *Login1Backend) notify(action string) {
-	e := events.Event{Type: events.TypePowerAction, Data: PowerActionData{Action: action}}
+	l.emit(events.Event{Type: events.TypePowerAction, Data: PowerActionData{Action: action}})
+}
+
+func (l *Login1Backend) emit(e events.Event) {
 	select {
 	case l.eventsC <- e:
 	default:
-		logger.Warn("[login1] event channel full, dropping %s event", events.TypePowerAction)
+		logger.Warn("[login1] event channel full, dropping %s event", e.Type)
 	}
 }
 
@@ -104,6 +107,20 @@ func (l *Login1Backend) PowerOff() error {
 	logger.Info("[login1] PowerOff requested")
 	l.notify("poweroff")
 	return l.callMethod(LOGIN1_PREFIX, LOGIN1_METHOD_POWEROFF, true)
+}
+
+func (l *Login1Backend) Status() PowerStatus {
+	r := l.RebootRequired()
+	by := r.Packages
+	if by == nil {
+		by = []string{}
+	}
+	return PowerStatus{
+		Reboot:           l.CanReboot,
+		PowerOff:         l.CanPoweroff,
+		RebootRequired:   r.Required,
+		RebootRequiredBy: by,
+	}
 }
 
 func (l *Login1Backend) validateCapabilities(capabilities config.Login1Capabilities) error {

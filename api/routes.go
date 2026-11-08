@@ -81,10 +81,7 @@ func (s *Server) registerLogin1Routes(b *login1.Login1Backend) {
 	s.mux.HandleFunc(
 		"/power",
 		JSONHandler(func(w http.ResponseWriter, r *http.Request) (any, error) {
-			return map[string]bool{
-				"reboot":    b.CanReboot,
-				"power_off": b.CanPoweroff,
-			}, nil
+			return b.Status(), nil
 		}),
 	)
 	s.mux.HandleFunc(

@@ -10,6 +10,7 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 
+	"github.com/b0bbywan/go-odio-api/events"
 	"github.com/b0bbywan/go-odio-api/logger"
 )
 
@@ -79,12 +80,13 @@ func (l *Login1Backend) readRebootRequired() {
 		return
 	}
 
-	if prev := l.reboot.Load(); prev != nil &&
-		prev.Required == next.Required && slices.Equal(prev.Packages, next.Packages) {
+	prev := l.RebootRequired()
+	if prev.Required == next.Required && slices.Equal(prev.Packages, next.Packages) {
 		return
 	}
 	l.reboot.Store(&next)
-	logger.Info("[login1] reboot required: %v %v", next.Required, next.Packages)
+	logger.Info("[login1] reboot required: %v %v, emitting %s", next.Required, next.Packages, events.TypePowerUpdated)
+	l.emit(events.Event{Type: events.TypePowerUpdated, Data: l.Status()})
 }
 
 func readPackages(path string) []string {
