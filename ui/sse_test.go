@@ -256,6 +256,13 @@ func TestSSEEvents_EventMapping(t *testing.T) {
 			wantSSEEvent: "event: section-input",
 		},
 		{
+			name:         "power.updated maps to section-power",
+			eventType:    events.TypePowerUpdated,
+			apiEndpoint:  "/power",
+			apiResponse:  `{"reboot":true,"power_off":true,"reboot_required":true,"reboot_required_by":["dbus"]}`,
+			wantSSEEvent: "event: section-power",
+		},
+		{
 			name:         "upgrade.progress maps to upgrade-progress",
 			eventType:    events.TypeUpgradeProgress,
 			apiEndpoint:  "/upgrade",

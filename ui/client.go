@@ -37,10 +37,17 @@ func (c *APIClient) GetServerInfo() (*ServerInfo, error) {
 		return nil, err
 	}
 	if v.Backends.Power {
-		var power PowerCapabilities
-		if err := c.get("/power", &power); err == nil {
-			v.Power = &power
+		if power, err := c.GetPower(); err == nil {
+			v.Power = power
 		}
+	}
+	return &v, nil
+}
+
+func (c *APIClient) GetPower() (*PowerStatus, error) {
+	var v PowerStatus
+	if err := c.get("/power", &v); err != nil {
+		return nil, err
 	}
 	return &v, nil
 }

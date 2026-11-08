@@ -82,25 +82,9 @@
 					   class="hover:scale-110 transition-transform"
 					   title="{{ .Admin }}">{{ template "icon-settings" }}</a>
 					{{ end }}
-					<!-- Power buttons -->
 					{{ if .ServerInfo.Power }}
-					<div class="flex items-center gap-1">
-						{{ if .ServerInfo.Power.PowerOff }}
-						<button class="hover:scale-110 transition-transform"
-						        hx-post="/power/power_off"
-						        hx-swap="none"
-						        hx-confirm="Power off the system?"
-						        title="Power off">{{ template "icon-power" }}</button>
-						{{ end }}
-
-
-						{{ if .ServerInfo.Power.Reboot }}
-						<button class="hover:scale-110 transition-transform"
-						        hx-post="/power/reboot"
-						        hx-swap="none"
-						        hx-confirm="Reboot the system?"
-						        title="Reboot">{{ template "icon-rotate-cw" }}</button>
-						{{ end }}
+					<div class="flex items-center gap-1" sse-swap="section-power" hx-swap="innerHTML">
+						{{ template "section-power" .ServerInfo.Power }}
 					</div>
 					{{ end }}
 				</div>
