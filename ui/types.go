@@ -1,26 +1,43 @@
 package ui
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 // ============================================================================
 // API Response Types (matching JSON API responses)
 // ============================================================================
 
-// PowerCapabilities represents what power actions are available from /power
-type PowerCapabilities struct {
-	Reboot   bool `json:"reboot"`
-	PowerOff bool `json:"power_off"`
+// PowerStatus is the response from /power
+type PowerStatus struct {
+	Reboot           bool     `json:"reboot"`
+	PowerOff         bool     `json:"power_off"`
+	RebootRequired   bool     `json:"reboot_required"`
+	RebootRequiredBy []string `json:"reboot_required_by"`
+}
+
+// RebootTitle is the reboot button tooltip, naming what asks for a reboot.
+func (p PowerStatus) RebootTitle() string {
+	switch {
+	case !p.RebootRequired:
+		return "Reboot"
+	case len(p.RebootRequiredBy) == 0:
+		return "Reboot required"
+	default:
+		return "Reboot required (" + strings.Join(p.RebootRequiredBy, ", ") + ")"
+	}
 }
 
 // ServerInfo represents the response from /server
 type ServerInfo struct {
-	Hostname   string             `json:"hostname"`
-	OSPlatform string             `json:"os_platform"`
-	OSVersion  string             `json:"os_version"`
-	APISW      string             `json:"api_sw"`
-	APIVersion string             `json:"api_version"`
-	Backends   Backends           `json:"backends"`
-	Power      *PowerCapabilities `json:"-"`
+	Hostname   string       `json:"hostname"`
+	OSPlatform string       `json:"os_platform"`
+	OSVersion  string       `json:"os_version"`
+	APISW      string       `json:"api_sw"`
+	APIVersion string       `json:"api_version"`
+	Backends   Backends     `json:"backends"`
+	Power      *PowerStatus `json:"-"`
 }
 
 // Backends indicates which backends are enabled

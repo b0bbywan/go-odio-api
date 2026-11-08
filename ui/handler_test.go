@@ -286,6 +286,76 @@ func TestInputBadgeTemplate(t *testing.T) {
 	}
 }
 
+// TestPowerButtonsTemplate asserts a pending reboot swaps the reboot icon for
+// a "!" that reveals the reboot icon on hover, with the packages in the tooltip.
+func TestPowerButtonsTemplate(t *testing.T) {
+	const (
+		rebootIcon = "M21 12a9 9"
+		bangIcon   = "M12 4v10"
+	)
+	tmpl := LoadTemplates()
+
+	tests := []struct {
+		name       string
+		status     *PowerStatus
+		want       []string
+		wantNoBang bool
+	}{
+		{name: "no status", status: nil, wantNoBang: true},
+		{
+			name:       "reboot not required",
+			status:     &PowerStatus{Reboot: true, PowerOff: true},
+			want:       []string{`hx-post="/power/power_off"`, `title="Reboot"`, rebootIcon},
+			wantNoBang: true,
+		},
+		{
+			name:   "reboot required with packages",
+			status: &PowerStatus{Reboot: true, RebootRequired: true, RebootRequiredBy: []string{"linux-image-6.12.57+deb13-amd64", "dbus"}},
+			want: []string{
+				`text-lime`,
+				`title="Reboot required (linux-image-6.12.57&#43;deb13-amd64, dbus)"`,
+				`<span class="group-hover:hidden">`, bangIcon,
+				`<span class="hidden group-hover:inline-flex">`, rebootIcon,
+			},
+		},
+		{
+			name:   "reboot required without packages",
+			status: &PowerStatus{Reboot: true, RebootRequired: true},
+			want:   []string{`title="Reboot required"`, bangIcon, rebootIcon},
+		},
+		{
+			name:       "reboot required but reboot disabled",
+			status:     &PowerStatus{PowerOff: true, RebootRequired: true},
+			want:       []string{`hx-post="/power/power_off"`},
+			wantNoBang: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			if err := tmpl.ExecuteTemplate(&buf, "section-power", tt.status); err != nil {
+				t.Fatalf("execute section-power: %v", err)
+			}
+			out := buf.String()
+			if tt.status == nil && strings.TrimSpace(out) != "" {
+				t.Errorf("expected no output without a status, got: %q", out)
+			}
+			rest := out
+			for _, want := range tt.want {
+				i := strings.Index(rest, want)
+				if i < 0 {
+					t.Fatalf("expected %q, in order, in output: %s", want, out)
+				}
+				rest = rest[i+len(want):]
+			}
+			if tt.wantNoBang && strings.Contains(out, bangIcon) {
+				t.Errorf("unexpected \"!\" icon in output: %s", out)
+			}
+		})
+	}
+}
+
 func TestUpgradeBadgeRunning(t *testing.T) {
 	tmpl := LoadTemplates()
 	pct := 42

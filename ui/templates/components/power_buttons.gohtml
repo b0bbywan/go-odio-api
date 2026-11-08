@@ -1,0 +1,30 @@
+{{/*
+	Power buttons for the header. Data is *ui.PowerStatus (may be nil). A pending
+	reboot turns the reboot icon into a green "!", which shows the reboot icon again
+	on hover.
+*/}}
+{{ define "section-power" }}
+{{- with . -}}
+{{- if .PowerOff -}}
+<button class="hover:scale-110 transition-transform"
+        hx-post="/power/power_off"
+        hx-swap="none"
+        hx-confirm="Power off the system?"
+        title="Power off">{{ template "icon-power" }}</button>
+{{- end -}}
+{{- if .Reboot -}}
+<button class="{{ if .RebootRequired }}group inline-flex text-lime {{ end }}hover:scale-110 transition-transform"
+        hx-post="/power/reboot"
+        hx-swap="none"
+        hx-confirm="Reboot the system?"
+        title="{{ .RebootTitle }}">
+	{{- if .RebootRequired -}}
+	<span class="group-hover:hidden">{{ template "icon-exclamation" }}</span>
+	<span class="hidden group-hover:inline-flex">{{ template "icon-rotate-cw" }}</span>
+	{{- else -}}
+	{{ template "icon-rotate-cw" }}
+	{{- end -}}
+</button>
+{{- end -}}
+{{- end -}}
+{{ end }}

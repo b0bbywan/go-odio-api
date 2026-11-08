@@ -316,6 +316,11 @@ func fetchInput(h *Handler) (string, any, error) {
 	return "section-input", status, err
 }
 
+func fetchPower(h *Handler) (string, any, error) {
+	status, err := h.client.GetPower()
+	return "section-power", status, err
+}
+
 func fetchUpgradeRing(h *Handler) (string, any, error) {
 	status, err := h.client.GetUpgrade()
 	var run *UpgradeRun
@@ -333,6 +338,7 @@ var (
 	upgradeSection     = &sseSection{name: "section-upgrade", fetchFn: fetchUpgrade}
 	upgradeRingSection = &sseSection{name: "upgrade-progress", fetchFn: fetchUpgradeRing}
 	inputSection       = &sseSection{name: "section-input", fetchFn: fetchInput}
+	powerSection       = &sseSection{name: "section-power", fetchFn: fetchPower}
 
 	eventToSection = map[string]*sseSection{
 		events.TypePlayerUpdated:   mprisSection,
@@ -356,6 +362,7 @@ var (
 		events.TypeUpgradeProgress:  upgradeRingSection,
 		// input.key is not mapped: a key press does not change the device list.
 		events.TypeInputUpdated: inputSection,
+		events.TypePowerUpdated: powerSection,
 	}
 )
 
