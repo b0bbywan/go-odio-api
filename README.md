@@ -130,7 +130,7 @@ Setup needs a few system steps (Odio isn't root): add the user to the `bluetooth
 
 ### Power Management
 
-Remote reboot and power-off via the REST API — no SSH for day-to-day ops. Disabled by default, uses `org.freedesktop.login1`. On desktop, logind handles permissions automatically; on headless systems a polkit rule is required to allow the user to reboot/power-off (full rule → [reference](https://docs.odio.love/api/power/)).
+Remote reboot and power-off via the REST API — no SSH for day-to-day ops. `GET /power` also reports `reboot_required` (and the packages behind it) from the distro's reboot flag (opt-in, e.g. Debian's `/run/reboot-required`), pushed live as `power.updated` (setup per distro → [Reboot required](#reboot-required)). Disabled by default, uses `org.freedesktop.login1`. On desktop, logind handles permissions automatically; on headless systems a polkit rule is required to allow the user to reboot/power-off (full rule → [reference](https://docs.odio.love/api/power/)).
 
 ### Remote Controls (IR, GPIO, Bluetooth, USB)
 
@@ -148,7 +148,7 @@ Run progress streams over a Unix socket, not a file or the journal: progress is 
 
 ### Real-time Event Stream (SSE)
 
-`GET /events` streams live state changes to any HTTP client — no polling. One event type per backend (`player.updated`, `audio.updated`, `service.updated`, `bluetooth.updated`, `input.key`, `power.action`, `upgrade.info`, …), filterable with `types`, `backend`, and `exclude` query params (`server.info` is always delivered). → [reference](https://docs.odio.love/api/events/)
+`GET /events` streams live state changes to any HTTP client — no polling. One event type per backend (`player.updated`, `audio.updated`, `service.updated`, `bluetooth.updated`, `input.key`, `power.action`, `power.updated`, `upgrade.info`, …), filterable with `types`, `backend`, and `exclude` query params (`server.info` is always delivered). → [reference](https://docs.odio.love/api/events/)
 
 ### REST API
 
@@ -414,6 +414,7 @@ bluetooth:
 power:
   enabled: true
   capabilities: { poweroff: true, reboot: true }
+  rebootRequiredFile: /run/reboot-required   # Debian, Ubuntu, Raspberry Pi OS; see Reboot required
 pulseaudio:
   enabled: true
   serve_cookie: true           # exposes GET /audio/cookie for network audio clients
@@ -440,6 +441,50 @@ input:                         # IR / GPIO / Bluetooth / USB remotes (opt-in)
 For `upgrade`, the result file is the source of truth for availability; the script reports live progress over the socket (`begin`/`progress`/`end`). Units are optional — omit both for a read-only status badge, or add either to enable its POST. For `input`, device names are the ones in `/proc/bus/input/devices` (matched case-insensitively) and key names are the kernel's (`evtest` shows both, and `logLevel: debug` logs each unmapped key pressed on a handled device; an IR receiver also needs its kernel keymap loaded, see `ir-keytable`). Actions: `player.{playpause,play,pause,stop,next,previous,forward,rewind}` on the active player (forward/rewind seek 10 s), `volume.{up,down,mute}` on the default output, `power.{poweroff,reboot}`, `service.{start,stop,restart}` with a `unit` listed in `systemd.user`, `bluetooth.{powerup,powerdown,pairing}`, and `none`. An action whose backend is disabled is skipped with a warning. `conf.d` snippets replace the `bindings` list, they don't append to it.
 
 Full per-option detail on [docs.odio.love](https://docs.odio.love/api/).
+
+#### Reboot required
+
+Opt-in: set `power.rebootRequiredFile` to the flag file your distro raises when a reboot is pending. odio-api watches it and lists the packages in its `.pkgs` sibling, one per line. It never runs the package manager itself. Unset, the check is off and `reboot_required` stays `false`.
+
+- **Debian, Raspberry Pi OS**: `/run/reboot-required`, raised with `unattended-upgrades` installed. Its kernel hook and the `dbus` package flag the reboot on every install, whatever runs apt. On Raspberry Pi OS, this needs a Debian-style `linux-image-rpi-*` kernel (Bookworm and later).
+  ```yaml
+  power:
+    rebootRequiredFile: /run/reboot-required
+  ```
+- **Ubuntu**: same path, raised by `update-notifier-common`.
+- **openSUSE / SLE**: `/run/reboot-needed`, raised by libzypp (no package list):
+  ```yaml
+  power:
+    rebootRequiredFile: /run/reboot-needed
+  ```
+- **Fedora / RHEL** (dnf5): no flag out of the box. Install `libdnf5-plugin-actions` and add `/etc/dnf/libdnf5-plugins/actions.d/odio-reboot-required.actions`:
+  ```
+  post_transaction:kernel-core:in::/usr/bin/sh -c echo\ ${pkg.name}\ >>/run/reboot-required.pkgs;touch\ /run/reboot-required
+  post_transaction:glibc:in::/usr/bin/sh -c echo\ ${pkg.name}\ >>/run/reboot-required.pkgs;touch\ /run/reboot-required
+  post_transaction:systemd:in::/usr/bin/sh -c echo\ ${pkg.name}\ >>/run/reboot-required.pkgs;touch\ /run/reboot-required
+  post_transaction:dbus-broker:in::/usr/bin/sh -c echo\ ${pkg.name}\ >>/run/reboot-required.pkgs;touch\ /run/reboot-required
+  post_transaction:linux-firmware:in::/usr/bin/sh -c echo\ ${pkg.name}\ >>/run/reboot-required.pkgs;touch\ /run/reboot-required
+  ```
+- **Arch**: no flag out of the box. Add a pacman hook, `/etc/pacman.d/hooks/odio-reboot-required.hook`:
+  ```ini
+  [Trigger]
+  Operation = Install
+  Operation = Upgrade
+  Type = Package
+  Target = linux
+  Target = linux-lts
+  Target = glibc
+  Target = systemd
+  Target = dbus-broker
+
+  [Action]
+  Description = Flagging reboot required...
+  When = PostTransaction
+  NeedsTargets
+  Exec = /usr/bin/sh -c 'cat >> /run/reboot-required.pkgs; touch /run/reboot-required'
+  ```
+
+Both hooks raise `/run/reboot-required`: set it as on Debian. The flag lives in `/run` (tmpfs), so a reboot clears it. A package appended twice is listed once.
 
 ### Security defaults
 
