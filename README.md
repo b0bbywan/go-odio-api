@@ -468,6 +468,8 @@ Full per-route reference with request bodies and responses lives on **[docs.odio
 
 Opt-in, disabled by default — see [Software Upgrades](#software-upgrades) for the model.
 
+For a plain Debian, Ubuntu or Raspberry Pi OS, [`share/examples/apt-upgrade`](share/examples/apt-upgrade/) provides a ready-made check/upgrade script and its units.
+
 ```
 GET    /upgrade                           # Detector status, live run state, and available triggers (can_check/can_upgrade)
 POST   /upgrade/check                     # Re-run detection (check unit); 202 Accepted — registered only when the check unit is configured
