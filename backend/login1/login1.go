@@ -24,10 +24,12 @@ func New(ctx context.Context, cfg *config.Login1Config) (*Login1Backend, error) 
 	}
 
 	backend := &Login1Backend{
-		conn:    conn,
-		ctx:     ctx,
-		timeout: 10 * time.Second,
-		eventsC: make(chan events.Event, 4),
+		conn:       conn,
+		ctx:        ctx,
+		timeout:    10 * time.Second,
+		eventsC:    make(chan events.Event, 4),
+		rebootFile: cfg.RebootRequiredFile,
+		rebootPkgs: cfg.RebootRequiredPkgs,
 	}
 
 	if cfg.Capabilities != nil {
@@ -46,8 +48,25 @@ func New(ctx context.Context, cfg *config.Login1Config) (*Login1Backend, error) 
 	return backend, nil
 }
 
-// Close cleanly closes connections and stops the listener
+// Start reads the reboot-required flag and watches it. Non-fatal on failure.
+func (l *Login1Backend) Start() error {
+	if l.rebootFile == "" {
+		return nil
+	}
+	l.readRebootRequired()
+	l.startWatcher()
+	return nil
+}
+
+// Close stops the reboot-required watcher and closes the D-Bus connection.
 func (l *Login1Backend) Close() {
+	if l.watcher != nil {
+		if err := l.watcher.Close(); err != nil {
+			logger.Warn("[login1] closing watcher: %v", err)
+		}
+	}
+	l.wg.Wait()
+	l.watcher = nil
 	if l.conn != nil {
 		if err := l.conn.Close(); err != nil {
 			logger.Error("Failed to close D-Bus connection: %v", err)
