@@ -2,11 +2,14 @@ package login1
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"slices"
 	"testing"
 	"time"
+
+	"github.com/b0bbywan/go-odio-api/events"
 )
 
 func newRebootBackend(t *testing.T, dir string) *Login1Backend {
@@ -18,6 +21,7 @@ func newRebootBackend(t *testing.T, dir string) *Login1Backend {
 		ctx:        ctx,
 		rebootFile: flag,
 		rebootPkgs: flag + ".pkgs",
+		eventsC:    make(chan events.Event, 4),
 	}
 }
 
@@ -197,5 +201,90 @@ func TestRebootRequired_CloseStopsWatcher(t *testing.T) {
 	case <-done:
 	case <-time.After(2 * time.Second):
 		t.Fatal("Close did not return")
+	}
+}
+
+func recvEvent(t *testing.T, l *Login1Backend, d time.Duration) (events.Event, bool) {
+	t.Helper()
+	select {
+	case e := <-l.Events():
+		return e, true
+	case <-time.After(d):
+		return events.Event{}, false
+	}
+}
+
+func TestStatus_JSON(t *testing.T) {
+	tests := []struct {
+		name string
+		flag bool
+		pkgs string
+		want string
+	}{
+		{"no reboot required", false, "", `{"reboot":true,"power_off":false,"reboot_required":false,"reboot_required_by":[]}`},
+		{"flag without pkgs", true, "", `{"reboot":true,"power_off":false,"reboot_required":true,"reboot_required_by":[]}`},
+		{"flag with pkgs", true, "linux-image-6.12.57+deb13-amd64\ndbus\n",
+			`{"reboot":true,"power_off":false,"reboot_required":true,"reboot_required_by":["linux-image-6.12.57+deb13-amd64","dbus"]}`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			l := newRebootBackend(t, t.TempDir())
+			l.CanReboot = true
+			if tt.flag {
+				touch(t, l.rebootFile, "")
+				touch(t, l.rebootPkgs, tt.pkgs)
+			}
+			startReboot(t, l)
+
+			got, err := json.Marshal(l.Status())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(got) != tt.want {
+				t.Errorf("Status JSON = %s, want %s", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestRebootRequired_NoEventWhenNothingChanged(t *testing.T) {
+	l := newRebootBackend(t, t.TempDir())
+	startReboot(t, l)
+
+	if e, ok := recvEvent(t, l, 100*time.Millisecond); ok {
+		t.Errorf("unexpected event at start: %+v", e)
+	}
+}
+
+func TestRebootRequired_EmitsPowerUpdated(t *testing.T) {
+	l := newRebootBackend(t, t.TempDir())
+	l.CanPoweroff = true
+	startReboot(t, l)
+
+	touch(t, l.rebootFile, "")
+	e, ok := recvEvent(t, l, 2*time.Second)
+	if !ok {
+		t.Fatal("no event after the flag was created")
+	}
+	if e.Type != events.TypePowerUpdated {
+		t.Fatalf("event type = %s, want %s", e.Type, events.TypePowerUpdated)
+	}
+	got, isStatus := e.Data.(PowerStatus)
+	if !isStatus {
+		t.Fatalf("event data = %T, want PowerStatus", e.Data)
+	}
+	if !got.RebootRequired || !got.PowerOff {
+		t.Errorf("event data = %+v, want reboot_required and power_off", got)
+	}
+
+	if err := os.Remove(l.rebootFile); err != nil {
+		t.Fatal(err)
+	}
+	e, ok = recvEvent(t, l, 2*time.Second)
+	if !ok {
+		t.Fatal("no event after the flag was removed")
+	}
+	if got := e.Data.(PowerStatus); got.RebootRequired {
+		t.Errorf("event data = %+v, want reboot not required", got)
 	}
 }

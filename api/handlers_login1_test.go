@@ -159,7 +159,7 @@ func TestPowerCapabilitiesHandler(t *testing.T) {
 				t.Errorf("status = %d, want %d", w.Code, http.StatusOK)
 			}
 
-			var got map[string]bool
+			var got map[string]any
 			if err := json.NewDecoder(w.Body).Decode(&got); err != nil {
 				t.Fatalf("failed to decode response: %v", err)
 			}
@@ -169,6 +169,12 @@ func TestPowerCapabilitiesHandler(t *testing.T) {
 			}
 			if got["power_off"] != tt.wantPowerOff {
 				t.Errorf("power_off = %v, want %v", got["power_off"], tt.wantPowerOff)
+			}
+			if got["reboot_required"] != false {
+				t.Errorf("reboot_required = %v, want false", got["reboot_required"])
+			}
+			if by, ok := got["reboot_required_by"].([]any); !ok || len(by) != 0 {
+				t.Errorf("reboot_required_by = %v, want []", got["reboot_required_by"])
 			}
 		})
 	}

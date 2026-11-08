@@ -17,6 +17,7 @@ const (
 	TypeInputKey            = "input.key"
 	TypeInputUpdated        = "input.updated"
 	TypePowerAction         = "power.action"
+	TypePowerUpdated        = "power.updated"
 	TypeUpgradeInfo         = "upgrade.info"
 	TypeUpgradeProgress     = "upgrade.progress"
 )
@@ -44,7 +45,7 @@ var BackendTypes = map[string][]string{
 	"systemd":   {TypeServiceUpdated},
 	"bluetooth": {TypeBluetoothUpdated, TypeBluetoothDiscovered},
 	"input":     {TypeInputKey, TypeInputUpdated},
-	"power":     {TypePowerAction},
+	"power":     {TypePowerAction, TypePowerUpdated},
 	"upgrade":   {TypeUpgradeInfo, TypeUpgradeProgress},
 }
 
