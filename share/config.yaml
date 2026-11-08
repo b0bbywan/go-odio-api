@@ -40,6 +40,9 @@ power:
   capabilities:
     poweroff: false
     reboot: false
+  # Flag file raised when a reboot is pending; unset disables the check.
+  # Debian, Ubuntu, Raspberry Pi OS: /run/reboot-required (other distros: see README).
+  # rebootRequiredFile: /run/reboot-required
 
 # Agnostic upgrade backend: reads a result file written by an external detector
 # and triggers external systemd user units. Disabled by default.
