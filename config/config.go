@@ -67,8 +67,10 @@ type Login1Capabilities struct {
 }
 
 type Login1Config struct {
-	Enabled      bool
-	Capabilities *Login1Capabilities
+	Enabled            bool
+	Capabilities       *Login1Capabilities
+	RebootRequiredFile string // flag file raised by package hooks (Debian: /run/reboot-required); empty disables the check
+	RebootRequiredPkgs string // packages that raised the flag, one per line
 }
 
 type MPRISConfig struct {
@@ -355,9 +357,16 @@ func New(cfgFile *string) (*Config, error) {
 		CanPoweroff: viper.GetBool("power.capabilities.poweroff"),
 	}
 
+	rebootRequiredFile := viper.GetString("power.rebootRequiredFile")
+	var rebootRequiredPkgs string
+	if rebootRequiredFile != "" {
+		rebootRequiredPkgs = rebootRequiredFile + ".pkgs"
+	}
 	logincfg := Login1Config{
-		Enabled:      viper.GetBool("power.enabled"),
-		Capabilities: &loginCapabilities,
+		Enabled:            viper.GetBool("power.enabled"),
+		Capabilities:       &loginCapabilities,
+		RebootRequiredFile: rebootRequiredFile,
+		RebootRequiredPkgs: rebootRequiredPkgs,
 	}
 
 	mpriscfg := MPRISConfig{
