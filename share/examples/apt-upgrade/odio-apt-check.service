@@ -1,0 +1,6 @@
+[Unit]
+Description=Check for apt upgrades (odio-api)
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/odio-apt-upgrade check

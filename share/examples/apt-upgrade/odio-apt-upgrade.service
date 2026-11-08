@@ -1,0 +1,6 @@
+[Unit]
+Description=Upgrade apt packages (odio-api)
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/odio-apt-upgrade upgrade

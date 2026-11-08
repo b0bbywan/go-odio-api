@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily apt upgrade check (odio-api)
+
+[Timer]
+OnCalendar=daily
+RandomizedDelaySec=1h
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,2 @@
+# /etc/sudoers.d/odio-apt-upgrade — replace USER with the user running odio-api.
+USER ALL=(root) NOPASSWD: /usr/local/bin/odio-apt-upgrade apt-update, /usr/local/bin/odio-apt-upgrade apt-upgrade
