@@ -223,8 +223,9 @@ type ProcessingFeature struct {
 }
 
 var processingMeta = map[string]struct{ label, icon string }{
-	"mono":         {"Mono downmix", "mono"},
-	"network_sink": {"Network audio sink", "share"},
+	"mono":              {"Mono downmix", "mono"},
+	"network_sink":      {"Network audio sink", "share"},
+	"zeroconf_discover": {"Discover network sinks", "radio"},
 }
 
 func (f ProcessingFeature) Label() string {
