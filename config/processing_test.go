@@ -14,9 +14,10 @@ func TestNew_ProcessingDefaults(t *testing.T) {
 	cfg := mustNew(t, nil)
 
 	want := &ProcessingConfig{
-		Mono:        &MonoConfig{},
-		NetworkSink: &NetworkSinkConfig{Port: 4713, ACL: true},
-		LedgerFile:  "/run/user/1000/odio-api/processing.json",
+		Mono:             &MonoConfig{},
+		NetworkSink:      &NetworkSinkConfig{Port: 4713, ACL: true},
+		ZeroconfDiscover: &ZeroconfDiscoverConfig{},
+		LedgerFile:       "/run/user/1000/odio-api/processing.json",
 	}
 	if !reflect.DeepEqual(cfg.Pulseaudio.Processing, want) {
 		t.Errorf("Processing = %+v, want %+v", cfg.Pulseaudio.Processing, want)
@@ -41,6 +42,9 @@ pulseaudio:
       extraAcl:
         - 10.8.0.0/24
         - 192.168.2.5
+    zeroconfDiscover:
+      enabled: true
+      onBoot: true
 `)
 
 	cfg := mustNew(t, &configFile)
@@ -52,7 +56,8 @@ pulseaudio:
 			Port:     4714,
 			ExtraACL: []string{"10.8.0.0/24", "192.168.2.5"},
 		},
-		LedgerFile: "/run/user/1000/odio-api/processing.json",
+		ZeroconfDiscover: &ZeroconfDiscoverConfig{Enabled: true, OnBoot: true},
+		LedgerFile:       "/run/user/1000/odio-api/processing.json",
 	}
 	if !reflect.DeepEqual(cfg.Pulseaudio.Processing, want) {
 		t.Errorf("Processing = %+v, want %+v", cfg.Pulseaudio.Processing, want)
