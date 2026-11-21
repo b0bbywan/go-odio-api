@@ -92,8 +92,9 @@ type PulseAudioConfig struct {
 // hidden unless Enabled; OnBoot is its state when the session starts, odio
 // then keeping the last one across its own and the server's restarts.
 type ProcessingConfig struct {
-	Mono        *MonoConfig
-	NetworkSink *NetworkSinkConfig
+	Mono             *MonoConfig
+	NetworkSink      *NetworkSinkConfig
+	ZeroconfDiscover *ZeroconfDiscoverConfig
 	// The modules odio loaded, in the runtime dir so that it goes with the
 	// session.
 	LedgerFile string
@@ -113,6 +114,13 @@ type NetworkSinkConfig struct {
 	ACL        bool
 	ExtraACL   []string
 	Interfaces []net.Interface // from bind, as for zeroconf
+}
+
+// ZeroconfDiscoverConfig adds the PulseAudio servers advertised on the LAN as
+// tunnel sinks.
+type ZeroconfDiscoverConfig struct {
+	Enabled bool
+	OnBoot  bool
 }
 
 // OpenMode is where the dashboard opens a service's URL: `open: tab | panel |
@@ -437,6 +445,10 @@ func New(cfgFile *string) (*Config, error) {
 			ACL:        viper.GetBool("pulseaudio.processing.networkSink.acl"),
 			ExtraACL:   extraACL,
 			Interfaces: interfaces,
+		},
+		ZeroconfDiscover: &ZeroconfDiscoverConfig{
+			Enabled: viper.GetBool("pulseaudio.processing.zeroconfDiscover.enabled"),
+			OnBoot:  viper.GetBool("pulseaudio.processing.zeroconfDiscover.onBoot"),
 		},
 		LedgerFile: filepath.Join(xdgRuntimeDir, "odio-api", "processing.json"),
 	}
