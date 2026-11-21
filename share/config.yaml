@@ -52,6 +52,7 @@ upgrade:
   # checkUnit: odio-check-upgrade.service       # optional user unit → enables POST /upgrade/check
   # upgradeUnit: odio-upgrade.service           # optional user unit → enables POST /upgrade/start
   # progressSocket: ""                          # unix socket the upgrade script streams JSON progress to; default $XDG_RUNTIME_DIR/odio-api/upgrade.sock
+  # stateFile: ""                               # run state kept across reboots; default ~/.cache/odio-api/upgrade-run.json
 
 # Remote controls (IR, GPIO keys, Bluetooth, USB) read from /dev/input.
 # Disabled by default; the user must be in the 'input' group. Handled devices
@@ -70,7 +71,18 @@ input:
 
 pulseaudio:
   enabled: true
+  # serve_cookie: false           # exposes GET /audio/cookie for network audio clients
   # volumeStep: 0.05              # volume.up / volume.down step of a remote
+  # processing:                   # server modules odio loads itself, hidden unless enabled
+  #   mono:
+  #     enabled: false            # mono remap sink, set as default output while on
+  #     onBoot: false             # state when the session starts, then the last one is kept
+  #   networkSink:
+  #     enabled: false            # TCP sink + zeroconf-publish
+  #     onBoot: false
+  #     port: 4713
+  #     acl: true                 # loopback + private subnets of bind; must be false on PipeWire
+  #     extraAcl: ""              # more IPs / CIDRs, ;-separated
 
 mpris:
   enabled: true

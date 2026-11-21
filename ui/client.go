@@ -202,9 +202,10 @@ func playerDisplayName(p Player) string {
 
 func (c *APIClient) GetAudio() (*AudioData, error) {
 	var raw struct {
-		Kind    string        `json:"kind"`
-		Clients []AudioClient `json:"clients"`
-		Outputs []AudioOutput `json:"outputs"`
+		Kind       string              `json:"kind"`
+		Clients    []AudioClient       `json:"clients"`
+		Outputs    []AudioOutput       `json:"outputs"`
+		Processing []ProcessingFeature `json:"processing"`
 	}
 	if err := c.get("/audio", &raw); err != nil {
 		return nil, err
@@ -218,9 +219,10 @@ func (c *APIClient) GetAudio() (*AudioData, error) {
 		}
 	}
 	data := &AudioData{
-		Kind:    raw.Kind,
-		Clients: clients,
-		Outputs: raw.Outputs,
+		Kind:       raw.Kind,
+		Clients:    clients,
+		Outputs:    raw.Outputs,
+		Processing: raw.Processing,
 	}
 	for i := range raw.Outputs {
 		if raw.Outputs[i].Default {
