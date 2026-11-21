@@ -7,12 +7,13 @@ import (
 	"github.com/b0bbywan/go-odio-api/config"
 )
 
-// processingCfg is both features enabled and on at boot, the network sink on
-// the default port with the derived acl.
+// processingCfg is mono and the network sink enabled and on at boot, the
+// network sink on the default port with the derived acl.
 func processingCfg() *config.ProcessingConfig {
 	return &config.ProcessingConfig{
-		Mono:        &config.MonoConfig{Enabled: true, OnBoot: true},
-		NetworkSink: &config.NetworkSinkConfig{Enabled: true, OnBoot: true, Port: 4713, ACL: true},
+		Mono:             &config.MonoConfig{Enabled: true, OnBoot: true},
+		NetworkSink:      &config.NetworkSinkConfig{Enabled: true, OnBoot: true, Port: 4713, ACL: true},
+		ZeroconfDiscover: &config.ZeroconfDiscoverConfig{},
 	}
 }
 
@@ -147,5 +148,21 @@ func TestBuildFeatures_NetworkSink(t *testing.T) {
 				t.Errorf("network sink = %+v, want %+v", got, want)
 			}
 		})
+	}
+}
+
+func TestBuildFeatures_ZeroconfDiscover(t *testing.T) {
+	cfg := processingCfg()
+	cfg.ZeroconfDiscover = &config.ZeroconfDiscoverConfig{Enabled: true, OnBoot: true}
+
+	got := buildFeatures(cfg, ServerPulse, nil)[2]
+
+	want := feature{
+		name:    featureZeroconfDiscover,
+		onBoot:  true,
+		modules: []moduleSpec{{name: "module-zeroconf-discover", args: map[string]string{}}},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("zeroconf discover = %+v, want %+v", got, want)
 	}
 }
