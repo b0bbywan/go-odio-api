@@ -853,6 +853,7 @@ func TestAudioProcessingTemplate(t *testing.T) {
 	data := &AudioData{DefaultSink: sink, Processing: []ProcessingFeature{
 		{Name: "mono", State: "disabled"},
 		{Name: "network_sink", State: "error", Error: "no private LAN subnet to allow"},
+		{Name: "future", State: "disabled"},
 	}}
 	if err := tmpl.ExecuteTemplate(&buf, "section-pulseaudio", data); err != nil {
 		t.Fatal(err)
@@ -864,6 +865,7 @@ func TestAudioProcessingTemplate(t *testing.T) {
 		`hx-post="/audio/processing/mono/enable"`,
 		`aria-checked="true" aria-label="Network audio sink"`,
 		`hx-post="/audio/processing/network_sink/disable"`,
+		`aria-checked="false" aria-label="future"`,
 		"no private LAN subnet to allow",
 	} {
 		if !strings.Contains(html, want) {
