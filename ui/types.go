@@ -338,6 +338,13 @@ type ServiceView struct {
 	Open        string // where URL opens: "tab", "panel" over the dashboard, "self" this tab
 }
 
+func (s ServiceView) Label() string {
+	if s.Description != "" {
+		return s.Description
+	}
+	return s.Name
+}
+
 // BluetoothView is the view model for the bluetooth section
 type BluetoothView struct {
 	Powered        bool

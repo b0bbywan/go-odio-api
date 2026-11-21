@@ -1332,3 +1332,12 @@ func TestMprisPlayerTracklistRendering(t *testing.T) {
 		}
 	})
 }
+
+func TestServiceViewLabel(t *testing.T) {
+	if got := (ServiceView{Name: "mympd.service", Description: "myMPD"}).Label(); got != "myMPD" {
+		t.Errorf("Label() = %q, want description", got)
+	}
+	if got := (ServiceView{Name: "mympd.service"}).Label(); got != "mympd.service" {
+		t.Errorf("Label() = %q, want name fallback", got)
+	}
+}
