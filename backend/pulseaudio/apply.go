@@ -52,7 +52,7 @@ type processing struct {
 
 // newProcessing is nil when no feature is enabled.
 func newProcessing(cfg *config.ProcessingConfig, srv moduleServer) *processing {
-	if cfg == nil || !cfg.Mono.Enabled && !cfg.NetworkSink.Enabled {
+	if cfg == nil || !cfg.Mono.Enabled && !cfg.NetworkSink.Enabled && !cfg.ZeroconfDiscover.Enabled {
 		return nil
 	}
 	return &processing{srv: srv, cfg: cfg, ledger: openLedger(cfg.LedgerFile)}
