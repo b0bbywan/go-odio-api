@@ -5,21 +5,21 @@
 		<div class="player-name mb-1">
 			{{ if eq .Open "panel" }}
 			<a href="#"
-			   onclick="openServicePanel('{{ .URL }}', '{{ if .Description }}{{ .Description }}{{ else }}{{ .Name }}{{ end }}'); return false;"
+			   onclick="openServicePanel('{{ .URL }}', '{{ .Label }}'); return false;"
 			   title="{{ .URL }}"
-			   class="hover:underline">{{ if .Description }}{{ .Description }}{{ else }}{{ .Name }}{{ end }} <span class="link-icon"><span class="hidden sm:inline">{{ template "icon-panel-right" }}</span><span class="sm:hidden">{{ template "icon-panel-bottom" }}</span></span></a>
+			   class="hover:underline">{{ .Label }} <span class="link-icon"><span class="hidden sm:inline">{{ template "icon-panel-right" }}</span><span class="sm:hidden">{{ template "icon-panel-bottom" }}</span></span></a>
 			{{ else if eq .Open "self" }}
 			<a href="#"
 			   onclick="openServiceHere('{{ .URL }}'); return false;"
 			   title="{{ .URL }}"
-			   class="hover:underline">{{ if .Description }}{{ .Description }}{{ else }}{{ .Name }}{{ end }} <span class="link-icon">{{ template "icon-app-window" }}</span></a>
+			   class="hover:underline">{{ .Label }} <span class="link-icon">{{ template "icon-app-window" }}</span></a>
 			{{ else if .URL }}
 			<a href="#"
 			   onclick="openServiceUrl('{{ .URL }}'); return false;"
 			   title="{{ .URL }}"
-			   class="hover:underline">{{ if .Description }}{{ .Description }}{{ else }}{{ .Name }}{{ end }} <span class="text-xs opacity-60">↗</span></a>
+			   class="hover:underline">{{ .Label }} <span class="text-xs opacity-60">↗</span></a>
 			{{ else }}
-			{{ if .Description }}{{ .Description }}{{ else }}{{ .Name }}{{ end }}
+			{{ .Label }}
 			{{ end }}
 		</div>
 		<div class="flex items-center gap-2">
