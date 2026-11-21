@@ -36,6 +36,7 @@ type PulseAudioBackend struct {
 	outputCache cache.Value[[]AudioOutput]
 	listener    *Listener
 	events      chan events.Event
+	processing  *processing // nil when disabled
 }
 
 type ServerInfo struct {

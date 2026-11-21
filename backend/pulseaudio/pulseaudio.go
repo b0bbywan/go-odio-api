@@ -30,6 +30,7 @@ func New(ctx context.Context, cfg *config.PulseAudioConfig) (*PulseAudioBackend,
 		ctx:         ctx,
 		events:      make(chan events.Event, 32),
 	}
+	backend.processing = newProcessing(cfg.Processing, backend)
 
 	return backend, nil
 }
@@ -50,11 +51,18 @@ func (pa *PulseAudioBackend) start() error {
 	pa.kind = detectServerKind(pa.server)
 	logger.Debug("[pulseaudio] detected server: %s (type=%s)", pa.server.PackageName, pa.kind)
 
-	// Load the cache at startup
-	if _, err := pa.ListClients(); err != nil {
+	// Before the caches, which then see the sinks it adds, and the listener,
+	// which then doesn't get its own changes.
+	if pa.processing != nil {
+		changed := pa.processing.reconcile(pa.kind, pa.server.DefaultSinkName, interfaceAddrs(pa.processing.cfg.NetworkSink.Interfaces))
+		pa.notifyProcessing(changed)
+	}
+
+	// Reloaded even when cached: on a reconnect, the server may have restarted.
+	if err := pa.reloadClients(); err != nil {
 		return err
 	}
-	if _, err := pa.ListOutputs(); err != nil {
+	if err := pa.reloadOutputs(); err != nil {
 		return err
 	}
 
@@ -180,6 +188,24 @@ func (pa *PulseAudioBackend) refreshCache() ([]AudioClient, error) {
 	return updatedClients, nil
 }
 
+// reloadClients refreshes the client cache and emits what changed.
+func (pa *PulseAudioBackend) reloadClients() error {
+	old := pa.cache.Load()
+	clients, err := pa.refreshCache()
+	if err != nil {
+		return err
+	}
+	changed, removed := diffClients(old, clients)
+	logger.Debug("[pulseaudio] client diff: %d changed, %d removed", len(changed), len(removed))
+	if len(changed) > 0 {
+		pa.notify(events.Event{Type: events.TypeAudioUpdated, Data: changed})
+	}
+	if len(removed) > 0 {
+		pa.notify(events.Event{Type: events.TypeAudioRemoved, Data: removed})
+	}
+	return nil
+}
+
 func (pa *PulseAudioBackend) mergeClients(oldClients []AudioClient, sinks []*proto.GetSinkInputInfoReply) []AudioClient {
 	// temporary map for lookup by Name
 	oldMap := make(map[string]AudioClient, len(oldClients))
@@ -211,7 +237,8 @@ func (pa *PulseAudioBackend) updateOrAddClient(oldMap map[string]AudioClient, cl
 }
 
 func clientChanged(a, b AudioClient) bool {
-	return a.Volume != b.Volume ||
+	return a.ID != b.ID ||
+		a.Volume != b.Volume ||
 		a.Muted != b.Muted ||
 		a.Corked != b.Corked
 }
@@ -322,6 +349,13 @@ func (pa *PulseAudioBackend) closeConnections() {
 func (pa *PulseAudioBackend) Close() {
 	pa.closeConnections()
 	close(pa.events)
+}
+
+// notifyProcessing emits the processing features whose state changed.
+func (pa *PulseAudioBackend) notifyProcessing(changed []ProcessingFeature) {
+	if len(changed) > 0 {
+		pa.notify(events.Event{Type: events.TypeAudioProcessing, Data: changed})
+	}
 }
 
 func (pa *PulseAudioBackend) notify(e events.Event) {
@@ -622,6 +656,24 @@ func (pa *PulseAudioBackend) refreshOutputCache() ([]AudioOutput, error) {
 	return outputs, nil
 }
 
+// reloadOutputs refreshes the output cache and emits what changed.
+func (pa *PulseAudioBackend) reloadOutputs() error {
+	old := pa.outputCache.Load()
+	outputs, err := pa.refreshOutputCache()
+	if err != nil {
+		return err
+	}
+	changed, removed := diffOutputs(old, outputs)
+	logger.Debug("[pulseaudio] output diff: %d changed, %d removed", len(changed), len(removed))
+	if len(changed) > 0 {
+		pa.notify(events.Event{Type: events.TypeAudioOutputUpdated, Data: changed})
+	}
+	if len(removed) > 0 {
+		pa.notify(events.Event{Type: events.TypeAudioOutputRemoved, Data: removed})
+	}
+	return nil
+}
+
 func (pa *PulseAudioBackend) GetOutput(name string) (*AudioOutput, bool) {
 	outputs := pa.outputCache.Load()
 	if outputs == nil {
@@ -776,7 +828,8 @@ func diffOutputs(old, new []AudioOutput) (changed []AudioOutput, removed []Audio
 }
 
 func outputChanged(a, b AudioOutput) bool {
-	return a.Volume != b.Volume ||
+	return a.Index != b.Index ||
+		a.Volume != b.Volume ||
 		a.Muted != b.Muted ||
 		a.State != b.State ||
 		a.Default != b.Default

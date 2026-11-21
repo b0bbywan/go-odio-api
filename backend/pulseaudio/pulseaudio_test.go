@@ -312,6 +312,12 @@ func TestClientChanged(t *testing.T) {
 			},
 			expected: false,
 		},
+		{
+			name:     "new index after a server restart",
+			a:        AudioClient{ID: 12, Name: "client1", Volume: 0.5},
+			b:        AudioClient{ID: 3, Name: "client1", Volume: 0.5},
+			expected: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -357,12 +363,21 @@ func TestUpdateOrAddClient(t *testing.T) {
 			newClient: AudioClient{Name: "client1", Volume: 0.5, Muted: false},
 			expected:  AudioClient{Name: "client1", Volume: 0.5, Muted: false},
 		},
+		{
+			name: "take the new index after a server restart",
+			oldMap: map[string]AudioClient{
+				"client1": {ID: 12, Name: "client1", Volume: 0.5},
+			},
+			newClient: AudioClient{ID: 3, Name: "client1", Volume: 0.5},
+			expected:  AudioClient{ID: 3, Name: "client1", Volume: 0.5},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := pa.updateOrAddClient(tt.oldMap, tt.newClient)
-			if result.Name != tt.expected.Name ||
+			if result.ID != tt.expected.ID ||
+				result.Name != tt.expected.Name ||
 				result.Volume != tt.expected.Volume ||
 				result.Muted != tt.expected.Muted {
 				t.Errorf("updateOrAddClient() = %+v, want %+v", result, tt.expected)
@@ -407,6 +422,12 @@ func TestOutputChanged(t *testing.T) {
 			name:     "volume changed",
 			a:        AudioOutput{Volume: 0.5},
 			b:        AudioOutput{Volume: 0.8},
+			expected: true,
+		},
+		{
+			name:     "new index after a server restart",
+			a:        AudioOutput{Index: 4, Name: "mono"},
+			b:        AudioOutput{Index: 1, Name: "mono"},
 			expected: true,
 		},
 		{

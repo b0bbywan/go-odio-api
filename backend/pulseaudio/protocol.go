@@ -119,6 +119,16 @@ func (pa *PulseAudioBackend) setDefaultSink(name string) error {
 	return pa.request(&proto.SetDefaultSink{SinkName: name}, nil)
 }
 
+func (pa *PulseAudioBackend) loadModule(name, args string) (uint32, error) {
+	var reply proto.LoadModuleReply
+	err := pa.request(&proto.LoadModule{Name: name, Args: args}, &reply)
+	return reply.ModuleIndex, err
+}
+
+func (pa *PulseAudioBackend) unloadModule(index uint32) error {
+	return pa.request(&proto.UnloadModule{ModuleIndex: index}, nil)
+}
+
 // volumeOf reports the first channel's volume as a fraction of normal volume,
 // rounded to two decimals.
 func volumeOf(cv proto.ChannelVolumes) float32 {
