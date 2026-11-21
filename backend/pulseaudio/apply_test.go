@@ -179,6 +179,30 @@ func TestReconcile_LoadsMonoOnTheDefaultSink(t *testing.T) {
 	}
 }
 
+// Enabled alone, zeroconf discover is enough for odio to manage modules.
+func TestReconcile_LoadsZeroconfDiscoverAlone(t *testing.T) {
+	cfg := &config.ProcessingConfig{
+		Mono:             &config.MonoConfig{},
+		NetworkSink:      &config.NetworkSinkConfig{},
+		ZeroconfDiscover: &config.ZeroconfDiscoverConfig{Enabled: true, OnBoot: true},
+		LedgerFile:       ledgerPath(t),
+	}
+	srv := newFakeServer(hwSink)
+	p := newProcessing(cfg, srv)
+	if p == nil {
+		t.Fatal("newProcessing = nil, want zeroconf discover managed")
+	}
+
+	changed := reconcile(t, p, ServerPulse)
+
+	assertCalls(t, srv, "load module-zeroconf-discover ")
+	assertOwned(t, p, featureZeroconfDiscover, record{Index: 101, Name: "module-zeroconf-discover", Args: ""})
+	want := []ProcessingFeature{{Name: featureZeroconfDiscover, State: stateActive}}
+	if !reflect.DeepEqual(changed, want) {
+		t.Errorf("changed = %v, want %v", changed, want)
+	}
+}
+
 // odios scripts load their own modules: odio must not touch them, nor count
 // them as its own.
 func TestReconcile_IgnoresForeignModules(t *testing.T) {
