@@ -21,7 +21,15 @@ var templatesFS embed.FS
 var staticFS embed.FS
 
 func LoadTemplates() *template.Template {
+	var tmpl *template.Template
 	funcMap := template.FuncMap{
+		"icon": func(name string) (template.HTML, error) {
+			var buf bytes.Buffer
+			if err := tmpl.ExecuteTemplate(&buf, "icon-"+name, nil); err != nil {
+				return "", err
+			}
+			return template.HTML(buf.String()), nil
+		},
 		"mul": func(a, b float64) float64 {
 			return a * b
 		},
@@ -45,13 +53,13 @@ func LoadTemplates() *template.Template {
 		},
 	}
 	// Load all .gohtml templates recursively
-	tmpl := template.New("").Funcs(funcMap)
-	return template.Must(tmpl.ParseFS(templatesFS,
+	tmpl = template.Must(template.New("").Funcs(funcMap).ParseFS(templatesFS,
 		"templates/base.gohtml",
 		"templates/pages/*.gohtml",
 		"templates/sections/*.gohtml",
 		"templates/components/*.gohtml",
 	))
+	return tmpl
 }
 
 // Handler manages UI routes and rendering

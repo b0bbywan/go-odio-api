@@ -222,6 +222,22 @@ type ProcessingFeature struct {
 	Error string `json:"error,omitempty"`
 }
 
+var processingMeta = map[string]struct{ label, icon string }{
+	"mono":         {"Mono downmix", "mono"},
+	"network_sink": {"Network audio sink", "share"},
+}
+
+func (f ProcessingFeature) Label() string {
+	if m, ok := processingMeta[f.Name]; ok {
+		return m.label
+	}
+	return f.Name
+}
+
+func (f ProcessingFeature) Icon() string {
+	return processingMeta[f.Name].icon
+}
+
 // AudioData holds the combined audio state from GET /audio
 type AudioData struct {
 	Kind        string       // "pulseaudio" or "pipewire"
