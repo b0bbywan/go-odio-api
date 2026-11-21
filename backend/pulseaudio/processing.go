@@ -12,8 +12,9 @@ import (
 type featureName string
 
 const (
-	featureMono        featureName = "mono"
-	featureNetworkSink featureName = "network_sink"
+	featureMono             featureName = "mono"
+	featureNetworkSink      featureName = "network_sink"
+	featureZeroconfDiscover featureName = "zeroconf_discover"
 )
 
 var (
@@ -52,6 +53,9 @@ func buildFeatures(cfg *config.ProcessingConfig, kind AudioServerKind, addrs []n
 	}
 	if cfg.NetworkSink.Enabled {
 		features = append(features, networkSinkFeature(cfg.NetworkSink, kind, addrs))
+	}
+	if cfg.ZeroconfDiscover.Enabled {
+		features = append(features, zeroconfDiscoverFeature(cfg.ZeroconfDiscover))
 	}
 	return features
 }
@@ -99,4 +103,12 @@ func networkSinkFeature(cfg *config.NetworkSinkConfig, kind AudioServerKind, add
 		{name: "module-zeroconf-publish", args: map[string]string{}, optional: true},
 	}
 	return f
+}
+
+func zeroconfDiscoverFeature(cfg *config.ZeroconfDiscoverConfig) feature {
+	return feature{
+		name:    featureZeroconfDiscover,
+		onBoot:  cfg.OnBoot,
+		modules: []moduleSpec{{name: "module-zeroconf-discover", args: map[string]string{}}},
+	}
 }
