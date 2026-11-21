@@ -1,6 +1,7 @@
 package pulseaudio
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"slices"
@@ -66,14 +67,47 @@ func (p *processing) reconcile(kind AudioServerKind, defaultSink string, addrs [
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	loaded, err := p.srv.modules()
+	changed, err := p.reconcileLocked(buildFeatures(p.cfg, kind, addrs), defaultSink)
 	if err != nil {
 		logger.Warn("[pulseaudio] processing: listing modules: %v", err)
-		return nil
 	}
-	p.ledger.prune(loaded)
+	return changed
+}
+
+// set turns name on or off, reconciles and returns the features whose state
+// changed; it fails if name ends in error.
+func (p *processing) set(name featureName, enabled bool, kind AudioServerKind, defaultSink string, addrs []net.Addr) ([]ProcessingFeature, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 
 	features := buildFeatures(p.cfg, kind, addrs)
+	if !slices.ContainsFunc(features, func(f feature) bool { return f.name == name }) {
+		return nil, &NotFoundError{Resource: "processing feature", Name: string(name)}
+	}
+	e := p.ledger.entry(name, enabled)
+	prev := e.Loaded
+	e.Loaded = enabled
+	changed, err := p.reconcileLocked(features, defaultSink)
+	if err != nil {
+		e.Loaded = prev
+		return nil, err
+	}
+
+	for _, st := range p.state.Load() {
+		if st.Name == name && st.State == stateError {
+			return changed, errors.New(st.Error)
+		}
+	}
+	return changed, nil
+}
+
+// reconcileLocked applies features; p.mu is held.
+func (p *processing) reconcileLocked(features []feature, defaultSink string) ([]ProcessingFeature, error) {
+	loaded, err := p.srv.modules()
+	if err != nil {
+		return nil, err
+	}
+	p.ledger.prune(loaded)
 	p.dropOrphans(features, defaultSink)
 
 	next := make([]ProcessingFeature, 0, len(features))
@@ -82,7 +116,7 @@ func (p *processing) reconcile(kind AudioServerKind, defaultSink string, addrs [
 	}
 	p.features = features
 	p.ledger.save()
-	return p.store(next)
+	return p.store(next), nil
 }
 
 // dropOrphans unloads the modules of features no longer in the config.
