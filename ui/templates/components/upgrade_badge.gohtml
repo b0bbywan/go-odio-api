@@ -8,7 +8,6 @@
 {{- $base := "inline-flex items-center rounded-full p-1.5 [&_svg]:h-4 [&_svg]:w-4" -}}
 {{- if .Running -}}
 	<span class="{{ $base }} bg-green-500/10 text-green-400"
-	      title="Upgrading…{{ with .Run.Step }} {{ . }}{{ end }}"
 	      sse-swap="upgrade-progress" hx-swap="innerHTML">
 		{{ template "upgrade-ring" .Run }}
 	</span>
