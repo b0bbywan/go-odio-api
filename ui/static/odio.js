@@ -346,11 +346,12 @@ document.addEventListener('click', function(e) {
 // Preserve <details> open/closed state across SSE innerHTML swaps.
 // Capture state in sseBeforeMessage (fires before swap), restore in afterSwap.
 var detailsState = {};
-document.addEventListener('htmx:sseBeforeMessage', function(e) {
+function captureDetailsState() {
 	document.querySelectorAll('details[id]').forEach(function(d) {
 		detailsState[d.id] = d.open;
 	});
-});
+}
+document.addEventListener('htmx:sseBeforeMessage', captureDetailsState);
 document.addEventListener('htmx:afterSwap', function(e) {
 	// A request with hx-swap="none" fires afterSwap too, on its own element;
 	// restoring then would replay the state captured before the last message.
@@ -360,6 +361,23 @@ document.addEventListener('htmx:afterSwap', function(e) {
 		if (el && el.open !== detailsState[id]) {
 			el.open = detailsState[id];
 		}
+	});
+});
+
+// SSE only streams changes: after a reconnect (odio-api restart), re-fetch each
+// section so what was pushed while disconnected isn't lost.
+var sseDropped = false;
+document.addEventListener('htmx:sseError', function() { sseDropped = true; });
+document.addEventListener('htmx:sseOpen', function() {
+	if (!sseDropped) return;
+	sseDropped = false;
+	captureDetailsState();
+	document.querySelectorAll('[sse-swap^="section-"]').forEach(function(el) {
+		const name = el.getAttribute('sse-swap').slice('section-'.length);
+		if (name === 'power') return; // no /ui/sections/power route
+		if (el.querySelector('.sink-dropdown ul:not(.hidden)')) return; // same guard as SSE swaps
+		// source=el so afterSwap sees an sse-swap element and restores <details>.
+		htmx.ajax('GET', '/ui/sections/' + name, {source: el, target: el, swap: 'innerHTML'});
 	});
 });
 
