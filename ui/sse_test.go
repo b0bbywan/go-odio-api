@@ -65,6 +65,30 @@ func TestSSEEvents_ContentType(t *testing.T) {
 	}
 }
 
+// The response must reach the client before any event, or EventSource's open
+// (which drives the reconnect re-fetch) waits for the next event.
+func TestSSEEvents_HeadersFlushedBeforeAnyEvent(t *testing.T) {
+	upstream := make(chan events.Event)
+	b := backend.NewBroadcaster(context.Background(), upstream)
+	server := httptest.NewServer(http.HandlerFunc(newTestHandler(b).SSEEvents))
+	defer server.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, server.URL, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("no response before any event: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected status 200, got %d", resp.StatusCode)
+	}
+}
+
 // player.position events are intentionally NOT mapped to a section refresh:
 // the seeker is interpolated client-side, so re-rendering on every heartbeat
 // tick (5s) would just make the card flicker.
