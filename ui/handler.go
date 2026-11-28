@@ -387,6 +387,9 @@ func (h *Handler) SSEEvents(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
 	w.Header().Set("X-Accel-Buffering", "no")
+	// Send headers now so EventSource opens (and re-fetches) without waiting for an event.
+	w.WriteHeader(http.StatusOK)
+	flusher.Flush()
 
 	ch := h.broadcaster.Subscribe()
 	defer h.broadcaster.Unsubscribe(ch)
