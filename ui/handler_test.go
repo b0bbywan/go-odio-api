@@ -389,6 +389,22 @@ func TestUpgradeBadgeRunning(t *testing.T) {
 	if !strings.Contains(noPct, "spinner") || strings.Contains(noPct, "upgrade-ring-fill") {
 		t.Errorf("running without percent should be a spinner, got: %s", noPct)
 	}
+
+	// The tooltip rides in the ring fragment upgrade-progress swaps in, so the step stays current.
+	renderRing := func(run *UpgradeRun) string {
+		t.Helper()
+		var buf bytes.Buffer
+		if err := tmpl.ExecuteTemplate(&buf, "upgrade-ring", run); err != nil {
+			t.Fatalf("execute upgrade-ring: %v", err)
+		}
+		return buf.String()
+	}
+	if ring := renderRing(&UpgradeRun{State: "running", Percent: &pct, Step: "finalize"}); !strings.Contains(ring, "<title>Upgrading… finalize</title>") {
+		t.Errorf("ring should carry the step tooltip, got: %s", ring)
+	}
+	if spin := renderRing(&UpgradeRun{State: "running", Step: "setup"}); !strings.Contains(spin, `title="Upgrading… setup"`) {
+		t.Errorf("spinner should carry the step tooltip, got: %s", spin)
+	}
 }
 
 func TestUpgradeBadgeFailed(t *testing.T) {
