@@ -55,14 +55,17 @@
 <span class="hidden group-hover:inline-flex">{{ template "icon-arrow-up" }}</span>
 {{- end }}
 
-{{/* Progress ring; data is *ui.UpgradeRun (may be nil). Spinner until a percent is streamed. */}}
+{{/* Progress ring; data is *ui.UpgradeRun (may be nil). Spinner until a percent is streamed.
+	The tooltip lives here, not on the badge: upgrade-progress only swaps this fragment. */}}
 {{ define "upgrade-ring" }}
+{{- $tip := "Upgrading…" }}{{ with . }}{{ with .Step }}{{ $tip = printf "Upgrading… %s" . }}{{ end }}{{ end -}}
 {{- if .HasPercent -}}
 <svg class="upgrade-ring" viewBox="0 0 36 36">
+	<title>{{ $tip }}</title>
 	<circle class="upgrade-ring-track" cx="18" cy="18" r="15.915"/>
 	<circle class="upgrade-ring-fill" cx="18" cy="18" r="15.915" stroke-dashoffset="{{ .RingOffset }}"/>
 </svg>
 {{- else -}}
-<span class="spinner"></span>
+<span class="spinner" title="{{ $tip }}"></span>
 {{- end -}}
 {{ end }}
